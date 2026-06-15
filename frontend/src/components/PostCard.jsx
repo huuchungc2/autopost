@@ -1,4 +1,5 @@
 import Badge from './ui/Badge';
+import { formatDateTime } from '../utils/date';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:3001';
 
@@ -29,7 +30,7 @@ export default function PostCard({ post, pageName, onEdit, onPublish, onApprove,
         </div>
         <h4>{post.topic || `Post #${post.id}`}</h4>
         <p>{post.content?.slice(0, 120)}{post.content?.length > 120 ? '...' : ''}</p>
-        {post.scheduled_at && <small>Scheduled: {new Date(post.scheduled_at).toLocaleString()}</small>}
+        {post.scheduled_at && <small>Lên lịch: {formatDateTime(post.scheduled_at)}</small>}
         <div className="post-card-actions">
           <button type="button" className="btn-link" onClick={() => onEdit?.(post)}>Edit</button>
           {post.status === 'draft' && <button type="button" className="btn-link" onClick={() => onPublish?.(post.id)}>Publish</button>}

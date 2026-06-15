@@ -56,6 +56,10 @@ cd d:\project\AutoPost\frontend
 npm run dev
 ```
 
+## Deploy VPS
+
+Xem [DEPLOY.md](./DEPLOY.md) — hướng dẫn deploy production (Nginx, PM2, MySQL, SSL).
+
 ## Lưu ý
 
 - Backend chạy trên `http://localhost:3001`

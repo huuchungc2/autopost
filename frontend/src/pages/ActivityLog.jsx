@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../services/api';
+import { formatDateTime } from '../utils/date';
 
 export default function ActivityLog() {
   const [logs, setLogs] = useState([]);
@@ -39,7 +40,7 @@ export default function ActivityLog() {
             <tbody>
               {logs.map((log) => (
                 <tr key={log.id}>
-                  <td>{new Date(log.created_at).toLocaleString()}</td>
+                  <td>{formatDateTime(log.created_at)}</td>
                   <td>{log.user_id || 'System'}</td>
                   <td>{log.action}</td>
                   <td>{log.target_type || 'N/A'}{log.target_id ? ` #${log.target_id}` : ''}</td>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../services/api';
+import { formatDateTime } from '../utils/date';
 import useNotifications from '../hooks/useNotifications';
 import { useToast } from '../context/ToastContext';
 
@@ -69,7 +70,7 @@ export default function Settings() {
             <tbody>
               {notifications.map((item) => (
                 <tr key={item.id} className={item.is_read ? 'row-read' : ''}>
-                  <td>{new Date(item.created_at).toLocaleString()}</td>
+                  <td>{formatDateTime(item.created_at)}</td>
                   <td>{item.type}</td>
                   <td>{item.title}</td>
                   <td>{item.message}</td>

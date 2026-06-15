@@ -10,6 +10,8 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0,
   decimalNumbers: true,
+  dateStrings: ['DATE', 'DATETIME', 'TIMESTAMP'],
+  timezone: '+07:00',
 });
 
 export async function query(sql, params = []) {

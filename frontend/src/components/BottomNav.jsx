@@ -1,24 +1,48 @@
 import { NavLink } from 'react-router-dom';
+import { LayoutDashboard, FileText, Sparkles, Menu } from 'lucide-react';
+import { isSecondaryRoute } from '../config/navConfig';
 
-const allItems = [
-  { to: '/', label: 'Home', icon: '🏠', roles: ['super_admin', 'admin', 'editor'] },
-  { to: '/posts', label: 'Posts', icon: '📝', roles: ['super_admin', 'admin', 'editor'] },
-  { to: '/generate', label: 'Generate', icon: '✨', roles: ['super_admin', 'admin', 'editor'] },
-  { to: '/pages', label: 'Pages', icon: '📄', roles: ['super_admin', 'admin'] },
-  { to: '/settings', label: 'More', icon: '⚙️', roles: ['super_admin', 'admin', 'editor'] },
+const tabItems = [
+  { to: '/', label: 'Home', icon: LayoutDashboard, end: true },
+  { to: '/posts', label: 'Posts', icon: FileText },
+  { to: '/generate', label: 'Tạo bài', icon: Sparkles, primary: true },
 ];
 
-export default function BottomNav({ role = 'editor' }) {
-  const items = allItems.filter((item) => item.roles.includes(role));
+export default function BottomNav({ role, pathname, menuOpen, onMenuOpen }) {
+  const menuActive = menuOpen || isSecondaryRoute(pathname);
 
   return (
-    <nav className="bottom-nav">
-      {items.map((item) => (
-        <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => (isActive ? 'bottom-nav-link active' : 'bottom-nav-link')}>
-          <span>{item.icon}</span>
-          <span>{item.label}</span>
-        </NavLink>
-      ))}
+    <nav className="bottom-nav" aria-label="Điều hướng chính">
+      {tabItems.map((item) => {
+        const Icon = item.icon;
+        return (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) =>
+              `bottom-nav-link${item.primary ? ' bottom-nav-link--primary' : ''}${isActive ? ' active' : ''}`
+            }
+          >
+            <span className="bottom-nav-icon">
+              <Icon size={item.primary ? 22 : 20} strokeWidth={2} />
+            </span>
+            <span>{item.label}</span>
+          </NavLink>
+        );
+      })}
+      <button
+        type="button"
+        className={`bottom-nav-link bottom-nav-link--menu${menuActive ? ' active' : ''}`}
+        onClick={onMenuOpen}
+        aria-label="Mở menu"
+        aria-expanded={menuOpen}
+      >
+        <span className="bottom-nav-icon">
+          <Menu size={20} strokeWidth={2} />
+        </span>
+        <span>Menu</span>
+      </button>
     </nav>
   );
 }

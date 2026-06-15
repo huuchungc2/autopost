@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { fromDatetimeLocalInput } from '../utils/date';
 import api from '../services/api';
 import VideoUpload from '../components/VideoUpload';
 import FacebookPreview from '../components/FacebookPreview';
 import { useToast } from '../context/ToastContext';
 
 export default function Generate() {
+  const navigate = useNavigate();
   const [pages, setPages] = useState([]);
   const [tab, setTab] = useState('text');
   const [pageId, setPageId] = useState('');
@@ -31,7 +34,7 @@ export default function Generate() {
       const response = await api.post('/posts/generate', {
         page_id: Number(pageId),
         topic,
-        scheduled_at: scheduledAt || null,
+        scheduled_at: fromDatetimeLocalInput(scheduledAt),
       });
       setPreview(response.data);
       showToast(`Generated post #${response.data.id}`, 'success');
@@ -55,7 +58,7 @@ export default function Generate() {
         page_id: Number(pageId),
         caption,
         video_url: videoUrl,
-        scheduled_at: scheduledAt || null,
+        scheduled_at: fromDatetimeLocalInput(scheduledAt),
       });
       setPreview({ ...response.data, content: caption, media_type: 'video', video_url: videoUrl });
       showToast(`Video post #${response.data.id} created`, 'success');
@@ -74,15 +77,25 @@ export default function Generate() {
       <div className="page-header">
         <div>
           <h1>Generate Post</h1>
-          <p>Create AI text+image posts or upload video posts.</p>
+          <p>Tạo bài bằng AI, upload video, hoặc viết tay.</p>
         </div>
       </div>
 
       <div className="tabs">
-        <button type="button" className={tab === 'text' ? 'tab active' : 'tab'} onClick={() => setTab('text')}>Text + Image</button>
+        <button type="button" className={tab === 'text' ? 'tab active' : 'tab'} onClick={() => setTab('text')}>AI Text + Image</button>
         <button type="button" className={tab === 'video' ? 'tab active' : 'tab'} onClick={() => setTab('video')}>Video</button>
+        <button type="button" className={tab === 'manual' ? 'tab active' : 'tab'} onClick={() => setTab('manual')}>Viết tay</button>
       </div>
 
+      {tab === 'manual' ? (
+        <div className="card manual-post-cta">
+          <h3>Viết bài thủ công</h3>
+          <p>Tự nhập nội dung, chọn ảnh/video, lên lịch hoặc lưu draft — không qua AI.</p>
+          <button type="button" className="btn btn-primary" onClick={() => navigate('/posts?action=create')}>
+            Mở trình viết bài
+          </button>
+        </div>
+      ) : (
       <div className="generate-layout">
         <div className="card form-card">
           <label>
@@ -124,6 +137,7 @@ export default function Generate() {
           />
         </div>
       </div>
+      )}
     </div>
   );
 }

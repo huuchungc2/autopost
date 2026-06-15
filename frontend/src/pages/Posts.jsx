@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { PenLine } from 'lucide-react';
 import api from '../services/api';
+import { formatDateTime } from '../utils/date';
 import PostCard from '../components/PostCard';
-import Modal from '../components/ui/Modal';
-import FacebookPreview from '../components/FacebookPreview';
+import PostEditorModal from '../components/PostEditorModal';
 import Skeleton from '../components/ui/Skeleton';
 import { useToast } from '../context/ToastContext';
 
@@ -12,7 +13,8 @@ export default function Posts() {
   const [pages, setPages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('grid');
-  const [editPost, setEditPost] = useState(null);
+  const [editorPost, setEditorPost] = useState(null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const { showToast } = useToast();
 
@@ -44,6 +46,15 @@ export default function Posts() {
     loadPosts();
   }, [searchParams]);
 
+  useEffect(() => {
+    if (searchParams.get('action') === 'create') {
+      openCreate();
+      const next = new URLSearchParams(searchParams);
+      next.delete('action');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams]);
+
   const setFilter = (key, value) => {
     const next = new URLSearchParams(searchParams);
     if (value) next.set(key, value);
@@ -52,7 +63,30 @@ export default function Posts() {
   };
 
   const pageNameById = (id) => pages.find((p) => p.id === id)?.name || id;
-  const pageById = (id) => pages.find((p) => p.id === id);
+
+  const openCreate = () => {
+    setEditorPost(null);
+    setEditorOpen(true);
+  };
+
+  const openEdit = (post) => {
+    setEditorPost(post);
+    setEditorOpen(true);
+  };
+
+  const closeEditor = () => {
+    setEditorOpen(false);
+    setEditorPost(null);
+  };
+
+  const handleSaved = () => {
+    showToast(editorPost?.id ? 'Đã cập nhật bài viết' : 'Đã tạo bài viết', 'success');
+    loadPosts();
+  };
+
+  const handleEditorError = (message) => {
+    showToast(message, 'error');
+  };
 
   const handlePublish = async (postId) => {
     try {
@@ -85,25 +119,18 @@ export default function Posts() {
     }
   };
 
-  const saveEdit = async () => {
-    try {
-      await api.put(`/posts/${editPost.id}`, editPost);
-      showToast('Post updated', 'success');
-      setEditPost(null);
-      loadPosts();
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Update failed', 'error');
-    }
-  };
-
   return (
     <div className="page-shell">
       <div className="page-header">
         <div>
           <h1>Posts</h1>
-          <p>Manage generated content for Facebook pages.</p>
+          <p>Quản lý bài đăng — tạo tay, sửa, duyệt và đăng lên Facebook.</p>
         </div>
         <div className="header-actions">
+          <button type="button" className="btn btn-primary post-create-btn" onClick={openCreate}>
+            <PenLine size={16} />
+            Viết bài tay
+          </button>
           <button type="button" className={`btn btn-secondary ${view === 'grid' ? 'active' : ''}`} onClick={() => setView('grid')}>Grid</button>
           <button type="button" className={`btn btn-secondary ${view === 'table' ? 'active' : ''}`} onClick={() => setView('table')}>Table</button>
         </div>
@@ -138,7 +165,7 @@ export default function Posts() {
               key={post.id}
               post={post}
               pageName={pageNameById(post.page_id)}
-              onEdit={setEditPost}
+              onEdit={openEdit}
               onPublish={handlePublish}
               onApprove={handleApprove}
               onDelete={handleDelete}
@@ -158,9 +185,9 @@ export default function Posts() {
                   <td>{pageNameById(post.page_id)}</td>
                   <td>{post.status}</td>
                   <td>{post.media_type}</td>
-                  <td>{post.scheduled_at ? new Date(post.scheduled_at).toLocaleString() : '-'}</td>
+                  <td>{post.scheduled_at ? formatDateTime(post.scheduled_at) : '-'}</td>
                   <td>
-                    <button type="button" className="btn-link" onClick={() => setEditPost(post)}>Edit</button>
+                    <button type="button" className="btn-link" onClick={() => openEdit(post)}>Edit</button>
                     {post.status === 'draft' && <button type="button" className="btn-link" onClick={() => handlePublish(post.id)}>Publish</button>}
                     {post.status === 'pending_approval' && <button type="button" className="btn-link" onClick={() => handleApprove(post.id)}>Approve</button>}
                     <button type="button" className="btn-link" onClick={() => handleDelete(post.id)}>Delete</button>
@@ -172,19 +199,14 @@ export default function Posts() {
         </div>
       )}
 
-      <Modal open={!!editPost} title="Edit post" onClose={() => setEditPost(null)} wide>
-        {editPost && (
-          <div className="edit-post-layout">
-            <div>
-              <label>Topic<input value={editPost.topic || ''} onChange={(e) => setEditPost({ ...editPost, topic: e.target.value })} /></label>
-              <label>Content<textarea rows={6} value={editPost.content || ''} onChange={(e) => setEditPost({ ...editPost, content: e.target.value })} /></label>
-              <label>Scheduled<input type="datetime-local" value={editPost.scheduled_at?.slice(0, 16) || ''} onChange={(e) => setEditPost({ ...editPost, scheduled_at: e.target.value })} /></label>
-              <button type="button" className="btn btn-primary" onClick={saveEdit}>Save</button>
-            </div>
-            <FacebookPreview post={editPost} pageName={pageNameById(editPost.page_id)} avatarUrl={pageById(editPost.page_id)?.avatar_url} />
-          </div>
-        )}
-      </Modal>
+      <PostEditorModal
+        open={editorOpen}
+        post={editorPost}
+        pages={pages}
+        onClose={closeEditor}
+        onSaved={handleSaved}
+        onError={handleEditorError}
+      />
     </div>
   );
 }

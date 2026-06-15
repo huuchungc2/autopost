@@ -10,11 +10,12 @@
   --bg-border: #E4E9F2;
   --bg-border-strong: #CBD5E1;
   --sidebar-bg: #1E1B4B;
-  --sidebar-item-hover: #2D2A6E;
-  --sidebar-item-active: #3730A3;
-  --sidebar-text: #A5B4FC;
+  --sidebar-item-hover: rgba(255, 255, 255, 0.08);
+  --sidebar-item-active: rgba(255, 255, 255, 0.16);
+  --sidebar-text: rgba(255, 255, 255, 0.62);
   --sidebar-text-active: #FFFFFF;
-  --sidebar-border: #2D2A6E;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-accent: var(--color-primary-light);
   --text-primary: #1E1B4B;
   --text-secondary: #64748B;
   --text-tertiary: #94A3B8;

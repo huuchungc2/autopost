@@ -108,6 +108,55 @@ router.post('/generate-batch', asyncHandler(async (req, res) => {
   res.status(201).json({ batch_id: batchId, count: jobs.length });
 }));
 
+router.post('/', asyncHandler(async (req, res) => {
+  const {
+    page_id,
+    topic,
+    content,
+    image_url,
+    video_url,
+    video_thumb_url,
+    media_type,
+    scheduled_at,
+    status,
+  } = req.body;
+
+  if (!page_id || !content?.trim()) {
+    return res.status(400).json({ error: 'page_id and content are required' });
+  }
+  await assertPageAccess(req.user, page_id);
+
+  const resolvedMediaType = media_type || (video_url ? 'video' : image_url ? 'image' : 'none');
+  let resolvedStatus = status || 'draft';
+  if (scheduled_at) resolvedStatus = 'scheduled';
+  if (!['draft', 'pending_approval', 'scheduled'].includes(resolvedStatus)) {
+    resolvedStatus = scheduled_at ? 'scheduled' : 'draft';
+  }
+
+  const result = await query(
+    'INSERT INTO posts (page_id, topic, content, image_url, video_url, video_thumb_url, media_type, status, scheduled_at, created_by_type, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
+    [
+      page_id,
+      topic || '',
+      content,
+      image_url || null,
+      video_url || null,
+      video_thumb_url || null,
+      resolvedMediaType,
+      resolvedStatus,
+      scheduled_at || null,
+      'manual',
+      req.user.id,
+    ]
+  );
+
+  const posts = await query(
+    'SELECT posts.*, fb_pages.name AS page_name FROM posts JOIN fb_pages ON fb_pages.id = posts.page_id WHERE posts.id = ?',
+    [result.insertId]
+  );
+  res.status(201).json(posts[0]);
+}));
+
 router.post('/:id/publish', asyncHandler(async (req, res) => {
   const post = await assertPostAccess(req.user, req.params.id);
 
@@ -153,10 +202,10 @@ router.post('/:id/approve', asyncHandler(async (req, res) => {
 
 router.put('/:id', asyncHandler(async (req, res) => {
   await assertPostAccess(req.user, req.params.id);
-  const { topic, content, image_url, video_url, video_thumb_url, scheduled_at, status } = req.body;
+  const { topic, content, image_url, video_url, video_thumb_url, media_type, scheduled_at, status } = req.body;
   await query(
-    'UPDATE posts SET topic = ?, content = ?, image_url = ?, video_url = ?, video_thumb_url = ?, scheduled_at = ?, status = ? WHERE id = ?',
-    [topic, content, image_url, video_url, video_thumb_url, scheduled_at, status, req.params.id]
+    'UPDATE posts SET topic = ?, content = ?, image_url = ?, video_url = ?, video_thumb_url = ?, media_type = ?, scheduled_at = ?, status = ? WHERE id = ?',
+    [topic, content, image_url, video_url, video_thumb_url, media_type, scheduled_at, status, req.params.id]
   );
   res.json({ message: 'Post updated' });
 }));

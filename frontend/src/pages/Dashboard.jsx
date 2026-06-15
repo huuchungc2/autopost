@@ -4,6 +4,7 @@ import Calendar from '../components/Calendar';
 import Badge from '../components/ui/Badge';
 import Skeleton from '../components/ui/Skeleton';
 import { useNavigate } from 'react-router-dom';
+import { compareApiDates, formatDateTime } from '../utils/date';
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
@@ -41,7 +42,7 @@ export default function Dashboard() {
 
   const upcoming = posts
     .filter((p) => p.scheduled_at && p.status === 'scheduled')
-    .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))
+    .sort((a, b) => compareApiDates(a.scheduled_at, b.scheduled_at))
     .slice(0, 5);
 
   if (!stats) {
@@ -79,13 +80,17 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
-        <Calendar posts={posts} onSelectDate={(date) => { setFilterDate(date); navigate(`/posts?date=${date}`); }} />
+        <Calendar
+          posts={posts}
+          selectedDate={filterDate}
+          onSelectDate={(date) => { setFilterDate(date); navigate(`/posts?date=${date}`); }}
+        />
       </div>
 
       <div className="card" style={{ marginTop: 24 }}>
         <div className="page-header" style={{ padding: 0, marginBottom: 16 }}>
           <h3>Upcoming scheduled</h3>
-          {filterDate && <small>Filter: {filterDate}</small>}
+          {filterDate && <small>Lọc: {filterDate.split('-').reverse().join('/')}</small>}
         </div>
         <div className="table-wrapper">
           <table className="table">
@@ -98,7 +103,7 @@ export default function Dashboard() {
                   <td>{post.id}</td>
                   <td>{post.topic}</td>
                   <td><Badge status={post.status}>{post.status}</Badge></td>
-                  <td>{new Date(post.scheduled_at).toLocaleString()}</td>
+                  <td>{formatDateTime(post.scheduled_at)}</td>
                 </tr>
               ))}
               {!upcoming.length && (
