@@ -1,0 +1,65 @@
+import { query } from '../db.js';
+
+export function isSuperAdmin(user) {
+  return user?.role === 'super_admin';
+}
+
+export async function getAssignedPageIds(userId) {
+  const rows = await query('SELECT page_id FROM user_pages WHERE user_id = ?', [userId]);
+  return rows.map((row) => row.page_id);
+}
+
+/** null = all pages (super_admin); [] = none */
+export async function getAccessiblePageIds(user) {
+  if (isSuperAdmin(user)) return null;
+  return getAssignedPageIds(user.id);
+}
+
+export async function assertPageAccess(user, pageId) {
+  if (isSuperAdmin(user)) return;
+  const ids = await getAssignedPageIds(user.id);
+  if (!ids.includes(Number(pageId))) {
+    const error = new Error('Forbidden: no access to this page');
+    error.status = 403;
+    throw error;
+  }
+}
+
+export async function assertPostAccess(user, postId) {
+  const rows = await query('SELECT page_id FROM posts WHERE id = ?', [postId]);
+  const post = rows[0];
+  if (!post) {
+    const error = new Error('Post not found');
+    error.status = 404;
+    throw error;
+  }
+  await assertPageAccess(user, post.page_id);
+  return post;
+}
+
+export function pageIdInClause(accessibleIds, column = 'id') {
+  if (accessibleIds === null) return { clause: '', params: [] };
+  if (!accessibleIds.length) return { clause: ' AND 1=0', params: [] };
+  const placeholders = accessibleIds.map(() => '?').join(', ');
+  return { clause: ` AND ${column} IN (${placeholders})`, params: accessibleIds };
+}
+
+export async function setUserPages(userId, pageIds) {
+  await query('DELETE FROM user_pages WHERE user_id = ?', [userId]);
+  const unique = [...new Set(pageIds.map(Number).filter(Boolean))];
+  for (const pageId of unique) {
+    await query('INSERT INTO user_pages (user_id, page_id) VALUES (?, ?)', [userId, pageId]);
+  }
+  return unique;
+}
+
+export async function getUserPages(userId) {
+  return query(
+    `SELECT fp.id, fp.name, fp.page_id, fp.token_status, fp.is_active
+     FROM user_pages up
+     JOIN fb_pages fp ON fp.id = up.page_id
+     WHERE up.user_id = ?
+     ORDER BY fp.name ASC`,
+    [userId]
+  );
+}

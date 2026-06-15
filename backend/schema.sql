@@ -1,0 +1,158 @@
+-- AutoPost PRD v2.1 database schema
+
+CREATE TABLE IF NOT EXISTS users (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  role ENUM('super_admin', 'admin', 'editor') DEFAULT 'editor',
+  is_active BOOLEAN DEFAULT true,
+  must_change_password BOOLEAN DEFAULT false,
+  last_login TIMESTAMP NULL,
+  created_by INT NULL,
+  deleted_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS ai_providers (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(100) NOT NULL,
+  type ENUM('text', 'image', 'video') NOT NULL,
+  api_key TEXT NOT NULL,
+  model VARCHAR(100),
+  is_active BOOLEAN DEFAULT true,
+  user_id INT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS skills (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  system_prompt LONGTEXT NOT NULL,
+  created_by INT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS fb_pages (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  page_id VARCHAR(100) UNIQUE NOT NULL,
+  page_token TEXT NOT NULL,
+  token_expires_at DATETIME NULL,
+  token_status ENUM('valid','expiring','expired') DEFAULT 'valid',
+  avatar_url TEXT,
+  skill_id INT NULL,
+  text_provider_id INT NULL,
+  image_provider_id INT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (skill_id) REFERENCES skills(id),
+  FOREIGN KEY (text_provider_id) REFERENCES ai_providers(id),
+  FOREIGN KEY (image_provider_id) REFERENCES ai_providers(id)
+);
+
+CREATE TABLE IF NOT EXISTS content_topics (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  page_id INT NOT NULL,
+  day_of_week TINYINT NOT NULL,
+  topic VARCHAR(500) NOT NULL,
+  post_time TIME DEFAULT '08:00:00',
+  is_active BOOLEAN DEFAULT true,
+  FOREIGN KEY (page_id) REFERENCES fb_pages(id)
+);
+
+CREATE TABLE IF NOT EXISTS posts (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  page_id INT NOT NULL,
+  topic VARCHAR(500),
+  content LONGTEXT NOT NULL,
+  image_url TEXT,
+  image_prompt TEXT,
+  video_url TEXT,
+  video_thumb_url TEXT,
+  media_type ENUM('none','image','video') DEFAULT 'none',
+  status ENUM('draft','pending_approval','scheduled','published','failed') DEFAULT 'draft',
+  scheduled_at DATETIME NULL,
+  published_at DATETIME NULL,
+  fb_post_id VARCHAR(100),
+  error_message TEXT,
+  created_by_type ENUM('auto','manual') DEFAULT 'auto',
+  created_by INT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (page_id) REFERENCES fb_pages(id),
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS generate_jobs (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  batch_id VARCHAR(36) NOT NULL,
+  page_id INT NOT NULL,
+  topic VARCHAR(500),
+  scheduled_date DATE,
+  scheduled_time TIME,
+  status ENUM('pending','processing','done','failed') DEFAULT 'pending',
+  post_id INT NULL,
+  error_message TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  processed_at TIMESTAMP NULL,
+  FOREIGN KEY (page_id) REFERENCES fb_pages(id),
+  FOREIGN KEY (post_id) REFERENCES posts(id)
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NULL,
+  type ENUM('error','warning','info','success') NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  message TEXT,
+  is_read BOOLEAN DEFAULT false,
+  related_type VARCHAR(50),
+  related_id INT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS activity_logs (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NULL,
+  action VARCHAR(100) NOT NULL,
+  target_type VARCHAR(50),
+  target_id INT,
+  detail JSON,
+  ip_address VARCHAR(45),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS content_templates (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  category VARCHAR(100),
+  prompt_template TEXT NOT NULL,
+  variables JSON,
+  created_by INT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS user_pages (
+  user_id INT NOT NULL,
+  page_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, page_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (page_id) REFERENCES fb_pages(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS user_providers (
+  user_id INT NOT NULL,
+  provider_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, provider_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (provider_id) REFERENCES ai_providers(id) ON DELETE CASCADE
+);
