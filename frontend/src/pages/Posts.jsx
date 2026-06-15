@@ -62,7 +62,7 @@ export default function Posts() {
     setSearchParams(next);
   };
 
-  const pageNameById = (id) => pages.find((p) => p.id === id)?.name || id;
+  const pageNameById = (id) => pages.find((p) => String(p.id) === String(id))?.name || id;
 
   const openCreate = () => {
     setEditorPost(null);
@@ -203,6 +203,7 @@ export default function Posts() {
         open={editorOpen}
         post={editorPost}
         pages={pages}
+        initialPageId={filters.page || ''}
         onClose={closeEditor}
         onSaved={handleSaved}
         onError={handleEditorError}

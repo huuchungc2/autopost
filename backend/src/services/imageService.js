@@ -3,11 +3,16 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { callWithRateLimit } from './aiService.js';
-import { detectProviderKind } from './providerService.js';
+import { formatEndpoint, resolveProviderKind } from './providerService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const imagesDir = path.resolve(__dirname, '../../../public/images');
+
+const DEFAULT_IMAGE_ENDPOINTS = {
+  openai: 'https://api.openai.com/v1/images/generations',
+  ideogram: 'https://api.ideogram.ai/generate',
+};
 
 function ensureImagesDir() {
   fs.mkdirSync(imagesDir, { recursive: true });
@@ -26,40 +31,48 @@ async function downloadAndSave(url) {
   return saveImageBuffer(Buffer.from(response.data), ext);
 }
 
-async function generateDalle({ apiKey, model, prompt }) {
+function imageEndpoint(provider) {
+  const kind = resolveProviderKind(provider);
+  if (provider?.api_endpoint) return provider.api_endpoint;
+  return DEFAULT_IMAGE_ENDPOINTS[kind] || DEFAULT_IMAGE_ENDPOINTS.openai;
+}
+
+async function generateDalle({ apiKey, model, prompt, endpoint }) {
+  const url = endpoint || DEFAULT_IMAGE_ENDPOINTS.openai;
   const response = await axios.post(
-    'https://api.openai.com/v1/images/generations',
+    url,
     { model: model || 'dall-e-3', prompt, n: 1, size: '1024x1024' },
     { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } }
   );
-  const url = response.data.data[0].url;
-  const imageUrl = await downloadAndSave(url);
+  const imageUrl = await downloadAndSave(response.data.data[0].url);
   return { image_url: imageUrl, image_prompt: prompt };
 }
 
-async function generateIdeogram({ apiKey, prompt }) {
+async function generateIdeogram({ apiKey, prompt, endpoint }) {
+  const url = endpoint || DEFAULT_IMAGE_ENDPOINTS.ideogram;
   const response = await axios.post(
-    'https://api.ideogram.ai/generate',
+    url,
     { image_request: { prompt, aspect_ratio: 'ASPECT_1_1', model: 'V_2' } },
     { headers: { 'Api-Key': apiKey, 'Content-Type': 'application/json' } }
   );
-  const url = response.data?.data?.[0]?.url;
-  if (!url) throw new Error('Ideogram returned no image');
-  const imageUrl = await downloadAndSave(url);
+  const remoteUrl = response.data?.data?.[0]?.url;
+  if (!remoteUrl) throw new Error('Ideogram returned no image');
+  const imageUrl = await downloadAndSave(remoteUrl);
   return { image_url: imageUrl, image_prompt: prompt };
 }
 
 export async function generateImage(prompt, providerConfig = null) {
-  const kind = providerConfig ? detectProviderKind(providerConfig) : 'placeholder';
+  const kind = resolveProviderKind(providerConfig);
   const apiKey = providerConfig?.api_key || process.env.IDEOGRAM_API_KEY || process.env.OPENAI_API_KEY;
+  const endpoint = imageEndpoint(providerConfig);
 
   return callWithRateLimit(kind === 'ideogram' ? 'ideogram' : 'openai', async () => {
     try {
       if (kind === 'ideogram' && (apiKey || process.env.IDEOGRAM_API_KEY)) {
-        return await generateIdeogram({ apiKey: apiKey || process.env.IDEOGRAM_API_KEY, prompt });
+        return await generateIdeogram({ apiKey: apiKey || process.env.IDEOGRAM_API_KEY, prompt, endpoint });
       }
       if ((kind === 'openai' || providerConfig) && (apiKey || process.env.OPENAI_API_KEY)) {
-        return await generateDalle({ apiKey: apiKey || process.env.OPENAI_API_KEY, model: providerConfig?.model, prompt });
+        return await generateDalle({ apiKey: apiKey || process.env.OPENAI_API_KEY, model: providerConfig?.model, prompt, endpoint });
       }
       ensureImagesDir();
       return { image_url: `/images/placeholder-${Date.now()}.png`, image_prompt: prompt };

@@ -2,6 +2,12 @@ import bcrypt from 'bcrypt';
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { query } from './src/db.js';
+import { syncPageSkills } from './src/services/pageSkillsService.js';
+import {
+  backfillProviderMetadata,
+  listProviderTemplates,
+  seedProviderTemplates,
+} from './src/services/providerTemplateService.js';
 
 dotenv.config();
 
@@ -129,38 +135,42 @@ async function seedFacebookPage(pageConfig) {
 }
 
 async function linkPageToSkill(pageDbId, skillId) {
-  await query('UPDATE fb_pages SET skill_id = ? WHERE id = ?', [skillId, pageDbId]);
+  await syncPageSkills(pageDbId, [skillId]);
 }
 
 async function seedProviders() {
-  const defaults = [
-    {
-      name: 'OpenAI Text',
-      type: 'text',
-      api_key: process.env.OPENAI_API_KEY || '',
-      model: 'gpt-4o-mini',
-    },
-    {
-      name: 'OpenAI DALL-E',
-      type: 'image',
-      api_key: process.env.OPENAI_API_KEY || '',
-      model: 'dall-e-3',
-    },
-  ].filter((p) => p.api_key);
+  await seedProviderTemplates();
+  await backfillProviderMetadata();
 
+  const openaiKey = process.env.OPENAI_API_KEY || '';
+  if (!openaiKey) return [];
+
+  const templates = await listProviderTemplates();
+  const toCreate = templates.filter((t) => ['openai-text', 'openai-image'].includes(t.slug));
   const ids = [];
-  for (const provider of defaults) {
-    const existing = await query('SELECT id FROM ai_providers WHERE name = ? AND type = ?', [provider.name, provider.type]);
+
+  for (const template of toCreate) {
+    const existing = await query('SELECT id FROM ai_providers WHERE name = ? AND type = ?', [template.name, template.type]);
     if (existing.length) {
       ids.push(existing[0].id);
       continue;
     }
     const result = await query(
-      'INSERT INTO ai_providers (name, type, api_key, model, is_active, user_id, created_at) VALUES (?, ?, ?, ?, true, NULL, NOW())',
-      [provider.name, provider.type, provider.api_key, provider.model]
+      `INSERT INTO ai_providers
+       (name, type, api_key, model, template_id, provider_kind, api_endpoint, is_active, user_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, true, NULL, NOW())`,
+      [
+        template.name,
+        template.type,
+        openaiKey,
+        template.default_model,
+        template.id,
+        template.provider_kind,
+        template.api_endpoint,
+      ]
     );
     ids.push(result.insertId);
-    console.log('Seeded provider:', provider.name);
+    console.log('Seeded provider:', template.name);
   }
   return ids;
 }

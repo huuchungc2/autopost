@@ -11,6 +11,7 @@ export default function Generate() {
   const [pages, setPages] = useState([]);
   const [tab, setTab] = useState('text');
   const [pageId, setPageId] = useState('');
+  const [skillId, setSkillId] = useState('');
   const [topic, setTopic] = useState('');
   const [caption, setCaption] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
@@ -22,23 +23,55 @@ export default function Generate() {
   useEffect(() => {
     api.get('/pages').then((response) => {
       setPages(response.data);
-      if (response.data.length) setPageId(String(response.data[0].id));
     }).catch(console.error);
   }, []);
 
   const selectedPage = pages.find((p) => String(p.id) === String(pageId));
+  const pageSkills = selectedPage?.skills || [];
 
-  const skillReady = selectedPage?.skill_id && selectedPage?.skill_name;
+  useEffect(() => {
+    if (!pageId) {
+      setSkillId('');
+      return;
+    }
+    if (pageSkills.length === 1) {
+      setSkillId(String(pageSkills[0].id));
+    } else if (pageSkills.length > 1) {
+      setSkillId((prev) => (
+        pageSkills.some((s) => String(s.id) === String(prev)) ? prev : String(pageSkills[0].id)
+      ));
+    } else {
+      setSkillId('');
+    }
+  }, [pageId, pageSkills.length]);
+
+  const skillReady = pageSkills.length > 0;
   const hasTextProvider = !!selectedPage?.text_provider_id;
+  const activeSkill = pageSkills.find((s) => String(s.id) === String(skillId));
 
   const handleGenerateText = async () => {
+    if (!pageId) {
+      showToast('Chọn fanpage', 'error');
+      return;
+    }
+    if (!skillReady) {
+      showToast('Fanpage chưa gắn skill — vào Pages chọn skill', 'error');
+      return;
+    }
     setIsLoading(true);
     try {
-      const response = await api.post('/posts/generate', {
+      const payload = {
         page_id: Number(pageId),
         topic,
         scheduled_at: fromDatetimeLocalInput(scheduledAt),
-      });
+      };
+      if (pageSkills.length > 1 && skillId) {
+        payload.skill_id = Number(skillId);
+      } else if (pageSkills.length === 1) {
+        payload.skill_id = pageSkills[0].id;
+      }
+
+      const response = await api.post('/posts/generate', payload);
       setPreview(response.data);
       showToast(`Generated post #${response.data.id}`, 'success');
       setTopic('');
@@ -51,6 +84,10 @@ export default function Generate() {
   };
 
   const handleGenerateVideo = async () => {
+    if (!pageId) {
+      showToast('Chọn fanpage', 'error');
+      return;
+    }
     if (!videoUrl) {
       showToast('Upload a video first', 'error');
       return;
@@ -104,10 +141,14 @@ export default function Generate() {
           <label>
             Fanpage
             <select value={pageId} onChange={(e) => setPageId(e.target.value)}>
+              <option value="">— Chọn fanpage —</option>
               {pages.map((page) => (
                 <option key={page.id} value={page.id}>{page.name}</option>
               ))}
             </select>
+            {selectedPage && (
+              <span className="field-hint">Bài sẽ lưu cho: <strong>{selectedPage.name}</strong></span>
+            )}
           </label>
 
           {tab === 'text' && selectedPage && (
@@ -115,12 +156,31 @@ export default function Generate() {
               <div className="skill-config-row">
                 <span className="skill-config-label">Skill AI</span>
                 <span className="skill-config-value">
-                  {skillReady ? selectedPage.skill_name : 'Chưa gắn — vào Pages chọn Skill'}
+                  {skillReady
+                    ? `${pageSkills.length} skill đã gắn`
+                    : 'Chưa gắn — vào Pages chọn skill'}
                 </span>
               </div>
-              {skillReady && selectedPage.skill_prompt_preview && (
-                <p className="skill-config-preview">{selectedPage.skill_prompt_preview}{selectedPage.skill_prompt_length > 200 ? '…' : ''}</p>
+
+              {pageSkills.length > 1 && (
+                <label>
+                  Skill dùng cho lần generate này
+                  <select value={skillId} onChange={(e) => setSkillId(e.target.value)}>
+                    {pageSkills.map((skill) => (
+                      <option key={skill.id} value={skill.id}>{skill.name}</option>
+                    ))}
+                  </select>
+                </label>
               )}
+
+              {activeSkill?.prompt_preview && (
+                <p className="skill-config-preview">{activeSkill.prompt_preview}{activeSkill.prompt_length > 200 ? '…' : ''}</p>
+              )}
+
+              {pageSkills.length > 1 && (
+                <p className="skill-config-hint">Fanpage có nhiều skill — chọn skill cụ thể cho bài này.</p>
+              )}
+
               {!hasTextProvider && (
                 <p className="skill-config-warn">Chưa gắn Text provider — AI có thể chỉ trả nội dung mẫu.</p>
               )}
@@ -134,7 +194,7 @@ export default function Generate() {
             <>
               <label>Topic<input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Enter topic" /></label>
               <label>Scheduled<input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} /></label>
-              <button type="button" className="btn btn-primary" onClick={handleGenerateText} disabled={isLoading || !topic || !pageId}>
+              <button type="button" className="btn btn-primary" onClick={handleGenerateText} disabled={isLoading || !topic || !pageId || !skillReady}>
                 {isLoading ? 'Generating...' : 'Generate'}
               </button>
             </>

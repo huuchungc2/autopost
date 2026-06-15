@@ -16,6 +16,10 @@ import uploadRoutes from './routes/upload.js';
 import settingsRoutes from './routes/settings.js';
 import { activityLogger } from './middleware/activityLog.js';
 import { startScheduler } from './services/scheduler.js';
+import {
+  backfillProviderMetadata,
+  seedProviderTemplates,
+} from './services/providerTemplateService.js';
 
 dotenv.config();
 
@@ -58,7 +62,15 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: err.message || 'Internal server error' });
 });
 
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`AutoPost backend listening on http://localhost:${port}`);
+  try {
+    await seedProviderTemplates();
+    await backfillProviderMetadata();
+    console.log('AI provider templates ready');
+  } catch (error) {
+    console.warn('Provider templates seed skipped:', error.message);
+    console.warn('Chạy backend/migrations/002_provider_templates.sql nếu DB cũ thiếu bảng/cột');
+  }
   startScheduler();
 });

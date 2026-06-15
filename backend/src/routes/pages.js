@@ -9,54 +9,79 @@ import {
   pageIdInClause,
 } from '../services/pageAccessService.js';
 import { assertProviderAccess } from '../services/providerAccessService.js';
+import { enrichPagesWithSkills, getPageSkills, syncPageSkills } from '../services/pageSkillsService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 const router = express.Router();
+
+function normalizeSkillIds(body) {
+  if (Array.isArray(body.skill_ids)) {
+    return body.skill_ids.map((id) => Number(id)).filter(Boolean);
+  }
+  if (body.skill_id) return [Number(body.skill_id)].filter(Boolean);
+  return [];
+}
 
 router.get('/', authenticate, asyncHandler(async (req, res) => {
   const accessibleIds = await getAccessiblePageIds(req.user);
   const { clause, params } = pageIdInClause(accessibleIds, 'fb_pages.id');
   const pages = await query(
     `SELECT fp.id, fp.name, fp.page_id, fp.avatar_url, fp.is_active, fp.token_status,
+            fp.token_expires_at,
             fp.skill_id, fp.text_provider_id, fp.image_provider_id, fp.created_at,
-            s.name AS skill_name,
-            LEFT(s.system_prompt, 200) AS skill_prompt_preview,
-            CHAR_LENGTH(s.system_prompt) AS skill_prompt_length
+            CONCAT(LEFT(fp.page_token, 8), '…', RIGHT(fp.page_token, 6)) AS page_token_preview
      FROM fb_pages fp
-     LEFT JOIN skills s ON s.id = fp.skill_id
      WHERE 1=1${clause}
      ORDER BY fp.name ASC`,
     params
   );
-  res.json(pages);
+  res.json(await enrichPagesWithSkills(pages));
 }));
 
 router.get('/:id', authenticate, asyncHandler(async (req, res) => {
   await assertPageAccess(req.user, req.params.id);
   const pages = await query(
-    'SELECT id, name, page_id, page_token, avatar_url, skill_id, text_provider_id, image_provider_id, is_active, token_status, created_at FROM fb_pages WHERE id = ?',
+    `SELECT id, name, page_id, page_token, avatar_url, skill_id, text_provider_id, image_provider_id,
+            is_active, token_status, token_expires_at, created_at
+     FROM fb_pages WHERE id = ?`,
     [req.params.id]
   );
   if (!pages.length) return res.status(404).json({ error: 'Page not found' });
-  res.json(pages[0]);
+  const skills = await getPageSkills(req.params.id);
+  const page = pages[0];
+  res.json({
+    ...page,
+    skills,
+    skill_ids: skills.map((s) => s.id),
+  });
 }));
 
 router.post('/', authenticate, requireSuperAdmin, asyncHandler(async (req, res) => {
-  const { name, page_id, page_token, avatar_url, skill_id, text_provider_id, image_provider_id, is_active = true } = req.body;
+  const {
+    name, page_id, page_token, avatar_url, text_provider_id, image_provider_id, is_active = true,
+  } = req.body;
+  const skillIds = normalizeSkillIds(req.body);
   if (!name || !page_id || !page_token) return res.status(400).json({ error: 'Missing required fields' });
 
   await verifyFacebookToken(page_id, page_token);
   const tokenExpiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
   const result = await query(
     'INSERT INTO fb_pages (name, page_id, page_token, token_expires_at, token_status, avatar_url, skill_id, text_provider_id, image_provider_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
-    [name, page_id, page_token, tokenExpiresAt, 'valid', avatar_url, skill_id, text_provider_id, image_provider_id, is_active]
+    [name, page_id, page_token, tokenExpiresAt, 'valid', avatar_url, skillIds[0] || null, text_provider_id, image_provider_id, is_active]
   );
-  res.status(201).json({ id: result.insertId, name, page_id, avatar_url, is_active });
+  await syncPageSkills(result.insertId, skillIds);
+  res.status(201).json({ id: result.insertId, name, page_id, avatar_url, is_active, skill_ids: skillIds });
 }));
 
 router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) => {
   await assertPageAccess(req.user, req.params.id);
-  const { name, page_token, avatar_url, skill_id, text_provider_id, image_provider_id, is_active } = req.body;
+  const {
+    name, page_token, avatar_url, text_provider_id, image_provider_id, is_active,
+  } = req.body;
+  const skillIds = req.body.skill_ids !== undefined || req.body.skill_id !== undefined
+    ? normalizeSkillIds(req.body)
+    : null;
+
   const existing = (await query('SELECT page_id, page_token FROM fb_pages WHERE id = ?', [req.params.id]))[0];
   if (!existing) return res.status(404).json({ error: 'Page not found' });
 
@@ -73,10 +98,19 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
   if (text_provider_id) await assertProviderAccess(req.user, text_provider_id);
   if (image_provider_id) await assertProviderAccess(req.user, image_provider_id);
 
+  const primarySkillId = skillIds !== null ? (skillIds[0] || null) : undefined;
+  const current = await query('SELECT skill_id FROM fb_pages WHERE id = ?', [req.params.id]);
+  const skillIdToSave = skillIds !== null ? primarySkillId : current[0]?.skill_id;
+
   await query(
     'UPDATE fb_pages SET name = ?, page_token = ?, avatar_url = ?, skill_id = ?, text_provider_id = ?, image_provider_id = ?, is_active = ?, token_expires_at = COALESCE(?, token_expires_at), token_status = ? WHERE id = ?',
-    [name, tokenToUpdate, avatar_url, skill_id, text_provider_id, image_provider_id, is_active, tokenExpiresAt, tokenStatus, req.params.id]
+    [name, tokenToUpdate, avatar_url, skillIdToSave, text_provider_id, image_provider_id, is_active, tokenExpiresAt, tokenStatus, req.params.id]
   );
+
+  if (skillIds !== null) {
+    await syncPageSkills(req.params.id, skillIds);
+  }
+
   res.json({ message: 'Page updated' });
 }));
 
@@ -113,6 +147,26 @@ router.put('/:id/token', authenticate, canManagePages, asyncHandler(async (req, 
   const tokenExpiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
   await query('UPDATE fb_pages SET page_token = ?, token_expires_at = ?, token_status = ? WHERE id = ?', [page_token, tokenExpiresAt, 'valid', req.params.id]);
   res.json({ message: 'Token updated' });
+}));
+
+router.post('/:id/verify-token', authenticate, canManagePages, asyncHandler(async (req, res) => {
+  await assertPageAccess(req.user, req.params.id);
+  const page = (await query('SELECT page_id, page_token, name FROM fb_pages WHERE id = ?', [req.params.id]))[0];
+  if (!page) return res.status(404).json({ error: 'Page not found' });
+  try {
+    const fb = await verifyFacebookToken(page.page_id, page.page_token);
+    await query('UPDATE fb_pages SET token_status = ? WHERE id = ?', ['valid', req.params.id]);
+    res.json({
+      ok: true,
+      message: 'Token hợp lệ',
+      fb_page_id: fb.id,
+      fb_name: fb.name,
+      matches_configured_page: String(fb.id) === String(page.page_id),
+    });
+  } catch (error) {
+    await query('UPDATE fb_pages SET token_status = ? WHERE id = ?', ['expired', req.params.id]);
+    res.status(400).json({ ok: false, error: error.message });
+  }
 }));
 
 export default router;

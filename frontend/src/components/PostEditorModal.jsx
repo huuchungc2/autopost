@@ -17,14 +17,22 @@ const emptyForm = {
   status: 'draft',
 };
 
-export default function PostEditorModal({ open, post, pages, onClose, onSaved, onError }) {
+export default function PostEditorModal({ open, post, pages, initialPageId, onClose, onSaved, onError }) {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const isEdit = Boolean(post?.id);
 
+  const resolveDefaultPageId = () => {
+    if (initialPageId && pages.some((p) => String(p.id) === String(initialPageId))) {
+      return String(initialPageId);
+    }
+    return '';
+  };
+
   useEffect(() => {
     if (!open) return;
+
     if (post?.id) {
       setForm({
         page_id: String(post.page_id || ''),
@@ -37,13 +45,22 @@ export default function PostEditorModal({ open, post, pages, onClose, onSaved, o
         scheduled_at: toDatetimeLocalInput(post.scheduled_at),
         status: post.status || 'draft',
       });
-    } else {
-      setForm({
-        ...emptyForm,
-        page_id: pages.length ? String(pages[0].id) : '',
-      });
+      return;
     }
-  }, [open, post, pages]);
+
+    setForm({
+      ...emptyForm,
+      page_id: resolveDefaultPageId(),
+    });
+  }, [open, post?.id]);
+
+  useEffect(() => {
+    if (!open || post?.id || !pages.length) return;
+    setForm((prev) => {
+      if (prev.page_id) return prev;
+      return { ...prev, page_id: resolveDefaultPageId() };
+    });
+  }, [open, post?.id, pages, initialPageId]);
 
   const selectedPage = pages.find((p) => String(p.id) === String(form.page_id));
 
@@ -105,23 +122,47 @@ export default function PostEditorModal({ open, post, pages, onClose, onSaved, o
     <Modal
       open={open}
       title={isEdit ? 'Sửa bài viết' : 'Viết bài tay'}
+      subtitle={
+        selectedPage
+          ? `${isEdit ? 'Sửa bài' : 'Tạo bài'} cho fanpage: ${selectedPage.name}`
+          : (isEdit ? 'Chỉnh nội dung, media và lịch đăng' : 'Tạo bài thủ công không qua AI')
+      }
       onClose={onClose}
       wide
+      size="xl"
+      footer={(
+        <>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Huỷ</button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleSubmit}
+            disabled={saving || !form.page_id || !form.content.trim()}
+          >
+            {saving ? 'Đang lưu...' : isEdit ? 'Cập nhật' : 'Tạo bài'}
+          </button>
+        </>
+      )}
     >
       <div className="edit-post-layout post-editor">
-        <div className="form-card post-editor-form">
+        <div className="modal-form post-editor-form">
           <label>
             Fanpage
             <select
               value={form.page_id}
               onChange={(e) => setField('page_id', e.target.value)}
-              disabled={isEdit}
+              required
             >
               <option value="">Chọn fanpage</option>
               {pages.map((page) => (
-                <option key={page.id} value={page.id}>{page.name}</option>
+                <option key={page.id} value={String(page.id)}>{page.name}</option>
               ))}
             </select>
+            {selectedPage ? (
+              <span className="field-hint">Bài sẽ lưu cho: <strong>{selectedPage.name}</strong></span>
+            ) : (
+              <span className="field-hint field-hint--warn">Chọn fanpage trước khi lưu</span>
+            )}
           </label>
 
           <label>
@@ -208,22 +249,10 @@ export default function PostEditorModal({ open, post, pages, onClose, onSaved, o
               </select>
             </label>
           )}
-
-          <div className="post-editor-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Huỷ</button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleSubmit}
-              disabled={saving || !form.page_id || !form.content.trim()}
-            >
-              {saving ? 'Đang lưu...' : isEdit ? 'Cập nhật' : 'Tạo bài'}
-            </button>
-          </div>
         </div>
 
-        <div className="card post-editor-preview">
-          <h3>Xem trước Facebook</h3>
+        <div className="post-editor-preview">
+          <h4 className="modal-section-title">Xem trước Facebook</h4>
           <FacebookPreview
             post={form}
             pageName={selectedPage?.name}

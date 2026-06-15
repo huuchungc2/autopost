@@ -57,11 +57,11 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 router.post('/generate', asyncHandler(async (req, res) => {
-  const { page_id, topic, prompt, scheduled_at } = req.body;
+  const { page_id, topic, prompt, scheduled_at, skill_id } = req.body;
   if (!page_id || !topic) return res.status(400).json({ error: 'page_id and topic are required' });
   await assertPageAccess(req.user, page_id);
 
-  const config = await getPageGenerationConfig(page_id);
+  const config = await getPageGenerationConfig(page_id, skill_id || null);
   if (!config) return res.status(404).json({ error: 'Page not found' });
 
   const userPrompt = prompt || `Viết bài Facebook về: ${topic}. Viết bằng tiếng Việt.`;
@@ -73,7 +73,15 @@ router.post('/generate', asyncHandler(async (req, res) => {
     [page_id, topic, textResult.text, imageResult.image_url, imageResult.image_prompt, 'image', scheduled_at ? 'scheduled' : 'pending_approval', scheduled_at || null, 'auto', req.user.id]
   );
 
-  res.status(201).json({ id: result.insertId, page_id, topic, content: textResult.text, image_url: imageResult.image_url });
+  res.status(201).json({
+    id: result.insertId,
+    page_id,
+    topic,
+    content: textResult.text,
+    image_url: imageResult.image_url,
+    skill_id: config.activeSkill?.id || null,
+    skill_name: config.activeSkill?.name || null,
+  });
 }));
 
 router.post('/generate-video', asyncHandler(async (req, res) => {
@@ -201,11 +209,17 @@ router.post('/:id/approve', asyncHandler(async (req, res) => {
 }));
 
 router.put('/:id', asyncHandler(async (req, res) => {
-  await assertPostAccess(req.user, req.params.id);
-  const { topic, content, image_url, video_url, video_thumb_url, media_type, scheduled_at, status } = req.body;
+  const post = await assertPostAccess(req.user, req.params.id);
+  const { page_id, topic, content, image_url, video_url, video_thumb_url, media_type, scheduled_at, status } = req.body;
+
+  const targetPageId = page_id != null ? Number(page_id) : post.page_id;
+  if (page_id != null && targetPageId !== post.page_id) {
+    await assertPageAccess(req.user, targetPageId);
+  }
+
   await query(
-    'UPDATE posts SET topic = ?, content = ?, image_url = ?, video_url = ?, video_thumb_url = ?, media_type = ?, scheduled_at = ?, status = ? WHERE id = ?',
-    [topic, content, image_url, video_url, video_thumb_url, media_type, scheduled_at, status, req.params.id]
+    'UPDATE posts SET page_id = ?, topic = ?, content = ?, image_url = ?, video_url = ?, video_thumb_url = ?, media_type = ?, scheduled_at = ?, status = ? WHERE id = ?',
+    [targetPageId, topic, content, image_url, video_url, video_thumb_url, media_type, scheduled_at, status, req.params.id]
   );
   res.json({ message: 'Post updated' });
 }));

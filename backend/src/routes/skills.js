@@ -8,7 +8,11 @@ router.use(authenticate);
 
 async function getSkillPages(skillId) {
   return query(
-    'SELECT id, name, page_id, is_active FROM fb_pages WHERE skill_id = ? ORDER BY name ASC',
+    `SELECT fp.id, fp.name, fp.page_id, fp.is_active
+     FROM page_skills ps
+     JOIN fb_pages fp ON fp.id = ps.page_id
+     WHERE ps.skill_id = ?
+     ORDER BY fp.name ASC`,
     [skillId]
   );
 }
@@ -18,17 +22,17 @@ router.get('/', asyncHandler(async (req, res) => {
     `SELECT s.id, s.name, s.description, s.created_by, s.created_at,
             LEFT(s.system_prompt, 120) AS prompt_preview,
             CHAR_LENGTH(s.system_prompt) AS prompt_length,
-            COUNT(fp.id) AS page_count
+            COUNT(ps.page_id) AS page_count
      FROM skills s
-     LEFT JOIN fb_pages fp ON fp.skill_id = s.id
+     LEFT JOIN page_skills ps ON ps.skill_id = s.id
      GROUP BY s.id, s.name, s.description, s.created_by, s.created_at, s.system_prompt
      ORDER BY s.name ASC`
   );
 
   const pageRows = await query(
-    `SELECT fp.id, fp.name, fp.skill_id, fp.is_active
-     FROM fb_pages fp
-     WHERE fp.skill_id IS NOT NULL
+    `SELECT fp.id, fp.name, ps.skill_id, fp.is_active
+     FROM page_skills ps
+     JOIN fb_pages fp ON fp.id = ps.page_id
      ORDER BY fp.name ASC`
   );
 
@@ -81,7 +85,7 @@ router.put('/:id', requireRole('super_admin'), asyncHandler(async (req, res) => 
 }));
 
 router.delete('/:id', requireRole('super_admin'), asyncHandler(async (req, res) => {
-  const linked = await query('SELECT COUNT(*) AS count FROM fb_pages WHERE skill_id = ?', [req.params.id]);
+  const linked = await query('SELECT COUNT(*) AS count FROM page_skills WHERE skill_id = ?', [req.params.id]);
   if (linked[0]?.count > 0) {
     return res.status(400).json({
       error: `Skill đang được ${linked[0].count} fanpage sử dụng. Gỡ gán ở Pages trước khi xóa.`,

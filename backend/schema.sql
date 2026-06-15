@@ -15,16 +15,37 @@ CREATE TABLE IF NOT EXISTS users (
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
+CREATE TABLE IF NOT EXISTS ai_provider_templates (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  slug VARCHAR(50) UNIQUE NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  type ENUM('text', 'image') NOT NULL,
+  provider_kind VARCHAR(30) NOT NULL,
+  api_endpoint VARCHAR(500) NOT NULL,
+  default_model VARCHAR(100),
+  description TEXT,
+  key_label VARCHAR(100),
+  key_placeholder VARCHAR(100),
+  key_help TEXT,
+  sort_order INT DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS ai_providers (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(100) NOT NULL,
   type ENUM('text', 'image', 'video') NOT NULL,
   api_key TEXT NOT NULL,
   model VARCHAR(100),
+  template_id INT NULL,
+  provider_kind VARCHAR(30) NULL,
+  api_endpoint VARCHAR(500) NULL,
   is_active BOOLEAN DEFAULT true,
   user_id INT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (template_id) REFERENCES ai_provider_templates(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS skills (
@@ -53,6 +74,16 @@ CREATE TABLE IF NOT EXISTS fb_pages (
   FOREIGN KEY (skill_id) REFERENCES skills(id),
   FOREIGN KEY (text_provider_id) REFERENCES ai_providers(id),
   FOREIGN KEY (image_provider_id) REFERENCES ai_providers(id)
+);
+
+CREATE TABLE IF NOT EXISTS page_skills (
+  page_id INT NOT NULL,
+  skill_id INT NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (page_id, skill_id),
+  FOREIGN KEY (page_id) REFERENCES fb_pages(id) ON DELETE CASCADE,
+  FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS content_topics (
