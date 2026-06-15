@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { fromDatetimeLocalInput } from '../utils/date';
 import api from '../services/api';
 import VideoUpload from '../components/VideoUpload';
@@ -27,6 +27,9 @@ export default function Generate() {
   }, []);
 
   const selectedPage = pages.find((p) => String(p.id) === String(pageId));
+
+  const skillReady = selectedPage?.skill_id && selectedPage?.skill_name;
+  const hasTextProvider = !!selectedPage?.text_provider_id;
 
   const handleGenerateText = async () => {
     setIsLoading(true);
@@ -99,13 +102,33 @@ export default function Generate() {
       <div className="generate-layout">
         <div className="card form-card">
           <label>
-            Facebook page
+            Fanpage
             <select value={pageId} onChange={(e) => setPageId(e.target.value)}>
               {pages.map((page) => (
                 <option key={page.id} value={page.id}>{page.name}</option>
               ))}
             </select>
           </label>
+
+          {tab === 'text' && selectedPage && (
+            <div className={`skill-config-panel${skillReady ? '' : ' skill-config-panel--warn'}`}>
+              <div className="skill-config-row">
+                <span className="skill-config-label">Skill AI</span>
+                <span className="skill-config-value">
+                  {skillReady ? selectedPage.skill_name : 'Chưa gắn — vào Pages chọn Skill'}
+                </span>
+              </div>
+              {skillReady && selectedPage.skill_prompt_preview && (
+                <p className="skill-config-preview">{selectedPage.skill_prompt_preview}{selectedPage.skill_prompt_length > 200 ? '…' : ''}</p>
+              )}
+              {!hasTextProvider && (
+                <p className="skill-config-warn">Chưa gắn Text provider — AI có thể chỉ trả nội dung mẫu.</p>
+              )}
+              {!skillReady && (
+                <Link to="/pages" className="btn-link">Gắn skill tại Pages →</Link>
+              )}
+            </div>
+          )}
 
           {tab === 'text' ? (
             <>

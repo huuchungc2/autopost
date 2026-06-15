@@ -158,11 +158,16 @@ export default function Pages() {
           </label>
           <label>Avatar URL<input value={form.avatar_url} onChange={(e) => handleChange('avatar_url', e.target.value)} /></label>
           <label>
-            Skill
+            Skill (dùng khi AI Generate bài cho fanpage này)
             <select value={form.skill_id} onChange={(e) => handleChange('skill_id', e.target.value)}>
-              <option value="">None</option>
+              <option value="">— Chưa chọn —</option>
               {skills.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
+            {form.skill_id && (
+              <small className="text-muted skill-inline-preview">
+                {skills.find((s) => String(s.id) === String(form.skill_id))?.prompt_preview || 'Không có preview'}
+              </small>
+            )}
           </label>
           <label>
             Text Provider
@@ -192,7 +197,7 @@ export default function Pages() {
       <div className="card table-wrapper" style={{ marginTop: 24 }}>
         <table className="table">
           <thead>
-            <tr><th>Name</th><th>Page ID</th><th>Token</th><th>Skill</th><th>Actions</th></tr>
+            <tr><th>Name</th><th>Page ID</th><th>Token</th><th>Skill AI</th><th>Actions</th></tr>
           </thead>
           <tbody>
             {pages.map((page) => (
@@ -200,7 +205,13 @@ export default function Pages() {
                 <td>{page.name}</td>
                 <td>{page.page_id}</td>
                 <td><span className={`token-badge token-${page.token_status}`}>{page.token_status}</span></td>
-                <td>{getName(page.skill_id, skills)}</td>
+                <td>
+                  {page.skill_id ? (
+                    <span className="skill-page-tag">{getName(page.skill_id, skills)}</span>
+                  ) : (
+                    <span className="text-muted">Chưa gắn</span>
+                  )}
+                </td>
                 <td>
                   <button type="button" className="btn-link" onClick={() => handleEdit(page)}>Edit</button>
                   <button type="button" className="btn-link" onClick={() => loadTopics(page.id)}>Topics</button>

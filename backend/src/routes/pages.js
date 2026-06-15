@@ -17,8 +17,15 @@ router.get('/', authenticate, asyncHandler(async (req, res) => {
   const accessibleIds = await getAccessiblePageIds(req.user);
   const { clause, params } = pageIdInClause(accessibleIds, 'fb_pages.id');
   const pages = await query(
-    `SELECT id, name, page_id, avatar_url, is_active, token_status, skill_id, text_provider_id, image_provider_id, created_at
-     FROM fb_pages WHERE 1=1${clause} ORDER BY name ASC`,
+    `SELECT fp.id, fp.name, fp.page_id, fp.avatar_url, fp.is_active, fp.token_status,
+            fp.skill_id, fp.text_provider_id, fp.image_provider_id, fp.created_at,
+            s.name AS skill_name,
+            LEFT(s.system_prompt, 200) AS skill_prompt_preview,
+            CHAR_LENGTH(s.system_prompt) AS skill_prompt_length
+     FROM fb_pages fp
+     LEFT JOIN skills s ON s.id = fp.skill_id
+     WHERE 1=1${clause}
+     ORDER BY fp.name ASC`,
     params
   );
   res.json(pages);
