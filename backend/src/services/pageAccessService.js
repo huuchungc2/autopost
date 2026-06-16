@@ -55,6 +55,22 @@ export function pageIdInClause(accessibleIds, column = 'id') {
   return { clause: ` AND ${column} IN (${placeholders})`, params: accessibleIds };
 }
 
+export async function assignPageToUser(userId, pageId) {
+  try {
+    await query(
+      'INSERT IGNORE INTO user_pages (user_id, page_id) VALUES (?, ?)',
+      [userId, Number(pageId)]
+    );
+  } catch (error) {
+    if (error?.code === 'ER_NO_SUCH_TABLE') {
+      const err = new Error('Bảng user_pages chưa tồn tại — restart backend để tự tạo bảng');
+      err.status = 503;
+      throw err;
+    }
+    throw error;
+  }
+}
+
 export async function setUserPages(userId, pageIds) {
   try {
     await query('DELETE FROM user_pages WHERE user_id = ?', [userId]);

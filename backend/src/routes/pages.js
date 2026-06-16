@@ -1,12 +1,14 @@
 import express from 'express';
 import { query } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
-import { canManagePages, requireSuperAdmin } from '../middleware/rbac.js';
+import { canManagePages } from '../middleware/rbac.js';
 import { verifyFacebookToken } from '../services/fbService.js';
 import {
   getAccessiblePageIds,
   assertPageAccess,
   pageIdInClause,
+  isSuperAdmin,
+  assignPageToUser,
 } from '../services/pageAccessService.js';
 import { assertProviderAccess } from '../services/providerAccessService.js';
 import { enrichPagesWithSkills, getPageSkills, syncPageSkills } from '../services/pageSkillsService.js';
@@ -56,12 +58,15 @@ router.get('/:id', authenticate, asyncHandler(async (req, res) => {
   });
 }));
 
-router.post('/', authenticate, requireSuperAdmin, asyncHandler(async (req, res) => {
+router.post('/', authenticate, canManagePages, asyncHandler(async (req, res) => {
   const {
     name, page_id, page_token, avatar_url, text_provider_id, image_provider_id, is_active = true,
   } = req.body;
   const skillIds = normalizeSkillIds(req.body);
   if (!name || !page_id || !page_token) return res.status(400).json({ error: 'Missing required fields' });
+
+  if (text_provider_id) await assertProviderAccess(req.user, text_provider_id);
+  if (image_provider_id) await assertProviderAccess(req.user, image_provider_id);
 
   await verifyFacebookToken(page_id, page_token);
   const tokenExpiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
@@ -70,6 +75,11 @@ router.post('/', authenticate, requireSuperAdmin, asyncHandler(async (req, res) 
     [name, page_id, page_token, tokenExpiresAt, 'valid', avatar_url, skillIds[0] || null, text_provider_id, image_provider_id, is_active]
   );
   await syncPageSkills(result.insertId, skillIds);
+
+  if (!isSuperAdmin(req.user)) {
+    await assignPageToUser(req.user.id, result.insertId);
+  }
+
   res.status(201).json({ id: result.insertId, name, page_id, avatar_url, is_active, skill_ids: skillIds });
 }));
 

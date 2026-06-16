@@ -21,7 +21,7 @@ import {
   backfillProviderMetadata,
   seedProviderTemplates,
 } from './services/providerTemplateService.js';
-import { ensureUserPagesTables, ensurePageSkillsTable, ensureContentTopicsRepeatDaily, ensureContentTopicsLastRun, ensureSkillsTypeColumn } from './services/migrationRunner.js';
+import { ensureUserPagesTables, ensurePageSkillsTable, ensureContentTopicsRepeatDaily, ensureContentTopicsLastRun, ensureSkillsTypeColumn, ensureUsersUsernameColumn } from './services/migrationRunner.js';
 
 dotenv.config();
 
@@ -83,6 +83,7 @@ app.listen(port, async () => {
     await ensureContentTopicsRepeatDaily();
     await ensureContentTopicsLastRun();
     await ensureSkillsTypeColumn();
+    await ensureUsersUsernameColumn();
   } catch (error) {
     console.warn('DB migration failed:', error.message);
   }

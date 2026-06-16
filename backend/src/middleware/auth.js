@@ -12,7 +12,13 @@ export async function authenticate(req, res, next) {
   const token = authHeader.split(' ')[1];
   try {
     const payload = jwt.verify(token, jwtSecret);
-    const users = await query('SELECT id, name, email, role, is_active, must_change_password FROM users WHERE id = ?', [payload.userId]);
+    const users = await query(
+      'SELECT id, name, username, email, role, is_active, must_change_password FROM users WHERE id = ?',
+      [payload.userId]
+    ).catch(async () => query(
+      'SELECT id, name, email, role, is_active, must_change_password FROM users WHERE id = ?',
+      [payload.userId]
+    ));
     const user = users[0];
     if (!user || !user.is_active) {
       return res.status(401).json({ error: 'Unauthorized' });

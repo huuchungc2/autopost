@@ -44,6 +44,8 @@ export default function Pages() {
 
   const isSuperAdmin = user?.role === 'super_admin';
 
+  const canManagePages = ['super_admin', 'admin'].includes(user?.role);
+
   const [pages, setPages] = useState([]);
 
   const [skills, setSkills] = useState([]);
@@ -516,11 +518,11 @@ export default function Pages() {
 
           <h1>Fanpage</h1>
 
-          <p>{isSuperAdmin ? 'Quản lý tất cả fanpage.' : 'Chỉ hiển thị page được gán cho bạn.'}</p>
+          <p>{isSuperAdmin ? 'Quản lý tất cả fanpage.' : 'Fanpage được gán — admin có thể thêm fanpage mới.'}</p>
 
         </div>
 
-        {isSuperAdmin && (
+        {canManagePages && (
 
           <div className="header-actions">
 
@@ -557,7 +559,9 @@ export default function Pages() {
                 <td colSpan={5}>
                   {isSuperAdmin
                     ? 'Chưa có fanpage nào — bấm Thêm fanpage.'
-                    : 'Chưa được gán fanpage nào. Liên hệ super admin gán page ở mục Người dùng → Sửa → tick fanpage → Cập nhật.'}
+                    : canManagePages
+                      ? 'Chưa có fanpage — bấm Thêm fanpage để kết nối Facebook.'
+                      : 'Chưa được gán fanpage nào. Liên hệ quản trị viên.'}
                 </td>
               </tr>
             )}
@@ -624,7 +628,7 @@ export default function Pages() {
 
                   <button type="button" className="btn-link" onClick={() => openTokenModal(page.id)}>Token</button>
 
-                  {isSuperAdmin && (
+                  {canManagePages && (
 
                     <button type="button" className="btn-link btn-link-danger" onClick={() => handleDelete(page.id)}>Xóa</button>
 

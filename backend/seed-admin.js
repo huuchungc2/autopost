@@ -67,20 +67,35 @@ async function resolvePageFromToken(pageToken, fallbackName, fallbackAvatar) {
 
 async function seedAdmin() {
   const email = process.env.SEED_ADMIN_EMAIL || 'admin@autopost.local';
+  const username = process.env.SEED_ADMIN_USERNAME || 'admin';
   const password = process.env.SEED_ADMIN_PASSWORD || 'ChangeMe123!';
-  const existing = await query('SELECT id FROM users WHERE email = ?', [email]);
+  const existing = await query('SELECT id, username FROM users WHERE email = ?', [email]);
 
   if (existing.length) {
+    if (!existing[0].username) {
+      try {
+        await query('UPDATE users SET username = ? WHERE id = ?', [username, existing[0].id]);
+        console.log('Backfilled admin username:', username);
+      } catch (error) {
+        if (error?.code !== 'ER_BAD_FIELD_ERROR') throw error;
+      }
+    }
     console.log('Admin user already exists:', email);
     return existing[0].id;
   }
 
   const hashed = await bcrypt.hash(password, 10);
   const result = await query(
-    'INSERT INTO users (name, email, password, role, is_active, must_change_password, created_at) VALUES (?, ?, ?, ?, true, true, NOW())',
-    ['Super Admin', email, hashed, 'super_admin']
-  );
-  console.log('Seeded admin user:', email, 'id:', result.insertId);
+    'INSERT INTO users (name, username, email, password, role, is_active, must_change_password, created_at) VALUES (?, ?, ?, ?, ?, true, true, NOW())',
+    ['Super Admin', username, email, hashed, 'super_admin']
+  ).catch(async (error) => {
+    if (error?.code !== 'ER_BAD_FIELD_ERROR') throw error;
+    return query(
+      'INSERT INTO users (name, email, password, role, is_active, must_change_password, created_at) VALUES (?, ?, ?, ?, true, true, NOW())',
+      ['Super Admin', email, hashed, 'super_admin']
+    );
+  });
+  console.log('Seeded admin user:', email, 'username:', username, 'id:', result.insertId);
   return result.insertId;
 }
 

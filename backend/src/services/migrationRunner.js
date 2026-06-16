@@ -123,3 +123,33 @@ export async function ensureSkillsTypeColumn() {
   }
   console.log('Migration 006 applied: skills.skill_type + posts.video_prompt ready');
 }
+
+export async function ensureUsersUsernameColumn() {
+  if (await columnExists('users', 'username')) {
+    await backfillMissingUsernamesFromRunner();
+    return;
+  }
+
+  const migrationPath = path.resolve(__dirname, '../../migrations/007_users_username.sql');
+  if (!fs.existsSync(migrationPath)) {
+    console.warn('Missing migration file:', migrationPath);
+    return;
+  }
+
+  const statements = parseSqlStatements(migrationPath);
+  for (const statement of statements) {
+    try {
+      await query(statement);
+    } catch (error) {
+      if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
+    }
+  }
+
+  await backfillMissingUsernamesFromRunner();
+  console.log('Migration 007 applied: users.username ready');
+}
+
+async function backfillMissingUsernamesFromRunner() {
+  const { backfillMissingUsernames } = await import('./userUsernameService.js');
+  await backfillMissingUsernames();
+}

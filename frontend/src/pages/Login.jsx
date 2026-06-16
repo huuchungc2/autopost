@@ -20,7 +20,7 @@ export default function Login() {
     const form = new FormData(event.target);
     try {
       const response = await api.post('/auth/login', {
-        email: form.get('email'),
+        login: form.get('login'),
         password: form.get('password'),
       });
       login(response.data.token, response.data.user);
@@ -40,8 +40,8 @@ export default function Login() {
         <h1>AutoPost</h1>
         <p>Đăng nhập để tiếp tục.</p>
         <label>
-          Email
-          <input name="email" type="email" required />
+          Email hoặc username
+          <input name="login" type="text" autoComplete="username" required placeholder="admin hoặc admin@autopost.local" />
         </label>
         <label>
           Mật khẩu

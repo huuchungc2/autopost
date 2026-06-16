@@ -6,10 +6,14 @@ export function requireSuperAdmin(req, res, next) {
 }
 
 export function canManageUsers(req, res, next) {
-  if (req.user?.role !== 'super_admin') {
+  if (!['super_admin', 'admin'].includes(req.user?.role)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   next();
+}
+
+export function isSuperAdminUser(user) {
+  return user?.role === 'super_admin';
 }
 
 /** Admin + super_admin — AI provider config (assigned/owned only for admin) */

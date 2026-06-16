@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import api from '../services/api';
 import { roleLabel } from '../config/vi';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../services/authContext';
 
 const initialForm = {
   name: '',
+  username: '',
   email: '',
   password: '',
   role: 'editor',
@@ -21,12 +24,18 @@ export default function UserManagement() {
   const [editingId, setEditingId] = useState(null);
   const [migrationWarning, setMigrationWarning] = useState('');
   const { showToast } = useToast();
+  const { user: currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const canManageUsers = ['super_admin', 'admin'].includes(currentUser?.role);
 
   const loadUsers = async () => {
     try {
       const response = await api.get('/users');
-      setUsers(response.data);
-      const adminWithoutPages = response.data.some(
+      const visibleUsers = isSuperAdmin
+        ? response.data
+        : response.data.filter((u) => u.role !== 'super_admin');
+      setUsers(visibleUsers);
+      const adminWithoutPages = visibleUsers.some(
         (u) => u.role !== 'super_admin' && Number(u.assigned_page_count) === 0
       );
       if (adminWithoutPages) {
@@ -98,6 +107,7 @@ export default function UserManagement() {
     try {
       const payload = {
         name: form.name,
+        username: form.username,
         email: form.email,
         role: form.role,
         is_active: form.is_active,
@@ -153,6 +163,7 @@ export default function UserManagement() {
     }
     setForm({
       name: user.name || '',
+      username: user.username || '',
       email: user.email || '',
       password: '',
       role: user.role || 'editor',
@@ -173,12 +184,16 @@ export default function UserManagement() {
     }
   };
 
+  if (!canManageUsers) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <div className="page-shell">
       <div className="page-header">
         <div>
           <h1>Quản lý người dùng</h1>
-          <p>Super admin gán fanpage và AI provider cho admin/editor.</p>
+          <p>{isSuperAdmin ? 'Super admin gán fanpage và AI provider cho admin/editor.' : 'Quản lý admin và biên tập — gán fanpage, provider.'}</p>
         </div>
       </div>
 
@@ -191,7 +206,19 @@ export default function UserManagement() {
       <div className="card form-card">
         <h2>{editingId ? 'Sửa người dùng' : 'Thêm người dùng'}</h2>
         <form className="form-grid" onSubmit={handleSubmit}>
-          <label>Tên<input value={form.name} onChange={(e) => handleChange('name', e.target.value)} required /></label>
+          <label>Tên hiển thị<input value={form.name} onChange={(e) => handleChange('name', e.target.value)} required /></label>
+          <label>
+            Username
+            <input
+              value={form.username}
+              onChange={(e) => handleChange('username', e.target.value.toLowerCase())}
+              required
+              pattern="[a-z0-9][a-z0-9._-]{2,49}"
+              placeholder="vd: admin, editor01"
+              autoComplete="off"
+            />
+            <small className="text-muted">Dùng đăng nhập — chữ thường, số, . _ -</small>
+          </label>
           <label>Email<input type="email" value={form.email} onChange={(e) => handleChange('email', e.target.value)} required /></label>
           <label>
             Mật khẩu
@@ -202,7 +229,7 @@ export default function UserManagement() {
             <select value={form.role} onChange={(e) => handleChange('role', e.target.value)}>
               <option value="editor">Biên tập</option>
               <option value="admin">Quản trị viên</option>
-              <option value="super_admin">Super Admin</option>
+              {isSuperAdmin && <option value="super_admin">Super Admin</option>}
             </select>
           </label>
           <label className="checkbox-label">
@@ -249,12 +276,13 @@ export default function UserManagement() {
       <div className="card table-wrapper" style={{ marginTop: 24 }}>
         <table className="table">
           <thead>
-            <tr><th>Tên</th><th>Email</th><th>Vai trò</th><th>Fanpage</th><th>Provider</th><th>Hoạt động</th><th>Thao tác</th></tr>
+            <tr><th>Tên</th><th>Username</th><th>Email</th><th>Vai trò</th><th>Fanpage</th><th>Provider</th><th>Hoạt động</th><th>Thao tác</th></tr>
           </thead>
           <tbody>
             {users.map((user) => (
               <tr key={user.id}>
                 <td>{user.name}</td>
+                <td><code>{user.username || '—'}</code></td>
                 <td>{user.email}</td>
                 <td>{roleLabel(user.role)}</td>
                 <td>{user.role === 'super_admin' ? 'Tất cả' : (

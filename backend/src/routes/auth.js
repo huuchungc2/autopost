@@ -7,13 +7,14 @@ import { getUserProviders } from '../services/providerAccessService.js';
 const router = express.Router();
 
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
+  const login = req.body.login || req.body.email || req.body.username;
+  const { password } = req.body;
+  if (!login || !password) {
+    return res.status(400).json({ error: 'Email/username và mật khẩu là bắt buộc' });
   }
-  const user = await authenticateUser(email, password);
+  const user = await authenticateUser(login, password);
   if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+    return res.status(401).json({ error: 'Sai email/username hoặc mật khẩu' });
   }
   const token = signToken(user);
   res.json({ token, user });

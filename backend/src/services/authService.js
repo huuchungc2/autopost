@@ -5,8 +5,17 @@ import { query } from '../db.js';
 const jwtSecret = process.env.JWT_SECRET || 'replace_with_strong_secret';
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
 
-export async function authenticateUser(email, password) {
-  const users = await query('SELECT id, name, email, password, role, is_active, must_change_password FROM users WHERE email = ?', [email]);
+export async function authenticateUser(identifier, password) {
+  const login = String(identifier || '').trim();
+  if (!login) return null;
+
+  const users = await query(
+    `SELECT id, name, username, email, password, role, is_active, must_change_password
+     FROM users
+     WHERE deleted_at IS NULL
+       AND (LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?))`,
+    [login, login]
+  );
   const user = users[0];
   if (!user || !user.is_active) {
     return null;
@@ -18,6 +27,7 @@ export async function authenticateUser(email, password) {
   return {
     id: user.id,
     name: user.name,
+    username: user.username,
     email: user.email,
     role: user.role,
     must_change_password: user.must_change_password,

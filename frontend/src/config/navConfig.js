@@ -41,7 +41,7 @@ export const navGroups = [
     id: 'admin',
     label: 'Quản trị',
     items: [
-      { to: '/users', label: 'Người dùng', icon: Users, roles: ['super_admin'] },
+      { to: '/users', label: 'Người dùng', icon: Users, roles: ['super_admin', 'admin'] },
       { to: '/activity', label: 'Nhật ký', icon: History, roles: ['super_admin'] },
     ],
   },
