@@ -3,9 +3,7 @@ import { query } from '../db.js';
 import { processPendingJobs } from './jobWorker.js';
 import { postToFacebook } from './fbService.js';
 import { createNotification } from './notifyService.js';
-import { generateText } from './aiService.js';
-import { generateImage } from './imageService.js';
-import { getPageGenerationConfig } from './providerService.js';
+import { runDueTopicSlots } from './topicSlotService.js';
 
 let started = false;
 
@@ -14,12 +12,9 @@ export function startScheduler() {
   started = true;
 
   cron.schedule('* * * * *', publishDuePosts);
+  cron.schedule('* * * * *', runDueTopicSlots);
   cron.schedule('*/5 * * * *', () => processPendingJobs(5));
   cron.schedule('0 * * * *', checkTokenExpiry);
-
-  const hour = process.env.AUTO_GENERATE_HOUR || '23';
-  const minute = process.env.AUTO_GENERATE_MINUTE || '0';
-  cron.schedule(`${minute} ${hour} * * *`, autoGenerateFromTopics);
 
   console.log('Scheduler started');
 }
@@ -75,34 +70,6 @@ async function checkTokenExpiry() {
           relatedId: page.id,
         });
       }
-    }
-  }
-}
-
-async function autoGenerateFromTopics() {
-  const day = new Date().getDay();
-  const topics = await query(
-    `SELECT ct.*, fp.id AS page_id
-     FROM content_topics ct
-     JOIN fb_pages fp ON fp.id = ct.page_id
-     WHERE ct.is_active = true AND ct.day_of_week = ? AND fp.is_active = true`,
-    [day]
-  );
-
-  for (const topic of topics) {
-    try {
-      const config = await getPageGenerationConfig(topic.page_id);
-      const userPrompt = `Viết bài Facebook về: ${topic.topic}`;
-      const textResult = await generateText(userPrompt, config?.textProvider, config?.skillPrompt || '');
-      const imageResult = await generateImage(topic.topic, config?.imageProvider);
-      const scheduledAt = `${new Date().toISOString().slice(0, 10)} ${topic.post_time}`;
-
-      await query(
-        'INSERT INTO posts (page_id, topic, content, image_url, image_prompt, media_type, status, scheduled_at, created_by_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
-        [topic.page_id, topic.topic, textResult.text, imageResult.image_url, imageResult.image_prompt, 'image', 'pending_approval', scheduledAt, 'auto']
-      );
-    } catch (error) {
-      console.error('Auto-generate failed:', error.message);
     }
   }
 }

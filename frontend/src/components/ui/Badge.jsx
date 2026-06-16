@@ -1,3 +1,5 @@
+import { postStatusLabel } from '../../config/vi';
+
 const variants = {
   draft: 'badge-draft',
   pending_approval: 'badge-pending',
@@ -8,5 +10,6 @@ const variants = {
 };
 
 export default function Badge({ children, status }) {
-  return <span className={`badge ${variants[status] || variants.default}`}>{children}</span>;
+  const label = status ? postStatusLabel(status) : children;
+  return <span className={`badge ${variants[status] || variants.default}`}>{label}</span>;
 }

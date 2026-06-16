@@ -1,21 +1,9 @@
 import axios from 'axios';
 import fs from 'fs';
-import path from 'path';
 import FormData from 'form-data';
-import { fileURLToPath } from 'url';
+import { resolveImageForPublish, resolveLocalImagePath } from './mediaStorage.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const publicRoot = path.resolve(__dirname, '../../../public');
 const apiBase = process.env.FB_GRAPH_API || 'https://graph.facebook.com/v19.0';
-
-function resolvePublicPath(mediaUrl) {
-  if (!mediaUrl) return null;
-  if (mediaUrl.startsWith('http')) return mediaUrl;
-  const relative = mediaUrl.replace(/^\//, '');
-  const fullPath = path.join(publicRoot, relative);
-  return fs.existsSync(fullPath) ? fullPath : null;
-}
 
 export async function verifyFacebookToken(pageId, pageToken) {
   try {
@@ -67,7 +55,29 @@ async function publishFeed({ pageId, pageToken, message, scheduledUnix, publishe
 }
 
 async function publishPhoto({ pageId, pageToken, message, imageUrl, scheduledUnix, published }) {
-  const localPath = resolvePublicPath(imageUrl);
+  const resolved = await resolveImageForPublish(imageUrl);
+
+  if (resolved?.buffer) {
+    const form = new FormData();
+    form.append('source', resolved.buffer, {
+      filename: resolved.filename,
+      contentType: resolved.mimeType,
+    });
+    form.append('message', message || '');
+    form.append('access_token', pageToken);
+    if (scheduledUnix) {
+      form.append('published', 'false');
+      form.append('scheduled_publish_time', String(scheduledUnix));
+    } else {
+      form.append('published', published ? 'true' : 'false');
+    }
+    const response = await axios.post(`${apiBase}/${pageId}/photos`, form, {
+      headers: form.getHeaders(),
+    });
+    return response.data;
+  }
+
+  const localPath = resolved?.localPath || resolveLocalImagePath(imageUrl);
   if (localPath) {
     const form = new FormData();
     form.append('source', fs.createReadStream(localPath));
@@ -85,9 +95,12 @@ async function publishPhoto({ pageId, pageToken, message, imageUrl, scheduledUni
     return response.data;
   }
 
+  const remoteUrl = resolved?.remoteUrl
+    || (imageUrl?.startsWith('http') ? imageUrl : `${process.env.PUBLIC_BASE_URL || 'http://localhost:3001'}${imageUrl}`);
+
   const response = await axios.post(`${apiBase}/${pageId}/photos`, null, {
     params: {
-      url: imageUrl.startsWith('http') ? imageUrl : `${process.env.PUBLIC_BASE_URL || 'http://localhost:3001'}${imageUrl}`,
+      url: remoteUrl,
       message,
       access_token: pageToken,
       published: scheduledUnix ? false : published,
@@ -98,7 +111,7 @@ async function publishPhoto({ pageId, pageToken, message, imageUrl, scheduledUni
 }
 
 async function publishVideo({ pageId, pageToken, message, videoUrl, scheduledUnix, published }) {
-  const localPath = resolvePublicPath(videoUrl);
+  const localPath = resolveLocalImagePath(videoUrl);
   if (localPath) {
     const form = new FormData();
     form.append('source', fs.createReadStream(localPath));

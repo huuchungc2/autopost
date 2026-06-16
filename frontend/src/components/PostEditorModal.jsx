@@ -245,7 +245,7 @@ export default function PostEditorModal({ open, post, pages, initialPageId, onCl
             <label>
               Trạng thái
               <select value={form.status} onChange={(e) => setField('status', e.target.value)}>
-                <option value="draft">Draft</option>
+                <option value="draft">Nháp</option>
                 <option value="pending_approval">Chờ duyệt</option>
               </select>
             </label>

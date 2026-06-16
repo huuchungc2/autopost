@@ -4,6 +4,8 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { authenticate } from '../middleware/auth.js';
+import { storeUploadedImage, validateImageUpload } from '../services/imageService.js';
+import { isUsingGoogleDrive } from '../services/mediaStorage.js';
 import { storeVideoFile, validateVideoFile } from '../services/videoService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -37,12 +39,23 @@ const videoStorage = multer.diskStorage({
   },
 });
 
-const imageUpload = multer({ storage: imageStorage });
+const imageUpload = multer({
+  storage: isUsingGoogleDrive() ? multer.memoryStorage() : imageStorage,
+});
 const videoUpload = multer({ storage: videoStorage });
 
-router.post('/image', imageUpload.single('image'), (req, res) => {
+router.post('/image', imageUpload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Image is required' });
-  res.json({ url: `/images/${req.file.filename}` });
+  try {
+    await validateImageUpload(req.file);
+    if (isUsingGoogleDrive()) {
+      const url = await storeUploadedImage(req.file);
+      return res.json({ url, storage: 'google_drive' });
+    }
+    res.json({ url: `/images/${req.file.filename}`, storage: 'local' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
 });
 
 router.post('/video', videoUpload.single('video'), (req, res) => {

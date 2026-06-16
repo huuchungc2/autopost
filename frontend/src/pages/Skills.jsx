@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Upload, FileText, PenLine } from 'lucide-react';
 import api from '../services/api';
+import { skillTypeLabel, SKILL_TYPE_HINTS } from '../config/vi';
 
 const initialForm = {
   name: '',
   description: '',
+  skill_type: 'text',
   system_prompt: '',
 };
 
@@ -128,6 +130,7 @@ export default function Skills() {
       setForm({
         name: detail.name || '',
         description: detail.description || '',
+        skill_type: detail.skill_type || 'text',
         system_prompt: detail.system_prompt || '',
       });
       setPromptMode('type');
@@ -159,9 +162,9 @@ export default function Skills() {
     <div className="page-shell">
       <div className="page-header">
         <div>
-          <h1>Skills</h1>
+          <h1>Skill AI</h1>
           <p>
-            System prompt cho AI — gắn vào fanpage ở <Link to="/pages">Pages</Link> để dùng khi Generate / auto đăng bài.
+            System prompt cho AI — gắn vào fanpage ở <Link to="/pages">Fanpage</Link> để dùng khi tạo bài / auto đăng bài.
           </p>
         </div>
       </div>
@@ -177,6 +180,15 @@ export default function Skills() {
           <label>
             Mô tả
             <input value={form.description} onChange={(e) => handleChange('description', e.target.value)} placeholder="Ghi chú ngắn" />
+          </label>
+          <label>
+            Loại skill
+            <select value={form.skill_type} onChange={(e) => handleChange('skill_type', e.target.value)}>
+              <option value="text">Viết bài (text)</option>
+              <option value="image">Ảnh (image_prompt)</option>
+              <option value="video">Video (video_prompt)</option>
+            </select>
+            <small className="text-muted">{SKILL_TYPE_HINTS[form.skill_type]}</small>
           </label>
         </form>
 
@@ -195,7 +207,7 @@ export default function Skills() {
             onClick={() => setPromptMode('file')}
           >
             <Upload size={16} />
-            Upload file
+            Upload file prompt
           </button>
         </div>
 
@@ -206,7 +218,13 @@ export default function Skills() {
               rows={8}
               value={form.system_prompt}
               onChange={(e) => handleChange('system_prompt', e.target.value)}
-              placeholder="Bạn là content writer cho fanpage... Viết bài Facebook bằng tiếng Việt..."
+              placeholder={
+                form.skill_type === 'image'
+                  ? 'Mô tả phong cách ảnh: ánh sáng, góc máy, không chữ trên ảnh, mood...'
+                  : form.skill_type === 'video'
+                    ? 'Mô tả phong cách video: cảnh quay, nhịp, 9:16, chuyển động camera...'
+                    : 'Bạn là content writer cho fanpage... Viết bài Facebook bằng tiếng Việt...'
+              }
               required
             />
             <small className="text-muted">{form.system_prompt.length} ký tự</small>
@@ -260,6 +278,7 @@ export default function Skills() {
           <thead>
             <tr>
               <th>Skill</th>
+              <th>Loại</th>
               <th>Fanpage dùng skill này</th>
               <th>Prompt</th>
               <th>Thao tác</th>
@@ -272,18 +291,19 @@ export default function Skills() {
                   <strong>{skill.name}</strong>
                   {skill.description && <div className="text-muted">{skill.description}</div>}
                 </td>
+                <td><span className="skill-type-badge">{skillTypeLabel(skill.skill_type || 'text')}</span></td>
                 <td>
                   {skill.pages?.length ? (
                     <div className="skill-page-tags">
                       {skill.pages.map((page) => (
                         <Link key={page.id} to="/pages" className="skill-page-tag">
                           {page.name}
-                          {!page.is_active && ' (off)'}
+                          {!page.is_active && ' (tắt)'}
                         </Link>
                       ))}
                     </div>
                   ) : (
-                    <span className="text-muted">Chưa gắn fanpage — vào Pages để chọn</span>
+                    <span className="text-muted">Chưa gắn fanpage — vào Fanpage để chọn</span>
                   )}
                 </td>
                 <td>
@@ -305,7 +325,7 @@ export default function Skills() {
             ))}
             {!skills.length && (
               <tr>
-                <td colSpan={4} className="text-muted">Chưa có skill — tạo mới hoặc chạy npm run seed</td>
+                <td colSpan={5} className="text-muted">Chưa có skill — tạo mới hoặc chạy npm run seed</td>
               </tr>
             )}
           </tbody>
@@ -313,11 +333,12 @@ export default function Skills() {
       </div>
 
       <div className="card skill-usage-hint" style={{ marginTop: 16 }}>
-        <h4>Cách skill được dùng khi đăng bài</h4>
+        <h4>Cách skill được dùng khi tạo bài</h4>
         <ol>
-          <li>Tạo / upload prompt ở đây</li>
-          <li>Vào <Link to="/pages">Pages</Link> → chọn <strong>Skill</strong> cho từng fanpage</li>
-          <li>Vào <Link to="/generate">Generate</Link> → chọn fanpage → AI dùng prompt của skill đó</li>
+          <li>Tạo skill theo loại: <strong>Viết bài</strong>, <strong>Ảnh</strong>, hoặc <strong>Video</strong></li>
+          <li>Vào <Link to="/pages">Fanpage</Link> → gắn 1+ skill mỗi loại</li>
+          <li>AI gọi <strong>1 lần</strong> → JSON <code>content</code> + <code>image_prompt</code> hoặc <code>video_prompt</code></li>
+          <li>Ảnh: DALL-E/Ideogram vẽ theo <code>image_prompt</code>. Video: lưu prompt (chưa AI render file)</li>
         </ol>
       </div>
     </div>

@@ -7,18 +7,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../services/authContext';
 import { compareApiDates, formatDateTime } from '../utils/date';
 
-const STATUS_LABELS = {
-  draft: 'Nháp',
-  pending_approval: 'Chờ duyệt',
-  scheduled: 'Đã lên lịch',
-  published: 'Đã đăng',
-  failed: 'Lỗi',
-};
-
-function statusLabel(status) {
-  return STATUS_LABELS[status] || status;
-}
-
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const isSuperAdmin = user?.role === 'super_admin';
@@ -148,7 +136,7 @@ export default function Dashboard() {
           <div className="status-chips">
             {Object.entries(stats.byStatus).map(([status, count]) => (
               <button key={status} type="button" className="status-chip" onClick={() => navigate(`/posts?status=${status}`)}>
-                <Badge status={status}>{statusLabel(status)}</Badge> {count}
+                <Badge status={status} /> {count}
               </button>
             ))}
             {!Object.keys(stats.byStatus).length && (
@@ -178,7 +166,7 @@ export default function Dashboard() {
                 <tr key={post.id}>
                   <td>{post.id}</td>
                   <td>{post.topic || '—'}</td>
-                  <td><Badge status={post.status}>{statusLabel(post.status)}</Badge></td>
+                  <td><Badge status={post.status} /></td>
                   <td>{formatDateTime(post.scheduled_at)}</td>
                 </tr>
               ))}

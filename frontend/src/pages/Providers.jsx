@@ -210,7 +210,7 @@ export default function Providers() {
       const sample = response.data.sample || response.data.message || 'OK';
       showToast(typeof sample === 'string' ? sample.slice(0, 120) : 'Test thành công', 'success');
     } catch (err) {
-      showToast(err.response?.data?.error || 'Test thất bại — kiểm tra API key / endpoint', 'error');
+      showToast(err.response?.data?.error || 'Thử provider thất bại — kiểm tra API key / endpoint', 'error');
     }
   };
 
@@ -492,7 +492,7 @@ export default function Providers() {
                 </td>
                 <td>{provider.is_active ? 'Có' : 'Không'}</td>
                 <td>
-                  <button type="button" className="btn-link" onClick={() => handleTest(provider.id)}>Test</button>
+                  <button type="button" className="btn-link" onClick={() => handleTest(provider.id)}>Thử</button>
                   <button type="button" className="btn-link" onClick={() => startEdit(provider)}>Sửa</button>
                   <button type="button" className="btn-link" onClick={() => handleDelete(provider.id)}>Xóa</button>
                 </td>

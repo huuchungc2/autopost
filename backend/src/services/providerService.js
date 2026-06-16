@@ -1,5 +1,6 @@
 import { query } from '../db.js';
-import { resolveSkillPrompt } from './pageSkillsService.js';
+import { resolveGenerationPrompts } from './pageSkillsService.js';
+import { resolveMediaMode } from './contentGenerationService.js';
 
 export async function getProviderById(id) {
   if (!id) return null;
@@ -34,7 +35,11 @@ export function formatEndpoint(endpoint, model) {
   return endpoint.replace(/\{model\}/g, model || '');
 }
 
-export async function getPageGenerationConfig(pageId, skillId = null) {
+export async function getPageGenerationConfig(pageId, options = null) {
+  const opts = typeof options === 'object' && options !== null
+    ? options
+    : { textSkillId: options || null };
+
   const rows = await query(
     `SELECT fp.id, fp.name, fp.skill_id, fp.text_provider_id, fp.image_provider_id
      FROM fb_pages fp
@@ -44,16 +49,36 @@ export async function getPageGenerationConfig(pageId, skillId = null) {
   const page = rows[0];
   if (!page) return null;
 
-  const { skills, skillPrompt, activeSkill } = await resolveSkillPrompt(pageId, skillId);
+  const prompts = await resolveGenerationPrompts(pageId, {
+    textSkillId: opts.textSkillId || opts.skill_id || null,
+    mediaType: opts.mediaType || opts.media_type || null,
+  });
+
   const textProvider = await getProviderById(page.text_provider_id);
   const imageProvider = await getProviderById(page.image_provider_id);
 
+  const mediaMode = resolveMediaMode({
+    mediaType: opts.mediaType || opts.media_type || prompts.mediaType,
+    imageSkills: prompts.imageSkills,
+    videoSkills: prompts.videoSkills,
+    imageProvider,
+  });
+
   return {
     page,
-    skills,
-    activeSkill,
-    skillPrompt,
+    skills: prompts.skills,
+    textSkills: prompts.textSkills,
+    imageSkills: prompts.imageSkills,
+    videoSkills: prompts.videoSkills,
+    textSystemPrompt: prompts.textSystemPrompt,
+    imageSystemPrompt: prompts.imageSystemPrompt,
+    videoSystemPrompt: prompts.videoSystemPrompt,
+    mediaMode,
+    activeTextSkill: prompts.activeTextSkill,
     textProvider,
     imageProvider,
+    // tương thích cũ
+    skillPrompt: prompts.textSystemPrompt,
+    activeSkill: prompts.activeTextSkill,
   };
 }

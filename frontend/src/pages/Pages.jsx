@@ -12,6 +12,8 @@ import { useAuth } from '../services/authContext';
 
 import { formatDateTime } from '../utils/date';
 
+import { WEEK_DAYS as DAYS, tokenStatusLabel, skillTypeLabel } from '../config/vi';
+
 
 
 const initialForm = {
@@ -33,26 +35,6 @@ const initialForm = {
   is_active: true,
 
 };
-
-
-
-const DAYS = [
-
-  { value: 0, label: 'Sunday' },
-
-  { value: 1, label: 'Monday' },
-
-  { value: 2, label: 'Tuesday' },
-
-  { value: 3, label: 'Wednesday' },
-
-  { value: 4, label: 'Thursday' },
-
-  { value: 5, label: 'Friday' },
-
-  { value: 6, label: 'Saturday' },
-
-];
 
 
 
@@ -490,6 +472,38 @@ export default function Pages() {
 
   const selectedSkills = skills.filter((s) => form.skill_ids.includes(s.id));
 
+  const skillsByType = {
+    text: skills.filter((s) => (s.skill_type || 'text') === 'text'),
+    image: skills.filter((s) => s.skill_type === 'image'),
+    video: skills.filter((s) => s.skill_type === 'video'),
+  };
+
+  const renderSkillGroup = (type, list) => {
+    if (!list.length) return null;
+    return (
+      <div key={type} className="page-skill-group">
+        <span className="field-label">{skillTypeLabel(type)}</span>
+        <div className="page-skill-picker">
+          {list.map((s) => (
+            <label key={s.id} className="page-skill-option">
+              <input
+                type="checkbox"
+                checked={form.skill_ids.includes(s.id)}
+                onChange={() => toggleSkill(s.id)}
+              />
+              <span>
+                <strong>{s.name}</strong>
+                {s.prompt_preview && (
+                  <small className="text-muted">{s.prompt_preview}</small>
+                )}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
 
 
   return (
@@ -500,7 +514,7 @@ export default function Pages() {
 
         <div>
 
-          <h1>Facebook Pages</h1>
+          <h1>Fanpage</h1>
 
           <p>{isSuperAdmin ? 'Quản lý tất cả fanpage.' : 'Chỉ hiển thị page được gán cho bạn.'}</p>
 
@@ -532,7 +546,7 @@ export default function Pages() {
 
           <thead>
 
-            <tr><th>Name</th><th>Page ID</th><th>Token</th><th>Skill AI</th><th>Actions</th></tr>
+            <tr><th>Tên</th><th>Page ID</th><th>Token</th><th>Skill AI</th><th>Thao tác</th></tr>
 
           </thead>
 
@@ -543,7 +557,7 @@ export default function Pages() {
                 <td colSpan={5}>
                   {isSuperAdmin
                     ? 'Chưa có fanpage nào — bấm Thêm fanpage.'
-                    : 'Chưa được gán fanpage nào. Liên hệ super admin gán page ở mục Users → Edit → tick fanpage → Update.'}
+                    : 'Chưa được gán fanpage nào. Liên hệ super admin gán page ở mục Người dùng → Sửa → tick fanpage → Cập nhật.'}
                 </td>
               </tr>
             )}
@@ -560,11 +574,11 @@ export default function Pages() {
 
                   <div className="token-cell">
 
-                    <span className={`token-badge token-${page.token_status}`}>{page.token_status}</span>
+                    <span className={`token-badge token-${page.token_status}`}>{tokenStatusLabel(page.token_status)}</span>
 
                     {page.page_token_preview && (
 
-                      <code className="token-preview-text" title="Preview — bấm Xem token để xem đủ">
+                      <code className="token-preview-text" title="Xem trước — bấm Token để xem đủ">
 
                         {page.page_token_preview}
 
@@ -606,7 +620,7 @@ export default function Pages() {
 
                   <button type="button" className="btn-link" onClick={() => handleEdit(page)}>Sửa</button>
 
-                  <button type="button" className="btn-link" onClick={() => loadTopics(page)}>Topics</button>
+                  <button type="button" className="btn-link" onClick={() => loadTopics(page)}>Chủ đề</button>
 
                   <button type="button" className="btn-link" onClick={() => openTokenModal(page.id)}>Token</button>
 
@@ -754,53 +768,29 @@ export default function Pages() {
 
             <div className="field-span-2">
 
-              <span className="field-label">Skill AI (chọn 1 hoặc nhiều)</span>
+              <span className="field-label">Skill AI (viết bài / ảnh / video)</span>
 
-              <div className="page-skill-picker">
+              {skills.length === 0 ? (
 
-                {skills.length === 0 ? (
+                <span className="text-muted">Chưa có skill — tạo tại mục Skill AI</span>
 
-                  <span className="text-muted">Chưa có skill — tạo tại mục Skills</span>
+              ) : (
 
-                ) : (
+                <>
 
-                  skills.map((s) => (
+                  {renderSkillGroup('text', skillsByType.text)}
 
-                    <label key={s.id} className="page-skill-option">
+                  {renderSkillGroup('image', skillsByType.image)}
 
-                      <input
+                  {renderSkillGroup('video', skillsByType.video)}
 
-                        type="checkbox"
+                </>
 
-                        checked={form.skill_ids.includes(s.id)}
-
-                        onChange={() => toggleSkill(s.id)}
-
-                      />
-
-                      <span>
-
-                        <strong>{s.name}</strong>
-
-                        {s.prompt_preview && (
-
-                          <small className="text-muted">{s.prompt_preview}</small>
-
-                        )}
-
-                      </span>
-
-                    </label>
-
-                  ))
-
-                )}
-
-              </div>
+              )}
 
               {selectedSkills.length > 0 && (
 
-                <span className="field-hint">Đã chọn {selectedSkills.length} skill: {selectedSkills.map((s) => s.name).join(', ')}</span>
+                <span className="field-hint">Đã chọn {selectedSkills.length} skill: {selectedSkills.map((s) => `${s.name} (${skillTypeLabel(s.skill_type || 'text')})`).join(', ')}</span>
 
               )}
 
@@ -944,7 +934,7 @@ export default function Pages() {
 
               <table className="table">
 
-                <thead><tr><th>Ngày</th><th>Chủ đề</th><th>Giờ</th><th>Active</th></tr></thead>
+                <thead><tr><th>Ngày</th><th>Chủ đề</th><th>Giờ</th><th>Bật</th></tr></thead>
 
                 <tbody>
 
@@ -982,7 +972,7 @@ export default function Pages() {
 
         open={!!tokenModalId}
 
-        title={tokenDetail ? tokenDetail.name : 'Page Token'}
+        title={tokenDetail ? tokenDetail.name : 'Token fanpage'}
 
         subtitle="Xem, copy và kiểm tra token với Facebook Graph API"
 
@@ -1020,7 +1010,7 @@ export default function Pages() {
 
                 <span className="token-meta-label">Trạng thái</span>
 
-                <span className={`token-badge token-${tokenDetail.token_status}`}>{tokenDetail.token_status}</span>
+                <span className={`token-badge token-${tokenDetail.token_status}`}>{tokenStatusLabel(tokenDetail.token_status)}</span>
 
               </div>
 
@@ -1064,7 +1054,7 @@ export default function Pages() {
 
                 <button type="button" className="btn btn-secondary btn-sm" onClick={copyToken}>
 
-                  <Copy size={16} /> Copy
+                  <Copy size={16} /> Sao chép
 
                 </button>
 
@@ -1088,7 +1078,7 @@ export default function Pages() {
 
                   <>
 
-                    Token OK — Facebook: <strong>{verifyResult.fb_name}</strong> (ID: {verifyResult.fb_page_id})
+                    Token hợp lệ — Facebook: <strong>{verifyResult.fb_name}</strong> (ID: {verifyResult.fb_page_id})
 
                     {!verifyResult.matches_configured_page && (
 

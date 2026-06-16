@@ -15,10 +15,10 @@ export default class ErrorBoundary extends Component {
       return (
         <div className="page-shell">
           <div className="card">
-            <h2>Something went wrong</h2>
-            <p>Please refresh the page or contact support.</p>
+            <h2>Đã xảy ra lỗi</h2>
+            <p>Vui lòng tải lại trang hoặc liên hệ quản trị viên.</p>
             <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
-              Refresh
+              Tải lại
             </button>
           </div>
         </div>

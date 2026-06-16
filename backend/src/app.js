@@ -13,13 +13,15 @@ import jobsRoutes from './routes/jobs.js';
 import notificationsRoutes from './routes/notifications.js';
 import activityRoutes from './routes/activity.js';
 import uploadRoutes from './routes/upload.js';
+import mediaRoutes from './routes/media.js';
 import settingsRoutes from './routes/settings.js';
 import { activityLogger } from './middleware/activityLog.js';
-import { startScheduler } from './services/scheduler.js';
+import { getMediaStorageMode, isUsingGoogleDrive } from './services/mediaStorage.js';
 import {
   backfillProviderMetadata,
   seedProviderTemplates,
 } from './services/providerTemplateService.js';
+import { ensureUserPagesTables, ensurePageSkillsTable, ensureContentTopicsRepeatDaily, ensureContentTopicsLastRun, ensureSkillsTypeColumn } from './services/migrationRunner.js';
 
 dotenv.config();
 
@@ -37,7 +39,12 @@ app.use('/images', express.static(path.join(publicPath, 'images')));
 app.use('/videos', express.static(path.join(publicPath, 'videos')));
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'autopost-backend', scheduler: process.env.DISABLE_SCHEDULER !== 'true' });
+  res.json({
+    status: 'ok',
+    service: 'autopost-backend',
+    scheduler: process.env.DISABLE_SCHEDULER !== 'true',
+    media_storage: getMediaStorageMode(),
+  });
 });
 
 app.use('/api/auth', authRoutes);
@@ -50,6 +57,7 @@ app.use('/api/jobs', jobsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/media', mediaRoutes);
 app.use('/api/settings', settingsRoutes);
 
 app.use((req, res) => {
@@ -65,6 +73,20 @@ app.use((err, req, res, next) => {
 app.listen(port, async () => {
   console.log(`AutoPost backend listening on http://localhost:${port}`);
   try {
+    await ensureUserPagesTables();
+  } catch (error) {
+    console.warn('user_pages migration failed:', error.message);
+    console.warn('Chạy thủ công: backend/migrations/001_user_pages.sql');
+  }
+  try {
+    await ensurePageSkillsTable();
+    await ensureContentTopicsRepeatDaily();
+    await ensureContentTopicsLastRun();
+    await ensureSkillsTypeColumn();
+  } catch (error) {
+    console.warn('DB migration failed:', error.message);
+  }
+  try {
     await seedProviderTemplates();
     await backfillProviderMetadata();
     console.log('AI provider templates ready');
@@ -73,4 +95,9 @@ app.listen(port, async () => {
     console.warn('Chạy backend/migrations/002_provider_templates.sql nếu DB cũ thiếu bảng/cột');
   }
   startScheduler();
+  if (isUsingGoogleDrive()) {
+    console.log('Media storage: Google Drive (ảnh không lưu lâu trên VPS)');
+  } else {
+    console.log('Media storage: local VPS disk');
+  }
 });

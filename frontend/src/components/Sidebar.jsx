@@ -27,7 +27,7 @@ export default function Sidebar({ role, collapsed, onToggle }) {
 
       {role !== 'super_admin' && !collapsed && (
         <div className="sidebar-role-hint">
-          {role === 'admin' ? 'Admin — fanpage & provider được gán' : 'Editor — fanpage được gán'}
+          {role === 'admin' ? 'Quản trị viên — fanpage & provider được gán' : 'Biên tập — fanpage được gán'}
         </div>
       )}
 

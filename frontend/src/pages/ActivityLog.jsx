@@ -12,7 +12,7 @@ export default function ActivityLog() {
       .then((response) => setLogs(response.data))
       .catch((err) => {
         console.error(err);
-        setError(err.response?.data?.error || 'Unable to load activity logs');
+        setError(err.response?.data?.error || 'Không tải được nhật ký hoạt động');
       });
   }, []);
 
@@ -20,30 +20,30 @@ export default function ActivityLog() {
     <div className="page-shell">
       <div className="page-header">
         <div>
-          <h1>Activity Log</h1>
-          <p>Recent user actions and system events.</p>
+          <h1>Nhật ký hoạt động</h1>
+          <p>Các thao tác gần đây của người dùng và hệ thống.</p>
         </div>
       </div>
       <div className="card">
         {error && <div className="form-error">{error}</div>}
-        {!error && logs.length === 0 && <p>No activity logs available.</p>}
+        {!error && logs.length === 0 && <p>Chưa có nhật ký nào.</p>}
         {logs.length > 0 && (
           <table className="table">
             <thead>
               <tr>
-                <th>Time</th>
-                <th>User</th>
-                <th>Action</th>
-                <th>Target</th>
+                <th>Thời gian</th>
+                <th>Người dùng</th>
+                <th>Hành động</th>
+                <th>Đối tượng</th>
               </tr>
             </thead>
             <tbody>
               {logs.map((log) => (
                 <tr key={log.id}>
                   <td>{formatDateTime(log.created_at)}</td>
-                  <td>{log.user_id || 'System'}</td>
+                  <td>{log.user_id || 'Hệ thống'}</td>
                   <td>{log.action}</td>
-                  <td>{log.target_type || 'N/A'}{log.target_id ? ` #${log.target_id}` : ''}</td>
+                  <td>{log.target_type || '—'}{log.target_id ? ` #${log.target_id}` : ''}</td>
                 </tr>
               ))}
             </tbody>

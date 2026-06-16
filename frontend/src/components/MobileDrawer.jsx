@@ -28,7 +28,7 @@ export default function MobileDrawer({ open, role, user, onClose, onLogout, onCh
 
         {role !== 'super_admin' && (
           <div className="mobile-drawer-hint">
-            {role === 'admin' ? 'Admin — fanpage & provider được gán' : 'Editor — fanpage được gán'}
+            {role === 'admin' ? 'Quản trị viên — fanpage & provider được gán' : 'Biên tập — fanpage được gán'}
           </div>
         )}
 

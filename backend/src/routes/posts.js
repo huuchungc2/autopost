@@ -2,8 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { query } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
-import { generateText } from '../services/aiService.js';
-import { generateImage } from '../services/imageService.js';
+import { generatePostWithMedia } from '../services/contentGenerationService.js';
 import { getPageGenerationConfig } from '../services/providerService.js';
 import { postToFacebook } from '../services/fbService.js';
 import { createNotification } from '../services/notifyService.js';
@@ -13,6 +12,13 @@ import {
   assertPostAccess,
   pageIdInClause,
 } from '../services/pageAccessService.js';
+import {
+  buildImportTemplateCsv,
+  parseCsvText,
+  normalizeImportRows,
+  buildAutoScheduleSlots,
+  MAX_IMPORT_ROWS,
+} from '../services/postImportExportService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 const router = express.Router();
@@ -47,6 +53,193 @@ router.get('/', asyncHandler(async (req, res) => {
   res.json(posts);
 }));
 
+router.post('/bulk-schedule', asyncHandler(async (req, res) => {
+  const { post_ids, page_id, start_date, times } = req.body;
+  if (!start_date || !Array.isArray(times) || !times.length) {
+    return res.status(400).json({ error: 'start_date và times là bắt buộc' });
+  }
+
+  const normalizedTimes = times
+    .map((t) => String(t).trim().slice(0, 5))
+    .filter(Boolean);
+  if (!normalizedTimes.length) {
+    return res.status(400).json({ error: 'Cần ít nhất một khung giờ' });
+  }
+
+  const accessibleIds = await getAccessiblePageIds(req.user);
+  const schedulableStatuses = ['draft', 'pending_approval'];
+  let posts = [];
+
+  if (Array.isArray(post_ids) && post_ids.length) {
+    const ids = post_ids.map(Number).filter(Boolean);
+    if (!ids.length) return res.status(400).json({ error: 'post_ids không hợp lệ' });
+
+    const placeholders = ids.map(() => '?').join(',');
+    posts = await query(
+      `SELECT id, page_id, status FROM posts WHERE id IN (${placeholders}) ORDER BY id ASC`,
+      ids
+    );
+    for (const post of posts) {
+      await assertPostAccess(req.user, post.id);
+      if (!schedulableStatuses.includes(post.status)) {
+        return res.status(400).json({ error: `Bài #${post.id} không thể lên lịch (trạng thái: ${post.status})` });
+      }
+    }
+  } else {
+    const conditions = [`status IN ('draft', 'pending_approval')`];
+    const params = [];
+
+    const accessFilter = pageIdInClause(accessibleIds, 'page_id');
+    if (accessFilter.clause) {
+      conditions.push(accessFilter.clause.replace(/^ AND /, ''));
+      params.push(...accessFilter.params);
+    }
+    if (page_id) {
+      await assertPageAccess(req.user, page_id);
+      conditions.push('page_id = ?');
+      params.push(page_id);
+    }
+
+    posts = await query(
+      `SELECT id, page_id, status FROM posts
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY created_at ASC, id ASC
+       LIMIT 500`,
+      params
+    );
+  }
+
+  if (!posts.length) {
+    return res.status(400).json({ error: 'Không có bài nào để lên lịch' });
+  }
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const addDays = (dateStr, days) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + days);
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+  };
+
+  const slotsPerDay = normalizedTimes.length;
+  const updates = [];
+
+  for (let i = 0; i < posts.length; i += 1) {
+    const dayOffset = Math.floor(i / slotsPerDay);
+    const time = normalizedTimes[i % slotsPerDay];
+    const date = addDays(start_date, dayOffset);
+    const scheduledAt = `${date} ${time}:00`;
+    updates.push({ id: posts[i].id, scheduled_at: scheduledAt });
+  }
+
+  for (const row of updates) {
+    await query(
+      'UPDATE posts SET status = ?, scheduled_at = ? WHERE id = ?',
+      ['scheduled', row.scheduled_at, row.id]
+    );
+  }
+
+  res.json({
+    scheduled_count: updates.length,
+    days: Math.ceil(updates.length / slotsPerDay),
+    slots_per_day: slotsPerDay,
+    start_date,
+    end_date: updates[updates.length - 1]?.scheduled_at?.slice(0, 10) || start_date,
+  });
+}));
+
+router.get('/import/template', asyncHandler(async (req, res) => {
+  const accessibleIds = await getAccessiblePageIds(req.user);
+  const { clause, params } = pageIdInClause(accessibleIds, 'id');
+  const pages = await query(
+    `SELECT id, name FROM fb_pages WHERE is_active = true${clause} ORDER BY name ASC`,
+    params
+  );
+
+  const csv = buildImportTemplateCsv(pages);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="mau-import-bai-viet.csv"');
+  res.send(csv);
+}));
+
+router.post('/import', asyncHandler(async (req, res) => {
+  const { csv, rows: rawRows, auto_schedule } = req.body;
+
+  let parsedRows = [];
+  if (Array.isArray(rawRows) && rawRows.length) {
+    parsedRows = rawRows.map((row, i) => ({ ...row, _line: row._line || i + 2 }));
+  } else if (csv && String(csv).trim()) {
+    const parsed = parseCsvText(csv);
+    parsedRows = parsed.rows;
+    if (parsedRows.length > MAX_IMPORT_ROWS) {
+      return res.status(400).json({ error: `Tối đa ${MAX_IMPORT_ROWS} dòng mỗi lần import` });
+    }
+    if (!parsedRows.length) {
+      return res.status(400).json({ error: 'File CSV không có dòng dữ liệu hợp lệ' });
+    }
+  } else {
+    return res.status(400).json({ error: 'Cần gửi csv (text) hoặc rows (mảng)' });
+  }
+
+  const accessibleIds = await getAccessiblePageIds(req.user);
+  const { clause, params } = pageIdInClause(accessibleIds, 'id');
+  const pages = await query(
+    `SELECT id, name FROM fb_pages WHERE is_active = true${clause}`,
+    params
+  );
+
+  let { rows, errors } = normalizeImportRows(parsedRows, pages);
+
+  if (!rows.length) {
+    return res.status(400).json({
+      error: 'Không có dòng hợp lệ để import',
+      errors,
+    });
+  }
+
+  if (auto_schedule?.start_date && Array.isArray(auto_schedule.times) && auto_schedule.times.length) {
+    rows = buildAutoScheduleSlots(rows, auto_schedule.start_date, auto_schedule.times);
+  }
+
+  const created = [];
+  for (const row of rows) {
+    await assertPageAccess(req.user, row.page_id);
+    const result = await query(
+      `INSERT INTO posts (page_id, topic, content, image_url, video_url, video_thumb_url, media_type, status, scheduled_at, created_by_type, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, NOW())`,
+      [
+        row.page_id,
+        row.topic,
+        row.content,
+        row.image_url,
+        row.video_url,
+        row.video_thumb_url,
+        row.media_type,
+        row.status,
+        row.scheduled_at,
+        req.user.id,
+      ]
+    );
+    created.push({
+      id: result.insertId,
+      line: row.line,
+      page_id: row.page_id,
+      scheduled_at: row.scheduled_at,
+      status: row.status,
+    });
+  }
+
+  const scheduledCount = created.filter((c) => c.status === 'scheduled').length;
+
+  res.status(201).json({
+    created_count: created.length,
+    scheduled_count: scheduledCount,
+    post_ids: created.map((c) => c.id),
+    errors,
+    posts: created,
+  });
+}));
+
 router.get('/:id', asyncHandler(async (req, res) => {
   await assertPostAccess(req.user, req.params.id);
   const posts = await query(
@@ -57,30 +250,53 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 router.post('/generate', asyncHandler(async (req, res) => {
-  const { page_id, topic, prompt, scheduled_at, skill_id } = req.body;
+  const { page_id, topic, prompt, scheduled_at, skill_id, media_type } = req.body;
   if (!page_id || !topic) return res.status(400).json({ error: 'page_id and topic are required' });
   await assertPageAccess(req.user, page_id);
 
-  const config = await getPageGenerationConfig(page_id, skill_id || null);
+  const config = await getPageGenerationConfig(page_id, {
+    textSkillId: skill_id || null,
+    mediaType: media_type || null,
+  });
   if (!config) return res.status(404).json({ error: 'Page not found' });
 
-  const userPrompt = prompt || `Viết bài Facebook về: ${topic}. Viết bằng tiếng Việt.`;
-  const textResult = await generateText(userPrompt, config.textProvider, config.skillPrompt);
-  const imageResult = await generateImage(`Facebook post illustration: ${topic}`, config.imageProvider);
+  const userPrompt = prompt || `Viết bài Facebook về: ${topic}.`;
+  const generated = await generatePostWithMedia({
+    topic,
+    userPrompt,
+    config,
+    mediaMode: config.mediaMode,
+  });
 
+  const status = scheduled_at ? 'scheduled' : 'pending_approval';
   const result = await query(
-    'INSERT INTO posts (page_id, topic, content, image_url, image_prompt, media_type, status, scheduled_at, created_by_type, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
-    [page_id, topic, textResult.text, imageResult.image_url, imageResult.image_prompt, 'image', scheduled_at ? 'scheduled' : 'pending_approval', scheduled_at || null, 'auto', req.user.id]
+    `INSERT INTO posts (page_id, topic, content, image_url, image_prompt, video_prompt, media_type, status, scheduled_at, created_by_type, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'auto', ?, NOW())`,
+    [
+      page_id,
+      topic,
+      generated.content,
+      generated.image_url,
+      generated.image_prompt,
+      generated.video_prompt,
+      generated.media_type,
+      status,
+      scheduled_at || null,
+      req.user.id,
+    ]
   );
 
   res.status(201).json({
     id: result.insertId,
     page_id,
     topic,
-    content: textResult.text,
-    image_url: imageResult.image_url,
-    skill_id: config.activeSkill?.id || null,
-    skill_name: config.activeSkill?.name || null,
+    content: generated.content,
+    image_url: generated.image_url,
+    image_prompt: generated.image_prompt,
+    video_prompt: generated.video_prompt,
+    media_type: generated.media_type,
+    skill_id: config.activeTextSkill?.id || null,
+    skill_name: config.activeTextSkill?.name || null,
   });
 }));
 
@@ -106,14 +322,50 @@ router.post('/generate-batch', asyncHandler(async (req, res) => {
   await assertPageAccess(req.user, page_id);
 
   const batchId = batch_id || crypto.randomUUID();
+  let oneTimeCount = 0;
+  let recurringCount = 0;
+
   for (const job of jobs) {
+    if (!job.topic?.trim()) continue;
+
+    const postTime = job.scheduled_time || '08:00:00';
+    const normalizedTime = postTime.length === 5 ? `${postTime}:00` : postTime;
+
+    if (job.repeat_daily) {
+      await query(
+        `INSERT INTO content_topics (page_id, day_of_week, topic, post_time, is_active, repeat_daily)
+         VALUES (?, 0, ?, ?, true, true)`,
+        [page_id, job.topic.trim(), normalizedTime]
+      );
+      recurringCount += 1;
+      continue;
+    }
+
+    // Một lần: chỉ lưu chủ đề — không bắt buộc ngày/giờ (user tự lên lịch sau khi AI tạo)
     await query(
       'INSERT INTO generate_jobs (batch_id, page_id, topic, scheduled_date, scheduled_time, status, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-      [batchId, page_id, job.topic, job.scheduled_date || null, job.scheduled_time || '08:00:00', 'pending']
+      [
+        batchId,
+        page_id,
+        job.topic.trim(),
+        job.scheduled_date || null,
+        job.scheduled_date ? normalizedTime : null,
+        'pending',
+      ]
     );
+    oneTimeCount += 1;
   }
 
-  res.status(201).json({ batch_id: batchId, count: jobs.length });
+  if (!oneTimeCount && !recurringCount) {
+    return res.status(400).json({ error: 'Cần ít nhất một chủ đề hợp lệ' });
+  }
+
+  res.status(201).json({
+    batch_id: oneTimeCount ? batchId : null,
+    count: oneTimeCount + recurringCount,
+    one_time_count: oneTimeCount,
+    recurring_count: recurringCount,
+  });
 }));
 
 router.post('/', asyncHandler(async (req, res) => {

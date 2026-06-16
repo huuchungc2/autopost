@@ -29,7 +29,7 @@ export default function Login() {
       event.target.querySelector('.form-error')?.remove();
       const el = document.createElement('div');
       el.className = 'form-error';
-      el.textContent = err.response?.data?.error || 'Login failed';
+      el.textContent = err.response?.data?.error || 'Đăng nhập thất bại';
       event.target.appendChild(el);
     }
   };

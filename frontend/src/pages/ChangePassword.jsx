@@ -19,12 +19,12 @@ export default function ChangePassword() {
         new_password: newPassword,
       });
       await refreshUser();
-      showToast('Password changed successfully', 'success');
+      showToast('Đã đổi mật khẩu', 'success');
       setOldPassword('');
       setNewPassword('');
       navigate('/');
     } catch (err) {
-      showToast(err.response?.data?.error || 'Unable to change password', 'error');
+      showToast(err.response?.data?.error || 'Không đổi được mật khẩu', 'error');
     }
   };
 
@@ -32,21 +32,21 @@ export default function ChangePassword() {
     <div className="page-shell">
       <div className="page-header">
         <div>
-          <h1>Change Password</h1>
-          <p>{user?.must_change_password ? 'You must change your password before continuing.' : 'Update credentials for your account.'}</p>
+          <h1>Đổi mật khẩu</h1>
+          <p>{user?.must_change_password ? 'Bạn cần đổi mật khẩu trước khi tiếp tục.' : 'Cập nhật mật khẩu tài khoản của bạn.'}</p>
         </div>
       </div>
       <div className="card form-card">
         <form className="form-grid" onSubmit={handleSubmit}>
           <label>
-            Current password
+            Mật khẩu hiện tại
             <input type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} required />
           </label>
           <label>
-            New password
+            Mật khẩu mới
             <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} />
           </label>
-          <button type="submit" className="btn btn-primary">Save password</button>
+          <button type="submit" className="btn btn-primary">Lưu mật khẩu</button>
         </form>
       </div>
     </div>

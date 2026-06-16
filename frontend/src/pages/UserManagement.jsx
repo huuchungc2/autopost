@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../services/api';
+import { roleLabel } from '../config/vi';
 import { useToast } from '../context/ToastContext';
 
 const initialForm = {
@@ -18,14 +19,24 @@ export default function UserManagement() {
   const [allProviders, setAllProviders] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
+  const [migrationWarning, setMigrationWarning] = useState('');
   const { showToast } = useToast();
 
   const loadUsers = async () => {
     try {
       const response = await api.get('/users');
       setUsers(response.data);
+      const adminWithoutPages = response.data.some(
+        (u) => u.role !== 'super_admin' && Number(u.assigned_page_count) === 0
+      );
+      if (adminWithoutPages) {
+        setMigrationWarning('Có user admin/biên tập chưa được gán fanpage (cột Fanpage = 0). Tick fanpage → bấm Cập nhật.');
+      } else {
+        setMigrationWarning('');
+      }
     } catch (err) {
       console.error(err);
+      setMigrationWarning('Không tải được danh sách user — kiểm tra backend và bảng user_pages.');
     }
   };
 
@@ -95,8 +106,18 @@ export default function UserManagement() {
       };
       if (editingId) {
         const response = await api.put(`/users/${editingId}`, payload);
-        const pageCount = response.data?.assigned_page_count ?? payload.page_ids.length;
-        showToast(`Đã cập nhật user — gán ${pageCount} fanpage`, 'success');
+        const pageCount = response.data?.assigned_page_count ?? 0;
+        const savedIds = response.data?.assigned_page_ids ?? [];
+        if (payload.page_ids.length > 0 && pageCount === 0) {
+          showToast('Gán fanpage thất bại — restart backend hoặc chạy migration 001_user_pages.sql', 'error');
+        } else if (payload.page_ids.length > 0 && pageCount !== payload.page_ids.length) {
+          showToast(`Đã lưu ${pageCount}/${payload.page_ids.length} fanpage — kiểm tra ID page`, 'error');
+        } else {
+          showToast(`Đã cập nhật — gán ${pageCount} fanpage`, 'success');
+        }
+        if (savedIds.length) {
+          console.info('Assigned page IDs:', savedIds);
+        }
       } else {
         const response = await api.post('/users', { ...payload, password: form.password });
         const pageCount = response.data?.assigned_page_count ?? payload.page_ids.length;
@@ -105,7 +126,7 @@ export default function UserManagement() {
       resetForm();
       loadUsers();
     } catch (err) {
-      showToast(err.response?.data?.error || 'Unable to save user', 'error');
+      showToast(err.response?.data?.error || 'Không lưu được user', 'error');
     }
   };
 
@@ -142,13 +163,13 @@ export default function UserManagement() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this user?')) return;
+    if (!window.confirm('Xóa user này?')) return;
     try {
       await api.delete(`/users/${id}`);
-      showToast('User deleted', 'success');
+      showToast('Đã xóa user', 'success');
       loadUsers();
     } catch (err) {
-      showToast(err.response?.data?.error || 'Unable to delete user', 'error');
+      showToast(err.response?.data?.error || 'Không xóa được user', 'error');
     }
   };
 
@@ -156,30 +177,36 @@ export default function UserManagement() {
     <div className="page-shell">
       <div className="page-header">
         <div>
-          <h1>User Management</h1>
-          <p>Super admin gán page và AI provider cho từng admin.</p>
+          <h1>Quản lý người dùng</h1>
+          <p>Super admin gán fanpage và AI provider cho admin/editor.</p>
         </div>
       </div>
 
+      {migrationWarning && (
+        <div className="card modal-alert modal-alert--error" style={{ marginBottom: 16 }}>
+          <p style={{ margin: 0 }}>{migrationWarning}</p>
+        </div>
+      )}
+
       <div className="card form-card">
-        <h2>{editingId ? 'Edit User' : 'New User'}</h2>
+        <h2>{editingId ? 'Sửa người dùng' : 'Thêm người dùng'}</h2>
         <form className="form-grid" onSubmit={handleSubmit}>
-          <label>Name<input value={form.name} onChange={(e) => handleChange('name', e.target.value)} required /></label>
+          <label>Tên<input value={form.name} onChange={(e) => handleChange('name', e.target.value)} required /></label>
           <label>Email<input type="email" value={form.email} onChange={(e) => handleChange('email', e.target.value)} required /></label>
           <label>
-            Password
-            <input type="password" value={form.password} onChange={(e) => handleChange('password', e.target.value)} placeholder={editingId ? 'Leave blank to keep' : ''} {...(editingId ? {} : { required: true })} />
+            Mật khẩu
+            <input type="password" value={form.password} onChange={(e) => handleChange('password', e.target.value)} placeholder={editingId ? 'Để trống nếu giữ mật khẩu cũ' : ''} {...(editingId ? {} : { required: true })} />
           </label>
           <label>
-            Role
+            Vai trò
             <select value={form.role} onChange={(e) => handleChange('role', e.target.value)}>
-              <option value="editor">Editor</option>
-              <option value="admin">Admin</option>
+              <option value="editor">Biên tập</option>
+              <option value="admin">Quản trị viên</option>
               <option value="super_admin">Super Admin</option>
             </select>
           </label>
           <label className="checkbox-label">
-            <input type="checkbox" checked={form.is_active} onChange={(e) => handleChange('is_active', e.target.checked)} /> Active
+            <input type="checkbox" checked={form.is_active} onChange={(e) => handleChange('is_active', e.target.checked)} /> Hoạt động
           </label>
         </form>
 
@@ -187,7 +214,7 @@ export default function UserManagement() {
           <>
             <div className="page-assign-block">
               <h3>Gán fanpage</h3>
-              <p className="text-muted">Tick fanpage rồi bấm <strong>Update</strong> để lưu. Admin chỉ thấy page đã gán ở đây.</p>
+              <p className="text-muted">Tick fanpage rồi bấm <strong>Cập nhật</strong> để lưu. Admin chỉ thấy page đã gán ở đây.</p>
               <div className="page-assign-grid">
                 {allPages.map((page) => (
                   <label key={page.id} className="checkbox-label page-assign-item">
@@ -207,35 +234,39 @@ export default function UserManagement() {
                     {provider.name} <small>({provider.type})</small>
                   </label>
                 ))}
-                {!allProviders.length && <p>Chưa có provider. Tạo ở mục Providers trước.</p>}
+                {!allProviders.length && <p>Chưa có provider. Tạo ở mục AI Provider trước.</p>}
               </div>
             </div>
           </>
         )}
 
         <div className="header-actions" style={{ marginTop: 16 }}>
-          <button type="button" className="btn btn-primary" onClick={handleSubmit}>{editingId ? 'Update' : 'Create'}</button>
-          {editingId && <button type="button" className="btn btn-secondary" onClick={resetForm}>Cancel</button>}
+          <button type="button" className="btn btn-primary" onClick={handleSubmit}>{editingId ? 'Cập nhật' : 'Tạo'}</button>
+          {editingId && <button type="button" className="btn btn-secondary" onClick={resetForm}>Huỷ</button>}
         </div>
       </div>
 
       <div className="card table-wrapper" style={{ marginTop: 24 }}>
         <table className="table">
           <thead>
-            <tr><th>Name</th><th>Email</th><th>Role</th><th>Pages</th><th>Providers</th><th>Active</th><th>Actions</th></tr>
+            <tr><th>Tên</th><th>Email</th><th>Vai trò</th><th>Fanpage</th><th>Provider</th><th>Hoạt động</th><th>Thao tác</th></tr>
           </thead>
           <tbody>
             {users.map((user) => (
               <tr key={user.id}>
                 <td>{user.name}</td>
                 <td>{user.email}</td>
-                <td>{user.role}</td>
-                <td>{user.role === 'super_admin' ? 'Tất cả' : (user.assigned_page_count ?? '—')}</td>
+                <td>{roleLabel(user.role)}</td>
+                <td>{user.role === 'super_admin' ? 'Tất cả' : (
+                  <strong style={Number(user.assigned_page_count) > 0 ? undefined : { color: 'var(--color-error)' }}>
+                    {user.assigned_page_count ?? 0}
+                  </strong>
+                )}</td>
                 <td>{user.role === 'super_admin' ? 'Tất cả' : (user.assigned_provider_count ?? '—')}</td>
-                <td>{user.is_active ? 'Yes' : 'No'}</td>
+                <td>{user.is_active ? 'Có' : 'Không'}</td>
                 <td>
-                  <button type="button" className="btn-link" onClick={() => handleEdit(user)}>Edit</button>
-                  <button type="button" className="btn-link" onClick={() => handleDelete(user.id)}>Delete</button>
+                  <button type="button" className="btn-link" onClick={() => handleEdit(user)}>Sửa</button>
+                  <button type="button" className="btn-link" onClick={() => handleDelete(user.id)}>Xóa</button>
                 </td>
               </tr>
             ))}

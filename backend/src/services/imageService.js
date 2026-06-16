@@ -1,34 +1,18 @@
 import axios from 'axios';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { callWithRateLimit } from './aiService.js';
-import { formatEndpoint, resolveProviderKind } from './providerService.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const imagesDir = path.resolve(__dirname, '../../../public/images');
+import { resolveProviderKind } from './providerService.js';
+import { storeImageBuffer } from './mediaStorage.js';
 
 const DEFAULT_IMAGE_ENDPOINTS = {
   openai: 'https://api.openai.com/v1/images/generations',
   ideogram: 'https://api.ideogram.ai/generate',
 };
 
-function ensureImagesDir() {
-  fs.mkdirSync(imagesDir, { recursive: true });
-}
-
-function saveImageBuffer(buffer, ext = 'png') {
-  ensureImagesDir();
-  const filename = `generated-${Date.now()}.${ext}`;
-  fs.writeFileSync(path.join(imagesDir, filename), buffer);
-  return `/images/${filename}`;
-}
-
-async function downloadAndSave(url) {
+async function downloadBuffer(url) {
   const response = await axios.get(url, { responseType: 'arraybuffer' });
   const ext = url.includes('.jpg') ? 'jpg' : 'png';
-  return saveImageBuffer(Buffer.from(response.data), ext);
+  const mimeType = ext === 'jpg' ? 'image/jpeg' : 'image/png';
+  return { buffer: Buffer.from(response.data), ext, mimeType };
 }
 
 function imageEndpoint(provider) {
@@ -44,7 +28,8 @@ async function generateDalle({ apiKey, model, prompt, endpoint }) {
     { model: model || 'dall-e-3', prompt, n: 1, size: '1024x1024' },
     { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } }
   );
-  const imageUrl = await downloadAndSave(response.data.data[0].url);
+  const { buffer, ext, mimeType } = await downloadBuffer(response.data.data[0].url);
+  const imageUrl = await storeImageBuffer(buffer, { ext, mimeType });
   return { image_url: imageUrl, image_prompt: prompt };
 }
 
@@ -57,7 +42,8 @@ async function generateIdeogram({ apiKey, prompt, endpoint }) {
   );
   const remoteUrl = response.data?.data?.[0]?.url;
   if (!remoteUrl) throw new Error('Ideogram returned no image');
-  const imageUrl = await downloadAndSave(remoteUrl);
+  const { buffer, ext, mimeType } = await downloadBuffer(remoteUrl);
+  const imageUrl = await storeImageBuffer(buffer, { ext, mimeType });
   return { image_url: imageUrl, image_prompt: prompt };
 }
 
@@ -74,12 +60,10 @@ export async function generateImage(prompt, providerConfig = null) {
       if ((kind === 'openai' || providerConfig) && (apiKey || process.env.OPENAI_API_KEY)) {
         return await generateDalle({ apiKey: apiKey || process.env.OPENAI_API_KEY, model: providerConfig?.model, prompt, endpoint });
       }
-      ensureImagesDir();
-      return { image_url: `/images/placeholder-${Date.now()}.png`, image_prompt: prompt };
+      throw new Error('Chưa cấu hình Image AI provider');
     } catch (error) {
       console.error('AI image generation failed:', error?.response?.data || error.message);
-      ensureImagesDir();
-      return { image_url: `/images/placeholder-${Date.now()}.png`, image_prompt: prompt };
+      throw error;
     }
   });
 }
@@ -89,4 +73,9 @@ export async function validateImageUpload(file) {
   const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
   if (!allowedTypes.includes(file.mimetype)) throw new Error('Unsupported image format');
   return true;
+}
+
+export async function storeUploadedImage(file) {
+  const ext = file.originalname?.split('.').pop() || 'jpg';
+  return storeImageBuffer(file.buffer, { ext, mimeType: file.mimetype });
 }

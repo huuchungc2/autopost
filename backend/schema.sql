@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS skills (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(255) NOT NULL,
   description TEXT,
+  skill_type ENUM('text', 'image', 'video') NOT NULL DEFAULT 'text',
   system_prompt LONGTEXT NOT NULL,
   created_by INT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -93,6 +94,8 @@ CREATE TABLE IF NOT EXISTS content_topics (
   topic VARCHAR(500) NOT NULL,
   post_time TIME DEFAULT '08:00:00',
   is_active BOOLEAN DEFAULT true,
+  repeat_daily BOOLEAN DEFAULT false,
+  last_run_date DATE NULL,
   FOREIGN KEY (page_id) REFERENCES fb_pages(id)
 );
 
@@ -103,6 +106,7 @@ CREATE TABLE IF NOT EXISTS posts (
   content LONGTEXT NOT NULL,
   image_url TEXT,
   image_prompt TEXT,
+  video_prompt TEXT,
   video_url TEXT,
   video_thumb_url TEXT,
   media_type ENUM('none','image','video') DEFAULT 'none',

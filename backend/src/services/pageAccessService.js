@@ -56,21 +56,39 @@ export function pageIdInClause(accessibleIds, column = 'id') {
 }
 
 export async function setUserPages(userId, pageIds) {
-  await query('DELETE FROM user_pages WHERE user_id = ?', [userId]);
-  const unique = normalizePageIds(pageIds);
-  for (const pageId of unique) {
-    await query('INSERT INTO user_pages (user_id, page_id) VALUES (?, ?)', [userId, pageId]);
+  try {
+    await query('DELETE FROM user_pages WHERE user_id = ?', [userId]);
+    const unique = normalizePageIds(pageIds);
+    for (const pageId of unique) {
+      await query('INSERT INTO user_pages (user_id, page_id) VALUES (?, ?)', [userId, pageId]);
+    }
+    return unique;
+  } catch (error) {
+    if (error?.code === 'ER_NO_SUCH_TABLE') {
+      const err = new Error('Bảng user_pages chưa tồn tại — restart backend để tự tạo bảng');
+      err.status = 503;
+      throw err;
+    }
+    throw error;
   }
-  return unique;
 }
 
 export async function getUserPages(userId) {
-  return query(
-    `SELECT fp.id, fp.name, fp.page_id, fp.token_status, fp.is_active
-     FROM user_pages up
-     JOIN fb_pages fp ON fp.id = up.page_id
-     WHERE up.user_id = ?
-     ORDER BY fp.name ASC`,
-    [userId]
-  );
+  try {
+    return await query(
+      `SELECT fp.id, fp.name, fp.page_id, fp.token_status, fp.is_active
+       FROM user_pages up
+       JOIN fb_pages fp ON fp.id = up.page_id
+       WHERE up.user_id = ?
+       ORDER BY fp.name ASC`,
+      [userId]
+    );
+  } catch (error) {
+    if (error?.code === 'ER_NO_SUCH_TABLE') {
+      const err = new Error('Bảng user_pages chưa tồn tại — restart backend để tự tạo bảng');
+      err.status = 503;
+      throw err;
+    }
+    throw error;
+  }
 }

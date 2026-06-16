@@ -18,7 +18,7 @@ export default function VideoUpload({ onUploaded }) {
       });
       onUploaded?.({ video_url: response.data.url, filename: file.name });
     } catch (err) {
-      setError(err.response?.data?.error || 'Upload failed');
+      setError(err.response?.data?.error || 'Upload thất bại');
     } finally {
       setUploading(false);
     }
@@ -28,7 +28,7 @@ export default function VideoUpload({ onUploaded }) {
     <div className="video-upload">
       <label className="video-upload-label">
         <input type="file" accept="video/mp4,video/quicktime,video/*" onChange={handleFile} disabled={uploading} />
-        {uploading ? 'Uploading...' : 'Choose video file (max 500MB)'}
+        {uploading ? 'Đang upload...' : 'Chọn file video (tối đa 500MB)'}
       </label>
       {error && <div className="form-error">{error}</div>}
     </div>

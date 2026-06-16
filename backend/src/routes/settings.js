@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { authenticate } from '../middleware/auth.js';
 import { getStorageUsage } from '../services/storageService.js';
+import { getMediaStorageMode, isUsingGoogleDrive } from '../services/mediaStorage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,7 +19,12 @@ router.get('/', (req, res) => {
   const videos = getStorageUsage(path.join(publicRoot, 'videos'), maxVideosMb);
 
   res.json({
-    storage: { images, videos },
+    storage: {
+      images,
+      videos,
+      media_mode: getMediaStorageMode(),
+      images_on_drive: isUsingGoogleDrive(),
+    },
     config: {
       max_images_mb: maxImagesMb,
       max_videos_mb: maxVideosMb,
