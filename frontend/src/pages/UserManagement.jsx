@@ -63,20 +63,22 @@ export default function UserManagement() {
   };
 
   const togglePage = (pageId) => {
+    const id = Number(pageId);
     setForm((prev) => ({
       ...prev,
-      page_ids: prev.page_ids.includes(pageId)
-        ? prev.page_ids.filter((id) => id !== pageId)
-        : [...prev.page_ids, pageId],
+      page_ids: prev.page_ids.some((x) => Number(x) === id)
+        ? prev.page_ids.filter((x) => Number(x) !== id)
+        : [...prev.page_ids, id],
     }));
   };
 
   const toggleProvider = (providerId) => {
+    const id = Number(providerId);
     setForm((prev) => ({
       ...prev,
-      provider_ids: prev.provider_ids.includes(providerId)
-        ? prev.provider_ids.filter((id) => id !== providerId)
-        : [...prev.provider_ids, providerId],
+      provider_ids: prev.provider_ids.some((x) => Number(x) === id)
+        ? prev.provider_ids.filter((x) => Number(x) !== id)
+        : [...prev.provider_ids, id],
     }));
   };
 
@@ -88,15 +90,17 @@ export default function UserManagement() {
         email: form.email,
         role: form.role,
         is_active: form.is_active,
-        page_ids: form.role === 'super_admin' ? [] : form.page_ids,
-        provider_ids: form.role === 'super_admin' ? [] : form.provider_ids,
+        page_ids: form.role === 'super_admin' ? [] : form.page_ids.map(Number).filter(Boolean),
+        provider_ids: form.role === 'super_admin' ? [] : form.provider_ids.map(Number).filter(Boolean),
       };
       if (editingId) {
-        await api.put(`/users/${editingId}`, payload);
-        showToast('User updated', 'success');
+        const response = await api.put(`/users/${editingId}`, payload);
+        const pageCount = response.data?.assigned_page_count ?? payload.page_ids.length;
+        showToast(`Đã cập nhật user — gán ${pageCount} fanpage`, 'success');
       } else {
-        await api.post('/users', { ...payload, password: form.password });
-        showToast('User created', 'success');
+        const response = await api.post('/users', { ...payload, password: form.password });
+        const pageCount = response.data?.assigned_page_count ?? payload.page_ids.length;
+        showToast(`Đã tạo user — gán ${pageCount} fanpage`, 'success');
       }
       resetForm();
       loadUsers();
@@ -107,18 +111,21 @@ export default function UserManagement() {
 
   const handleEdit = async (user) => {
     setEditingId(user.id);
+    await loadPages();
+    await loadProviders();
     let pageIds = [];
     let providerIds = [];
     if (user.role !== 'super_admin') {
       try {
         const pagesRes = await api.get(`/users/${user.id}/pages`);
-        pageIds = pagesRes.data.map((p) => p.id);
-      } catch {
+        pageIds = pagesRes.data.map((p) => Number(p.id)).filter(Boolean);
+      } catch (err) {
         pageIds = [];
+        showToast(err.response?.data?.error || 'Không tải được fanpage đã gán — kiểm tra bảng user_pages', 'error');
       }
       try {
         const providersRes = await api.get(`/users/${user.id}/providers`);
-        providerIds = providersRes.data.map((p) => p.id);
+        providerIds = providersRes.data.map((p) => Number(p.id)).filter(Boolean);
       } catch {
         providerIds = [];
       }
@@ -180,10 +187,11 @@ export default function UserManagement() {
           <>
             <div className="page-assign-block">
               <h3>Gán fanpage</h3>
+              <p className="text-muted">Tick fanpage rồi bấm <strong>Update</strong> để lưu. Admin chỉ thấy page đã gán ở đây.</p>
               <div className="page-assign-grid">
                 {allPages.map((page) => (
                   <label key={page.id} className="checkbox-label page-assign-item">
-                    <input type="checkbox" checked={form.page_ids.includes(page.id)} onChange={() => togglePage(page.id)} />
+                    <input type="checkbox" checked={form.page_ids.some((id) => Number(id) === Number(page.id))} onChange={() => togglePage(page.id)} />
                     {page.name} <small>({page.page_id})</small>
                   </label>
                 ))}
@@ -195,7 +203,7 @@ export default function UserManagement() {
               <div className="page-assign-grid">
                 {allProviders.map((provider) => (
                   <label key={provider.id} className="checkbox-label page-assign-item">
-                    <input type="checkbox" checked={form.provider_ids.includes(provider.id)} onChange={() => toggleProvider(provider.id)} />
+                    <input type="checkbox" checked={form.provider_ids.some((id) => Number(id) === Number(provider.id))} onChange={() => toggleProvider(provider.id)} />
                     {provider.name} <small>({provider.type})</small>
                   </label>
                 ))}
@@ -214,7 +222,7 @@ export default function UserManagement() {
       <div className="card table-wrapper" style={{ marginTop: 24 }}>
         <table className="table">
           <thead>
-            <tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th>Actions</th></tr>
+            <tr><th>Name</th><th>Email</th><th>Role</th><th>Pages</th><th>Providers</th><th>Active</th><th>Actions</th></tr>
           </thead>
           <tbody>
             {users.map((user) => (
@@ -222,6 +230,8 @@ export default function UserManagement() {
                 <td>{user.name}</td>
                 <td>{user.email}</td>
                 <td>{user.role}</td>
+                <td>{user.role === 'super_admin' ? 'Tất cả' : (user.assigned_page_count ?? '—')}</td>
+                <td>{user.role === 'super_admin' ? 'Tất cả' : (user.assigned_provider_count ?? '—')}</td>
                 <td>{user.is_active ? 'Yes' : 'No'}</td>
                 <td>
                   <button type="button" className="btn-link" onClick={() => handleEdit(user)}>Edit</button>

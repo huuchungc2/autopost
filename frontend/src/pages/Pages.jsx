@@ -538,6 +538,16 @@ export default function Pages() {
 
           <tbody>
 
+            {!pages.length && (
+              <tr>
+                <td colSpan={5}>
+                  {isSuperAdmin
+                    ? 'Chưa có fanpage nào — bấm Thêm fanpage.'
+                    : 'Chưa được gán fanpage nào. Liên hệ super admin gán page ở mục Users → Edit → tick fanpage → Update.'}
+                </td>
+              </tr>
+            )}
+
             {pages.map((page) => (
 
               <tr key={page.id}>

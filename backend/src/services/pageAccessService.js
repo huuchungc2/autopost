@@ -6,7 +6,12 @@ export function isSuperAdmin(user) {
 
 export async function getAssignedPageIds(userId) {
   const rows = await query('SELECT page_id FROM user_pages WHERE user_id = ?', [userId]);
-  return rows.map((row) => row.page_id);
+  return rows.map((row) => Number(row.page_id)).filter((id) => Number.isFinite(id));
+}
+
+function normalizePageIds(pageIds) {
+  if (!Array.isArray(pageIds)) return [];
+  return [...new Set(pageIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0))];
 }
 
 /** null = all pages (super_admin); [] = none */
@@ -18,7 +23,8 @@ export async function getAccessiblePageIds(user) {
 export async function assertPageAccess(user, pageId) {
   if (isSuperAdmin(user)) return;
   const ids = await getAssignedPageIds(user.id);
-  if (!ids.includes(Number(pageId))) {
+  const targetId = Number(pageId);
+  if (!ids.some((id) => id === targetId)) {
     const error = new Error('Forbidden: no access to this page');
     error.status = 403;
     throw error;
@@ -46,7 +52,7 @@ export function pageIdInClause(accessibleIds, column = 'id') {
 
 export async function setUserPages(userId, pageIds) {
   await query('DELETE FROM user_pages WHERE user_id = ?', [userId]);
-  const unique = [...new Set(pageIds.map(Number).filter(Boolean))];
+  const unique = normalizePageIds(pageIds);
   for (const pageId of unique) {
     await query('INSERT INTO user_pages (user_id, page_id) VALUES (?, ?)', [userId, pageId]);
   }

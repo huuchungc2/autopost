@@ -14,42 +14,42 @@ import {
 export const navGroups = [
   {
     id: 'overview',
-    label: 'Overview',
+    label: 'Tổng quan',
     items: [
-      { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: ['super_admin', 'admin', 'editor'] },
+      { to: '/', label: 'Bảng tin', icon: LayoutDashboard, end: true, roles: ['super_admin', 'admin', 'editor'] },
     ],
   },
   {
     id: 'content',
-    label: 'Content',
+    label: 'Nội dung',
     items: [
-      { to: '/posts', label: 'Posts', icon: FileText, roles: ['super_admin', 'admin', 'editor'] },
-      { to: '/generate', label: 'Generate', icon: Sparkles, roles: ['super_admin', 'admin', 'editor'] },
-      { to: '/batch-generate', label: 'Batch', icon: Layers, roles: ['super_admin', 'admin', 'editor'] },
+      { to: '/posts', label: 'Bài viết', icon: FileText, roles: ['super_admin', 'admin', 'editor'] },
+      { to: '/generate', label: 'Tạo bài', icon: Sparkles, roles: ['super_admin', 'admin', 'editor'] },
+      { to: '/batch-generate', label: 'Hàng loạt', icon: Layers, roles: ['super_admin', 'admin', 'editor'] },
     ],
   },
   {
     id: 'config',
-    label: 'Configuration',
+    label: 'Cấu hình',
     items: [
-      { to: '/pages', label: 'Pages', icon: Flag, roles: ['super_admin', 'admin'] },
-      { to: '/skills', label: 'Skills', icon: Wand2, roles: ['super_admin'] },
-      { to: '/providers', label: 'Providers', icon: Cpu, roles: ['super_admin', 'admin'] },
+      { to: '/pages', label: 'Fanpage', icon: Flag, roles: ['super_admin', 'admin'] },
+      { to: '/skills', label: 'Skill AI', icon: Wand2, roles: ['super_admin'] },
+      { to: '/providers', label: 'AI Provider', icon: Cpu, roles: ['super_admin', 'admin'] },
     ],
   },
   {
     id: 'admin',
-    label: 'Administration',
+    label: 'Quản trị',
     items: [
-      { to: '/users', label: 'Users', icon: Users, roles: ['super_admin'] },
-      { to: '/activity', label: 'Activity', icon: History, roles: ['super_admin'] },
+      { to: '/users', label: 'Người dùng', icon: Users, roles: ['super_admin'] },
+      { to: '/activity', label: 'Nhật ký', icon: History, roles: ['super_admin'] },
     ],
   },
   {
     id: 'system',
-    label: 'System',
+    label: 'Hệ thống',
     items: [
-      { to: '/settings', label: 'Settings', icon: Settings, roles: ['super_admin', 'admin', 'editor'] },
+      { to: '/settings', label: 'Cài đặt', icon: Settings, roles: ['super_admin', 'admin', 'editor'] },
     ],
   },
 ];
@@ -70,7 +70,7 @@ export function getPageTitle(pathname) {
       if (matched) return item.label;
     }
   }
-  if (pathname.startsWith('/change-password')) return 'Change password';
+  if (pathname.startsWith('/change-password')) return 'Đổi mật khẩu';
   return 'AutoPost';
 }
 

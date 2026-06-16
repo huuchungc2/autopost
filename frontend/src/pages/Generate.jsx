@@ -192,7 +192,11 @@ export default function Generate() {
 
           {tab === 'text' ? (
             <>
-              <label>Topic<input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Enter topic" /></label>
+              <label>
+                Chủ đề cho AI
+                <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="VD: Lợi ích đặt xe về quê dịp Tết" />
+                <span className="field-hint">AI viết bài từ chủ đề này — không phải tiêu đề trên Facebook.</span>
+              </label>
               <label>Scheduled<input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} /></label>
               <button type="button" className="btn btn-primary" onClick={handleGenerateText} disabled={isLoading || !topic || !pageId || !skillReady}>
                 {isLoading ? 'Generating...' : 'Generate'}

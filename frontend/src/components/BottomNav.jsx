@@ -3,8 +3,8 @@ import { LayoutDashboard, FileText, Sparkles, Menu } from 'lucide-react';
 import { isSecondaryRoute } from '../config/navConfig';
 
 const tabItems = [
-  { to: '/', label: 'Home', icon: LayoutDashboard, end: true },
-  { to: '/posts', label: 'Posts', icon: FileText },
+  { to: '/', label: 'Trang chủ', icon: LayoutDashboard, end: true },
+  { to: '/posts', label: 'Bài viết', icon: FileText },
   { to: '/generate', label: 'Tạo bài', icon: Sparkles, primary: true },
 ];
 

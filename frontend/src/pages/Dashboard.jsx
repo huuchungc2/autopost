@@ -4,23 +4,36 @@ import Calendar from '../components/Calendar';
 import Badge from '../components/ui/Badge';
 import Skeleton from '../components/ui/Skeleton';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../services/authContext';
 import { compareApiDates, formatDateTime } from '../utils/date';
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
   const [stats, setStats] = useState(null);
   const [posts, setPosts] = useState([]);
   const [filterDate, setFilterDate] = useState('');
+  const [loadError, setLoadError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!user) return;
+
     async function load() {
+      setLoadError('');
       try {
-        const [postsRes, pagesRes, providersRes, usersRes] = await Promise.all([
+        const requests = [
           api.get('/posts'),
           api.get('/pages'),
           api.get('/providers'),
-          api.get('/users'),
-        ]);
+        ];
+        if (isSuperAdmin) {
+          requests.push(api.get('/users'));
+        }
+
+        const results = await Promise.all(requests);
+        const [postsRes, pagesRes, providersRes, usersRes] = results;
+
         setPosts(postsRes.data);
         const byStatus = postsRes.data.reduce((acc, p) => {
           acc[p.status] = (acc[p.status] || 0) + 1;
@@ -30,15 +43,16 @@ export default function Dashboard() {
           posts: postsRes.data.length,
           pages: pagesRes.data.length,
           providers: providersRes.data.length,
-          users: usersRes.data.length,
+          users: isSuperAdmin ? usersRes.data.length : null,
           byStatus,
         });
       } catch (error) {
         console.error(error);
+        setLoadError(error.response?.data?.error || 'Không tải được dashboard');
       }
     }
     load();
-  }, []);
+  }, [user, isSuperAdmin]);
 
   const upcoming = posts
     .filter((p) => p.scheduled_at && p.status === 'scheduled')
@@ -48,7 +62,13 @@ export default function Dashboard() {
   if (!stats) {
     return (
       <div className="page-shell">
-        <Skeleton lines={4} />
+        {loadError ? (
+          <div className="card">
+            <p className="form-error">{loadError}</p>
+          </div>
+        ) : (
+          <Skeleton lines={4} />
+        )}
       </div>
     );
   }
@@ -58,7 +78,7 @@ export default function Dashboard() {
       <div className="page-header">
         <div>
           <h1>Dashboard</h1>
-          <p>Overview of your AutoPost workspace.</p>
+          <p>{isSuperAdmin ? 'Overview of your AutoPost workspace.' : 'Tổng quan page và bài viết được gán cho bạn.'}</p>
         </div>
       </div>
 
@@ -66,7 +86,9 @@ export default function Dashboard() {
         <div className="card card-stat"><h3>Posts</h3><p>{stats.posts}</p></div>
         <div className="card card-stat"><h3>Pages</h3><p>{stats.pages}</p></div>
         <div className="card card-stat"><h3>Providers</h3><p>{stats.providers}</p></div>
-        <div className="card card-stat"><h3>Users</h3><p>{stats.users}</p></div>
+        {isSuperAdmin && (
+          <div className="card card-stat"><h3>Users</h3><p>{stats.users}</p></div>
+        )}
       </div>
 
       <div className="dashboard-split">

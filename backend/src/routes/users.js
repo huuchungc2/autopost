@@ -11,7 +11,14 @@ const router = express.Router();
 router.use(authenticate, canManageUsers);
 
 router.get('/', asyncHandler(async (req, res) => {
-  const users = await query('SELECT id, name, email, role, is_active, must_change_password, created_at FROM users WHERE deleted_at IS NULL');
+  const users = await query(
+    `SELECT u.id, u.name, u.email, u.role, u.is_active, u.must_change_password, u.created_at,
+            (SELECT COUNT(*) FROM user_pages up WHERE up.user_id = u.id) AS assigned_page_count,
+            (SELECT COUNT(*) FROM user_providers uv WHERE uv.user_id = u.id) AS assigned_provider_count
+     FROM users u
+     WHERE u.deleted_at IS NULL
+     ORDER BY u.name ASC`
+  );
   res.json(users);
 }));
 
@@ -24,8 +31,16 @@ router.post('/', asyncHandler(async (req, res) => {
     [name, email, hashed, role]
   );
   if (role !== 'super_admin') {
-    if (page_ids.length) await setUserPages(result.insertId, page_ids);
-    if (provider_ids.length) await setUserProviders(result.insertId, provider_ids);
+    const savedPageIds = await setUserPages(result.insertId, page_ids);
+    const savedProviderIds = await setUserProviders(result.insertId, provider_ids);
+    return res.status(201).json({
+      id: result.insertId,
+      name,
+      email,
+      role,
+      assigned_page_count: savedPageIds.length,
+      assigned_provider_count: savedProviderIds.length,
+    });
   }
   res.status(201).json({ id: result.insertId, name, email, role });
 }));
@@ -83,6 +98,9 @@ router.put('/:id/providers', asyncHandler(async (req, res) => {
 
 router.put('/:id', asyncHandler(async (req, res) => {
   const { name, email, role, is_active, page_ids, provider_ids } = req.body;
+  const existing = (await query('SELECT id, role FROM users WHERE id = ? AND deleted_at IS NULL', [req.params.id]))[0];
+  if (!existing) return res.status(404).json({ error: 'User not found' });
+
   await query('UPDATE users SET name = ?, email = ?, role = ?, is_active = ? WHERE id = ?', [name, email, role, is_active, req.params.id]);
   if (role !== 'super_admin') {
     if (page_ids) await setUserPages(req.params.id, page_ids);
@@ -92,7 +110,13 @@ router.put('/:id', asyncHandler(async (req, res) => {
     await query('DELETE FROM user_pages WHERE user_id = ?', [req.params.id]);
     await query('DELETE FROM user_providers WHERE user_id = ?', [req.params.id]);
   }
-  res.json({ message: 'User updated' });
+  const assigned_pages = role === 'super_admin' ? [] : await getUserPages(req.params.id);
+  const assigned_providers = role === 'super_admin' ? [] : await getUserProviders(req.params.id);
+  res.json({
+    message: 'User updated',
+    assigned_page_count: assigned_pages.length,
+    assigned_provider_count: assigned_providers.length,
+  });
 }));
 
 router.patch('/:id/status', asyncHandler(async (req, res) => {

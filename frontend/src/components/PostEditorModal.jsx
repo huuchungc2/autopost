@@ -166,12 +166,13 @@ export default function PostEditorModal({ open, post, pages, initialPageId, onCl
           </label>
 
           <label>
-            Chủ đề
+            Ghi chú / chủ đề (nội bộ)
             <input
               value={form.topic}
               onChange={(e) => setField('topic', e.target.value)}
-              placeholder="Tiêu đề / chủ đề ngắn"
+              placeholder="VD: Khuyến mãi Tết — chỉ để tìm bài trong hệ thống"
             />
+            <span className="field-hint">Không đăng lên Facebook. Trên fanpage chỉ hiện phần <strong>Nội dung</strong> bên dưới.</span>
           </label>
 
           <label>

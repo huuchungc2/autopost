@@ -42,7 +42,7 @@ export default function Header({ isMobile, pathname, sidebarCollapsed, onSidebar
           type="button"
           className="header-menu-btn"
           onClick={onSidebarToggle}
-          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={sidebarCollapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
         >
           <Menu size={20} />
         </button>
@@ -61,7 +61,7 @@ export default function Header({ isMobile, pathname, sidebarCollapsed, onSidebar
         </button>
         <button type="button" className="header-icon-btn" onClick={logout} title="Đăng xuất">
           <LogOut size={18} />
-          <span className="header-btn-label">Logout</span>
+          <span className="header-btn-label">Đăng xuất</span>
         </button>
       </div>
     </header>
