@@ -315,6 +315,20 @@ export default function Pages() {
     }));
   };
 
+  const loadAssignedUsersIntoForm = async (pageId) => {
+    if (!isSuperAdmin) return;
+    try {
+      const response = await api.get(`/pages/${pageId}`);
+      const ids = response.data?.assigned_user_ids || [];
+      setForm((prev) => ({
+        ...prev,
+        assign_user_ids: Array.isArray(ids) ? ids.map(Number).filter(Boolean) : [],
+      }));
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Không tải được user đã gán cho fanpage', 'error');
+    }
+  };
+
   const handleSubmit = async (event) => {
 
     event?.preventDefault?.();
@@ -378,6 +392,10 @@ export default function Pages() {
     setShowEditToken(false);
 
     setFormModalOpen(true);
+
+    if (isSuperAdmin) {
+      loadAssignedUsersIntoForm(page.id);
+    }
 
   };
 
@@ -867,13 +885,13 @@ export default function Pages() {
 
 
 
-            {isSuperAdmin && !editingId && assignableUsers.length > 0 && (
+            {isSuperAdmin && assignableUsers.length > 0 && (
 
               <div className="field-span-2">
 
                 <span className="field-label">Gán cho admin/biên tập</span>
 
-                <p className="field-hint">Chọn user sẽ thấy fanpage này sau khi tạo. Có thể gán thêm ở mục Quản lý người dùng.</p>
+                <p className="field-hint">Chọn user sẽ thấy fanpage này (kể cả khi sửa fanpage đã có). Có thể gán thêm ở mục Quản lý người dùng.</p>
 
                 <div className="page-assign-grid">
 

@@ -10,6 +10,8 @@ import {
   isSuperAdmin,
   assignPageToUser,
   assignPageToUsers,
+  getPageAssignedUserIds,
+  setPageAssignedUsers,
 } from '../services/pageAccessService.js';
 import { assertProviderAccess } from '../services/providerAccessService.js';
 import { enrichPagesWithSkills, getPageSkills, syncPageSkills } from '../services/pageSkillsService.js';
@@ -52,10 +54,12 @@ router.get('/:id', authenticate, asyncHandler(async (req, res) => {
   if (!pages.length) return res.status(404).json({ error: 'Page not found' });
   const skills = await getPageSkills(req.params.id);
   const page = pages[0];
+  const assigned_user_ids = isSuperAdmin(req.user) ? await getPageAssignedUserIds(req.params.id) : undefined;
   res.json({
     ...page,
     skills,
     skill_ids: skills.map((s) => s.id),
+    ...(assigned_user_ids !== undefined ? { assigned_user_ids } : {}),
   });
 }));
 
@@ -96,6 +100,7 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
   await assertPageAccess(req.user, req.params.id);
   const {
     name, page_token, avatar_url, text_provider_id, image_provider_id, is_active,
+    assign_user_ids,
   } = req.body;
   const skillIds = req.body.skill_ids !== undefined || req.body.skill_id !== undefined
     ? normalizeSkillIds(req.body)
@@ -128,6 +133,20 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
 
   if (skillIds !== null) {
     await syncPageSkills(req.params.id, skillIds);
+  }
+
+  // Super admin can assign/unassign page visibility for admin/editor users
+  if (isSuperAdmin(req.user) && Array.isArray(assign_user_ids)) {
+    const ids = assign_user_ids.map((id) => Number(id)).filter(Boolean);
+    let targets = [];
+    if (ids.length) {
+      targets = await query(
+        `SELECT id FROM users WHERE id IN (${ids.map(() => '?').join(', ')})
+         AND deleted_at IS NULL AND role IN ('admin', 'editor')`,
+        ids
+      );
+    }
+    await setPageAssignedUsers(req.params.id, targets.map((u) => u.id));
   }
 
   res.json({ message: 'Page updated' });

@@ -118,3 +118,34 @@ export async function getUserPages(userId) {
     throw error;
   }
 }
+
+export async function getPageAssignedUserIds(pageId) {
+  try {
+    const rows = await query('SELECT user_id FROM user_pages WHERE page_id = ?', [Number(pageId)]);
+    return rows.map((row) => Number(row.user_id)).filter((id) => Number.isFinite(id) && id > 0);
+  } catch (error) {
+    if (error?.code === 'ER_NO_SUCH_TABLE') return [];
+    throw error;
+  }
+}
+
+export async function setPageAssignedUsers(pageId, userIds) {
+  const pid = Number(pageId);
+  const uniqueUserIds = [...new Set(
+    (userIds || []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
+  )];
+  try {
+    await query('DELETE FROM user_pages WHERE page_id = ?', [pid]);
+    for (const userId of uniqueUserIds) {
+      await query('INSERT INTO user_pages (user_id, page_id) VALUES (?, ?)', [userId, pid]);
+    }
+    return uniqueUserIds;
+  } catch (error) {
+    if (error?.code === 'ER_NO_SUCH_TABLE') {
+      const err = new Error('Bảng user_pages chưa tồn tại — restart backend để tự tạo bảng');
+      err.status = 503;
+      throw err;
+    }
+    throw error;
+  }
+}
