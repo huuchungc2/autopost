@@ -13,7 +13,8 @@ import {
   pageIdInClause,
 } from '../services/pageAccessService.js';
 import {
-  buildImportTemplateCsv,
+  buildImportTemplateXlsx,
+  parseExcelBuffer,
   parseCsvText,
   normalizeImportRows,
   buildAutoScheduleSlots,
@@ -156,18 +157,28 @@ router.get('/import/template', asyncHandler(async (req, res) => {
     params
   );
 
-  const csv = buildImportTemplateCsv(pages);
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="mau-import-bai-viet.csv"');
-  res.send(csv);
+  const xlsx = buildImportTemplateXlsx(pages);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="mau-import-bai-viet.xlsx"');
+  res.send(xlsx);
 }));
 
 router.post('/import', asyncHandler(async (req, res) => {
-  const { csv, rows: rawRows, auto_schedule } = req.body;
+  const { csv, rows: rawRows, excel_base64, auto_schedule } = req.body;
 
   let parsedRows = [];
   if (Array.isArray(rawRows) && rawRows.length) {
     parsedRows = rawRows.map((row, i) => ({ ...row, _line: row._line || i + 2 }));
+  } else if (excel_base64 && String(excel_base64).trim()) {
+    const buffer = Buffer.from(String(excel_base64), 'base64');
+    const parsed = parseExcelBuffer(buffer);
+    parsedRows = parsed.rows;
+    if (parsedRows.length > MAX_IMPORT_ROWS) {
+      return res.status(400).json({ error: `Tối đa ${MAX_IMPORT_ROWS} dòng mỗi lần import` });
+    }
+    if (!parsedRows.length) {
+      return res.status(400).json({ error: 'File Excel không có dòng dữ liệu hợp lệ (sheet Import)' });
+    }
   } else if (csv && String(csv).trim()) {
     const parsed = parseCsvText(csv);
     parsedRows = parsed.rows;
@@ -175,10 +186,10 @@ router.post('/import', asyncHandler(async (req, res) => {
       return res.status(400).json({ error: `Tối đa ${MAX_IMPORT_ROWS} dòng mỗi lần import` });
     }
     if (!parsedRows.length) {
-      return res.status(400).json({ error: 'File CSV không có dòng dữ liệu hợp lệ' });
+      return res.status(400).json({ error: 'File không có dòng dữ liệu hợp lệ' });
     }
   } else {
-    return res.status(400).json({ error: 'Cần gửi csv (text) hoặc rows (mảng)' });
+    return res.status(400).json({ error: 'Cần gửi rows (mảng), excel_base64 hoặc csv' });
   }
 
   const accessibleIds = await getAccessiblePageIds(req.user);

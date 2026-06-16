@@ -385,7 +385,7 @@ export default function Posts() {
 
       await downloadImportTemplate(api);
 
-      showToast('Đã tải file mẫu CSV', 'success');
+      showToast('Đã tải file mẫu Excel', 'success');
 
     } catch (err) {
 
@@ -425,7 +425,7 @@ export default function Posts() {
 
           <h1>Bài viết</h1>
 
-          <p>Quản lý bài đăng — import CSV hoặc lên lịch hàng loạt theo giờ mỗi ngày.</p>
+          <p>Quản lý bài đăng — import Excel hoặc lên lịch hàng loạt theo giờ mỗi ngày.</p>
 
         </div>
 
@@ -435,7 +435,7 @@ export default function Posts() {
 
             <Download size={16} />
 
-            File mẫu CSV
+            File mẫu Excel
 
           </button>
 
@@ -443,7 +443,7 @@ export default function Posts() {
 
             <Upload size={16} />
 
-            Import CSV
+            Import Excel
 
           </button>
 

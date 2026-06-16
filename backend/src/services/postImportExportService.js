@@ -1,3 +1,5 @@
+import XLSX from 'xlsx';
+
 export const MAX_IMPORT_ROWS = 500;
 
 const TEMPLATE_COLUMNS = [
@@ -103,6 +105,88 @@ function escapeCsvCell(value) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
+}
+
+export function buildImportTemplateXlsx(pages = []) {
+  const wb = XLSX.utils.book_new();
+
+  const guideLines = [
+    ['Mẫu import bài viết AutoPost'],
+    [''],
+    ['Cột bắt buộc: fanpage_id HOẶC fanpage_ten, noi_dung'],
+    ['loai_media: image | video | none (để trống = tự đoán từ URL)'],
+    ['ngay_dang: YYYY-MM-DD, gio_dang: HH:MM — để trống nếu lên lịch sau'],
+    [''],
+  ];
+  if (pages.length) {
+    guideLines.push(['Fanpage của bạn:']);
+    pages.forEach((p) => guideLines.push([`${p.id}`, p.name]));
+  }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(guideLines), 'Huong dan');
+
+  const examplePage = pages[0];
+  const importRows = [
+    TEMPLATE_COLUMNS,
+    [
+      examplePage?.id ?? '',
+      examplePage?.name ?? 'Tên fanpage',
+      'Ví dụ chủ đề',
+      'Nội dung bài viết đầy đủ...',
+      'image',
+      'https://example.com/anh.jpg',
+      '',
+      '',
+      '2026-06-20',
+      '08:00',
+    ],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(importRows), 'Import');
+
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+
+export function parseExcelBuffer(buffer) {
+  const workbook = XLSX.read(buffer, { type: 'buffer' });
+  const sheet = workbook.Sheets.Import || workbook.Sheets[workbook.SheetNames[0]];
+  if (!sheet) return { rows: [] };
+
+  const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  return parseSheetRows(data);
+}
+
+function parseSheetRows(data) {
+  let headerRowIndex = -1;
+  let fieldIndex = {};
+
+  for (let i = 0; i < data.length; i += 1) {
+    const headerCells = data[i].map((cell) => normalizeHeader(cell));
+    const index = {};
+    for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+      const idx = headerCells.findIndex((h) => aliases.includes(h));
+      if (idx >= 0) index[field] = idx;
+    }
+    if (index.noi_dung != null) {
+      headerRowIndex = i;
+      fieldIndex = index;
+      break;
+    }
+  }
+
+  if (headerRowIndex < 0) return { rows: [] };
+
+  const rows = [];
+  for (let i = headerRowIndex + 1; i < data.length; i += 1) {
+    const cells = data[i].map((cell) => String(cell ?? '').trim());
+    if (cells.every((c) => !c)) continue;
+
+    const row = { _line: i + 1 };
+    for (const [field, idx] of Object.entries(fieldIndex)) {
+      row[field] = cells[idx] ?? '';
+    }
+    rows.push(row);
+  }
+
+  return { rows };
 }
 
 export function buildImportTemplateCsv(pages = []) {

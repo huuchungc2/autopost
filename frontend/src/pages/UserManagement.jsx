@@ -241,7 +241,7 @@ export default function UserManagement() {
           <>
             <div className="page-assign-block">
               <h3>Gán fanpage</h3>
-              <p className="text-muted">Tick fanpage rồi bấm <strong>Cập nhật</strong> để lưu. Admin chỉ thấy page đã gán ở đây.</p>
+              <p className="text-muted">Tick fanpage rồi bấm <strong>Cập nhật</strong> để lưu. Admin chỉ thấy fanpage đã tick ở đây hoặc khi super admin gán lúc tạo fanpage mới.</p>
               <div className="page-assign-grid">
                 {allPages.map((page) => (
                   <label key={page.id} className="checkbox-label page-assign-item">

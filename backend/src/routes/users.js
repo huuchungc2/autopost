@@ -247,16 +247,18 @@ router.put('/:id', asyncHandler(async (req, res) => {
     );
   });
   if (resolvedRole !== 'super_admin') {
-    const pageIdList = Array.isArray(page_ids) ? page_ids : [];
-    const providerIdList = Array.isArray(provider_ids) ? provider_ids : [];
-    await setUserPages(
-      req.params.id,
-      await resolvePageIdsForAssignment(req, req.params.id, pageIdList)
-    );
-    await setUserProviders(
-      req.params.id,
-      await resolveProviderIdsForAssignment(req, req.params.id, providerIdList)
-    );
+    if (Array.isArray(page_ids)) {
+      await setUserPages(
+        req.params.id,
+        await resolvePageIdsForAssignment(req, req.params.id, page_ids)
+      );
+    }
+    if (Array.isArray(provider_ids)) {
+      await setUserProviders(
+        req.params.id,
+        await resolveProviderIdsForAssignment(req, req.params.id, provider_ids)
+      );
+    }
   }
   if (resolvedRole === 'super_admin') {
     await query('DELETE FROM user_pages WHERE user_id = ?', [req.params.id]);

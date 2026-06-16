@@ -34,6 +34,8 @@ const initialForm = {
 
   is_active: true,
 
+  assign_user_ids: [],
+
 };
 
 
@@ -47,6 +49,8 @@ export default function Pages() {
   const canManagePages = ['super_admin', 'admin'].includes(user?.role);
 
   const [pages, setPages] = useState([]);
+
+  const [assignableUsers, setAssignableUsers] = useState([]);
 
   const [skills, setSkills] = useState([]);
 
@@ -90,21 +94,28 @@ export default function Pages() {
 
     try {
 
-      const [pagesRes, skillsRes, providersRes] = await Promise.all([
-
+      const requests = [
         api.get('/pages'),
-
         api.get('/skills'),
-
         api.get('/providers'),
+      ];
+      if (isSuperAdmin) requests.push(api.get('/users'));
 
-      ]);
+      const results = await Promise.all(requests);
+
+      const [pagesRes, skillsRes, providersRes, usersRes] = results;
 
       setPages(pagesRes.data);
 
       setSkills(skillsRes.data);
 
       setProviders(providersRes.data);
+
+      if (usersRes?.data) {
+        setAssignableUsers(
+          usersRes.data.filter((u) => u.is_active && ['admin', 'editor'].includes(u.role))
+        );
+      }
 
     } catch (error) {
 
@@ -116,7 +127,7 @@ export default function Pages() {
 
 
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { if (user) loadData(); }, [user?.role]);
 
 
 
@@ -284,6 +295,16 @@ export default function Pages() {
 
 
 
+  const toggleAssignUser = (userId) => {
+    const id = Number(userId);
+    setForm((prev) => ({
+      ...prev,
+      assign_user_ids: prev.assign_user_ids.includes(id)
+        ? prev.assign_user_ids.filter((x) => x !== id)
+        : [...prev.assign_user_ids, id],
+    }));
+  };
+
   const toggleSkill = (skillId) => {
     const id = Number(skillId);
     setForm((prev) => ({
@@ -349,6 +370,8 @@ export default function Pages() {
       image_provider_id: page.image_provider_id || '',
 
       is_active: !!page.is_active,
+
+      assign_user_ids: [],
 
     });
 
@@ -518,7 +541,7 @@ export default function Pages() {
 
           <h1>Fanpage</h1>
 
-          <p>{isSuperAdmin ? 'Quản lý tất cả fanpage.' : 'Fanpage được gán — admin có thể thêm fanpage mới.'}</p>
+          <p>{isSuperAdmin ? 'Quản lý tất cả fanpage — gán cho admin khi tạo mới.' : 'Fanpage được gán — admin có thể thêm fanpage mới.'}</p>
 
         </div>
 
@@ -841,6 +864,44 @@ export default function Pages() {
               Fanpage đang hoạt động
 
             </label>
+
+
+
+            {isSuperAdmin && !editingId && assignableUsers.length > 0 && (
+
+              <div className="field-span-2">
+
+                <span className="field-label">Gán cho admin/biên tập</span>
+
+                <p className="field-hint">Chọn user sẽ thấy fanpage này sau khi tạo. Có thể gán thêm ở mục Quản lý người dùng.</p>
+
+                <div className="page-assign-grid">
+
+                  {assignableUsers.map((u) => (
+
+                    <label key={u.id} className="checkbox-label page-assign-item">
+
+                      <input
+
+                        type="checkbox"
+
+                        checked={form.assign_user_ids.includes(Number(u.id))}
+
+                        onChange={() => toggleAssignUser(u.id)}
+
+                      />
+
+                      {u.name} <small>({u.role})</small>
+
+                    </label>
+
+                  ))}
+
+                </div>
+
+              </div>
+
+            )}
 
           </div>
 

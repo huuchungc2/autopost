@@ -9,6 +9,7 @@ import {
   pageIdInClause,
   isSuperAdmin,
   assignPageToUser,
+  assignPageToUsers,
 } from '../services/pageAccessService.js';
 import { assertProviderAccess } from '../services/providerAccessService.js';
 import { enrichPagesWithSkills, getPageSkills, syncPageSkills } from '../services/pageSkillsService.js';
@@ -61,6 +62,7 @@ router.get('/:id', authenticate, asyncHandler(async (req, res) => {
 router.post('/', authenticate, canManagePages, asyncHandler(async (req, res) => {
   const {
     name, page_id, page_token, avatar_url, text_provider_id, image_provider_id, is_active = true,
+    assign_user_ids = [],
   } = req.body;
   const skillIds = normalizeSkillIds(req.body);
   if (!name || !page_id || !page_token) return res.status(400).json({ error: 'Missing required fields' });
@@ -78,6 +80,13 @@ router.post('/', authenticate, canManagePages, asyncHandler(async (req, res) => 
 
   if (!isSuperAdmin(req.user)) {
     await assignPageToUser(req.user.id, result.insertId);
+  } else if (Array.isArray(assign_user_ids) && assign_user_ids.length) {
+    const targets = await query(
+      `SELECT id FROM users WHERE id IN (${assign_user_ids.map(() => '?').join(', ')})
+       AND deleted_at IS NULL AND role IN ('admin', 'editor')`,
+      assign_user_ids.map((id) => Number(id)).filter(Boolean)
+    );
+    await assignPageToUsers(result.insertId, targets.map((u) => u.id));
   }
 
   res.status(201).json({ id: result.insertId, name, page_id, avatar_url, is_active, skill_ids: skillIds });

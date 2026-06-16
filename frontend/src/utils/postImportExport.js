@@ -1,3 +1,5 @@
+import * as XLSX from 'xlsx';
+
 const HEADER_ALIASES = {
   fanpage_id: ['fanpage_id', 'page_id', 'id_fanpage'],
   fanpage_ten: ['fanpage_ten', 'page_name', 'ten_fanpage', 'fanpage'],
@@ -20,61 +22,33 @@ function normalizeHeader(cell) {
     .replace(/\s+/g, '_');
 }
 
-function parseCsvLine(line) {
-  const cells = [];
-  let current = '';
-  let inQuotes = false;
+function parseSheetRows(data) {
+  let headerRowIndex = -1;
+  let fieldIndex = {};
 
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"' && line[i + 1] === '"') {
-        current += '"';
-        i += 1;
-      } else if (ch === '"') {
-        inQuotes = false;
-      } else {
-        current += ch;
-      }
-    } else if (ch === '"') {
-      inQuotes = true;
-    } else if (ch === ',') {
-      cells.push(current);
-      current = '';
-    } else {
-      current += ch;
+  for (let i = 0; i < data.length; i += 1) {
+    const headerCells = data[i].map((cell) => normalizeHeader(cell));
+    const index = {};
+    for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+      const idx = headerCells.findIndex((h) => aliases.includes(h));
+      if (idx >= 0) index[field] = idx;
+    }
+    if (index.noi_dung != null) {
+      headerRowIndex = i;
+      fieldIndex = index;
+      break;
     }
   }
-  cells.push(current);
-  return cells.map((c) => c.trim());
-}
 
-export function parseImportCsv(text) {
-  const raw = String(text || '').replace(/^\uFEFF/, '');
-  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const dataLines = lines.filter((l) => !l.startsWith('#'));
-
-  if (!dataLines.length) {
-    return { rows: [], errors: ['File trống hoặc không có header'] };
-  }
-
-  const headerCells = parseCsvLine(dataLines[0]).map(normalizeHeader);
-  const fieldIndex = {};
-
-  for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
-    const idx = headerCells.findIndex((h) => aliases.includes(h));
-    if (idx >= 0) fieldIndex[field] = idx;
-  }
-
-  if (fieldIndex.noi_dung == null) {
-    return { rows: [], errors: ['Thiếu cột noi_dung (nội dung bài)'] };
+  if (headerRowIndex < 0) {
+    return { rows: [], errors: ['Không tìm thấy cột noi_dung — dùng sheet Import trong file mẫu'] };
   }
 
   const rows = [];
   const errors = [];
 
-  for (let i = 1; i < dataLines.length; i += 1) {
-    const cells = parseCsvLine(dataLines[i]);
+  for (let i = headerRowIndex + 1; i < data.length; i += 1) {
+    const cells = data[i].map((cell) => String(cell ?? '').trim());
     if (cells.every((c) => !c)) continue;
 
     const row = { _line: i + 1 };
@@ -98,7 +72,18 @@ export function parseImportCsv(text) {
   return { rows, errors };
 }
 
-export function downloadBlob(filename, content, mimeType = 'text/csv;charset=utf-8') {
+export function parseImportExcel(arrayBuffer) {
+  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+  const sheet = workbook.Sheets.Import || workbook.Sheets[workbook.SheetNames[0]];
+  if (!sheet) {
+    return { rows: [], errors: ['File Excel trống'] };
+  }
+
+  const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  return parseSheetRows(data);
+}
+
+export function downloadBlob(filename, content, mimeType = 'application/octet-stream') {
   const blob = content instanceof Blob ? content : new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -110,5 +95,9 @@ export function downloadBlob(filename, content, mimeType = 'text/csv;charset=utf
 
 export async function downloadImportTemplate(apiClient) {
   const response = await apiClient.get('/posts/import/template', { responseType: 'blob' });
-  downloadBlob('mau-import-bai-viet.csv', response.data);
+  downloadBlob(
+    'mau-import-bai-viet.xlsx',
+    response.data,
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
 }

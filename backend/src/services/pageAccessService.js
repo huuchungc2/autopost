@@ -71,6 +71,16 @@ export async function assignPageToUser(userId, pageId) {
   }
 }
 
+export async function assignPageToUsers(pageId, userIds) {
+  const uniqueUserIds = [...new Set(
+    (userIds || []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
+  )];
+  for (const userId of uniqueUserIds) {
+    await assignPageToUser(userId, pageId);
+  }
+  return uniqueUserIds;
+}
+
 export async function setUserPages(userId, pageIds) {
   try {
     await query('DELETE FROM user_pages WHERE user_id = ?', [userId]);

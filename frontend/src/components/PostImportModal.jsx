@@ -7,11 +7,11 @@ import {
   describeBulkPlan,
   getDefaultStartDate,
 } from '../utils/bulkScheduleAssign';
-import { parseImportCsv, downloadImportTemplate } from '../utils/postImportExport';
+import { parseImportExcel, downloadImportTemplate } from '../utils/postImportExport';
 import api from '../services/api';
 
 export default function PostImportModal({ open, onClose, onImported, pages = [] }) {
-  const [csvText, setCsvText] = useState('');
+  const [importRows, setImportRows] = useState([]);
   const [fileName, setFileName] = useState('');
   const [parseErrors, setParseErrors] = useState([]);
   const [autoSchedule, setAutoSchedule] = useState(false);
@@ -22,7 +22,7 @@ export default function PostImportModal({ open, onClose, onImported, pages = [] 
 
   useEffect(() => {
     if (!open) return;
-    setCsvText('');
+    setImportRows([]);
     setFileName('');
     setParseErrors([]);
     setAutoSchedule(false);
@@ -30,10 +30,7 @@ export default function PostImportModal({ open, onClose, onImported, pages = [] 
     setTimes([...DEFAULT_DAILY_SLOTS]);
   }, [open]);
 
-  const parsed = useMemo(() => {
-    if (!csvText.trim()) return { rows: [], errors: [] };
-    return parseImportCsv(csvText);
-  }, [csvText]);
+  const parsed = useMemo(() => ({ rows: importRows, errors: parseErrors }), [importRows, parseErrors]);
 
   const rowsWithoutDate = useMemo(
     () => parsed.rows.filter((r) => !r.ngay_dang?.trim()),
@@ -50,20 +47,31 @@ export default function PostImportModal({ open, onClose, onImported, pages = [] 
     try {
       await downloadImportTemplate(api);
     } catch {
-      // fallback: minimal template
-      const header = 'fanpage_id,fanpage_ten,chu_de,noi_dung,loai_media,url_anh,url_video,url_thumb,ngay_dang,gio_dang';
-      const hint = pages.map((p) => `${p.id}=${p.name}`).join('; ');
-      const csv = `\uFEFF# Fanpage: ${hint}\r\n${header}\r\n`;
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'mau-import-bai-viet.csv';
-      a.click();
-      URL.revokeObjectURL(url);
+      showFallbackTemplate();
     } finally {
       setDownloading(false);
     }
+  };
+
+  const showFallbackTemplate = async () => {
+    const XLSX = await import('xlsx');
+    const wb = XLSX.utils.book_new();
+    const hint = pages.map((p) => `${p.id}=${p.name}`).join('; ');
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.aoa_to_sheet([['Fanpage:', hint], ['Dùng file mẫu từ server khi có kết nối API']]),
+      'Huong dan'
+    );
+    const header = 'fanpage_id,fanpage_ten,chu_de,noi_dung,loai_media,url_anh,url_video,url_thumb,ngay_dang,gio_dang'.split(',');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header]), 'Import');
+    const buffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mau-import-bai-viet.xlsx';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleFile = (event) => {
@@ -72,13 +80,12 @@ export default function PostImportModal({ open, onClose, onImported, pages = [] 
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = () => {
-      const text = String(reader.result || '');
-      setCsvText(text);
-      const result = parseImportCsv(text);
+      const result = parseImportExcel(reader.result);
+      setImportRows(result.rows);
       setParseErrors(result.errors);
     };
     reader.onerror = () => setParseErrors(['Không đọc được file']);
-    reader.readAsText(file, 'UTF-8');
+    reader.readAsArrayBuffer(file);
     event.target.value = '';
   };
 
@@ -86,7 +93,7 @@ export default function PostImportModal({ open, onClose, onImported, pages = [] 
     if (!parsed.rows.length) return;
     setSaving(true);
     try {
-      const payload = { csv: csvText };
+      const payload = { rows: parsed.rows };
       if (autoSchedule && rowsWithoutDate.length) {
         payload.auto_schedule = {
           start_date: startDate,
@@ -113,7 +120,7 @@ export default function PostImportModal({ open, onClose, onImported, pages = [] 
     <Modal
       open={open}
       title="Import bài viết hàng loạt"
-      subtitle="Tải file mẫu CSV → điền nội dung → upload để tạo bài và lên lịch"
+      subtitle="Tải file mẫu Excel → điền nội dung → upload để tạo bài và lên lịch"
       onClose={onClose}
       wide
       footer={(
@@ -139,14 +146,14 @@ export default function PostImportModal({ open, onClose, onImported, pages = [] 
             disabled={downloading}
           >
             <Download size={14} />
-            {downloading ? 'Đang tải...' : 'Tải file mẫu CSV'}
+            {downloading ? 'Đang tải...' : 'Tải file mẫu Excel'}
           </button>
         </div>
 
         <p className="field-hint">
           Cột bắt buộc: <strong>fanpage_id</strong> hoặc <strong>fanpage_ten</strong>, <strong>noi_dung</strong>.
           Có thể thêm <strong>ngay_dang</strong> (YYYY-MM-DD) + <strong>gio_dang</strong> (HH:MM) từng dòng,
-          hoặc bật tự lên lịch bên dưới.
+          hoặc bật tự lên lịch bên dưới. Điền dữ liệu ở sheet <strong>Import</strong>.
         </p>
 
         {pages.length > 0 && (
@@ -158,10 +165,14 @@ export default function PostImportModal({ open, onClose, onImported, pages = [] 
         )}
 
         <label className="skill-file-label">
-          <input type="file" accept=".csv,text/csv" onChange={handleFile} />
+          <input
+            type="file"
+            accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            onChange={handleFile}
+          />
           <Upload size={28} strokeWidth={1.5} />
-          <span>{fileName ? `Đã chọn: ${fileName}` : 'Chọn file CSV đã điền'}</span>
-          <small>UTF-8 — mở bằng Excel hoặc Google Sheets</small>
+          <span>{fileName ? `Đã chọn: ${fileName}` : 'Chọn file Excel đã điền'}</span>
+          <small>Định dạng .xlsx — mở bằng Microsoft Excel hoặc Google Sheets</small>
         </label>
 
         {parsed.rows.length > 0 && (
