@@ -6,6 +6,32 @@ import Modal from '../components/ui/Modal';
 import { useToast } from '../context/ToastContext';
 import { typeLabel } from '../config/providerPresets';
 
+function normalizeEndpointInput(raw, providerKind, type) {
+  const value = (raw || '').trim();
+  if (!value) return '';
+
+  // If user pasted a full endpoint, keep it
+  if (/\/v1\//i.test(value) || /generatecontent/i.test(value) || /\/messages\b/i.test(value)) return value;
+
+  // If user pasted only base URL, append best-known path
+  const base = value.replace(/\/+$/, '');
+  if (providerKind === 'claude') return `${base}/v1/messages`;
+  if (providerKind === 'gemini') return `${base}/v1beta/models/{model}:generateContent`;
+  if (providerKind === 'ideogram') return `${base}/generate`;
+
+  // OpenAI-compatible
+  if (type === 'image') return `${base}/v1/images/generations`;
+  return `${base}/v1/chat/completions`;
+}
+
+function endpointPreset(providerKind, type) {
+  if (providerKind === 'claude') return 'https://api.anthropic.com/v1/messages';
+  if (providerKind === 'gemini') return 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent';
+  if (providerKind === 'ideogram') return 'https://api.ideogram.ai/generate';
+  if (type === 'image') return 'https://api.openai.com/v1/images/generations';
+  return 'https://api.openai.com/v1/chat/completions';
+}
+
 const PROVIDER_KINDS = [
   { value: 'openai', label: 'OpenAI-compatible (GPT, 9Router, OpenRouter…)' },
   { value: 'claude', label: 'Claude / Anthropic' },
@@ -93,7 +119,12 @@ export default function Providers() {
       showToast('Dán API key vào ô trên', 'error');
       return;
     }
-    if (!endpointOverride.trim()) {
+    const normalizedEndpoint = normalizeEndpointInput(
+      endpointOverride,
+      selectedTemplate.provider_kind || 'openai',
+      selectedTemplate.type || 'text'
+    );
+    if (!normalizedEndpoint) {
       showToast('Nhập API endpoint', 'error');
       return;
     }
@@ -110,7 +141,7 @@ export default function Providers() {
         template_id: selectedTemplate.id,
         api_key: apiKey.trim(),
         model: modelOverride.trim() || undefined,
-        api_endpoint: endpointOverride.trim(),
+        api_endpoint: normalizedEndpoint,
         is_active: true,
       });
       showToast(`Đã thêm ${selectedTemplate.name}`, 'success');
@@ -125,8 +156,9 @@ export default function Providers() {
 
   const handleCustomAdd = async () => {
     const { name, type, provider_kind, api_endpoint, api_key, model } = customForm;
-    if (!name.trim() || !api_endpoint.trim() || !api_key.trim()) {
-      showToast('Nhập tên, endpoint và API key', 'error');
+    const normalizedEndpoint = normalizeEndpointInput(api_endpoint, provider_kind, type);
+    if (!name.trim() || !normalizedEndpoint || !api_key.trim()) {
+      showToast('Nhập tên, API endpoint và API key', 'error');
       return;
     }
     setSaving(true);
@@ -135,7 +167,7 @@ export default function Providers() {
         name: name.trim(),
         type,
         provider_kind,
-        api_endpoint: api_endpoint.trim(),
+        api_endpoint: normalizedEndpoint,
         api_key: api_key.trim(),
         model: model.trim() || undefined,
         is_active: true,
@@ -169,7 +201,12 @@ export default function Providers() {
 
   const handleUpdate = async () => {
     if (!editingProvider) return;
-    if (!editForm.api_endpoint.trim()) {
+    const normalizedEndpoint = normalizeEndpointInput(
+      editForm.api_endpoint,
+      editForm.provider_kind || editingProvider.provider_kind || 'openai',
+      editingProvider.type || 'text'
+    );
+    if (!normalizedEndpoint) {
       showToast('API endpoint không được để trống', 'error');
       return;
     }
@@ -178,7 +215,7 @@ export default function Providers() {
       await api.put(`/providers/${editingId}`, {
         api_key: editForm.api_key || undefined,
         model: editForm.model,
-        api_endpoint: editForm.api_endpoint.trim(),
+        api_endpoint: normalizedEndpoint,
         provider_kind: editForm.provider_kind,
         is_active: editForm.is_active,
       });
@@ -263,7 +300,14 @@ export default function Providers() {
               Kiểu API
               <select
                 value={customForm.provider_kind}
-                onChange={(e) => setCustomForm((f) => ({ ...f, provider_kind: e.target.value }))}
+                onChange={(e) => {
+                  const nextKind = e.target.value;
+                  setCustomForm((f) => ({
+                    ...f,
+                    provider_kind: nextKind,
+                    api_endpoint: f.api_endpoint || endpointPreset(nextKind, f.type),
+                  }));
+                }}
               >
                 {PROVIDER_KINDS.map((k) => (
                   <option key={k.value} value={k.value}>{k.label}</option>
@@ -275,8 +319,11 @@ export default function Providers() {
               <input
                 value={customForm.api_endpoint}
                 onChange={(e) => setCustomForm((f) => ({ ...f, api_endpoint: e.target.value }))}
-                placeholder="https://your-gateway.com/v1/chat/completions"
+                placeholder="Dán full endpoint hoặc chỉ base URL (sẽ tự thêm /v1/...)"
               />
+              <small className="text-muted">
+                Gợi ý: {customForm.provider_kind === 'gemini' ? 'Gemini dùng {model} trong endpoint.' : 'Bạn có thể dán base URL (vd http://localhost:20128)'}
+              </small>
             </label>
             <label>
               API key
@@ -349,10 +396,10 @@ export default function Providers() {
                     type="url"
                     value={endpointOverride}
                     onChange={(e) => setEndpointOverride(e.target.value)}
-                    placeholder="https://..."
+                    placeholder="Dán full endpoint hoặc chỉ base URL (sẽ tự thêm /v1/...)"
                   />
                   <small className="text-muted">
-                    Mặc định từ template. 9Router local: <code>http://localhost:20128/v1/chat/completions</code>
+                    Mặc định từ template. Bạn có thể dán base URL (vd <code>http://localhost:20128</code>) — hệ thống sẽ tự thêm path đúng.
                   </small>
                 </label>
 
@@ -425,8 +472,11 @@ export default function Providers() {
                 type="url"
                 value={editForm.api_endpoint}
                 onChange={(e) => setEditForm((f) => ({ ...f, api_endpoint: e.target.value }))}
-                placeholder="https://..."
+                placeholder="Dán full endpoint hoặc chỉ base URL (sẽ tự thêm /v1/...)"
               />
+              <small className="text-muted">
+                Gợi ý: <code>{endpointPreset(editForm.provider_kind || 'openai', editingProvider.type || 'text')}</code>
+              </small>
             </label>
             <label>
               Kiểu API
