@@ -4,7 +4,7 @@ import { useAuth } from '../services/authContext';
 import { getPageTitle } from '../config/navConfig';
 import NotificationDropdown from './NotificationDropdown';
 
-export default function Header({ isMobile, pathname, sidebarCollapsed, onSidebarToggle }) {
+export default function Header({ isMobile, pathname, sidebarCollapsed, onSidebarToggle, onMobileMenuOpen }) {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const pageTitle = getPageTitle(pathname);
@@ -14,6 +14,14 @@ export default function Header({ isMobile, pathname, sidebarCollapsed, onSidebar
     return (
       <header className="app-header app-header--mobile">
         <div className="header-left">
+          <button
+            type="button"
+            className="header-menu-btn header-menu-btn--mobile"
+            onClick={onMobileMenuOpen}
+            aria-label="Mở menu điều hướng"
+          >
+            <Menu size={22} />
+          </button>
           <span className="header-mobile-logo" aria-hidden>
             <Zap size={18} strokeWidth={2.25} />
           </span>
@@ -25,7 +33,7 @@ export default function Header({ isMobile, pathname, sidebarCollapsed, onSidebar
             type="button"
             className="header-avatar-btn"
             onClick={() => navigate('/change-password')}
-            title={user?.name || 'Profile'}
+            title={user?.name || 'Tài khoản'}
             aria-label="Tài khoản"
           >
             {initial}
@@ -57,7 +65,7 @@ export default function Header({ isMobile, pathname, sidebarCollapsed, onSidebar
           title="Đổi mật khẩu"
         >
           <KeyRound size={18} />
-          <span className="header-btn-label">{user?.name || 'Profile'}</span>
+          <span className="header-btn-label">{user?.name || 'Tài khoản'}</span>
         </button>
         <button type="button" className="header-icon-btn" onClick={logout} title="Đăng xuất">
           <LogOut size={18} />

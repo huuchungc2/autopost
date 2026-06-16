@@ -35,7 +35,10 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 router.post('/', canManageProviders, asyncHandler(async (req, res) => {
-  const { template_id, api_key, model, is_active = true, name, type } = req.body;
+  const {
+    template_id, api_key, model, is_active = true, name, type,
+    api_endpoint, provider_kind,
+  } = req.body;
 
   if (!api_key?.trim()) {
     return res.status(400).json({ error: 'API key là bắt buộc' });
@@ -47,17 +50,28 @@ router.post('/', canManageProviders, asyncHandler(async (req, res) => {
     const template = await getProviderTemplateById(template_id);
     if (!template) return res.status(400).json({ error: 'Template không tồn tại' });
     payload = {
-      name: template.name,
+      name: name?.trim() || template.name,
       type: template.type,
       model: model?.trim() || template.default_model,
       api_key: api_key.trim(),
       is_active,
       template_id: template.id,
-      provider_kind: template.provider_kind,
-      api_endpoint: template.api_endpoint,
+      provider_kind: provider_kind?.trim() || template.provider_kind,
+      api_endpoint: api_endpoint?.trim() || template.api_endpoint,
     };
-  } else if (!name || !type) {
-    return res.status(400).json({ error: 'Chọn template hoặc nhập name + type' });
+  } else if (name?.trim() && type && api_endpoint?.trim()) {
+    payload = {
+      name: name.trim(),
+      type,
+      model: model?.trim() || null,
+      api_key: api_key.trim(),
+      is_active,
+      template_id: null,
+      provider_kind: provider_kind?.trim() || 'openai',
+      api_endpoint: api_endpoint.trim(),
+    };
+  } else {
+    return res.status(400).json({ error: 'Chọn template hoặc nhập tên + loại + API endpoint' });
   }
 
   const duplicate = await query(
@@ -65,7 +79,7 @@ router.post('/', canManageProviders, asyncHandler(async (req, res) => {
     [payload.name, payload.type]
   );
   if (duplicate.length) {
-    return res.status(400).json({ error: `Đã có provider "${payload.name}" — dùng Sửa để đổi key` });
+    return res.status(400).json({ error: `Đã có provider "${payload.name}" — dùng Sửa để cập nhật` });
   }
 
   const ownerId = isSuperAdmin(req.user) ? null : req.user.id;
@@ -104,7 +118,7 @@ router.post('/', canManageProviders, asyncHandler(async (req, res) => {
 
 router.put('/:id', canManageProviders, asyncHandler(async (req, res) => {
   await assertProviderAccess(req.user, req.params.id);
-  const { api_key, model, is_active } = req.body;
+  const { api_key, model, is_active, api_endpoint, provider_kind, name } = req.body;
   const existing = (await query(
     `SELECT api_key, name, type, template_id, provider_kind, api_endpoint FROM ai_providers WHERE id = ?`,
     [req.params.id]
@@ -112,8 +126,21 @@ router.put('/:id', canManageProviders, asyncHandler(async (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Provider not found' });
 
   await query(
-    `UPDATE ai_providers SET api_key = ?, model = ?, is_active = ? WHERE id = ?`,
-    [api_key || existing.api_key, model ?? existing.model, is_active ?? true, req.params.id]
+    `UPDATE ai_providers SET
+       api_key = ?, model = ?, is_active = ?,
+       api_endpoint = COALESCE(?, api_endpoint),
+       provider_kind = COALESCE(?, provider_kind),
+       name = COALESCE(?, name)
+     WHERE id = ?`,
+    [
+      api_key?.trim() || existing.api_key,
+      model ?? existing.model,
+      is_active ?? true,
+      api_endpoint?.trim() || null,
+      provider_kind?.trim() || null,
+      name?.trim() || null,
+      req.params.id,
+    ]
   );
   res.json({ message: 'Provider updated' });
 }));

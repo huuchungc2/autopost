@@ -60,6 +60,7 @@ export default function Layout() {
           pathname={location.pathname}
           sidebarCollapsed={collapsed}
           onSidebarToggle={() => setCollapsed((value) => !value)}
+          onMobileMenuOpen={() => setMobileMenuOpen(true)}
         />
         <main className="content">
           <Outlet />

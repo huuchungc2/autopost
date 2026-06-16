@@ -18,7 +18,7 @@ export default function MobileDrawer({ open, role, user, onClose, onLogout, onCh
             </span>
             <div>
               <div className="mobile-drawer-title">AutoPost</div>
-              <div className="mobile-drawer-subtitle">{user?.name || 'User'}</div>
+              <div className="mobile-drawer-subtitle">{user?.name || 'Người dùng'}</div>
             </div>
           </div>
           <button type="button" className="mobile-drawer-close" onClick={onClose} aria-label="Đóng">
@@ -28,7 +28,7 @@ export default function MobileDrawer({ open, role, user, onClose, onLogout, onCh
 
         {role !== 'super_admin' && (
           <div className="mobile-drawer-hint">
-            {role === 'admin' ? 'Admin — page & provider được gán' : 'Editor — page được gán'}
+            {role === 'admin' ? 'Admin — fanpage & provider được gán' : 'Editor — fanpage được gán'}
           </div>
         )}
 

@@ -1,10 +1,26 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, KeyRound } from 'lucide-react';
+import { Check, KeyRound, Plus } from 'lucide-react';
 import api from '../services/api';
 import Modal from '../components/ui/Modal';
 import { useToast } from '../context/ToastContext';
 import { typeLabel } from '../config/providerPresets';
+
+const PROVIDER_KINDS = [
+  { value: 'openai', label: 'OpenAI-compatible (GPT, 9Router, OpenRouter…)' },
+  { value: 'claude', label: 'Claude / Anthropic' },
+  { value: 'gemini', label: 'Google Gemini' },
+  { value: 'ideogram', label: 'Ideogram' },
+];
+
+const emptyCustomForm = {
+  name: '',
+  type: 'text',
+  provider_kind: 'openai',
+  api_endpoint: '',
+  api_key: '',
+  model: '',
+};
 
 export default function Providers() {
   const [templates, setTemplates] = useState([]);
@@ -12,9 +28,14 @@ export default function Providers() {
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [apiKey, setApiKey] = useState('');
   const [modelOverride, setModelOverride] = useState('');
+  const [endpointOverride, setEndpointOverride] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customForm, setCustomForm] = useState(emptyCustomForm);
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ api_key: '', model: '', is_active: true });
+  const [editForm, setEditForm] = useState({
+    api_key: '', model: '', api_endpoint: '', provider_kind: '', is_active: true,
+  });
   const [saving, setSaving] = useState(false);
   const { showToast } = useToast();
 
@@ -31,6 +52,7 @@ export default function Providers() {
       setProviders(providersRes.data);
       if (!selectedTemplateId && templatesRes.data.length) {
         setSelectedTemplateId(templatesRes.data[0].id);
+        setEndpointOverride(templatesRes.data[0].api_endpoint || '');
       }
     } catch (err) {
       showToast(err.response?.data?.error || 'Không tải được providers', 'error');
@@ -41,26 +63,45 @@ export default function Providers() {
     loadAll();
   }, []);
 
+  useEffect(() => {
+    if (selectedTemplate?.api_endpoint) {
+      setEndpointOverride(selectedTemplate.api_endpoint);
+    }
+  }, [selectedTemplateId, selectedTemplate?.api_endpoint]);
+
   const resetCreateForm = () => {
     setApiKey('');
     setModelOverride('');
     setShowAdvanced(false);
+    if (selectedTemplate?.api_endpoint) {
+      setEndpointOverride(selectedTemplate.api_endpoint);
+    }
+  };
+
+  const selectTemplate = (template) => {
+    setSelectedTemplateId(template.id);
+    setModelOverride('');
+    setEndpointOverride(template.api_endpoint || '');
   };
 
   const handleQuickAdd = async () => {
     if (!selectedTemplate) {
-      showToast('Chưa có template — chạy migration DB và restart backend', 'error');
+      showToast('Chưa có template — restart backend để seed template', 'error');
       return;
     }
     if (!apiKey.trim()) {
       showToast('Dán API key vào ô trên', 'error');
       return;
     }
+    if (!endpointOverride.trim()) {
+      showToast('Nhập API endpoint', 'error');
+      return;
+    }
     const exists = providers.some(
       (p) => p.name === selectedTemplate.name && p.type === selectedTemplate.type
     );
     if (exists) {
-      showToast(`Đã có "${selectedTemplate.name}" — dùng Sửa để đổi key`, 'error');
+      showToast(`Đã có "${selectedTemplate.name}" — dùng Sửa để cập nhật`, 'error');
       return;
     }
     setSaving(true);
@@ -69,6 +110,7 @@ export default function Providers() {
         template_id: selectedTemplate.id,
         api_key: apiKey.trim(),
         model: modelOverride.trim() || undefined,
+        api_endpoint: endpointOverride.trim(),
         is_active: true,
       });
       showToast(`Đã thêm ${selectedTemplate.name}`, 'success');
@@ -81,23 +123,63 @@ export default function Providers() {
     }
   };
 
+  const handleCustomAdd = async () => {
+    const { name, type, provider_kind, api_endpoint, api_key, model } = customForm;
+    if (!name.trim() || !api_endpoint.trim() || !api_key.trim()) {
+      showToast('Nhập tên, endpoint và API key', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.post('/providers', {
+        name: name.trim(),
+        type,
+        provider_kind,
+        api_endpoint: api_endpoint.trim(),
+        api_key: api_key.trim(),
+        model: model.trim() || undefined,
+        is_active: true,
+      });
+      showToast(`Đã thêm ${name.trim()}`, 'success');
+      setCustomForm(emptyCustomForm);
+      setShowCustomForm(false);
+      loadAll();
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Không tạo được provider', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const startEdit = (provider) => {
     setEditingId(provider.id);
-    setEditForm({ api_key: '', model: provider.model || '', is_active: !!provider.is_active });
+    setEditForm({
+      api_key: '',
+      model: provider.model || '',
+      api_endpoint: provider.api_endpoint || '',
+      provider_kind: provider.provider_kind || 'openai',
+      is_active: !!provider.is_active,
+    });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditForm({ api_key: '', model: '', is_active: true });
+    setEditForm({ api_key: '', model: '', api_endpoint: '', provider_kind: '', is_active: true });
   };
 
   const handleUpdate = async () => {
     if (!editingProvider) return;
+    if (!editForm.api_endpoint.trim()) {
+      showToast('API endpoint không được để trống', 'error');
+      return;
+    }
     setSaving(true);
     try {
       await api.put(`/providers/${editingId}`, {
         api_key: editForm.api_key || undefined,
         model: editForm.model,
+        api_endpoint: editForm.api_endpoint.trim(),
+        provider_kind: editForm.provider_kind,
         is_active: editForm.is_active,
       });
       showToast('Đã cập nhật provider', 'success');
@@ -128,7 +210,7 @@ export default function Providers() {
       const sample = response.data.sample || response.data.message || 'OK';
       showToast(typeof sample === 'string' ? sample.slice(0, 120) : 'Test thành công', 'success');
     } catch (err) {
-      showToast(err.response?.data?.error || 'Test thất bại — kiểm tra API key', 'error');
+      showToast(err.response?.data?.error || 'Test thất bại — kiểm tra API key / endpoint', 'error');
     }
   };
 
@@ -136,39 +218,114 @@ export default function Providers() {
     <div className="page-shell">
       <div className="page-header">
         <div>
-          <h1>AI Providers</h1>
+          <h1>AI Provider</h1>
           <p>
-            Template lưu trong DB (endpoint, model mặc định) — bạn chỉ dán API key.
-            Gắn vào fanpage tại <Link to="/pages">Pages</Link>.
+            Chọn template (OpenAI, 9Router, Claude…) → dán API key → chỉnh endpoint nếu cần.
+            Gắn vào fanpage tại <Link to="/pages">Fanpage</Link>.
           </p>
+        </div>
+        <div className="header-actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setShowCustomForm((v) => !v)}
+          >
+            <Plus size={18} />
+            {showCustomForm ? 'Ẩn form tùy chỉnh' : 'Provider tùy chỉnh'}
+          </button>
         </div>
       </div>
 
+      {showCustomForm && (
+        <div className="card form-card" style={{ marginBottom: 24 }}>
+          <h2>Thêm provider tùy chỉnh</h2>
+          <p className="text-muted">Tự nhập tên, endpoint và loại — dùng cho gateway riêng hoặc API tương thích OpenAI.</p>
+          <div className="modal-form-grid">
+            <label>
+              Tên hiển thị
+              <input
+                value={customForm.name}
+                onChange={(e) => setCustomForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="VD: 9Router VPS"
+              />
+            </label>
+            <label>
+              Loại
+              <select
+                value={customForm.type}
+                onChange={(e) => setCustomForm((f) => ({ ...f, type: e.target.value }))}
+              >
+                <option value="text">Văn bản</option>
+                <option value="image">Ảnh</option>
+              </select>
+            </label>
+            <label>
+              Kiểu API
+              <select
+                value={customForm.provider_kind}
+                onChange={(e) => setCustomForm((f) => ({ ...f, provider_kind: e.target.value }))}
+              >
+                {PROVIDER_KINDS.map((k) => (
+                  <option key={k.value} value={k.value}>{k.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field-span-2">
+              API endpoint
+              <input
+                value={customForm.api_endpoint}
+                onChange={(e) => setCustomForm((f) => ({ ...f, api_endpoint: e.target.value }))}
+                placeholder="https://your-gateway.com/v1/chat/completions"
+              />
+            </label>
+            <label>
+              API key
+              <input
+                type="password"
+                value={customForm.api_key}
+                onChange={(e) => setCustomForm((f) => ({ ...f, api_key: e.target.value }))}
+                autoComplete="off"
+              />
+            </label>
+            <label>
+              Model (tuỳ chọn)
+              <input
+                value={customForm.model}
+                onChange={(e) => setCustomForm((f) => ({ ...f, model: e.target.value }))}
+                placeholder="gpt-4o-mini / cc/claude-sonnet-4-5"
+              />
+            </label>
+          </div>
+          <button type="button" className="btn btn-primary" onClick={handleCustomAdd} disabled={saving}>
+            {saving ? 'Đang lưu...' : 'Thêm provider'}
+          </button>
+        </div>
+      )}
+
       <div className="card provider-quick-add">
-        <h2>Thêm provider — chỉ cần API key</h2>
+        <h2>Thêm từ template</h2>
         <p className="text-muted provider-quick-hint">
-          Chọn loại AI → dán key → Thêm. Endpoint &amp; model lấy từ database.
+          Chọn loại AI → chỉnh endpoint (nếu cần) → dán key → Thêm.
         </p>
 
         {!templates.length ? (
           <div className="form-error">
-            Chưa có template trong DB. Chạy <code>backend/migrations/002_provider_templates.sql</code> rồi restart backend.
+            Chưa có template. Restart backend để seed template (hoặc chạy migration 002).
           </div>
         ) : (
           <>
             <div className="provider-preset-grid">
               {templates.map((template) => {
-                const configured = providers.some((p) => p.template_id === template.id || (p.name === template.name && p.type === template.type));
+                const configured = providers.some(
+                  (p) => p.template_id === template.id || (p.name === template.name && p.type === template.type)
+                );
                 const active = selectedTemplateId === template.id;
                 return (
                   <button
                     key={template.id}
                     type="button"
                     className={`provider-preset-card${active ? ' active' : ''}${configured ? ' configured' : ''}`}
-                    onClick={() => {
-                      setSelectedTemplateId(template.id);
-                      setModelOverride('');
-                    }}
+                    onClick={() => selectTemplate(template)}
                   >
                     {configured && (
                       <span className="provider-preset-badge" title="Đã cấu hình">
@@ -186,10 +343,18 @@ export default function Providers() {
 
             {selectedTemplate && (
               <div className="provider-selected-detail">
-                <div className="provider-endpoint-box">
-                  <span className="provider-endpoint-label">API endpoint (lưu DB)</span>
-                  <code>{selectedTemplate.api_endpoint}</code>
-                </div>
+                <label className="provider-endpoint-field">
+                  <span className="provider-endpoint-label">API endpoint</span>
+                  <input
+                    type="url"
+                    value={endpointOverride}
+                    onChange={(e) => setEndpointOverride(e.target.value)}
+                    placeholder="https://..."
+                  />
+                  <small className="text-muted">
+                    Mặc định từ template. 9Router local: <code>http://localhost:20128/v1/chat/completions</code>
+                  </small>
+                </label>
 
                 <label className="provider-key-field">
                   <span className="provider-key-label">
@@ -228,7 +393,7 @@ export default function Providers() {
                   type="button"
                   className="btn btn-primary"
                   onClick={handleQuickAdd}
-                  disabled={saving || !apiKey.trim()}
+                  disabled={saving || !apiKey.trim() || !endpointOverride.trim()}
                 >
                   {saving ? 'Đang lưu...' : `Thêm ${selectedTemplate.name}`}
                 </button>
@@ -241,7 +406,7 @@ export default function Providers() {
       <Modal
         open={!!editingId && !!editingProvider}
         title={`Sửa ${editingProvider?.name || 'provider'}`}
-        subtitle="Đổi API key hoặc model — endpoint lấy từ template trong DB"
+        subtitle="Cập nhật API key, endpoint, model"
         onClose={cancelEdit}
         footer={(
           <>
@@ -254,10 +419,26 @@ export default function Providers() {
       >
         {editingProvider && (
           <div className="modal-form">
-            <div className="provider-endpoint-box">
-              <span className="provider-endpoint-label">Endpoint (DB)</span>
-              <code>{editingProvider.api_endpoint || '—'}</code>
-            </div>
+            <label>
+              API endpoint
+              <input
+                type="url"
+                value={editForm.api_endpoint}
+                onChange={(e) => setEditForm((f) => ({ ...f, api_endpoint: e.target.value }))}
+                placeholder="https://..."
+              />
+            </label>
+            <label>
+              Kiểu API
+              <select
+                value={editForm.provider_kind}
+                onChange={(e) => setEditForm((f) => ({ ...f, provider_kind: e.target.value }))}
+              >
+                {PROVIDER_KINDS.map((k) => (
+                  <option key={k.value} value={k.value}>{k.label}</option>
+                ))}
+              </select>
+            </label>
             <label>
               API key mới
               <input
@@ -288,7 +469,7 @@ export default function Providers() {
       </Modal>
 
       <div className="card table-wrapper" style={{ marginTop: 24 }}>
-        <h3 style={{ margin: '0 0 12px' }}>Provider đã cấu hình (key trong DB)</h3>
+        <h3 style={{ margin: '0 0 12px' }}>Provider đã cấu hình</h3>
         <table className="table">
           <thead>
             <tr>
@@ -312,7 +493,7 @@ export default function Providers() {
                 <td>{provider.is_active ? 'Có' : 'Không'}</td>
                 <td>
                   <button type="button" className="btn-link" onClick={() => handleTest(provider.id)}>Test</button>
-                  <button type="button" className="btn-link" onClick={() => startEdit(provider)}>Sửa key</button>
+                  <button type="button" className="btn-link" onClick={() => startEdit(provider)}>Sửa</button>
                   <button type="button" className="btn-link" onClick={() => handleDelete(provider.id)}>Xóa</button>
                 </td>
               </tr>
@@ -320,7 +501,7 @@ export default function Providers() {
             {!providers.length && (
               <tr>
                 <td colSpan={6} className="text-muted">
-                  Chưa có provider — chọn template và dán API key.
+                  Chưa có provider — chọn template hoặc thêm tùy chỉnh.
                 </td>
               </tr>
             )}

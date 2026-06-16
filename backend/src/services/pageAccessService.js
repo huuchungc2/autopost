@@ -5,8 +5,13 @@ export function isSuperAdmin(user) {
 }
 
 export async function getAssignedPageIds(userId) {
-  const rows = await query('SELECT page_id FROM user_pages WHERE user_id = ?', [userId]);
-  return rows.map((row) => Number(row.page_id)).filter((id) => Number.isFinite(id));
+  try {
+    const rows = await query('SELECT page_id FROM user_pages WHERE user_id = ?', [userId]);
+    return rows.map((row) => Number(row.page_id)).filter((id) => Number.isFinite(id));
+  } catch (error) {
+    if (error?.code === 'ER_NO_SUCH_TABLE') return [];
+    throw error;
+  }
 }
 
 function normalizePageIds(pageIds) {

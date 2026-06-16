@@ -12,7 +12,7 @@ export default function BottomNav({ role, pathname, menuOpen, onMenuOpen }) {
   const menuActive = menuOpen || isSecondaryRoute(pathname);
 
   return (
-    <nav className="bottom-nav" aria-label="Điều hướng chính">
+    <nav className="bottom-nav bottom-nav--visible" aria-label="Điều hướng chính">
       {tabItems.map((item) => {
         const Icon = item.icon;
         return (
@@ -41,7 +41,7 @@ export default function BottomNav({ role, pathname, menuOpen, onMenuOpen }) {
         <span className="bottom-nav-icon">
           <Menu size={20} strokeWidth={2} />
         </span>
-        <span>Menu</span>
+        <span>Danh mục</span>
       </button>
     </nav>
   );

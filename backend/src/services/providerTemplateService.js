@@ -66,6 +66,32 @@ export const DEFAULT_TEMPLATES = [
     key_help: 'Lấy tại ideogram.ai',
     sort_order: 5,
   },
+  {
+    slug: '9router-text',
+    name: '9Router Text',
+    type: 'text',
+    provider_kind: 'openai',
+    api_endpoint: 'http://localhost:20128/v1/chat/completions',
+    default_model: 'cc/claude-sonnet-4-5',
+    description: 'Gateway OpenAI-compatible — route Claude, GPT, Gemini…',
+    key_label: '9Router API Key',
+    key_placeholder: 'Lấy từ dashboard 9Router',
+    key_help: 'npm i -g 9router → dashboard → API key. Sửa endpoint nếu chạy trên VPS/domain khác.',
+    sort_order: 6,
+  },
+  {
+    slug: '9router-image',
+    name: '9Router Image',
+    type: 'image',
+    provider_kind: 'openai',
+    api_endpoint: 'http://localhost:20128/v1/images/generations',
+    default_model: 'dall-e-3',
+    description: 'Tạo ảnh qua 9Router (OpenAI-compatible)',
+    key_label: '9Router API Key',
+    key_placeholder: 'Lấy từ dashboard 9Router',
+    key_help: 'Cùng key với 9Router Text — đổi endpoint nếu cần.',
+    sort_order: 7,
+  },
 ];
 
 export async function seedProviderTemplates() {

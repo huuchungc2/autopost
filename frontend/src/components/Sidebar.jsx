@@ -18,7 +18,7 @@ export default function Sidebar({ role, collapsed, onToggle }) {
           type="button"
           className="sidebar-toggle"
           onClick={onToggle}
-          aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
+          aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
           title={collapsed ? 'Mở menu' : 'Thu gọn menu'}
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
@@ -27,7 +27,7 @@ export default function Sidebar({ role, collapsed, onToggle }) {
 
       {role !== 'super_admin' && !collapsed && (
         <div className="sidebar-role-hint">
-          {role === 'admin' ? 'Admin — page & provider được gán' : 'Editor — page được gán'}
+          {role === 'admin' ? 'Admin — fanpage & provider được gán' : 'Editor — fanpage được gán'}
         </div>
       )}
 
