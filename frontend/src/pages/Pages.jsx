@@ -14,7 +14,7 @@ import { formatDateTime } from '../utils/date';
 
 import { WEEK_DAYS as DAYS, tokenStatusLabel, skillTypeLabel } from '../config/vi';
 
-import { Button } from '../components/ui/button';
+import { Button } from '../components/ui/Button';
 
 
 
