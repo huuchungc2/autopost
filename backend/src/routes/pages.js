@@ -29,7 +29,7 @@ function normalizeSkillIds(body) {
 
 router.get('/', authenticate, asyncHandler(async (req, res) => {
   const accessibleIds = await getAccessiblePageIds(req.user);
-  const { clause, params } = pageIdInClause(accessibleIds, 'fb_pages.id');
+  const { clause, params } = pageIdInClause(accessibleIds, 'fp.id');
   const pages = await query(
     `SELECT fp.id, fp.name, fp.page_id, fp.avatar_url, fp.is_active, fp.token_status,
             fp.token_expires_at,
