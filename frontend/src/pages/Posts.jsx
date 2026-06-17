@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { CalendarClock, PenLine, Upload, Download } from 'lucide-react';
 
@@ -9,11 +9,11 @@ import api from '../services/api';
 import { formatDateTime } from '../utils/date';
 
 import PostCard from '../components/PostCard';
+import PostImagePromptActions from '../components/PostImagePromptActions';
 
 import PostEditorModal from '../components/PostEditorModal';
 
 import BulkScheduleModal from '../components/BulkScheduleModal';
-import PostImportModal from '../components/PostImportModal';
 import { downloadImportTemplate } from '../utils/postImportExport';
 
 import Skeleton from '../components/ui/Skeleton';
@@ -21,6 +21,7 @@ import Skeleton from '../components/ui/Skeleton';
 import Badge from '../components/ui/Badge';
 
 import { useToast } from '../context/ToastContext';
+import useIsMobile from '../hooks/useIsMobile';
 
 import { mediaTypeLabel, postStatusLabel } from '../config/vi';
 
@@ -46,13 +47,13 @@ export default function Posts() {
 
   const [bulkOpen, setBulkOpen] = useState(false);
 
-  const [importOpen, setImportOpen] = useState(false);
-
   const [bulkSaving, setBulkSaving] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const { showToast } = useToast();
 
@@ -110,6 +111,49 @@ export default function Posts() {
 
 
 
+  const pageNameById = (id) => pages.find((p) => String(p.id) === String(id))?.name || id;
+
+  const buildImportPath = () => {
+    const params = new URLSearchParams();
+    if (filters.page) params.set('page', filters.page);
+    const query = params.toString();
+    return query ? `/posts/import?${query}` : '/posts/import';
+  };
+
+  const openImport = () => {
+    navigate(buildImportPath());
+  };
+
+  const buildEditorPath = (postId = null) => {
+    const params = new URLSearchParams();
+    if (filters.page) params.set('page', filters.page);
+    const query = params.toString();
+    if (postId) {
+      return query ? `/posts/${postId}/edit?${query}` : `/posts/${postId}/edit`;
+    }
+    return query ? `/posts/new?${query}` : '/posts/new';
+  };
+
+  const openCreate = () => {
+    if (isMobile) {
+      navigate(buildEditorPath());
+      return;
+    }
+
+    setEditorPost(null);
+    setEditorOpen(true);
+  };
+
+  const openEdit = (post) => {
+    if (isMobile) {
+      navigate(buildEditorPath(post.id));
+      return;
+    }
+
+    setEditorPost(post);
+    setEditorOpen(true);
+  };
+
   useEffect(() => {
 
     loadPosts();
@@ -122,6 +166,14 @@ export default function Posts() {
 
     if (searchParams.get('action') === 'create') {
 
+      if (isMobile) {
+        const next = new URLSearchParams(searchParams);
+        next.delete('action');
+        const query = next.toString();
+        navigate(query ? `/posts/new?${query}` : '/posts/new', { replace: true });
+        return;
+      }
+
       openCreate();
 
       const next = new URLSearchParams(searchParams);
@@ -132,19 +184,12 @@ export default function Posts() {
 
     }
 
-  }, [searchParams]);
-
-
+  }, [searchParams, isMobile, navigate]);
 
   const schedulablePosts = useMemo(
-
     () => posts.filter((p) => SCHEDULABLE.has(p.status)),
-
     [posts]
-
   );
-
-
 
   const selectedSchedulableIds = useMemo(() => {
 
@@ -179,30 +224,6 @@ export default function Posts() {
     else next.delete(key);
 
     setSearchParams(next);
-
-  };
-
-
-
-  const pageNameById = (id) => pages.find((p) => String(p.id) === String(id))?.name || id;
-
-
-
-  const openCreate = () => {
-
-    setEditorPost(null);
-
-    setEditorOpen(true);
-
-  };
-
-
-
-  const openEdit = (post) => {
-
-    setEditorPost(post);
-
-    setEditorOpen(true);
 
   };
 
@@ -397,24 +418,6 @@ export default function Posts() {
 
 
 
-  const handleImported = (result) => {
-
-    const skipped = result.errors?.length ? ` — ${result.errors.length} dòng lỗi` : '';
-
-    showToast(
-
-      `Đã import ${result.created_count} bài (${result.scheduled_count} đã lên lịch)${skipped}`,
-
-      'success'
-
-    );
-
-    loadPosts();
-
-  };
-
-
-
   return (
 
     <div className="page-shell">
@@ -439,7 +442,7 @@ export default function Posts() {
 
           </button>
 
-          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>
+          <button type="button" className="btn btn-secondary" onClick={openImport}>
 
             <Upload size={16} />
 
@@ -567,6 +570,8 @@ export default function Posts() {
 
               onDelete={handleDelete}
 
+              onRefresh={loadPosts}
+
             />
 
           ))}
@@ -601,7 +606,7 @@ export default function Posts() {
 
                 </th>
 
-                <th>ID</th><th>Fanpage</th><th>Chủ đề</th><th>Trạng thái</th><th>Lên lịch</th><th>Thao tác</th>
+                <th>ID</th><th>Fanpage</th><th>Chủ đề</th><th>Trạng thái</th><th>Lên lịch</th><th>Prompt ảnh</th><th>Thao tác</th>
 
               </tr>
 
@@ -642,6 +647,10 @@ export default function Posts() {
                   <td>{post.scheduled_at ? formatDateTime(post.scheduled_at) : '—'}</td>
 
                   <td>
+                    <PostImagePromptActions post={post} onGenerated={loadPosts} compact />
+                  </td>
+
+                  <td>
 
                     <button type="button" className="btn-link" onClick={() => openEdit(post)}>Sửa</button>
 
@@ -667,23 +676,17 @@ export default function Posts() {
 
 
 
-      <PostEditorModal
-
-        open={editorOpen}
-
-        post={editorPost}
-
-        pages={pages}
-
-        initialPageId={filters.page || ''}
-
-        onClose={closeEditor}
-
-        onSaved={handleSaved}
-
-        onError={handleEditorError}
-
-      />
+      {!isMobile && (
+        <PostEditorModal
+          open={editorOpen}
+          post={editorPost}
+          pages={pages}
+          initialPageId={filters.page || ''}
+          onClose={closeEditor}
+          onSaved={handleSaved}
+          onError={handleEditorError}
+        />
+      )}
 
 
 
@@ -703,19 +706,6 @@ export default function Posts() {
 
       />
 
-
-
-      <PostImportModal
-
-        open={importOpen}
-
-        onClose={() => setImportOpen(false)}
-
-        pages={pages}
-
-        onImported={handleImported}
-
-      />
 
     </div>
 

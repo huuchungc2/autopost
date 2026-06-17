@@ -296,7 +296,7 @@ export default function Generate() {
 
           <p>Tự nhập nội dung, chọn ảnh/video, lên lịch hoặc lưu nháp — không qua AI.</p>
 
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/posts?action=create')}>
+          <button type="button" className="btn btn-primary" onClick={() => navigate('/posts/new')}>
 
             Mở trình viết bài
 

@@ -2,30 +2,18 @@ import XLSX from 'xlsx';
 
 export const MAX_IMPORT_ROWS = 500;
 
-const TEMPLATE_COLUMNS = [
-  'fanpage_id',
-  'fanpage_ten',
-  'chu_de',
+export const TEMPLATE_COLUMNS = [
   'noi_dung',
-  'loai_media',
-  'url_anh',
-  'url_video',
-  'url_thumb',
+  'prompt_anh',
   'ngay_dang',
   'gio_dang',
 ];
 
 const HEADER_ALIASES = {
-  fanpage_id: ['fanpage_id', 'page_id', 'id_fanpage'],
-  fanpage_ten: ['fanpage_ten', 'page_name', 'ten_fanpage', 'fanpage'],
-  chu_de: ['chu_de', 'topic', 'chu_de_bai', 'tieu_de'],
-  noi_dung: ['noi_dung', 'content', 'noi_dung_bai', 'caption'],
-  loai_media: ['loai_media', 'media_type', 'media'],
-  url_anh: ['url_anh', 'image_url', 'anh'],
-  url_video: ['url_video', 'video_url', 'video'],
-  url_thumb: ['url_thumb', 'video_thumb_url', 'thumb'],
-  ngay_dang: ['ngay_dang', 'scheduled_date', 'ngay'],
-  gio_dang: ['gio_dang', 'scheduled_time', 'gio'],
+  noi_dung: ['noi_dung', 'content', 'noi_dung_bai', 'caption', 'noi_dung'],
+  prompt_anh: ['prompt_anh', 'prompt', 'image_prompt'],
+  ngay_dang: ['ngay_dang', 'scheduled_date', 'ngay', 'noi_dang'],
+  gio_dang: ['gio_dang', 'scheduled_time', 'gio', 'gio_dang'],
 };
 
 function normalizeHeader(cell) {
@@ -107,35 +95,28 @@ function escapeCsvCell(value) {
   return str;
 }
 
-export function buildImportTemplateXlsx(pages = []) {
+export function buildImportTemplateXlsx() {
   const wb = XLSX.utils.book_new();
 
   const guideLines = [
     ['Mẫu import bài viết AutoPost'],
     [''],
-    ['Cột bắt buộc: fanpage_id HOẶC fanpage_ten, noi_dung'],
-    ['loai_media: image | video | none (để trống = tự đoán từ URL)'],
-    ['ngay_dang: YYYY-MM-DD, gio_dang: HH:MM — để trống nếu lên lịch sau'],
+    ['Chỉ cần 4 cột ở sheet Import:'],
+    ['  noi_dung — nội dung bài đăng (bắt buộc)'],
+    ['  prompt_anh — mô tả ảnh tiếng Anh; AI dùng để generate ảnh lên VPS nếu chưa có ảnh'],
+    ['  ngay_dang — YYYY-MM-DD (tuỳ chọn, để trống nếu lên lịch sau)'],
+    ['  gio_dang — HH:MM (tuỳ chọn)'],
+    [''],
+    ['Khi import trên app: chọn fanpage đích, upload file, có thể tự chia lịch theo giờ mỗi ngày.'],
     [''],
   ];
-  if (pages.length) {
-    guideLines.push(['Fanpage của bạn:']);
-    pages.forEach((p) => guideLines.push([`${p.id}`, p.name]));
-  }
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(guideLines), 'Huong dan');
 
-  const examplePage = pages[0];
   const importRows = [
     TEMPLATE_COLUMNS,
     [
-      examplePage?.id ?? '',
-      examplePage?.name ?? 'Tên fanpage',
-      'Ví dụ chủ đề',
-      'Nội dung bài viết đầy đủ...',
-      'image',
-      'https://example.com/anh.jpg',
-      '',
-      '',
+      'Nội dung bài viết đầy tiên...',
+      'A warm illustration of Vietnamese family reunion, square 1:1, no text',
       '2026-06-20',
       '08:00',
     ],
@@ -189,29 +170,17 @@ function parseSheetRows(data) {
   return { rows };
 }
 
-export function buildImportTemplateCsv(pages = []) {
+export function buildImportTemplateCsv() {
   const commentLines = [
     '# Mau import bai viet AutoPost — xoa dong bat dau bang # truoc khi import (hoac de nguyen, he thong tu bo qua)',
-    '# fanpage_id HOAC fanpage_ten: bat buoc mot trong hai',
     '# noi_dung: bat buoc',
-    '# loai_media: image | video | none (de trong = tu doan tu url)',
-    '# ngay_dang: YYYY-MM-DD, gio_dang: HH:MM — de trong neu len lich sau',
+    '# prompt_anh: mo ta anh — AI generate anh len VPS neu chua co anh',
+    '# ngay_dang: YYYY-MM-DD, gio_dang: HH:MM — de trong neu len lich sau tren app',
   ];
 
-  if (pages.length) {
-    commentLines.push(`# Fanpage cua ban: ${pages.map((p) => `${p.id}=${p.name}`).join('; ')}`);
-  }
-
-  const examplePage = pages[0];
   const exampleRow = [
-    examplePage?.id ?? '',
-    examplePage?.name ?? 'Ten fanpage',
-    'Vi du chu de',
     'Noi dung bai viet day du...',
-    'image',
-    'https://example.com/anh.jpg',
-    '',
-    '',
+    'A warm illustration of Vietnamese family reunion, square 1:1, no text',
     '2026-06-20',
     '08:00',
   ];
@@ -223,20 +192,6 @@ export function buildImportTemplateCsv(pages = []) {
   ];
 
   return `\uFEFF${lines.join('\r\n')}\r\n`;
-}
-
-function normalizeMediaType(value, row) {
-  const raw = String(value || '').trim().toLowerCase();
-  if (['image', 'anh', 'ảnh'].includes(raw)) return 'image';
-  if (['video', 'vid'].includes(raw)) return 'video';
-  if (['none', 'khong', ''].includes(raw)) {
-    if (row.url_video) return 'video';
-    if (row.url_anh) return 'image';
-    return 'none';
-  }
-  if (row.url_video) return 'video';
-  if (row.url_anh) return 'image';
-  return 'none';
 }
 
 function normalizeTime(value) {
@@ -270,21 +225,14 @@ function buildScheduledAt(date, time) {
   return `${d} ${t}`;
 }
 
-function resolvePageId(row, pagesById, pagesByName) {
-  const id = Number(row.fanpage_id);
-  if (id && pagesById.has(id)) return id;
-
-  const name = String(row.fanpage_ten || '').trim().toLowerCase();
-  if (name && pagesByName.has(name)) return pagesByName.get(name);
-
-  return null;
-}
-
-export function normalizeImportRows(rows, accessiblePages) {
-  const pagesById = new Map(accessiblePages.map((p) => [p.id, p]));
-  const pagesByName = new Map(
-    accessiblePages.map((p) => [String(p.name).trim().toLowerCase(), p.id])
-  );
+export function normalizeImportRows(rows, defaultPageId) {
+  const pageId = Number(defaultPageId);
+  if (!pageId) {
+    return {
+      rows: [],
+      errors: [{ line: '?', error: 'Thiếu fanpage đích (page_id)' }],
+    };
+  }
 
   const normalized = [];
   const errors = [];
@@ -298,24 +246,21 @@ export function normalizeImportRows(rows, accessiblePages) {
       continue;
     }
 
-    const pageId = resolvePageId(row, pagesById, pagesByName);
-    if (!pageId) {
-      errors.push({ line, error: 'Không tìm thấy fanpage (fanpage_id hoặc fanpage_ten)' });
-      continue;
-    }
-
-    const mediaType = normalizeMediaType(row.loai_media, row);
     const scheduledAt = buildScheduledAt(row.ngay_dang, row.gio_dang);
+    const promptText = String(row.prompt_anh || row.prompt || '').trim();
+    const mediaType = promptText ? 'image' : 'none';
 
     normalized.push({
       line,
       page_id: pageId,
-      topic: String(row.chu_de || '').trim(),
+      topic: '',
       content,
       media_type: mediaType,
-      image_url: String(row.url_anh || '').trim() || null,
-      video_url: String(row.url_video || '').trim() || null,
-      video_thumb_url: String(row.url_thumb || '').trim() || null,
+      image_url: null,
+      image_prompt: promptText || null,
+      video_prompt: null,
+      video_url: null,
+      video_thumb_url: null,
       scheduled_at: scheduledAt,
       status: scheduledAt ? 'scheduled' : 'pending_approval',
     });

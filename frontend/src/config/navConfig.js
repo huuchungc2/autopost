@@ -64,6 +64,9 @@ export function getNavGroupsForRole(role) {
 }
 
 export function getPageTitle(pathname) {
+  if (pathname === '/posts/new') return 'Viết bài tay';
+  if (pathname === '/posts/import') return 'Import Excel';
+  if (/^\/posts\/\d+\/edit$/.test(pathname)) return 'Sửa bài viết';
   for (const group of navGroups) {
     for (const item of group.items) {
       const matched = item.end ? pathname === item.to : pathname === item.to || pathname.startsWith(`${item.to}/`);

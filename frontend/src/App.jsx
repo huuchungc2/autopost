@@ -3,6 +3,8 @@ import { AuthProvider } from './services/authContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Posts from './pages/Posts';
+import PostEditor from './pages/PostEditor';
+import PostImport from './pages/PostImport';
 import Generate from './pages/Generate';
 import BatchGenerate from './pages/BatchGenerate';
 import Pages from './pages/Pages';
@@ -24,6 +26,9 @@ function App() {
           <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route index element={<Dashboard />} />
             <Route path="posts" element={<Posts />} />
+            <Route path="posts/new" element={<PostEditor />} />
+            <Route path="posts/import" element={<PostImport />} />
+            <Route path="posts/:id/edit" element={<PostEditor />} />
             <Route path="generate" element={<Generate />} />
             <Route path="batch-generate" element={<BatchGenerate />} />
             <Route path="pages" element={<Pages />} />

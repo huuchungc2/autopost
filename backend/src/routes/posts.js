@@ -3,7 +3,8 @@ import crypto from 'crypto';
 import { query } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { generatePostWithMedia } from '../services/contentGenerationService.js';
-import { getPageGenerationConfig } from '../services/providerService.js';
+import { generateImage } from '../services/imageService.js';
+import { getPageGenerationConfig, getProviderById } from '../services/providerService.js';
 import { postToFacebook } from '../services/fbService.js';
 import { createNotification } from '../services/notifyService.js';
 import {
@@ -150,21 +151,20 @@ router.post('/bulk-schedule', asyncHandler(async (req, res) => {
 }));
 
 router.get('/import/template', asyncHandler(async (req, res) => {
-  const accessibleIds = await getAccessiblePageIds(req.user);
-  const { clause, params } = pageIdInClause(accessibleIds, 'id');
-  const pages = await query(
-    `SELECT id, name FROM fb_pages WHERE is_active = true${clause} ORDER BY name ASC`,
-    params
-  );
-
-  const xlsx = buildImportTemplateXlsx(pages);
+  const xlsx = buildImportTemplateXlsx();
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename="mau-import-bai-viet.xlsx"');
   res.send(xlsx);
 }));
 
 router.post('/import', asyncHandler(async (req, res) => {
-  const { csv, rows: rawRows, excel_base64, auto_schedule } = req.body;
+  const { page_id, csv, rows: rawRows, excel_base64, auto_schedule, auto_generate_images } = req.body;
+
+  if (!page_id) {
+    return res.status(400).json({ error: 'page_id là bắt buộc — chọn fanpage trước khi import' });
+  }
+
+  await assertPageAccess(req.user, page_id);
 
   let parsedRows = [];
   if (Array.isArray(rawRows) && rawRows.length) {
@@ -192,14 +192,7 @@ router.post('/import', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Cần gửi rows (mảng), excel_base64 hoặc csv' });
   }
 
-  const accessibleIds = await getAccessiblePageIds(req.user);
-  const { clause, params } = pageIdInClause(accessibleIds, 'id');
-  const pages = await query(
-    `SELECT id, name FROM fb_pages WHERE is_active = true${clause}`,
-    params
-  );
-
-  let { rows, errors } = normalizeImportRows(parsedRows, pages);
+  let { rows, errors } = normalizeImportRows(parsedRows, page_id);
 
   if (!rows.length) {
     return res.status(400).json({
@@ -216,13 +209,15 @@ router.post('/import', asyncHandler(async (req, res) => {
   for (const row of rows) {
     await assertPageAccess(req.user, row.page_id);
     const result = await query(
-      `INSERT INTO posts (page_id, topic, content, image_url, video_url, video_thumb_url, media_type, status, scheduled_at, created_by_type, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, NOW())`,
+      `INSERT INTO posts (page_id, topic, content, image_url, image_prompt, video_prompt, video_url, video_thumb_url, media_type, status, scheduled_at, created_by_type, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, NOW())`,
       [
         row.page_id,
         row.topic,
         row.content,
         row.image_url,
+        row.image_prompt,
+        row.video_prompt,
         row.video_url,
         row.video_thumb_url,
         row.media_type,
@@ -235,9 +230,41 @@ router.post('/import', asyncHandler(async (req, res) => {
       id: result.insertId,
       line: row.line,
       page_id: row.page_id,
+      image_prompt: row.image_prompt,
       scheduled_at: row.scheduled_at,
       status: row.status,
     });
+  }
+
+  let imageGeneratedCount = 0;
+  const imageErrors = [];
+
+  if (auto_generate_images) {
+    const pageRows = await query('SELECT image_provider_id FROM fb_pages WHERE id = ?', [page_id]);
+    const imageProvider = await getProviderById(pageRows[0]?.image_provider_id);
+
+    for (const item of created) {
+      const prompt = String(item.image_prompt || '').trim();
+      if (!prompt) continue;
+
+      try {
+        if (!imageProvider) {
+          throw new Error('Fanpage chưa cấu hình AI provider ảnh');
+        }
+        const imageResult = await generateImage(prompt, imageProvider);
+        await query(
+          'UPDATE posts SET image_url = ?, image_prompt = ?, media_type = ? WHERE id = ?',
+          [imageResult.image_url, imageResult.image_prompt || prompt, 'image', item.id]
+        );
+        imageGeneratedCount += 1;
+      } catch (err) {
+        imageErrors.push({
+          id: item.id,
+          line: item.line,
+          error: err.message || 'Xuất ảnh thất bại',
+        });
+      }
+    }
   }
 
   const scheduledCount = created.filter((c) => c.status === 'scheduled').length;
@@ -245,6 +272,8 @@ router.post('/import', asyncHandler(async (req, res) => {
   res.status(201).json({
     created_count: created.length,
     scheduled_count: scheduledCount,
+    image_generated_count: imageGeneratedCount,
+    image_errors: imageErrors,
     post_ids: created.map((c) => c.id),
     errors,
     posts: created,
@@ -385,6 +414,8 @@ router.post('/', asyncHandler(async (req, res) => {
     topic,
     content,
     image_url,
+    image_prompt,
+    video_prompt,
     video_url,
     video_thumb_url,
     media_type,
@@ -405,12 +436,14 @@ router.post('/', asyncHandler(async (req, res) => {
   }
 
   const result = await query(
-    'INSERT INTO posts (page_id, topic, content, image_url, video_url, video_thumb_url, media_type, status, scheduled_at, created_by_type, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
+    'INSERT INTO posts (page_id, topic, content, image_url, image_prompt, video_prompt, video_url, video_thumb_url, media_type, status, scheduled_at, created_by_type, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
     [
       page_id,
       topic || '',
       content,
       image_url || null,
+      image_prompt || null,
+      video_prompt || null,
       video_url || null,
       video_thumb_url || null,
       resolvedMediaType,
@@ -473,7 +506,19 @@ router.post('/:id/approve', asyncHandler(async (req, res) => {
 
 router.put('/:id', asyncHandler(async (req, res) => {
   const post = await assertPostAccess(req.user, req.params.id);
-  const { page_id, topic, content, image_url, video_url, video_thumb_url, media_type, scheduled_at, status } = req.body;
+  const {
+    page_id,
+    topic,
+    content,
+    image_url,
+    image_prompt,
+    video_prompt,
+    video_url,
+    video_thumb_url,
+    media_type,
+    scheduled_at,
+    status,
+  } = req.body;
 
   const targetPageId = page_id != null ? Number(page_id) : post.page_id;
   if (page_id != null && targetPageId !== post.page_id) {
@@ -481,10 +526,55 @@ router.put('/:id', asyncHandler(async (req, res) => {
   }
 
   await query(
-    'UPDATE posts SET page_id = ?, topic = ?, content = ?, image_url = ?, video_url = ?, video_thumb_url = ?, media_type = ?, scheduled_at = ?, status = ? WHERE id = ?',
-    [targetPageId, topic, content, image_url, video_url, video_thumb_url, media_type, scheduled_at, status, req.params.id]
+    `UPDATE posts SET page_id = ?, topic = ?, content = ?, image_url = ?, image_prompt = ?, video_prompt = ?,
+     video_url = ?, video_thumb_url = ?, media_type = ?, scheduled_at = ?, status = ? WHERE id = ?`,
+    [
+      targetPageId,
+      topic,
+      content,
+      image_url,
+      image_prompt ?? post.image_prompt,
+      video_prompt ?? post.video_prompt,
+      video_url,
+      video_thumb_url,
+      media_type,
+      scheduled_at,
+      status,
+      req.params.id,
+    ]
   );
   res.json({ message: 'Post updated' });
+}));
+
+router.post('/:id/generate-image', asyncHandler(async (req, res) => {
+  await assertPostAccess(req.user, req.params.id);
+  const rows = await query('SELECT page_id, image_prompt FROM posts WHERE id = ?', [req.params.id]);
+  const post = rows[0];
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+
+  const prompt = String(req.body?.prompt || post.image_prompt || '').trim();
+  if (!prompt) {
+    return res.status(400).json({ error: 'Bài chưa có prompt ảnh. Thêm prompt trước khi xuất ảnh.' });
+  }
+
+  const pages = await query('SELECT image_provider_id FROM fb_pages WHERE id = ?', [post.page_id]);
+  const imageProvider = await getProviderById(pages[0]?.image_provider_id);
+  if (!imageProvider) {
+    return res.status(400).json({ error: 'Fanpage chưa cấu hình AI provider ảnh' });
+  }
+
+  const imageResult = await generateImage(prompt, imageProvider);
+  await query(
+    'UPDATE posts SET image_url = ?, image_prompt = ?, media_type = ? WHERE id = ?',
+    [imageResult.image_url, imageResult.image_prompt || prompt, 'image', req.params.id]
+  );
+
+  res.json({
+    message: 'Đã xuất ảnh từ prompt',
+    image_url: imageResult.image_url,
+    image_prompt: imageResult.image_prompt || prompt,
+    media_type: 'image',
+  });
 }));
 
 router.delete('/:id', asyncHandler(async (req, res) => {

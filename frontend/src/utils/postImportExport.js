@@ -1,15 +1,9 @@
 import * as XLSX from 'xlsx';
 
 const HEADER_ALIASES = {
-  fanpage_id: ['fanpage_id', 'page_id', 'id_fanpage'],
-  fanpage_ten: ['fanpage_ten', 'page_name', 'ten_fanpage', 'fanpage'],
-  chu_de: ['chu_de', 'topic', 'chu_de_bai', 'tieu_de'],
   noi_dung: ['noi_dung', 'content', 'noi_dung_bai', 'caption'],
-  loai_media: ['loai_media', 'media_type', 'media'],
-  url_anh: ['url_anh', 'image_url', 'anh'],
-  url_video: ['url_video', 'video_url', 'video'],
-  url_thumb: ['url_thumb', 'video_thumb_url', 'thumb'],
-  ngay_dang: ['ngay_dang', 'scheduled_date', 'ngay'],
+  prompt_anh: ['prompt_anh', 'prompt', 'image_prompt', 'prompt_anh'],
+  ngay_dang: ['ngay_dang', 'scheduled_date', 'ngay', 'noi_dang'],
   gio_dang: ['gio_dang', 'scheduled_time', 'gio'],
 };
 
@@ -59,10 +53,6 @@ function parseSheetRows(data) {
     const content = String(row.noi_dung || '').trim();
     if (!content) {
       errors.push(`Dòng ${row._line}: thiếu nội dung`);
-      continue;
-    }
-    if (!row.fanpage_id && !row.fanpage_ten) {
-      errors.push(`Dòng ${row._line}: thiếu fanpage_id hoặc fanpage_ten`);
       continue;
     }
 
