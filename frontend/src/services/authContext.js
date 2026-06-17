@@ -6,10 +6,7 @@ const tokenKey = 'autopost_token';
 const userKey = 'autopost_user';
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const stored = window.localStorage.getItem(userKey);
-    return stored ? JSON.parse(stored) : null;
-  });
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(!!window.localStorage.getItem(tokenKey));
 
   const logout = () => {

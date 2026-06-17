@@ -1,22 +1,35 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../services/authContext';
 import api from '../services/api';
 
+function loginErrorMessage(err) {
+  if (err.response?.data?.error) return err.response.data.error;
+  if (err.code === 'ERR_NETWORK' || !err.response) {
+    return 'Không kết nối được server — kiểm tra backend hoặc VITE_API_BASE_URL lúc build frontend.';
+  }
+  return 'Đăng nhập thất bại';
+}
+
 export default function Login() {
-  const { login, user } = useAuth();
+  const { login, user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/';
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    if (loading || submitting) return;
     if (user) {
       navigate(user.must_change_password ? '/change-password' : from, { replace: true });
     }
-  }, [user, navigate, from]);
+  }, [user, loading, submitting, navigate, from]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setError('');
+    setSubmitting(true);
     const form = new FormData(event.target);
     try {
       const response = await api.post('/auth/login', {
@@ -26,11 +39,9 @@ export default function Login() {
       login(response.data.token, response.data.user);
       navigate(response.data.user.must_change_password ? '/change-password' : from, { replace: true });
     } catch (err) {
-      event.target.querySelector('.form-error')?.remove();
-      const el = document.createElement('div');
-      el.className = 'form-error';
-      el.textContent = err.response?.data?.error || 'Đăng nhập thất bại';
-      event.target.appendChild(el);
+      setError(loginErrorMessage(err));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -39,15 +50,18 @@ export default function Login() {
       <form className="login-form" onSubmit={handleSubmit}>
         <h1>AutoPost</h1>
         <p>Đăng nhập để tiếp tục.</p>
+        {error && <div className="form-error">{error}</div>}
         <label>
           Email hoặc username
           <input name="login" type="text" autoComplete="username" required placeholder="admin hoặc admin@autopost.local" />
         </label>
         <label>
           Mật khẩu
-          <input name="password" type="password" required />
+          <input name="password" type="password" autoComplete="current-password" required />
         </label>
-        <button type="submit" className="btn-primary">Đăng nhập</button>
+        <button type="submit" className="btn-primary" disabled={submitting || loading}>
+          {submitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
+        </button>
       </form>
     </div>
   );

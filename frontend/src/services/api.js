@@ -18,4 +18,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status;
+    const url = String(error.config?.url || '');
+    const isAuthRoute = url.includes('/auth/login') || url.includes('/auth/me');
+    if (status === 401 && !isAuthRoute) {
+      window.localStorage.removeItem('autopost_token');
+      window.localStorage.removeItem('autopost_user');
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.assign('/login');
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;

@@ -9,13 +9,25 @@ export async function authenticateUser(identifier, password) {
   const login = String(identifier || '').trim();
   if (!login) return null;
 
-  const users = await query(
-    `SELECT id, name, username, email, password, role, is_active, must_change_password
-     FROM users
-     WHERE deleted_at IS NULL
-       AND (LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?))`,
-    [login, login]
-  );
+  let users;
+  try {
+    users = await query(
+      `SELECT id, name, username, email, password, role, is_active, must_change_password
+       FROM users
+       WHERE deleted_at IS NULL
+         AND (LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?))`,
+      [login, login]
+    );
+  } catch (error) {
+    if (error?.code !== 'ER_BAD_FIELD_ERROR') throw error;
+    users = await query(
+      `SELECT id, name, email, password, role, is_active, must_change_password
+       FROM users
+       WHERE deleted_at IS NULL AND LOWER(email) = LOWER(?)`,
+      [login]
+    );
+  }
+
   const user = users[0];
   if (!user || !user.is_active) {
     return null;
