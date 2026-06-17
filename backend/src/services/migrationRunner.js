@@ -153,3 +153,23 @@ async function backfillMissingUsernamesFromRunner() {
   const { backfillMissingUsernames } = await import('./userUsernameService.js');
   await backfillMissingUsernames();
 }
+
+export async function ensurePostsFbMediaIds() {
+  if (await columnExists('posts', 'fb_photo_id')) return;
+
+  const migrationPath = path.resolve(__dirname, '../../migrations/008_posts_fb_media_ids.sql');
+  if (!fs.existsSync(migrationPath)) {
+    console.warn('Missing migration file:', migrationPath);
+    return;
+  }
+
+  const statements = parseSqlStatements(migrationPath);
+  for (const statement of statements) {
+    try {
+      await query(statement);
+    } catch (error) {
+      if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
+    }
+  }
+  console.log('Migration 008 applied: posts.fb_photo_id + fb_video_id ready');
+}

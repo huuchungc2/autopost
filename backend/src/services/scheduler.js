@@ -3,6 +3,7 @@ import { query } from '../db.js';
 import { processPendingJobs } from './jobWorker.js';
 import { postToFacebook } from './fbService.js';
 import { createNotification } from './notifyService.js';
+import { persistFacebookPublishIds } from './postPublishService.js';
 import { runDueTopicSlots } from './topicSlotService.js';
 
 let started = false;
@@ -37,8 +38,11 @@ async function publishDuePosts() {
         videoUrl: post.media_type === 'video' ? post.video_url : null,
         published: true,
       });
-      const fbPostId = response.id || response.post_id || null;
-      await query('UPDATE posts SET status = ?, published_at = NOW(), fb_post_id = ? WHERE id = ?', ['published', fbPostId, post.id]);
+      await persistFacebookPublishIds(post.id, response, {
+        hasImage: post.media_type === 'image',
+        hasVideo: post.media_type === 'video',
+      });
+      await query('UPDATE posts SET status = ?, published_at = NOW() WHERE id = ?', ['published', post.id]);
       await createNotification({ type: 'success', title: 'Auto-published', message: `Post #${post.id} published`, relatedType: 'post', relatedId: post.id });
     } catch (error) {
       await query('UPDATE posts SET status = ?, error_message = ? WHERE id = ?', ['failed', error.message, post.id]);

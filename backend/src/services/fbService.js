@@ -142,3 +142,21 @@ async function publishVideo({ pageId, pageToken, message, videoUrl, scheduledUni
   });
   return response.data;
 }
+
+/** Photo API trả { id: photoId, post_id: feedPostId }; feed chỉ có id. */
+export function normalizeFacebookPublishIds(response, { hasImage = false, hasVideo = false } = {}) {
+  const r = response || {};
+  const ids = { fb_post_id: null, fb_photo_id: null, fb_video_id: null };
+
+  if (hasVideo) {
+    ids.fb_video_id = r.id ? String(r.id) : null;
+    ids.fb_post_id = r.post_id ? String(r.post_id) : ids.fb_video_id;
+  } else if (hasImage) {
+    ids.fb_photo_id = r.id ? String(r.id) : null;
+    ids.fb_post_id = r.post_id ? String(r.post_id) : ids.fb_photo_id;
+  } else {
+    ids.fb_post_id = r.id ? String(r.id) : (r.post_id ? String(r.post_id) : null);
+  }
+
+  return ids;
+}

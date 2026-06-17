@@ -115,6 +115,8 @@ CREATE TABLE IF NOT EXISTS posts (
   scheduled_at DATETIME NULL,
   published_at DATETIME NULL,
   fb_post_id VARCHAR(100),
+  fb_photo_id VARCHAR(100),
+  fb_video_id VARCHAR(100),
   error_message TEXT,
   created_by_type ENUM('auto','manual') DEFAULT 'auto',
   created_by INT NULL,

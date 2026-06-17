@@ -7,6 +7,7 @@ import { generatePostWithMedia } from '../services/contentGenerationService.js';
 import { generateImage } from '../services/imageService.js';
 import { getPageGenerationConfig, getProviderById } from '../services/providerService.js';
 import { postToFacebook } from '../services/fbService.js';
+import { persistFacebookPublishIds } from '../services/postPublishService.js';
 import { createNotification } from '../services/notifyService.js';
 import {
   getAccessiblePageIds,
@@ -33,7 +34,18 @@ const importUpload = multer({
 });
 
 router.get('/', asyncHandler(async (req, res) => {
-  const { page, status, media_type, date, limit = 50, offset = 0 } = req.query;
+  const {
+    page: pageFilter,
+    status,
+    media_type,
+    date,
+    sort = 'scheduled_at',
+    order = 'asc',
+    limit: limitRaw = 30,
+    page_num: pageNumRaw = 1,
+    offset: offsetRaw,
+  } = req.query;
+
   const accessibleIds = await getAccessiblePageIds(req.user);
   const conditions = [];
   const params = [];
@@ -44,21 +56,51 @@ router.get('/', asyncHandler(async (req, res) => {
     params.push(...accessFilter.params);
   }
 
-  if (page) {
-    await assertPageAccess(req.user, page);
+  if (pageFilter) {
+    await assertPageAccess(req.user, pageFilter);
     conditions.push('posts.page_id = ?');
-    params.push(page);
+    params.push(pageFilter);
   }
   if (status) { conditions.push('posts.status = ?'); params.push(status); }
   if (media_type) { conditions.push('posts.media_type = ?'); params.push(media_type); }
   if (date) { conditions.push('DATE(posts.scheduled_at) = ?'); params.push(date); }
 
+  const sortColumns = {
+    scheduled_at: 'posts.scheduled_at',
+    created_at: 'posts.created_at',
+    published_at: 'posts.published_at',
+    id: 'posts.id',
+  };
+  const sortCol = sortColumns[sort] || sortColumns.scheduled_at;
+  const sortDir = String(order).toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+  const limit = Math.min(Math.max(parseInt(limitRaw, 10) || 30, 1), 200);
+  const pageNum = Math.max(parseInt(pageNumRaw, 10) || 1, 1);
+  const offset = offsetRaw != null && offsetRaw !== ''
+    ? Math.max(parseInt(offsetRaw, 10) || 0, 0)
+    : (pageNum - 1) * limit;
+
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-  const posts = await query(
-    `SELECT posts.*, fb_pages.name AS page_name FROM posts JOIN fb_pages ON fb_pages.id = posts.page_id ${where} ORDER BY posts.created_at DESC LIMIT ? OFFSET ?`,
-    [...params, parseInt(limit, 10), parseInt(offset, 10)]
+  const fromClause = 'FROM posts JOIN fb_pages ON fb_pages.id = posts.page_id';
+  const orderClause = `ORDER BY ${sortCol} IS NULL, ${sortCol} ${sortDir}, posts.id DESC`;
+
+  const [countRow] = await query(
+    `SELECT COUNT(*) AS total ${fromClause} ${where}`,
+    params
   );
-  res.json(posts);
+  const posts = await query(
+    `SELECT posts.*, fb_pages.name AS page_name ${fromClause} ${where} ${orderClause} LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  );
+
+  res.json({
+    items: posts,
+    total: countRow?.total ?? posts.length,
+    limit,
+    offset,
+    page: Math.floor(offset / limit) + 1,
+    sort,
+    order: sortDir.toLowerCase(),
+  });
 }));
 
 router.post('/bulk-schedule', asyncHandler(async (req, res) => {
@@ -509,15 +551,18 @@ router.post('/:id/publish', asyncHandler(async (req, res) => {
     published: !post.scheduled_at || new Date(post.scheduled_at) <= new Date(),
   });
 
-  const fbPostId = response.id || response.post_id || null;
+  const fbIds = await persistFacebookPublishIds(req.params.id, response, {
+    hasImage: post.media_type === 'image',
+    hasVideo: post.media_type === 'video',
+  });
   const newStatus = post.scheduled_at && new Date(post.scheduled_at) > new Date() ? 'scheduled' : 'published';
   await query(
-    'UPDATE posts SET status = ?, published_at = IF(? = "published", NOW(), published_at), fb_post_id = ? WHERE id = ?',
-    [newStatus, newStatus, fbPostId, req.params.id]
+    'UPDATE posts SET status = ?, published_at = IF(? = "published", NOW(), published_at) WHERE id = ?',
+    [newStatus, newStatus, req.params.id]
   );
   await createNotification({ type: 'success', title: 'Post published', message: `Post ${req.params.id} was published.`, relatedType: 'post', relatedId: req.params.id });
 
-  res.json({ message: 'Post published', fb_post_id: fbPostId, status: newStatus });
+  res.json({ message: 'Post published', ...fbIds, status: newStatus });
 }));
 
 router.post('/:id/schedule', asyncHandler(async (req, res) => {

@@ -24,7 +24,7 @@ export default function Dashboard() {
       setLoadError('');
       try {
         const requests = [
-          { key: 'posts', promise: api.get('/posts') },
+          { key: 'posts', promise: api.get('/posts', { params: { limit: 500 } }) },
           { key: 'pages', promise: api.get('/pages') },
           { key: 'providers', promise: api.get('/providers') },
         ];
@@ -42,19 +42,20 @@ export default function Dashboard() {
           return [];
         };
 
-        const postsData = getData(0, 'bài viết');
+        const postsPayload = getData(0, 'bài viết');
+        const postsList = Array.isArray(postsPayload) ? postsPayload : (postsPayload?.items || []);
         const pagesData = getData(1, 'fanpage');
         const providersData = getData(2, 'provider');
         const usersData = isSuperAdmin ? getData(3, 'người dùng') : null;
 
-        setPosts(Array.isArray(postsData) ? postsData : []);
-        const byStatus = (Array.isArray(postsData) ? postsData : []).reduce((acc, p) => {
+        setPosts(postsList);
+        const byStatus = postsList.reduce((acc, p) => {
           acc[p.status] = (acc[p.status] || 0) + 1;
           return acc;
         }, {});
 
         setStats({
-          posts: Array.isArray(postsData) ? postsData.length : 0,
+          posts: postsPayload?.total ?? postsList.length,
           pages: Array.isArray(pagesData) ? pagesData.length : 0,
           providers: Array.isArray(providersData) ? providersData.length : 0,
           users: isSuperAdmin && Array.isArray(usersData) ? usersData.length : null,
