@@ -25,6 +25,11 @@ api.interceptors.response.use(
     const url = String(error.config?.url || '');
     const isAuthRoute = url.includes('/auth/login') || url.includes('/auth/me');
     if (status === 401 && !isAuthRoute) {
+      const msg = String(error.response?.data?.error || '');
+      const isGenerateImage = url.includes('/generate-image');
+      if (isGenerateImage && msg !== 'Unauthorized') {
+        return Promise.reject(error);
+      }
       window.localStorage.removeItem('autopost_token');
       window.localStorage.removeItem('autopost_user');
       if (!window.location.pathname.startsWith('/login')) {

@@ -33,7 +33,8 @@ export default function PostImagePromptActions({
       showToast('Đã xuất ảnh từ prompt', 'success');
       onGenerated?.();
     } catch (err) {
-      showToast(err.response?.data?.error || 'Xuất ảnh từ prompt thất bại', 'error');
+      const msg = err.response?.data?.error || err.message || 'Xuất ảnh từ prompt thất bại';
+      showToast(msg, 'error');
     } finally {
       setGenerating(false);
     }
