@@ -17,6 +17,7 @@ export default function PostImportForm({
   footer = null,
 }) {
   const [pageId, setPageId] = useState(initialPageId);
+  const [importFile, setImportFile] = useState(null);
   const [importRows, setImportRows] = useState([]);
   const [fileName, setFileName] = useState('');
   const [parseErrors, setParseErrors] = useState([]);
@@ -66,6 +67,7 @@ export default function PostImportForm({
   const handleFile = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setImportFile(file);
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = () => {
@@ -83,24 +85,23 @@ export default function PostImportForm({
       onError?.('Chọn fanpage trước khi import');
       return;
     }
-    if (!parsed.rows.length) return;
+    if (!importFile || !parsed.rows.length) return;
 
     setSaving(true);
     try {
-      const payload = {
-        page_id: Number(pageId),
-        rows: parsed.rows,
-      };
+      const formData = new FormData();
+      formData.append('page_id', String(pageId));
+      formData.append('file', importFile);
       if (autoSchedule && rowsWithoutDate.length) {
-        payload.auto_schedule = {
+        formData.append('auto_schedule', JSON.stringify({
           start_date: startDate,
           times: times.filter(Boolean),
-        };
+        }));
       }
       if (autoGenerateImages && rowsWithPrompt.length) {
-        payload.auto_generate_images = true;
+        formData.append('auto_generate_images', '1');
       }
-      const response = await api.post('/posts/import', payload);
+      const response = await api.post('/posts/import', formData);
       onImported?.(response.data);
     } catch (err) {
       const data = err.response?.data;
@@ -117,7 +118,7 @@ export default function PostImportForm({
     ? describeBulkPlan(rowsWithoutDate.length, times)
     : null;
 
-  const canSubmit = Boolean(pageId && parsed.rows.length && !saving);
+  const canSubmit = Boolean(pageId && importFile && parsed.rows.length && !saving);
 
   const defaultFooter = (
     <>

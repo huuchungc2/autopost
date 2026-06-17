@@ -1,4 +1,5 @@
 import express from 'express';
+import multer from 'multer';
 import crypto from 'crypto';
 import { query } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
@@ -25,6 +26,11 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 
 const router = express.Router();
 router.use(authenticate);
+
+const importUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+});
 
 router.get('/', asyncHandler(async (req, res) => {
   const { page, status, media_type, date, limit = 50, offset = 0 } = req.query;
@@ -157,8 +163,24 @@ router.get('/import/template', asyncHandler(async (req, res) => {
   res.send(xlsx);
 }));
 
-router.post('/import', asyncHandler(async (req, res) => {
-  const { page_id, csv, rows: rawRows, excel_base64, auto_schedule, auto_generate_images } = req.body;
+function parseImportOptions(body = {}) {
+  let autoSchedule = body.auto_schedule;
+  if (typeof autoSchedule === 'string' && autoSchedule.trim()) {
+    try {
+      autoSchedule = JSON.parse(autoSchedule);
+    } catch {
+      autoSchedule = null;
+    }
+  }
+  const autoGenerateImages = body.auto_generate_images === true
+    || body.auto_generate_images === '1'
+    || body.auto_generate_images === 'true';
+  return { autoSchedule, autoGenerateImages };
+}
+
+router.post('/import', importUpload.single('file'), asyncHandler(async (req, res) => {
+  const { page_id, csv, rows: rawRows, excel_base64 } = req.body;
+  const { autoSchedule, autoGenerateImages } = parseImportOptions(req.body);
 
   if (!page_id) {
     return res.status(400).json({ error: 'page_id là bắt buộc — chọn fanpage trước khi import' });
@@ -167,7 +189,16 @@ router.post('/import', asyncHandler(async (req, res) => {
   await assertPageAccess(req.user, page_id);
 
   let parsedRows = [];
-  if (Array.isArray(rawRows) && rawRows.length) {
+  if (req.file?.buffer) {
+    const parsed = parseExcelBuffer(req.file.buffer);
+    parsedRows = parsed.rows;
+    if (parsedRows.length > MAX_IMPORT_ROWS) {
+      return res.status(400).json({ error: `Tối đa ${MAX_IMPORT_ROWS} dòng mỗi lần import` });
+    }
+    if (!parsedRows.length) {
+      return res.status(400).json({ error: 'File Excel không có dòng dữ liệu hợp lệ (sheet Import)' });
+    }
+  } else if (Array.isArray(rawRows) && rawRows.length) {
     parsedRows = rawRows.map((row, i) => ({ ...row, _line: row._line || i + 2 }));
   } else if (excel_base64 && String(excel_base64).trim()) {
     const buffer = Buffer.from(String(excel_base64), 'base64');
@@ -189,7 +220,7 @@ router.post('/import', asyncHandler(async (req, res) => {
       return res.status(400).json({ error: 'File không có dòng dữ liệu hợp lệ' });
     }
   } else {
-    return res.status(400).json({ error: 'Cần gửi rows (mảng), excel_base64 hoặc csv' });
+    return res.status(400).json({ error: 'Cần upload file Excel, rows (mảng), excel_base64 hoặc csv' });
   }
 
   let { rows, errors } = normalizeImportRows(parsedRows, page_id);
@@ -201,8 +232,8 @@ router.post('/import', asyncHandler(async (req, res) => {
     });
   }
 
-  if (auto_schedule?.start_date && Array.isArray(auto_schedule.times) && auto_schedule.times.length) {
-    rows = buildAutoScheduleSlots(rows, auto_schedule.start_date, auto_schedule.times);
+  if (autoSchedule?.start_date && Array.isArray(autoSchedule.times) && autoSchedule.times.length) {
+    rows = buildAutoScheduleSlots(rows, autoSchedule.start_date, autoSchedule.times);
   }
 
   const created = [];
@@ -239,7 +270,7 @@ router.post('/import', asyncHandler(async (req, res) => {
   let imageGeneratedCount = 0;
   const imageErrors = [];
 
-  if (auto_generate_images) {
+  if (autoGenerateImages) {
     const pageRows = await query('SELECT image_provider_id FROM fb_pages WHERE id = ?', [page_id]);
     const imageProvider = await getProviderById(pageRows[0]?.image_provider_id);
 

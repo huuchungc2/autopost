@@ -32,8 +32,9 @@ const __dirname = path.dirname(__filename);
 const publicPath = path.resolve(__dirname, '../../public');
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+const bodyLimit = process.env.JSON_BODY_LIMIT || '15mb';
+app.use(express.json({ limit: bodyLimit }));
+app.use(express.urlencoded({ extended: true, limit: bodyLimit }));
 app.use(activityLogger);
 app.use('/images', express.static(path.join(publicPath, 'images')));
 app.use('/videos', express.static(path.join(publicPath, 'videos')));
@@ -66,6 +67,9 @@ app.use((req, res) => {
 
 app.use((err, req, res, next) => {
   console.error(err);
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'File hoặc dữ liệu quá lớn — thử import file Excel trực tiếp hoặc giảm số dòng' });
+  }
   const status = err.status || 500;
   res.status(status).json({ error: err.message || 'Internal server error' });
 });
