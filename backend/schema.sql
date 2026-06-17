@@ -107,6 +107,8 @@ CREATE TABLE IF NOT EXISTS posts (
   content LONGTEXT NOT NULL,
   image_url TEXT,
   image_prompt TEXT,
+  auto_generate_image BOOLEAN NOT NULL DEFAULT false,
+  save_image_local BOOLEAN NOT NULL DEFAULT true,
   video_prompt TEXT,
   video_url TEXT,
   video_thumb_url TEXT,

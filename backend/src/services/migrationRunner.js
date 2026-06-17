@@ -173,3 +173,43 @@ export async function ensurePostsFbMediaIds() {
   }
   console.log('Migration 008 applied: posts.fb_photo_id + fb_video_id ready');
 }
+
+export async function ensurePostsAutoGenerateImage() {
+  if (await columnExists('posts', 'auto_generate_image')) return;
+
+  const migrationPath = path.resolve(__dirname, '../../migrations/009_posts_auto_generate_image.sql');
+  if (!fs.existsSync(migrationPath)) {
+    console.warn('Missing migration file:', migrationPath);
+    return;
+  }
+
+  const statements = parseSqlStatements(migrationPath);
+  for (const statement of statements) {
+    try {
+      await query(statement);
+    } catch (error) {
+      if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
+    }
+  }
+  console.log('Migration 009 applied: posts.auto_generate_image ready');
+}
+
+export async function ensurePostsSaveImageLocal() {
+  if (await columnExists('posts', 'save_image_local')) return;
+
+  const migrationPath = path.resolve(__dirname, '../../migrations/010_posts_save_image_local.sql');
+  if (!fs.existsSync(migrationPath)) {
+    console.warn('Missing migration file:', migrationPath);
+    return;
+  }
+
+  const statements = parseSqlStatements(migrationPath);
+  for (const statement of statements) {
+    try {
+      await query(statement);
+    } catch (error) {
+      if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
+    }
+  }
+  console.log('Migration 010 applied: posts.save_image_local ready');
+}

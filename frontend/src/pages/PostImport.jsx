@@ -22,9 +22,8 @@ export default function PostImport() {
   const handleImported = (result) => {
     const parts = [`Đã import ${result.created_count} bài`];
     if (result.scheduled_count) parts.push(`${result.scheduled_count} đã lên lịch`);
-    if (result.image_generated_count) parts.push(`${result.image_generated_count} đã xuất ảnh AI`);
+    if (result.auto_generate_image_count) parts.push(`${result.auto_generate_image_count} sẽ tự xuất ảnh khi đăng`);
     if (result.errors?.length) parts.push(`${result.errors.length} dòng lỗi import`);
-    if (result.image_errors?.length) parts.push(`${result.image_errors.length} lỗi xuất ảnh`);
     showToast(parts.join(' — '), 'success');
     navigate('/posts');
   };

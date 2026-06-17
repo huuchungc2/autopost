@@ -4,6 +4,7 @@ import { processPendingJobs } from './jobWorker.js';
 import { postToFacebook } from './fbService.js';
 import { createNotification } from './notifyService.js';
 import { persistFacebookPublishIds } from './postPublishService.js';
+import { ensurePostImageForPublish } from './postImageService.js';
 import { runDueTopicSlots } from './topicSlotService.js';
 
 let started = false;
@@ -22,7 +23,7 @@ export function startScheduler() {
 
 async function publishDuePosts() {
   const posts = await query(
-    `SELECT p.*, fp.page_id AS fb_page_id, fp.page_token
+    `SELECT p.*, fp.page_id AS fb_page_id, fp.page_token, fp.image_provider_id
      FROM posts p
      JOIN fb_pages fp ON fp.id = p.page_id
      WHERE p.status = 'scheduled' AND p.scheduled_at <= NOW()`
@@ -30,17 +31,18 @@ async function publishDuePosts() {
 
   for (const post of posts) {
     try {
+      const readyPost = await ensurePostImageForPublish(post, post.image_provider_id);
       const response = await postToFacebook({
-        pageId: post.fb_page_id,
-        pageToken: post.page_token,
-        message: post.content,
-        imageUrl: post.media_type === 'image' ? post.image_url : null,
-        videoUrl: post.media_type === 'video' ? post.video_url : null,
+        pageId: readyPost.fb_page_id,
+        pageToken: readyPost.page_token,
+        message: readyPost.content,
+        imageUrl: readyPost.media_type === 'image' ? readyPost.image_url : null,
+        videoUrl: readyPost.media_type === 'video' ? readyPost.video_url : null,
         published: true,
       });
-      await persistFacebookPublishIds(post.id, response, {
-        hasImage: post.media_type === 'image',
-        hasVideo: post.media_type === 'video',
+      await persistFacebookPublishIds(readyPost.id, response, {
+        hasImage: readyPost.media_type === 'image',
+        hasVideo: readyPost.media_type === 'video',
       });
       await query('UPDATE posts SET status = ?, published_at = NOW() WHERE id = ?', ['published', post.id]);
       await createNotification({ type: 'success', title: 'Auto-published', message: `Post #${post.id} published`, relatedType: 'post', relatedId: post.id });

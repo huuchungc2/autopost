@@ -1269,14 +1269,6 @@ button {
   gap: 8px;
 }
 
-.post-editor-page {
-  padding-bottom: calc(88px + env(safe-area-inset-bottom));
-}
-
-.post-editor-page-header {
-  margin-bottom: 12px;
-}
-
 .post-editor-back-btn {
   display: inline-flex;
   align-items: center;
@@ -1298,25 +1290,20 @@ button {
 }
 
 .post-editor-page-footer {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: calc(80px + env(safe-area-inset-bottom));
-  z-index: 20;
   display: flex;
   gap: 10px;
-  padding: 12px 16px;
-  background: var(--bg-main);
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 16px;
   border-top: 1px solid var(--bg-border);
-  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
 }
 
 .post-editor-page-footer .btn {
-  flex: 1;
+  min-width: 120px;
 }
 
-.post-import-page {
-  padding-bottom: calc(88px + env(safe-area-inset-bottom));
+.post-import-card .post-editor-page-footer {
+  margin-top: 20px;
 }
 
 .post-import-card {
@@ -2084,6 +2071,11 @@ body.mobile-menu-open {
   .header-actions .btn {
     flex: 1;
     min-height: 44px;
+  }
+
+  .post-editor-page-footer .btn {
+    flex: 1;
+    min-width: 0;
   }
 
   .dashboard-grid {

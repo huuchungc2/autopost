@@ -73,9 +73,31 @@ export default function PostEditorForm({
           <span className="field-hint">
             {form.media_type === 'video'
               ? 'Lưu mô tả video để AI render sau.'
-              : 'Lưu mô tả ảnh — bấm "Xuất ảnh từ prompt" để AI vẽ theo prompt.'}
+              : 'Lưu mô tả ảnh — bấm "Xuất ảnh từ prompt" để AI vẽ ngay, hoặc tick bên dưới để tự xuất khi đăng.'}
           </span>
         </label>
+
+        {form.media_type === 'image' && form.image_prompt?.trim() && !form.image_url && (
+          <label className="checkbox-field page-skill-option">
+            <input
+              type="checkbox"
+              checked={form.auto_generate_image}
+              onChange={(e) => setField('auto_generate_image', e.target.checked)}
+            />
+            <span>Tự xuất ảnh AI khi đến giờ đăng (mặc định bật)</span>
+          </label>
+        )}
+
+        {form.media_type === 'image' && form.image_prompt?.trim() && (
+          <label className="checkbox-field page-skill-option">
+            <input
+              type="checkbox"
+              checked={form.save_image_local}
+              onChange={(e) => setField('save_image_local', e.target.checked)}
+            />
+            <span>Lưu ảnh AI lên VPS (bỏ tick = đăng thẳng URL ảnh AI lên Facebook)</span>
+          </label>
+        )}
 
         {form.media_type !== 'video' && activePrompt?.trim() && isEdit && (
           <button

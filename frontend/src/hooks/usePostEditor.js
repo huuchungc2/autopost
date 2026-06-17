@@ -9,6 +9,8 @@ const emptyForm = {
   media_type: 'none',
   image_url: '',
   image_prompt: '',
+  auto_generate_image: true,
+  save_image_local: true,
   video_prompt: '',
   video_url: '',
   video_thumb_url: '',
@@ -41,6 +43,8 @@ export default function usePostEditor({ post, pages, initialPageId, active, onSa
         media_type: post.media_type || 'none',
         image_url: post.image_url || '',
         image_prompt: post.image_prompt || '',
+        auto_generate_image: post.auto_generate_image !== 0 && post.auto_generate_image !== false,
+        save_image_local: post.save_image_local !== 0 && post.save_image_local !== false,
         video_prompt: post.video_prompt || '',
         video_url: post.video_url || '',
         video_thumb_url: post.video_thumb_url || '',
@@ -112,7 +116,10 @@ export default function usePostEditor({ post, pages, initialPageId, active, onSa
     }
     setGeneratingImage(true);
     try {
-      const response = await api.post(`/posts/${post.id}/generate-image`, { prompt });
+      const response = await api.post(`/posts/${post.id}/generate-image`, {
+        prompt,
+        save_image_local: form.save_image_local,
+      });
       setForm((prev) => ({
         ...prev,
         media_type: 'image',
@@ -137,6 +144,15 @@ export default function usePostEditor({ post, pages, initialPageId, active, onSa
         media_type: form.media_type,
         image_url: form.media_type === 'image' ? form.image_url || null : null,
         image_prompt: form.image_prompt?.trim() || null,
+        auto_generate_image: form.media_type === 'image'
+          && Boolean(form.image_prompt?.trim())
+          && !form.image_url
+          ? Boolean(form.auto_generate_image)
+          : false,
+        save_image_local: form.media_type === 'image'
+          && Boolean(form.image_prompt?.trim())
+          ? Boolean(form.save_image_local)
+          : true,
         video_prompt: form.video_prompt?.trim() || null,
         video_url: form.media_type === 'video' ? form.video_url || null : null,
         video_thumb_url: form.media_type === 'video' ? form.video_thumb_url || null : null,

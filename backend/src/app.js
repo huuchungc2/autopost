@@ -21,7 +21,8 @@ import {
   backfillProviderMetadata,
   seedProviderTemplates,
 } from './services/providerTemplateService.js';
-import { ensureUserPagesTables, ensurePageSkillsTable, ensureContentTopicsRepeatDaily, ensureContentTopicsLastRun, ensureSkillsTypeColumn, ensureUsersUsernameColumn, ensurePostsFbMediaIds } from './services/migrationRunner.js';
+import { ensureUserPagesTables, ensurePageSkillsTable, ensureContentTopicsRepeatDaily, ensureContentTopicsLastRun, ensureSkillsTypeColumn, ensureUsersUsernameColumn, ensurePostsFbMediaIds, ensurePostsAutoGenerateImage, ensurePostsSaveImageLocal } from './services/migrationRunner.js';
+import { startScheduler } from './services/scheduler.js';
 
 dotenv.config();
 
@@ -89,6 +90,8 @@ app.listen(port, async () => {
     await ensureSkillsTypeColumn();
     await ensureUsersUsernameColumn();
     await ensurePostsFbMediaIds();
+    await ensurePostsAutoGenerateImage();
+    await ensurePostsSaveImageLocal();
   } catch (error) {
     console.warn('DB migration failed:', error.message);
   }

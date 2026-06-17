@@ -22,7 +22,8 @@ export default function PostImportForm({
   const [fileName, setFileName] = useState('');
   const [parseErrors, setParseErrors] = useState([]);
   const [autoSchedule, setAutoSchedule] = useState(false);
-  const [autoGenerateImages, setAutoGenerateImages] = useState(false);
+  const [autoGenerateImages, setAutoGenerateImages] = useState(true);
+  const [saveImageLocal, setSaveImageLocal] = useState(true);
   const [startDate, setStartDate] = useState(getDefaultStartDate);
   const [times, setTimes] = useState([...DEFAULT_DAILY_SLOTS]);
   const [saving, setSaving] = useState(false);
@@ -100,6 +101,7 @@ export default function PostImportForm({
       }
       if (autoGenerateImages && rowsWithPrompt.length) {
         formData.append('auto_generate_images', '1');
+        if (!saveImageLocal) formData.append('save_image_local', '0');
       }
       const response = await api.post('/posts/import', formData);
       onImported?.(response.data);
@@ -217,8 +219,21 @@ export default function PostImportForm({
               onChange={(e) => setAutoGenerateImages(e.target.checked)}
             />
             <span>
-              AI tự xuất ảnh từ prompt cho <strong>{rowsWithPrompt.length}</strong> bài có prompt
-              (cần cấu hình AI provider ảnh trên fanpage)
+              AI tự xuất ảnh khi đến giờ đăng cho <strong>{rowsWithPrompt.length}</strong> bài có prompt
+              nhưng chưa có ảnh (cần cấu hình AI provider ảnh trên fanpage)
+            </span>
+          </label>
+        )}
+
+        {rowsWithPrompt.length > 0 && autoGenerateImages && (
+          <label className="page-skill-option" style={{ marginTop: 8 }}>
+            <input
+              type="checkbox"
+              checked={saveImageLocal}
+              onChange={(e) => setSaveImageLocal(e.target.checked)}
+            />
+            <span>
+              Lưu ảnh AI lên VPS trước khi đăng (bỏ tick = đăng thẳng URL ảnh AI lên Facebook, không lưu server)
             </span>
           </label>
         )}

@@ -8,6 +8,7 @@ import { generateImage } from '../services/imageService.js';
 import { getPageGenerationConfig, getProviderById } from '../services/providerService.js';
 import { postToFacebook } from '../services/fbService.js';
 import { persistFacebookPublishIds } from '../services/postPublishService.js';
+import { ensurePostImageForPublish } from '../services/postImageService.js';
 import { createNotification } from '../services/notifyService.js';
 import {
   getAccessiblePageIds,
@@ -258,6 +259,11 @@ router.get('/import/template', asyncHandler(async (req, res) => {
   res.send(xlsx);
 }));
 
+function parseBoolDefaultTrue(value) {
+  if (value === false || value === 0 || value === '0' || value === 'false') return false;
+  return true;
+}
+
 function parseImportOptions(body = {}) {
   let autoSchedule = body.auto_schedule;
   if (typeof autoSchedule === 'string' && autoSchedule.trim()) {
@@ -270,12 +276,13 @@ function parseImportOptions(body = {}) {
   const autoGenerateImages = body.auto_generate_images === true
     || body.auto_generate_images === '1'
     || body.auto_generate_images === 'true';
-  return { autoSchedule, autoGenerateImages };
+  const saveImageLocal = parseBoolDefaultTrue(body.save_image_local);
+  return { autoSchedule, autoGenerateImages, saveImageLocal };
 }
 
 router.post('/import', importUpload.single('file'), asyncHandler(async (req, res) => {
   const { page_id, csv, rows: rawRows, excel_base64 } = req.body;
-  const { autoSchedule, autoGenerateImages } = parseImportOptions(req.body);
+  const { autoSchedule, autoGenerateImages, saveImageLocal } = parseImportOptions(req.body);
 
   if (!page_id) {
     return res.status(400).json({ error: 'page_id là bắt buộc — chọn fanpage trước khi import' });
@@ -334,15 +341,18 @@ router.post('/import', importUpload.single('file'), asyncHandler(async (req, res
   const created = [];
   for (const row of rows) {
     await assertPageAccess(req.user, row.page_id);
+    const autoGenerateImage = autoGenerateImages && Boolean(String(row.image_prompt || '').trim());
     const result = await query(
-      `INSERT INTO posts (page_id, topic, content, image_url, image_prompt, video_prompt, video_url, video_thumb_url, media_type, status, scheduled_at, created_by_type, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, NOW())`,
+      `INSERT INTO posts (page_id, topic, content, image_url, image_prompt, auto_generate_image, save_image_local, video_prompt, video_url, video_thumb_url, media_type, status, scheduled_at, created_by_type, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, NOW())`,
       [
         row.page_id,
         row.topic,
         row.content,
         row.image_url,
         row.image_prompt,
+        autoGenerateImage,
+        autoGenerateImage ? saveImageLocal : true,
         row.video_prompt,
         row.video_url,
         row.video_thumb_url,
@@ -357,49 +367,19 @@ router.post('/import', importUpload.single('file'), asyncHandler(async (req, res
       line: row.line,
       page_id: row.page_id,
       image_prompt: row.image_prompt,
+      auto_generate_image: autoGenerateImage,
       scheduled_at: row.scheduled_at,
       status: row.status,
     });
   }
 
-  let imageGeneratedCount = 0;
-  const imageErrors = [];
-
-  if (autoGenerateImages) {
-    const pageRows = await query('SELECT image_provider_id FROM fb_pages WHERE id = ?', [page_id]);
-    const imageProvider = await getProviderById(pageRows[0]?.image_provider_id);
-
-    for (const item of created) {
-      const prompt = String(item.image_prompt || '').trim();
-      if (!prompt) continue;
-
-      try {
-        if (!imageProvider) {
-          throw new Error('Fanpage chưa cấu hình AI provider ảnh');
-        }
-        const imageResult = await generateImage(prompt, imageProvider);
-        await query(
-          'UPDATE posts SET image_url = ?, image_prompt = ?, media_type = ? WHERE id = ?',
-          [imageResult.image_url, imageResult.image_prompt || prompt, 'image', item.id]
-        );
-        imageGeneratedCount += 1;
-      } catch (err) {
-        imageErrors.push({
-          id: item.id,
-          line: item.line,
-          error: err.message || 'Xuất ảnh thất bại',
-        });
-      }
-    }
-  }
-
   const scheduledCount = created.filter((c) => c.status === 'scheduled').length;
+  const autoImageCount = created.filter((c) => c.auto_generate_image).length;
 
   res.status(201).json({
     created_count: created.length,
     scheduled_count: scheduledCount,
-    image_generated_count: imageGeneratedCount,
-    image_errors: imageErrors,
+    auto_generate_image_count: autoImageCount,
     post_ids: created.map((c) => c.id),
     errors,
     posts: created,
@@ -541,6 +521,8 @@ router.post('/', asyncHandler(async (req, res) => {
     content,
     image_url,
     image_prompt,
+    auto_generate_image,
+    save_image_local,
     video_prompt,
     video_url,
     video_thumb_url,
@@ -555,20 +537,39 @@ router.post('/', asyncHandler(async (req, res) => {
   await assertPageAccess(req.user, page_id);
 
   const resolvedMediaType = media_type || (video_url ? 'video' : image_url ? 'image' : 'none');
+  const resolvedAutoGenerate = auto_generate_image === true
+    || auto_generate_image === 1
+    || auto_generate_image === '1'
+    || (
+      auto_generate_image !== false
+      && auto_generate_image !== 0
+      && auto_generate_image !== '0'
+      && Boolean(image_prompt?.trim())
+      && !image_url
+      && resolvedMediaType === 'image'
+    );
   let resolvedStatus = status || 'draft';
   if (scheduled_at) resolvedStatus = 'scheduled';
   if (!['draft', 'pending_approval', 'scheduled'].includes(resolvedStatus)) {
     resolvedStatus = scheduled_at ? 'scheduled' : 'draft';
   }
 
+  const resolvedSaveImageLocal = save_image_local === false
+    || save_image_local === 0
+    || save_image_local === '0'
+    ? false
+    : true;
+
   const result = await query(
-    'INSERT INTO posts (page_id, topic, content, image_url, image_prompt, video_prompt, video_url, video_thumb_url, media_type, status, scheduled_at, created_by_type, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
+    'INSERT INTO posts (page_id, topic, content, image_url, image_prompt, auto_generate_image, save_image_local, video_prompt, video_url, video_thumb_url, media_type, status, scheduled_at, created_by_type, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
     [
       page_id,
       topic || '',
       content,
       image_url || null,
       image_prompt || null,
+      resolvedAutoGenerate,
+      resolvedSaveImageLocal,
       video_prompt || null,
       video_url || null,
       video_thumb_url || null,
@@ -590,23 +591,25 @@ router.post('/', asyncHandler(async (req, res) => {
 router.post('/:id/publish', asyncHandler(async (req, res) => {
   const post = await assertPostAccess(req.user, req.params.id);
 
-  const pages = await query('SELECT page_id, page_token FROM fb_pages WHERE id = ?', [post.page_id]);
+  const pages = await query('SELECT page_id, page_token, image_provider_id FROM fb_pages WHERE id = ?', [post.page_id]);
   const page = pages[0];
   if (!page) return res.status(404).json({ error: 'Page not found' });
+
+  const readyPost = await ensurePostImageForPublish(post, page.image_provider_id);
 
   const response = await postToFacebook({
     pageId: page.page_id,
     pageToken: page.page_token,
-    message: post.content,
-    imageUrl: post.media_type === 'image' ? post.image_url : null,
-    videoUrl: post.media_type === 'video' ? post.video_url : null,
-    scheduledPublishTime: post.scheduled_at,
-    published: !post.scheduled_at || new Date(post.scheduled_at) <= new Date(),
+    message: readyPost.content,
+    imageUrl: readyPost.media_type === 'image' ? readyPost.image_url : null,
+    videoUrl: readyPost.media_type === 'video' ? readyPost.video_url : null,
+    scheduledPublishTime: readyPost.scheduled_at,
+    published: !readyPost.scheduled_at || new Date(readyPost.scheduled_at) <= new Date(),
   });
 
   const fbIds = await persistFacebookPublishIds(req.params.id, response, {
-    hasImage: post.media_type === 'image',
-    hasVideo: post.media_type === 'video',
+    hasImage: readyPost.media_type === 'image',
+    hasVideo: readyPost.media_type === 'video',
   });
   const newStatus = post.scheduled_at && new Date(post.scheduled_at) > new Date() ? 'scheduled' : 'published';
   await query(
@@ -641,6 +644,8 @@ router.put('/:id', asyncHandler(async (req, res) => {
     content,
     image_url,
     image_prompt,
+    auto_generate_image,
+    save_image_local,
     video_prompt,
     video_url,
     video_thumb_url,
@@ -654,8 +659,32 @@ router.put('/:id', asyncHandler(async (req, res) => {
     await assertPageAccess(req.user, targetPageId);
   }
 
+  const resolvedMediaType = media_type ?? post.media_type;
+
+  const resolvedAutoGenerate = auto_generate_image === true
+    || auto_generate_image === 1
+    || auto_generate_image === '1'
+    ? true
+    : auto_generate_image === false
+      || auto_generate_image === 0
+      || auto_generate_image === '0'
+      ? false
+      : Boolean(String(image_prompt ?? post.image_prompt || '').trim())
+        && !(image_url ?? post.image_url)
+        && resolvedMediaType === 'image';
+
+  const resolvedSaveImageLocal = save_image_local === true
+    || save_image_local === 1
+    || save_image_local === '1'
+    ? true
+    : save_image_local === false
+      || save_image_local === 0
+      || save_image_local === '0'
+      ? false
+      : post.save_image_local !== 0 && post.save_image_local !== false;
+
   await query(
-    `UPDATE posts SET page_id = ?, topic = ?, content = ?, image_url = ?, image_prompt = ?, video_prompt = ?,
+    `UPDATE posts SET page_id = ?, topic = ?, content = ?, image_url = ?, image_prompt = ?, auto_generate_image = ?, save_image_local = ?, video_prompt = ?,
      video_url = ?, video_thumb_url = ?, media_type = ?, scheduled_at = ?, status = ? WHERE id = ?`,
     [
       targetPageId,
@@ -663,6 +692,8 @@ router.put('/:id', asyncHandler(async (req, res) => {
       content,
       image_url,
       image_prompt ?? post.image_prompt,
+      resolvedAutoGenerate,
+      resolvedSaveImageLocal,
       video_prompt ?? post.video_prompt,
       video_url,
       video_thumb_url,
@@ -677,7 +708,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
 
 router.post('/:id/generate-image', asyncHandler(async (req, res) => {
   await assertPostAccess(req.user, req.params.id);
-  const rows = await query('SELECT page_id, image_prompt FROM posts WHERE id = ?', [req.params.id]);
+  const rows = await query('SELECT page_id, image_prompt, save_image_local FROM posts WHERE id = ?', [req.params.id]);
   const post = rows[0];
   if (!post) return res.status(404).json({ error: 'Post not found' });
 
@@ -692,17 +723,25 @@ router.post('/:id/generate-image', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Fanpage chưa cấu hình AI provider ảnh' });
   }
 
-  const imageResult = await generateImage(prompt, imageProvider);
-  await query(
-    'UPDATE posts SET image_url = ?, image_prompt = ?, media_type = ? WHERE id = ?',
-    [imageResult.image_url, imageResult.image_prompt || prompt, 'image', req.params.id]
-  );
+  const persist = req.body?.save_image_local != null
+    ? parseBoolDefaultTrue(req.body.save_image_local)
+    : post.save_image_local !== 0 && post.save_image_local !== false;
+
+  const imageResult = await generateImage(prompt, imageProvider, { persist });
+
+  if (persist) {
+    await query(
+      'UPDATE posts SET image_url = ?, image_prompt = ?, media_type = ? WHERE id = ?',
+      [imageResult.image_url, imageResult.image_prompt || prompt, 'image', req.params.id]
+    );
+  }
 
   res.json({
-    message: 'Đã xuất ảnh từ prompt',
+    message: persist ? 'Đã xuất ảnh từ prompt' : 'Đã tạo ảnh AI (chưa lưu VPS — dùng khi đăng)',
     image_url: imageResult.image_url,
     image_prompt: imageResult.image_prompt || prompt,
     media_type: 'image',
+    saved: persist,
   });
 }));
 

@@ -21,19 +21,23 @@ function imageEndpoint(provider) {
   return DEFAULT_IMAGE_ENDPOINTS[kind] || DEFAULT_IMAGE_ENDPOINTS.openai;
 }
 
-async function generateDalle({ apiKey, model, prompt, endpoint }) {
+async function generateDalle({ apiKey, model, prompt, endpoint, persist = true }) {
   const url = endpoint || DEFAULT_IMAGE_ENDPOINTS.openai;
   const response = await axios.post(
     url,
     { model: model || 'dall-e-3', prompt, n: 1, size: '1024x1024' },
     { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } }
   );
-  const { buffer, ext, mimeType } = await downloadBuffer(response.data.data[0].url);
+  const remoteUrl = response.data.data[0].url;
+  if (!persist) {
+    return { image_url: remoteUrl, image_prompt: prompt, ephemeral: true };
+  }
+  const { buffer, ext, mimeType } = await downloadBuffer(remoteUrl);
   const imageUrl = await storeImageBuffer(buffer, { ext, mimeType });
   return { image_url: imageUrl, image_prompt: prompt };
 }
 
-async function generateIdeogram({ apiKey, prompt, endpoint }) {
+async function generateIdeogram({ apiKey, prompt, endpoint, persist = true }) {
   const url = endpoint || DEFAULT_IMAGE_ENDPOINTS.ideogram;
   const response = await axios.post(
     url,
@@ -42,12 +46,16 @@ async function generateIdeogram({ apiKey, prompt, endpoint }) {
   );
   const remoteUrl = response.data?.data?.[0]?.url;
   if (!remoteUrl) throw new Error('Ideogram returned no image');
+  if (!persist) {
+    return { image_url: remoteUrl, image_prompt: prompt, ephemeral: true };
+  }
   const { buffer, ext, mimeType } = await downloadBuffer(remoteUrl);
   const imageUrl = await storeImageBuffer(buffer, { ext, mimeType });
   return { image_url: imageUrl, image_prompt: prompt };
 }
 
-export async function generateImage(prompt, providerConfig = null) {
+export async function generateImage(prompt, providerConfig = null, options = {}) {
+  const persist = options.persist !== false;
   const kind = resolveProviderKind(providerConfig);
   const apiKey = providerConfig?.api_key || process.env.IDEOGRAM_API_KEY || process.env.OPENAI_API_KEY;
   const endpoint = imageEndpoint(providerConfig);
@@ -55,10 +63,10 @@ export async function generateImage(prompt, providerConfig = null) {
   return callWithRateLimit(kind === 'ideogram' ? 'ideogram' : 'openai', async () => {
     try {
       if (kind === 'ideogram' && (apiKey || process.env.IDEOGRAM_API_KEY)) {
-        return await generateIdeogram({ apiKey: apiKey || process.env.IDEOGRAM_API_KEY, prompt, endpoint });
+        return await generateIdeogram({ apiKey: apiKey || process.env.IDEOGRAM_API_KEY, prompt, endpoint, persist });
       }
       if ((kind === 'openai' || providerConfig) && (apiKey || process.env.OPENAI_API_KEY)) {
-        return await generateDalle({ apiKey: apiKey || process.env.OPENAI_API_KEY, model: providerConfig?.model, prompt, endpoint });
+        return await generateDalle({ apiKey: apiKey || process.env.OPENAI_API_KEY, model: providerConfig?.model, prompt, endpoint, persist });
       }
       throw new Error('Chưa cấu hình Image AI provider');
     } catch (error) {
