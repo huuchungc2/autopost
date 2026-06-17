@@ -11,7 +11,6 @@ import { formatDateTime } from '../utils/date';
 import PostCard from '../components/PostCard';
 import PostImagePromptActions from '../components/PostImagePromptActions';
 
-import BulkScheduleModal from '../components/BulkScheduleModal';
 import { downloadImportTemplate } from '../utils/postImportExport';
 
 import Skeleton from '../components/ui/Skeleton';
@@ -43,10 +42,6 @@ export default function Posts() {
   const [loading, setLoading] = useState(true);
 
   const [view, setView] = useState('table');
-
-  const [bulkOpen, setBulkOpen] = useState(false);
-
-  const [bulkSaving, setBulkSaving] = useState(false);
 
   const [bulkActionSaving, setBulkActionSaving] = useState(false);
 
@@ -440,52 +435,13 @@ export default function Posts() {
 
 
 
-  const handleBulkSchedule = async ({ start_date, times, post_ids }) => {
-    setBulkSaving(true);
-
-    try {
-
-      const payload = {
-
-        start_date,
-
-        times,
-
-        page_id: filters.page ? Number(filters.page) : undefined,
-
-      };
-
-      if (post_ids?.length) payload.post_ids = post_ids;
-
-
-
-      const response = await api.post('/posts/bulk-schedule', payload);
-
-      showToast(
-
-        `Đã lên lịch ${response.data.scheduled_count} bài — ${response.data.days} ngày × ${response.data.slots_per_day} bài/ngày`,
-
-        'success'
-
-      );
-
-      setBulkOpen(false);
-
-      loadPosts();
-
-    } catch (err) {
-
-      showToast(err.response?.data?.error || 'Lên lịch hàng loạt thất bại', 'error');
-
-    } finally {
-
-      setBulkSaving(false);
-
-    }
-
+  const openBulkSchedule = () => {
+    const params = new URLSearchParams();
+    if (selectedSchedulableIds.length) params.set('ids', selectedSchedulableIds.join(','));
+    if (filters.page) params.set('page', filters.page);
+    const query = params.toString();
+    navigate(query ? `/posts/bulk-schedule?${query}` : '/posts/bulk-schedule');
   };
-
-
 
   const handleDownloadTemplate = async () => {
 
@@ -545,7 +501,7 @@ export default function Posts() {
 
               className="btn btn-secondary"
 
-              onClick={() => setBulkOpen(true)}
+              onClick={openBulkSchedule}
 
             >
 
@@ -901,24 +857,6 @@ export default function Posts() {
         </div>
 
       )}
-
-
-
-      <BulkScheduleModal
-
-        open={bulkOpen}
-
-        onClose={() => setBulkOpen(false)}
-
-        postIds={selectedSchedulableIds.length ? selectedSchedulableIds : undefined}
-
-        postCount={bulkTargetIds.length}
-
-        onSubmit={handleBulkSchedule}
-
-        saving={bulkSaving}
-
-      />
 
 
     </div>

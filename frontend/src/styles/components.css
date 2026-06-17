@@ -1832,7 +1832,12 @@ button {
   border: 1px dashed var(--bg-border-strong);
   border-radius: 12px;
   background: var(--bg-elevated);
-  min-height: 140px;
+  min-height: 100px;
+}
+
+.provider-slot--focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-border);
 }
 
 .provider-slot--configured {
@@ -1932,6 +1937,144 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.provider-slot-config-btn {
+  align-self: stretch;
+  justify-content: center;
+  margin-top: auto;
+}
+
+.provider-flow-card {
+  margin-bottom: 20px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06), rgba(59, 130, 246, 0.04));
+  border-color: var(--color-primary-border);
+}
+
+.provider-flow-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.provider-flow-steps {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.provider-flow-steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.provider-flow-steps strong {
+  color: var(--text-primary);
+}
+
+.providers-page {
+  padding-bottom: 32px;
+}
+
+.provider-setup-panel {
+  margin-top: 24px;
+  scroll-margin-top: 16px;
+}
+
+.provider-setup-panel-inner {
+  padding: 20px 24px;
+  border: 2px solid var(--color-primary);
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.12);
+}
+
+.provider-setup-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.provider-setup-header h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.provider-setup-header p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.provider-setup-preset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--bg-border);
+}
+
+.provider-setup-preset-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  width: 100%;
+}
+
+.provider-setup-preset code {
+  font-size: 12px;
+  color: var(--color-primary);
+}
+
+.provider-setup-preset p {
+  margin: 4px 0 0;
+  width: 100%;
+  font-size: 13px;
+}
+
+.provider-setup-form {
+  margin-bottom: 8px;
+}
+
+.provider-setup-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid var(--bg-border);
+  margin-top: 8px;
+}
+
+.page-form-section-title {
+  margin: 0 0 6px;
+  font-size: 17px;
+}
+
+.page-form-section-hint {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.page-ai-config-block {
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--bg-border);
+}
+
+.page-ai-config-block label {
+  margin: 0;
 }
 
 .provider-inline-form {

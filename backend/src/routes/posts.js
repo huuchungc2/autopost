@@ -656,12 +656,29 @@ router.put('/:id', asyncHandler(async (req, res) => {
     status,
   } = req.body;
 
+  if (!content?.trim()) {
+    return res.status(400).json({ error: 'content is required' });
+  }
+
   const targetPageId = page_id != null ? Number(page_id) : post.page_id;
   if (page_id != null && targetPageId !== post.page_id) {
     await assertPageAccess(req.user, targetPageId);
   }
 
-  const resolvedMediaType = media_type ?? post.media_type;
+  const finalTopic = topic !== undefined ? (topic || '') : (post.topic || '');
+  const finalImagePrompt = image_prompt !== undefined
+    ? (String(image_prompt || '').trim() || null)
+    : post.image_prompt;
+  const finalImageUrl = image_url !== undefined ? (image_url || null) : post.image_url;
+  const finalVideoPrompt = video_prompt !== undefined
+    ? (String(video_prompt || '').trim() || null)
+    : post.video_prompt;
+  const finalVideoUrl = video_url !== undefined ? (video_url || null) : post.video_url;
+  const finalVideoThumb = video_thumb_url !== undefined ? (video_thumb_url || null) : post.video_thumb_url;
+  const finalScheduledAt = scheduled_at !== undefined ? (scheduled_at || null) : post.scheduled_at;
+
+  const resolvedMediaType = media_type
+    || (finalVideoUrl ? 'video' : (finalImageUrl || finalImagePrompt) ? 'image' : post.media_type || 'none');
 
   const resolvedAutoGenerate = auto_generate_image === true
     || auto_generate_image === 1
@@ -671,37 +688,48 @@ router.put('/:id', asyncHandler(async (req, res) => {
       || auto_generate_image === 0
       || auto_generate_image === '0'
       ? false
-      : Boolean(String(image_prompt ?? post.image_prompt ?? '').trim())
-        && !(image_url ?? post.image_url)
+      : Boolean(String(finalImagePrompt || '').trim())
+        && !finalImageUrl
         && resolvedMediaType === 'image';
 
-  const resolvedSaveImageLocal = save_image_local === true
-    || save_image_local === 1
-    || save_image_local === '1'
-    ? true
-    : save_image_local === false
-      || save_image_local === 0
-      || save_image_local === '0'
-      ? false
+  const resolvedSaveImageLocal = save_image_local === false
+    || save_image_local === 0
+    || save_image_local === '0'
+    ? false
+    : save_image_local === true
+      || save_image_local === 1
+      || save_image_local === '1'
+      ? true
       : post.save_image_local !== 0 && post.save_image_local !== false;
+
+  const ALLOWED_STATUS = ['draft', 'pending_approval', 'scheduled', 'published', 'failed'];
+  let resolvedStatus = status ?? post.status ?? 'draft';
+  if (!ALLOWED_STATUS.includes(resolvedStatus)) resolvedStatus = post.status || 'draft';
+  if (finalScheduledAt) {
+    resolvedStatus = 'scheduled';
+  } else if (resolvedStatus === 'scheduled' && !finalScheduledAt) {
+    resolvedStatus = ['published', 'failed', 'pending_approval'].includes(post.status)
+      ? post.status
+      : 'draft';
+  }
 
   await query(
     `UPDATE posts SET page_id = ?, topic = ?, content = ?, image_url = ?, image_prompt = ?, auto_generate_image = ?, save_image_local = ?, video_prompt = ?,
      video_url = ?, video_thumb_url = ?, media_type = ?, scheduled_at = ?, status = ? WHERE id = ?`,
     [
       targetPageId,
-      topic,
-      content,
-      image_url,
-      image_prompt ?? post.image_prompt,
+      finalTopic,
+      content.trim(),
+      finalImageUrl,
+      finalImagePrompt,
       resolvedAutoGenerate,
       resolvedSaveImageLocal,
-      video_prompt ?? post.video_prompt,
-      video_url,
-      video_thumb_url,
-      media_type,
-      scheduled_at,
-      status,
+      finalVideoPrompt,
+      finalVideoUrl,
+      finalVideoThumb,
+      resolvedMediaType,
+      finalScheduledAt,
+      resolvedStatus,
       req.params.id,
     ]
   );

@@ -157,6 +157,12 @@ export default function usePostEditor({ post, pages, initialPageId, active, onSa
           ? 'image'
           : 'none';
 
+      const resolveStatus = () => {
+        if (form.scheduled_at) return 'scheduled';
+        if (['published', 'failed'].includes(form.status)) return form.status;
+        return form.status || 'draft';
+      };
+
       const payload = {
         page_id: Number(form.page_id),
         topic: form.topic,
@@ -174,7 +180,7 @@ export default function usePostEditor({ post, pages, initialPageId, active, onSa
         video_url: form.media_type === 'video' ? form.video_url || null : null,
         video_thumb_url: form.media_type === 'video' ? form.video_thumb_url || null : null,
         scheduled_at: fromDatetimeLocalInput(form.scheduled_at),
-        status: form.scheduled_at ? 'scheduled' : form.status,
+        status: resolveStatus(),
       };
 
       if (isEdit) {
