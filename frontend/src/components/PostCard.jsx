@@ -3,11 +3,26 @@ import { formatDateTime } from '../utils/date';
 import { mediaSrc } from '../utils/mediaUrl';
 import PostImagePromptActions from './PostImagePromptActions';
 
-export default function PostCard({ post, pageName, onEdit, onPublish, onApprove, onDelete, onRefresh }) {
+export default function PostCard({
+  post,
+  pageName,
+  selected = false,
+  onToggleSelect,
+  onEdit,
+  onPublish,
+  onApprove,
+  onDelete,
+  onRefresh,
+}) {
   const hasPromptNoImage = post.image_prompt?.trim() && !post.image_url;
 
   return (
-    <div className="post-card">
+    <div className={`post-card${selected ? ' post-card--selected' : ''}`}>
+      {onToggleSelect && (
+        <label className="post-card-select">
+          <input type="checkbox" checked={selected} onChange={onToggleSelect} />
+        </label>
+      )}
       <div className="post-card-media">
         {post.media_type === 'image' && post.image_url && (
           <img src={mediaSrc(post.image_url)} alt={post.topic || 'Bài viết'} />

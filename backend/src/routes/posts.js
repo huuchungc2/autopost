@@ -198,6 +198,59 @@ router.post('/bulk-schedule', asyncHandler(async (req, res) => {
   });
 }));
 
+const BULK_STATUSES = new Set(['draft', 'pending_approval', 'scheduled', 'published', 'failed']);
+
+router.post('/bulk-delete', asyncHandler(async (req, res) => {
+  const { post_ids } = req.body;
+  if (!Array.isArray(post_ids) || !post_ids.length) {
+    return res.status(400).json({ error: 'post_ids là bắt buộc' });
+  }
+
+  const ids = [...new Set(post_ids.map(Number).filter(Boolean))];
+  let deleted_count = 0;
+  const errors = [];
+
+  for (const id of ids) {
+    try {
+      await assertPostAccess(req.user, id);
+      const result = await query('DELETE FROM posts WHERE id = ?', [id]);
+      if (result.affectedRows) deleted_count += 1;
+      else errors.push({ id, error: 'Không tìm thấy bài' });
+    } catch (err) {
+      errors.push({ id, error: err.message || 'Không xóa được' });
+    }
+  }
+
+  res.json({ deleted_count, errors });
+}));
+
+router.post('/bulk-status', asyncHandler(async (req, res) => {
+  const { post_ids, status } = req.body;
+  if (!Array.isArray(post_ids) || !post_ids.length) {
+    return res.status(400).json({ error: 'post_ids là bắt buộc' });
+  }
+  if (!BULK_STATUSES.has(status)) {
+    return res.status(400).json({ error: 'status không hợp lệ' });
+  }
+
+  const ids = [...new Set(post_ids.map(Number).filter(Boolean))];
+  let updated_count = 0;
+  const errors = [];
+
+  for (const id of ids) {
+    try {
+      await assertPostAccess(req.user, id);
+      const result = await query('UPDATE posts SET status = ? WHERE id = ?', [status, id]);
+      if (result.affectedRows) updated_count += 1;
+      else errors.push({ id, error: 'Không tìm thấy bài' });
+    } catch (err) {
+      errors.push({ id, error: err.message || 'Không cập nhật được' });
+    }
+  }
+
+  res.json({ updated_count, status, errors });
+}));
+
 router.get('/import/template', asyncHandler(async (req, res) => {
   const xlsx = buildImportTemplateXlsx();
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

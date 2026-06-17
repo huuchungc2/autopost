@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { CalendarClock, PenLine, Upload, Download } from 'lucide-react';
+import { CalendarClock, PenLine, Upload, Download, Trash2 } from 'lucide-react';
 
 import api from '../services/api';
 
@@ -26,6 +26,8 @@ import { mediaTypeLabel, postStatusLabel } from '../config/vi';
 
 const SCHEDULABLE = new Set(['draft', 'pending_approval']);
 
+const BULK_STATUS_OPTIONS = ['draft', 'pending_approval', 'scheduled', 'published', 'failed'];
+
 
 
 const PAGE_SIZE = 30;
@@ -45,6 +47,10 @@ export default function Posts() {
   const [bulkOpen, setBulkOpen] = useState(false);
 
   const [bulkSaving, setBulkSaving] = useState(false);
+
+  const [bulkActionSaving, setBulkActionSaving] = useState(false);
+
+  const [bulkStatus, setBulkStatus] = useState('');
 
   const [selectedIds, setSelectedIds] = useState(new Set());
 
@@ -246,9 +252,15 @@ export default function Posts() {
 
 
 
-  const toggleSelectAllSchedulable = () => {
+  const selectedCount = selectedIds.size;
 
-    if (selectedSchedulableIds.length === schedulablePosts.length && schedulablePosts.length) {
+  const allOnPageSelected = posts.length > 0 && posts.every((p) => selectedIds.has(p.id));
+
+
+
+  const toggleSelectAllOnPage = () => {
+
+    if (allOnPageSelected) {
 
       setSelectedIds(new Set());
 
@@ -256,7 +268,111 @@ export default function Posts() {
 
     }
 
-    setSelectedIds(new Set(schedulablePosts.map((p) => p.id)));
+    setSelectedIds(new Set(posts.map((p) => p.id)));
+
+  };
+
+
+
+  const handleBulkDelete = async () => {
+
+    const ids = [...selectedIds];
+
+    if (!ids.length) return;
+
+    if (!window.confirm(`Xóa ${ids.length} bài đã chọn?`)) return;
+
+    setBulkActionSaving(true);
+
+    try {
+
+      const response = await api.post('/posts/bulk-delete', { post_ids: ids });
+
+      const skipped = response.data.errors?.length ? ` — ${response.data.errors.length} lỗi` : '';
+
+      showToast(`Đã xóa ${response.data.deleted_count} bài${skipped}`, 'success');
+
+      loadPosts();
+
+    } catch (err) {
+
+      showToast(err.response?.data?.error || 'Xóa hàng loạt thất bại', 'error');
+
+    } finally {
+
+      setBulkActionSaving(false);
+
+    }
+
+  };
+
+
+
+  const handleBulkStatus = async () => {
+
+    const ids = [...selectedIds];
+
+    if (!ids.length || !bulkStatus) return;
+
+    setBulkActionSaving(true);
+
+    try {
+
+      const response = await api.post('/posts/bulk-status', { post_ids: ids, status: bulkStatus });
+
+      const skipped = response.data.errors?.length ? ` — ${response.data.errors.length} lỗi` : '';
+
+      showToast(
+
+        `Đã đổi trạng thái ${response.data.updated_count} bài → ${postStatusLabel(bulkStatus)}${skipped}`,
+
+        'success'
+
+      );
+
+      setBulkStatus('');
+
+      loadPosts();
+
+    } catch (err) {
+
+      showToast(err.response?.data?.error || 'Đổi trạng thái hàng loạt thất bại', 'error');
+
+    } finally {
+
+      setBulkActionSaving(false);
+
+    }
+
+  };
+
+
+
+  const toggleSelectAllSchedulable = () => {
+
+    const schedulableIds = schedulablePosts.map((p) => p.id);
+
+    const allSchedulableSelected = schedulableIds.length > 0
+
+      && schedulableIds.every((id) => selectedIds.has(id));
+
+    if (allSchedulableSelected) {
+
+      setSelectedIds((prev) => {
+
+        const next = new Set(prev);
+
+        schedulableIds.forEach((id) => next.delete(id));
+
+        return next;
+
+      });
+
+      return;
+
+    }
+
+    setSelectedIds((prev) => new Set([...prev, ...schedulableIds]));
 
   };
 
@@ -519,15 +635,103 @@ export default function Posts() {
 
 
 
+      {selectedCount > 0 && (
+
+        <div className="card posts-bulk-bar">
+
+          <span className="posts-bulk-bar-label">Đã chọn <strong>{selectedCount}</strong> bài</span>
+
+          <div className="posts-bulk-bar-actions">
+
+            <select
+
+              value={bulkStatus}
+
+              onChange={(e) => setBulkStatus(e.target.value)}
+
+              disabled={bulkActionSaving}
+
+            >
+
+              <option value="">Đổi trạng thái...</option>
+
+              {BULK_STATUS_OPTIONS.map((s) => (
+
+                <option key={s} value={s}>{postStatusLabel(s)}</option>
+
+              ))}
+
+            </select>
+
+            <button
+
+              type="button"
+
+              className="btn btn-secondary btn-sm"
+
+              onClick={handleBulkStatus}
+
+              disabled={!bulkStatus || bulkActionSaving}
+
+            >
+
+              Áp dụng
+
+            </button>
+
+            <button
+
+              type="button"
+
+              className="btn btn-secondary btn-sm posts-bulk-delete-btn"
+
+              onClick={handleBulkDelete}
+
+              disabled={bulkActionSaving}
+
+            >
+
+              <Trash2 size={14} />
+
+              Xóa đã chọn
+
+            </button>
+
+            <button
+
+              type="button"
+
+              className="btn-link"
+
+              onClick={() => { setSelectedIds(new Set()); setBulkStatus(''); }}
+
+            >
+
+              Bỏ chọn
+
+            </button>
+
+          </div>
+
+        </div>
+
+      )}
+
+
+
       {schedulablePosts.length > 0 && (
 
         <p className="field-hint" style={{ margin: '0 0 12px' }}>
 
           {selectedSchedulableIds.length > 0
 
-            ? `Đã chọn ${selectedSchedulableIds.length} bài — bấm Lên lịch hàng loạt, chỉ cần nhập giờ (VD: 4 lần/ngày).`
+            ? `Đã chọn ${selectedSchedulableIds.length} bài có thể lên lịch — bấm Lên lịch hàng loạt.`
 
-            : `Có ${schedulablePosts.length} bài có thể lên lịch — tick chọn hoặc lên lịch tất cả.`}
+            : `Có ${schedulablePosts.length} bài có thể lên lịch — tick chọn hoặc dùng "Chọn bài lên lịch".`}
+
+          {' '}
+
+          <button type="button" className="btn-link" onClick={toggleSelectAllSchedulable}>Chọn bài lên lịch</button>
 
         </p>
 
@@ -552,6 +756,10 @@ export default function Posts() {
               post={post}
 
               pageName={pageNameById(post.page_id)}
+
+              selected={selectedIds.has(post.id)}
+
+              onToggleSelect={() => toggleSelect(post.id)}
 
               onEdit={openEdit}
 
@@ -585,13 +793,13 @@ export default function Posts() {
 
                     type="checkbox"
 
-                    checked={schedulablePosts.length > 0 && selectedSchedulableIds.length === schedulablePosts.length}
+                    checked={posts.length > 0 && allOnPageSelected}
 
-                    onChange={toggleSelectAllSchedulable}
+                    onChange={toggleSelectAllOnPage}
 
-                    disabled={!schedulablePosts.length}
+                    disabled={!posts.length}
 
-                    title="Chọn tất cả bài có thể lên lịch"
+                    title="Chọn tất cả bài trên trang này"
 
                   />
 
@@ -611,19 +819,15 @@ export default function Posts() {
 
                   <td>
 
-                    {SCHEDULABLE.has(post.status) ? (
+                    <input
 
-                      <input
+                      type="checkbox"
 
-                        type="checkbox"
+                      checked={selectedIds.has(post.id)}
 
-                        checked={selectedIds.has(post.id)}
+                      onChange={() => toggleSelect(post.id)}
 
-                        onChange={() => toggleSelect(post.id)}
-
-                      />
-
-                    ) : null}
+                    />
 
                   </td>
 
