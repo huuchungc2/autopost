@@ -669,7 +669,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
       || auto_generate_image === 0
       || auto_generate_image === '0'
       ? false
-      : Boolean(String(image_prompt ?? post.image_prompt || '').trim())
+      : Boolean(String(image_prompt ?? post.image_prompt ?? '').trim())
         && !(image_url ?? post.image_url)
         && resolvedMediaType === 'image';
 
