@@ -2,8 +2,13 @@ import { query } from '../db.js';
 import { isSuperAdmin } from './pageAccessService.js';
 
 export async function getAssignedProviderIds(userId) {
-  const rows = await query('SELECT provider_id FROM user_providers WHERE user_id = ?', [userId]);
-  return rows.map((row) => row.provider_id);
+  try {
+    const rows = await query('SELECT provider_id FROM user_providers WHERE user_id = ?', [userId]);
+    return rows.map((row) => row.provider_id);
+  } catch (error) {
+    if (error?.code === 'ER_NO_SUCH_TABLE') return [];
+    throw error;
+  }
 }
 
 /** null = all providers (super_admin) */
@@ -42,14 +47,19 @@ export async function setUserProviders(userId, providerIds) {
 }
 
 export async function getUserProviders(userId) {
-  return query(
-    `SELECT ap.id, ap.name, ap.type, ap.model, ap.is_active
-     FROM user_providers up
-     JOIN ai_providers ap ON ap.id = up.provider_id
-     WHERE up.user_id = ?
-     ORDER BY ap.name ASC`,
-    [userId]
-  );
+  try {
+    return await query(
+      `SELECT ap.id, ap.name, ap.type, ap.model, ap.is_active
+       FROM user_providers up
+       JOIN ai_providers ap ON ap.id = up.provider_id
+       WHERE up.user_id = ?
+       ORDER BY ap.name ASC`,
+      [userId]
+    );
+  } catch (error) {
+    if (error?.code === 'ER_NO_SUCH_TABLE') return [];
+    throw error;
+  }
 }
 
 export async function linkProviderToUser(userId, providerId) {

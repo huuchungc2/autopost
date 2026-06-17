@@ -6,7 +6,10 @@ import api from '../services/api';
 function loginErrorMessage(err) {
   if (err.response?.data?.error) return err.response.data.error;
   if (err.code === 'ERR_NETWORK' || !err.response) {
-    return 'Không kết nối được server — kiểm tra backend hoặc VITE_API_BASE_URL lúc build frontend.';
+    return 'Không kết nối được server — kiểm tra backend (pm2 logs autopost-api) và VITE_API_BASE_URL lúc build frontend.';
+  }
+  if (err.response?.status >= 500) {
+    return `Lỗi server (${err.response.status}) — chạy: pm2 logs autopost-api`;
   }
   return 'Đăng nhập thất bại';
 }

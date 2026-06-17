@@ -111,9 +111,7 @@ export async function getUserPages(userId) {
     );
   } catch (error) {
     if (error?.code === 'ER_NO_SUCH_TABLE') {
-      const err = new Error('Bảng user_pages chưa tồn tại — restart backend để tự tạo bảng');
-      err.status = 503;
-      throw err;
+      return [];
     }
     throw error;
   }

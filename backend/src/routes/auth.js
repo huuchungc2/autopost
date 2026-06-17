@@ -3,10 +3,11 @@ import { authenticate } from '../middleware/auth.js';
 import { authenticateUser, signToken, setPassword, verifyPassword } from '../services/authService.js';
 import { getUserPages, isSuperAdmin } from '../services/pageAccessService.js';
 import { getUserProviders } from '../services/providerAccessService.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 
 const router = express.Router();
 
-router.post('/login', async (req, res) => {
+router.post('/login', asyncHandler(async (req, res) => {
   const login = req.body.login || req.body.email || req.body.username;
   const { password } = req.body;
   if (!login || !password) {
@@ -18,19 +19,19 @@ router.post('/login', async (req, res) => {
   }
   const token = signToken(user);
   res.json({ token, user });
-});
+}));
 
 router.post('/logout', authenticate, (req, res) => {
   res.json({ message: 'Logout successful' });
 });
 
-router.get('/me', authenticate, async (req, res) => {
+router.get('/me', authenticate, asyncHandler(async (req, res) => {
   const assigned_pages = isSuperAdmin(req.user) ? null : await getUserPages(req.user.id);
   const assigned_providers = isSuperAdmin(req.user) ? null : await getUserProviders(req.user.id);
   res.json({ ...req.user, assigned_pages, assigned_providers });
-});
+}));
 
-router.post('/change-password', authenticate, async (req, res) => {
+router.post('/change-password', authenticate, asyncHandler(async (req, res) => {
   const { old_password, new_password } = req.body;
   if (!new_password) {
     return res.status(400).json({ error: 'New password is required' });
@@ -53,6 +54,6 @@ router.post('/change-password', authenticate, async (req, res) => {
 
   await setPassword(req.user.id, new_password, false);
   res.json({ message: 'Password updated successfully' });
-});
+}));
 
 export default router;

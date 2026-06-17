@@ -5,29 +5,59 @@ import { query } from '../db.js';
 const jwtSecret = process.env.JWT_SECRET || 'replace_with_strong_secret';
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
 
+const LOGIN_QUERIES = [
+  {
+    sql: `SELECT id, name, username, email, password, role, is_active, must_change_password
+          FROM users
+          WHERE deleted_at IS NULL
+            AND (LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?))`,
+    params: (login) => [login, login],
+  },
+  {
+    sql: `SELECT id, name, email, password, role, is_active, must_change_password
+          FROM users
+          WHERE deleted_at IS NULL AND LOWER(email) = LOWER(?)`,
+    params: (login) => [login],
+  },
+  {
+    sql: `SELECT id, name, username, email, password, role, is_active, must_change_password
+          FROM users
+          WHERE LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)`,
+    params: (login) => [login, login],
+  },
+  {
+    sql: `SELECT id, name, email, password, role, is_active, must_change_password
+          FROM users
+          WHERE LOWER(email) = LOWER(?)`,
+    params: (login) => [login],
+  },
+];
+
+async function findUserByLogin(login) {
+  let lastError = null;
+
+  for (const attempt of LOGIN_QUERIES) {
+    try {
+      const users = await query(attempt.sql, attempt.params(login));
+      if (users.length) return users;
+    } catch (error) {
+      if (error?.code === 'ER_BAD_FIELD_ERROR') {
+        lastError = error;
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  if (lastError) throw lastError;
+  return [];
+}
+
 export async function authenticateUser(identifier, password) {
   const login = String(identifier || '').trim();
   if (!login) return null;
 
-  let users;
-  try {
-    users = await query(
-      `SELECT id, name, username, email, password, role, is_active, must_change_password
-       FROM users
-       WHERE deleted_at IS NULL
-         AND (LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?))`,
-      [login, login]
-    );
-  } catch (error) {
-    if (error?.code !== 'ER_BAD_FIELD_ERROR') throw error;
-    users = await query(
-      `SELECT id, name, email, password, role, is_active, must_change_password
-       FROM users
-       WHERE deleted_at IS NULL AND LOWER(email) = LOWER(?)`,
-      [login]
-    );
-  }
-
+  const users = await findUserByLogin(login);
   const user = users[0];
   if (!user || !user.is_active) {
     return null;
