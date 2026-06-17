@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { KeyRound, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import api from '../services/api';
-import Modal from '../components/ui/Modal';
 import ProviderFamilyCard from '../components/ProviderFamilyCard';
 import { useToast } from '../context/ToastContext';
-import { typeLabel } from '../config/providerPresets';
 import {
   PROVIDER_FAMILIES,
   groupProvidersByFamily,
@@ -16,7 +14,7 @@ function normalizeEndpointInput(raw, providerKind, type) {
   const value = (raw || '').trim();
   if (!value) return '';
 
-  if (/\/v1\//i.test(value) || /generatecontent/i.test(value) || /\/messages\b/i.test(value)) return value;
+  if (/\/v1\//i.test(value) || /generatecontent/i.test(value) || /\/messages\b/i.test(value) || /:predict\b/i.test(value)) return value;
 
   const base = value.replace(/\/+$/, '');
   if (providerKind === 'claude') return `${base}/v1/messages`;
@@ -56,11 +54,6 @@ export default function Providers() {
   const [providers, setProviders] = useState([]);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customForm, setCustomForm] = useState(emptyCustomForm);
-  const [configSlot, setConfigSlot] = useState(null);
-  const [configApiKey, setConfigApiKey] = useState('');
-  const [configModel, setConfigModel] = useState('');
-  const [configEndpoint, setConfigEndpoint] = useState('');
-  const [configShowAdvanced, setConfigShowAdvanced] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({
     api_key: '', model: '', api_endpoint: '', provider_kind: '', is_active: true,
@@ -70,8 +63,6 @@ export default function Providers() {
 
   const templateGroups = useMemo(() => groupTemplatesByFamily(templates), [templates]);
   const providerGroups = useMemo(() => groupProvidersByFamily(providers, templates), [providers, templates]);
-  const editingProvider = providers.find((p) => p.id === editingId);
-  const configTemplate = configSlot?.template;
 
   const loadAll = async () => {
     try {
@@ -90,41 +81,21 @@ export default function Providers() {
     loadAll();
   }, []);
 
-  const openConfigureSlot = ({ type, template }) => {
-    if (template) {
-      setConfigSlot({ type, template });
-      setConfigApiKey('');
-      setConfigModel('');
-      setConfigEndpoint(template.api_endpoint || '');
-      setConfigShowAdvanced(false);
-      return;
+  const handleFormChange = (mode, field, value) => {
+    if (mode === 'edit') {
+      setEditForm((prev) => ({ ...prev, [field]: value }));
     }
-    setShowCustomForm(true);
-    setCustomForm((prev) => ({
-      ...emptyCustomForm,
-      type,
-      api_endpoint: endpointPreset('openai', type),
-    }));
   };
 
-  const closeConfigureSlot = () => {
-    setConfigSlot(null);
-    setConfigApiKey('');
-    setConfigModel('');
-    setConfigEndpoint('');
-    setConfigShowAdvanced(false);
-  };
-
-  const handleSlotAdd = async () => {
-    if (!configTemplate) return;
-    if (!configApiKey.trim()) {
+  const handleSlotAdd = async (template, addForm) => {
+    if (!addForm.api_key?.trim()) {
       showToast('Dán API key', 'error');
       return;
     }
     const normalizedEndpoint = normalizeEndpointInput(
-      configEndpoint,
-      configTemplate.provider_kind || 'openai',
-      configTemplate.type || 'text'
+      addForm.endpoint,
+      template.provider_kind || 'openai',
+      template.type || 'text'
     );
     if (!normalizedEndpoint) {
       showToast('Nhập API endpoint', 'error');
@@ -133,14 +104,13 @@ export default function Providers() {
     setSaving(true);
     try {
       await api.post('/providers', {
-        template_id: configTemplate.id,
-        api_key: configApiKey.trim(),
-        model: configModel.trim() || undefined,
+        template_id: template.id,
+        api_key: addForm.api_key.trim(),
+        model: addForm.model?.trim() || undefined,
         api_endpoint: normalizedEndpoint,
         is_active: true,
       });
-      showToast(`Đã thêm ${configTemplate.name}`, 'success');
-      closeConfigureSlot();
+      showToast(`Đã thêm ${template.name}`, 'success');
       loadAll();
     } catch (err) {
       showToast(err.response?.data?.error || 'Không tạo được provider', 'error');
@@ -194,12 +164,13 @@ export default function Providers() {
     setEditForm({ api_key: '', model: '', api_endpoint: '', provider_kind: '', is_active: true });
   };
 
-  const handleUpdate = async () => {
-    if (!editingProvider) return;
+  const handleUpdate = async (providerId) => {
+    const provider = providers.find((p) => p.id === providerId);
+    if (!provider) return;
     const normalizedEndpoint = normalizeEndpointInput(
       editForm.api_endpoint,
-      editForm.provider_kind || editingProvider.provider_kind || 'openai',
-      editingProvider.type || 'text'
+      editForm.provider_kind || provider.provider_kind || 'openai',
+      provider.type || 'text'
     );
     if (!normalizedEndpoint) {
       showToast('API endpoint không được để trống', 'error');
@@ -207,7 +178,7 @@ export default function Providers() {
     }
     setSaving(true);
     try {
-      await api.put(`/providers/${editingId}`, {
+      await api.put(`/providers/${providerId}`, {
         api_key: editForm.api_key || undefined,
         model: editForm.model,
         api_endpoint: normalizedEndpoint,
@@ -252,8 +223,8 @@ export default function Providers() {
         <div>
           <h1>AI Provider</h1>
           <p>
-            Mỗi nhà cung cấp có <strong>2 loại</strong>: bài viết và ảnh. Cấu hình mặc định hoặc thêm nhiều bản ghi.
-            Gắn vào fanpage tại <Link to="/pages">Fanpage</Link>.
+            Mỗi nhà cung cấp có <strong>Bài viết</strong> và <strong>Ảnh</strong> — cấu hình sẵn endpoint/model,
+            chỉ cần dán API key ngay trên thẻ (không popup). Gắn fanpage tại <Link to="/pages">Fanpage</Link>.
           </p>
         </div>
         <div className="header-actions">
@@ -271,14 +242,13 @@ export default function Providers() {
       {showCustomForm && (
         <div className="card form-card" style={{ marginBottom: 24 }}>
           <h2>Thêm provider tùy chỉnh</h2>
-          <p className="text-muted">Tự nhập tên, endpoint và loại — dùng cho gateway riêng hoặc API tương thích OpenAI.</p>
           <div className="modal-form-grid">
             <label>
               Tên hiển thị
               <input
                 value={customForm.name}
                 onChange={(e) => setCustomForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="VD: 9Router VPS"
+                placeholder="VD: Gateway riêng"
               />
             </label>
             <label>
@@ -314,7 +284,6 @@ export default function Providers() {
               <input
                 value={customForm.api_endpoint}
                 onChange={(e) => setCustomForm((f) => ({ ...f, api_endpoint: e.target.value }))}
-                placeholder="Dán full endpoint hoặc chỉ base URL"
               />
             </label>
             <label>
@@ -331,7 +300,6 @@ export default function Providers() {
               <input
                 value={customForm.model}
                 onChange={(e) => setCustomForm((f) => ({ ...f, model: e.target.value }))}
-                placeholder="gpt-4o-mini / dall-e-3"
               />
             </label>
           </div>
@@ -355,147 +323,21 @@ export default function Providers() {
               imageTemplate={templateGroups[family.id]?.image}
               textProviders={providerGroups[family.id]?.text || []}
               imageProviders={providerGroups[family.id]?.image || []}
-              onConfigure={openConfigureSlot}
-              onEdit={startEdit}
+              editingId={editingId}
+              editForm={editForm}
+              onStartEdit={startEdit}
+              onCancelEdit={cancelEdit}
+              onSubmitEdit={handleUpdate}
+              onSubmitAdd={handleSlotAdd}
+              onAddFormChange={handleFormChange}
               onDelete={handleDelete}
               onTest={handleTest}
+              providerKinds={PROVIDER_KINDS}
+              saving={saving}
             />
           ))}
         </div>
       )}
-
-      <Modal
-        open={!!configSlot && !!configTemplate}
-        title={configTemplate ? `Cấu hình ${configTemplate.name}` : 'Cấu hình provider'}
-        subtitle={configTemplate ? `${typeLabel(configTemplate.type)} · ${configTemplate.description}` : ''}
-        onClose={closeConfigureSlot}
-        footer={(
-          <>
-            <button type="button" className="btn btn-secondary" onClick={closeConfigureSlot}>Huỷ</button>
-            <button type="button" className="btn btn-primary" onClick={handleSlotAdd} disabled={saving || !configApiKey.trim()}>
-              {saving ? 'Đang lưu...' : 'Thêm provider'}
-            </button>
-          </>
-        )}
-      >
-        {configTemplate && (
-          <div className="modal-form">
-            <label className="provider-endpoint-field">
-              <span className="provider-endpoint-label">API endpoint</span>
-              <input
-                type="url"
-                value={configEndpoint}
-                onChange={(e) => setConfigEndpoint(e.target.value)}
-                placeholder="Dán full endpoint hoặc chỉ base URL"
-              />
-              <small className="text-muted">
-                Mặc định từ template. Có thể dán base URL — hệ thống tự thêm path đúng.
-              </small>
-            </label>
-
-            <label className="provider-key-field">
-              <span className="provider-key-label">
-                <KeyRound size={16} />
-                {configTemplate.key_label || 'API Key'}
-              </span>
-              <input
-                type="password"
-                value={configApiKey}
-                onChange={(e) => setConfigApiKey(e.target.value)}
-                placeholder={configTemplate.key_placeholder || 'Dán API key...'}
-                autoComplete="off"
-              />
-              <small className="text-muted">{configTemplate.key_help}</small>
-            </label>
-
-            <button
-              type="button"
-              className="btn-link provider-advanced-toggle"
-              onClick={() => setConfigShowAdvanced((v) => !v)}
-            >
-              {configShowAdvanced ? 'Ẩn tùy chọn model' : 'Đổi model (tuỳ chọn)'}
-            </button>
-            {configShowAdvanced && (
-              <label>
-                Model
-                <input
-                  value={configModel}
-                  onChange={(e) => setConfigModel(e.target.value)}
-                  placeholder={configTemplate.default_model}
-                />
-              </label>
-            )}
-          </div>
-        )}
-      </Modal>
-
-      <Modal
-        open={!!editingId && !!editingProvider}
-        title={`Sửa ${editingProvider?.name || 'provider'}`}
-        subtitle={`${typeLabel(editingProvider?.type)} · cập nhật API key, endpoint, model`}
-        onClose={cancelEdit}
-        footer={(
-          <>
-            <button type="button" className="btn btn-secondary" onClick={cancelEdit}>Huỷ</button>
-            <button type="button" className="btn btn-primary" onClick={handleUpdate} disabled={saving}>
-              {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
-            </button>
-          </>
-        )}
-      >
-        {editingProvider && (
-          <div className="modal-form">
-            <label>
-              API endpoint
-              <input
-                type="url"
-                value={editForm.api_endpoint}
-                onChange={(e) => setEditForm((f) => ({ ...f, api_endpoint: e.target.value }))}
-                placeholder="Dán full endpoint hoặc chỉ base URL"
-              />
-              <small className="text-muted">
-                Gợi ý: <code>{endpointPreset(editForm.provider_kind || 'openai', editingProvider.type || 'text')}</code>
-              </small>
-            </label>
-            <label>
-              Kiểu API
-              <select
-                value={editForm.provider_kind}
-                onChange={(e) => setEditForm((f) => ({ ...f, provider_kind: e.target.value }))}
-              >
-                {PROVIDER_KINDS.map((k) => (
-                  <option key={k.value} value={k.value}>{k.label}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              API key mới
-              <input
-                type="password"
-                value={editForm.api_key}
-                onChange={(e) => setEditForm((f) => ({ ...f, api_key: e.target.value }))}
-                placeholder="Để trống nếu giữ key cũ"
-                autoComplete="off"
-              />
-            </label>
-            <label>
-              Model
-              <input
-                value={editForm.model}
-                onChange={(e) => setEditForm((f) => ({ ...f, model: e.target.value }))}
-              />
-            </label>
-            <label className="checkbox-field">
-              <input
-                type="checkbox"
-                checked={editForm.is_active}
-                onChange={(e) => setEditForm((f) => ({ ...f, is_active: e.target.checked }))}
-              />
-              Provider đang bật
-            </label>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }

@@ -1934,6 +1934,37 @@ button {
   gap: 6px;
 }
 
+.provider-inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: white;
+  border: 1px solid var(--bg-border);
+}
+
+.provider-inline-preset {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.provider-inline-preset strong {
+  font-size: 13px;
+}
+
+.provider-inline-preset code {
+  font-size: 11px;
+  color: var(--color-primary);
+}
+
+.provider-inline-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 @media (max-width: 720px) {
   .provider-family-slots {
     grid-template-columns: 1fr;

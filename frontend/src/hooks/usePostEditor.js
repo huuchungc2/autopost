@@ -43,8 +43,12 @@ export default function usePostEditor({ post, pages, initialPageId, active, onSa
         media_type: post.media_type || 'none',
         image_url: post.image_url || '',
         image_prompt: post.image_prompt || '',
-        auto_generate_image: post.auto_generate_image !== 0 && post.auto_generate_image !== false,
-        save_image_local: post.save_image_local !== 0 && post.save_image_local !== false,
+        auto_generate_image: Boolean(post.image_prompt?.trim()) && !post.image_url
+          ? (post.auto_generate_image === 0 || post.auto_generate_image === false ? false : true)
+          : false,
+        save_image_local: Boolean(post.image_prompt?.trim())
+          ? post.save_image_local !== 0 && post.save_image_local !== false
+          : true,
         video_prompt: post.video_prompt || '',
         video_url: post.video_url || '',
         video_thumb_url: post.video_thumb_url || '',
@@ -77,9 +81,18 @@ export default function usePostEditor({ post, pages, initialPageId, active, onSa
   const setActivePrompt = (value) => {
     if (form.media_type === 'video') {
       setField('video_prompt', value);
-    } else {
-      setField('image_prompt', value);
+      return;
     }
+    setForm((prev) => {
+      const trimmed = String(value || '').trim();
+      return {
+        ...prev,
+        image_prompt: value,
+        media_type: trimmed ? 'image' : prev.media_type === 'image' && !prev.image_url ? 'none' : prev.media_type,
+        auto_generate_image: trimmed && !prev.image_url ? true : prev.auto_generate_image,
+        save_image_local: trimmed ? true : prev.save_image_local,
+      };
+    });
   };
 
   const handleImageUpload = async (event) => {
@@ -137,20 +150,24 @@ export default function usePostEditor({ post, pages, initialPageId, active, onSa
     if (!form.page_id || !form.content.trim()) return;
     setSaving(true);
     try {
+      const hasImagePrompt = Boolean(form.image_prompt?.trim());
+      const resolvedMediaType = form.media_type === 'video'
+        ? 'video'
+        : hasImagePrompt || form.image_url || form.media_type === 'image'
+          ? 'image'
+          : 'none';
+
       const payload = {
         page_id: Number(form.page_id),
         topic: form.topic,
         content: form.content,
-        media_type: form.media_type,
-        image_url: form.media_type === 'image' ? form.image_url || null : null,
+        media_type: resolvedMediaType,
+        image_url: resolvedMediaType === 'image' ? form.image_url || null : null,
         image_prompt: form.image_prompt?.trim() || null,
-        auto_generate_image: form.media_type === 'image'
-          && Boolean(form.image_prompt?.trim())
-          && !form.image_url
+        auto_generate_image: hasImagePrompt && !form.image_url
           ? Boolean(form.auto_generate_image)
           : false,
-        save_image_local: form.media_type === 'image'
-          && Boolean(form.image_prompt?.trim())
+        save_image_local: hasImagePrompt
           ? Boolean(form.save_image_local)
           : true,
         video_prompt: form.video_prompt?.trim() || null,

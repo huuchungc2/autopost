@@ -273,9 +273,11 @@ function parseImportOptions(body = {}) {
       autoSchedule = null;
     }
   }
-  const autoGenerateImages = body.auto_generate_images === true
-    || body.auto_generate_images === '1'
-    || body.auto_generate_images === 'true';
+  const autoGenerateImages = body.auto_generate_images === false
+    || body.auto_generate_images === '0'
+    || body.auto_generate_images === 'false'
+    ? false
+    : true;
   const saveImageLocal = parseBoolDefaultTrue(body.save_image_local);
   return { autoSchedule, autoGenerateImages, saveImageLocal };
 }
@@ -536,7 +538,7 @@ router.post('/', asyncHandler(async (req, res) => {
   }
   await assertPageAccess(req.user, page_id);
 
-  const resolvedMediaType = media_type || (video_url ? 'video' : image_url ? 'image' : 'none');
+  const resolvedMediaType = media_type || (video_url ? 'video' : image_url || image_prompt?.trim() ? 'image' : 'none');
   const resolvedAutoGenerate = auto_generate_image === true
     || auto_generate_image === 1
     || auto_generate_image === '1'

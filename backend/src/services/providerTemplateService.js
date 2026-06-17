@@ -47,11 +47,24 @@ export const DEFAULT_TEMPLATES = [
     provider_kind: 'gemini',
     api_endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
     default_model: 'gemini-1.5-flash',
-    description: 'Viết bài bằng Google Gemini',
+    description: 'Viết bài Facebook bằng Gemini',
     key_label: 'Google AI API Key',
     key_placeholder: 'AIza...',
     key_help: 'Lấy tại aistudio.google.com/apikey',
     sort_order: 4,
+  },
+  {
+    slug: 'gemini-image',
+    name: 'Gemini Imagen',
+    type: 'image',
+    provider_kind: 'gemini',
+    api_endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict',
+    default_model: 'imagen-3.0-generate-002',
+    description: 'Xuất ảnh bài đăng bằng Google Imagen',
+    key_label: 'Google AI API Key',
+    key_placeholder: 'AIza...',
+    key_help: 'Cùng key với Gemini Text — lấy tại aistudio.google.com/apikey',
+    sort_order: 5,
   },
   {
     slug: 'ideogram-image',
@@ -64,7 +77,7 @@ export const DEFAULT_TEMPLATES = [
     key_label: 'Ideogram API Key',
     key_placeholder: '...',
     key_help: 'Lấy tại ideogram.ai',
-    sort_order: 5,
+    sort_order: 6,
   },
   {
     slug: '9router-text',
@@ -77,7 +90,7 @@ export const DEFAULT_TEMPLATES = [
     key_label: '9Router API Key',
     key_placeholder: 'Lấy từ dashboard 9Router',
     key_help: 'npm i -g 9router → dashboard → API key. Sửa endpoint nếu chạy trên VPS/domain khác.',
-    sort_order: 6,
+    sort_order: 7,
   },
   {
     slug: '9router-image',
@@ -90,7 +103,7 @@ export const DEFAULT_TEMPLATES = [
     key_label: '9Router API Key',
     key_placeholder: 'Lấy từ dashboard 9Router',
     key_help: 'Cùng key với 9Router Text — đổi endpoint nếu cần.',
-    sort_order: 7,
+    sort_order: 8,
   },
 ];
 

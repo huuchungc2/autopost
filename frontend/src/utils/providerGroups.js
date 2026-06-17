@@ -2,7 +2,7 @@ export const PROVIDER_FAMILIES = [
   { id: 'openai', label: 'OpenAI', description: 'GPT viết bài · DALL-E tạo ảnh' },
   { id: '9router', label: '9Router', description: 'Gateway OpenAI-compatible (Claude, GPT, ảnh…)' },
   { id: 'claude', label: 'Claude', description: 'Anthropic — viết bài Facebook' },
-  { id: 'gemini', label: 'Gemini', description: 'Google — viết bài Facebook' },
+  { id: 'gemini', label: 'Gemini', description: 'Google — viết bài Facebook · xuất ảnh Imagen' },
   { id: 'ideogram', label: 'Ideogram', description: 'Tạo ảnh minh họa bài đăng' },
   { id: 'custom', label: 'Khác / tùy chỉnh', description: 'API gateway hoặc provider riêng' },
 ];

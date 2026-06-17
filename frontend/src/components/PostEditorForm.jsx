@@ -77,7 +77,7 @@ export default function PostEditorForm({
           </span>
         </label>
 
-        {form.media_type === 'image' && form.image_prompt?.trim() && !form.image_url && (
+        {form.image_prompt?.trim() && !form.image_url && (
           <label className="checkbox-field page-skill-option">
             <input
               type="checkbox"
@@ -88,7 +88,7 @@ export default function PostEditorForm({
           </label>
         )}
 
-        {form.media_type === 'image' && form.image_prompt?.trim() && (
+        {form.image_prompt?.trim() && (
           <label className="checkbox-field page-skill-option">
             <input
               type="checkbox"

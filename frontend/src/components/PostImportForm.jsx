@@ -99,9 +99,9 @@ export default function PostImportForm({
           times: times.filter(Boolean),
         }));
       }
-      if (autoGenerateImages && rowsWithPrompt.length) {
-        formData.append('auto_generate_images', '1');
-        if (!saveImageLocal) formData.append('save_image_local', '0');
+      if (parsed.rows.length) {
+        formData.append('auto_generate_images', autoGenerateImages ? '1' : '0');
+        formData.append('save_image_local', saveImageLocal ? '1' : '0');
       }
       const response = await api.post('/posts/import', formData);
       onImported?.(response.data);
@@ -211,31 +211,38 @@ export default function PostImportForm({
           </div>
         )}
 
-        {rowsWithPrompt.length > 0 && (
-          <label className="page-skill-option" style={{ marginTop: 16 }}>
-            <input
-              type="checkbox"
-              checked={autoGenerateImages}
-              onChange={(e) => setAutoGenerateImages(e.target.checked)}
-            />
-            <span>
-              AI tự xuất ảnh khi đến giờ đăng cho <strong>{rowsWithPrompt.length}</strong> bài có prompt
-              nhưng chưa có ảnh (cần cấu hình AI provider ảnh trên fanpage)
-            </span>
-          </label>
-        )}
+        {parsed.rows.length > 0 && (
+          <>
+            <label className="page-skill-option" style={{ marginTop: 16 }}>
+              <input
+                type="checkbox"
+                checked={autoGenerateImages}
+                onChange={(e) => setAutoGenerateImages(e.target.checked)}
+              />
+              <span>
+                AI tự xuất ảnh khi đến giờ đăng
+                {rowsWithPrompt.length > 0 ? (
+                  <> cho <strong>{rowsWithPrompt.length}</strong> bài có prompt ảnh</>
+                ) : (
+                  <> (áp dụng cho các dòng có cột prompt ảnh)</>
+                )}
+                {' '}— cần cấu hình AI provider ảnh trên fanpage
+              </span>
+            </label>
 
-        {rowsWithPrompt.length > 0 && autoGenerateImages && (
-          <label className="page-skill-option" style={{ marginTop: 8 }}>
-            <input
-              type="checkbox"
-              checked={saveImageLocal}
-              onChange={(e) => setSaveImageLocal(e.target.checked)}
-            />
-            <span>
-              Lưu ảnh AI lên VPS trước khi đăng (bỏ tick = đăng thẳng URL ảnh AI lên Facebook, không lưu server)
-            </span>
-          </label>
+            {autoGenerateImages && (
+              <label className="page-skill-option" style={{ marginTop: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={saveImageLocal}
+                  onChange={(e) => setSaveImageLocal(e.target.checked)}
+                />
+                <span>
+                  Lưu ảnh AI lên VPS trước khi đăng (bỏ tick = đăng thẳng URL ảnh AI lên Facebook, không lưu server)
+                </span>
+              </label>
+            )}
+          </>
         )}
 
         {rowsWithoutDate.length > 0 && (
