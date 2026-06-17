@@ -33,7 +33,7 @@ export const navGroups = [
     label: 'Cấu hình',
     items: [
       { to: '/pages', label: 'Fanpage', icon: Flag, roles: ['super_admin', 'admin'] },
-      { to: '/skills', label: 'Skill AI', icon: Wand2, roles: ['super_admin'] },
+      { to: '/skills', label: 'Skill AI', icon: Wand2, roles: ['super_admin', 'admin'] },
       { to: '/providers', label: 'AI Provider', icon: Cpu, roles: ['super_admin', 'admin'] },
     ],
   },

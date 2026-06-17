@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../db.js';
-import { authenticate, requireRole } from '../middleware/auth.js';
+import { authenticate } from '../middleware/auth.js';
+import { canManageSkills } from '../middleware/rbac.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 const router = express.Router();
@@ -87,7 +88,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
   res.json({ ...skills[0], skill_type: skills[0].skill_type || 'text', pages });
 }));
 
-router.post('/', requireRole('super_admin'), asyncHandler(async (req, res) => {
+router.post('/', canManageSkills, asyncHandler(async (req, res) => {
   const { name, description, system_prompt, skill_type } = req.body;
   if (!name?.trim() || !system_prompt?.trim()) {
     return res.status(400).json({ error: 'Tên và system prompt là bắt buộc' });
@@ -105,7 +106,7 @@ router.post('/', requireRole('super_admin'), asyncHandler(async (req, res) => {
   res.status(201).json({ id: result.insertId, name, description, skill_type: type });
 }));
 
-router.put('/:id', requireRole('super_admin'), asyncHandler(async (req, res) => {
+router.put('/:id', canManageSkills, asyncHandler(async (req, res) => {
   const { name, description, system_prompt, skill_type } = req.body;
   if (!name?.trim() || !system_prompt?.trim()) {
     return res.status(400).json({ error: 'Tên và system prompt là bắt buộc' });
@@ -123,7 +124,7 @@ router.put('/:id', requireRole('super_admin'), asyncHandler(async (req, res) => 
   res.json({ message: 'Skill updated', skill_type: type });
 }));
 
-router.delete('/:id', requireRole('super_admin'), asyncHandler(async (req, res) => {
+router.delete('/:id', canManageSkills, asyncHandler(async (req, res) => {
   const linked = await query('SELECT COUNT(*) AS count FROM page_skills WHERE skill_id = ?', [req.params.id]);
   if (linked[0]?.count > 0) {
     return res.status(400).json({

@@ -31,3 +31,11 @@ export function canManagePages(req, res, next) {
   }
   next();
 }
+
+/** Admin + super_admin — skill (system prompt) management */
+export function canManageSkills(req, res, next) {
+  if (!['super_admin', 'admin'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  next();
+}
