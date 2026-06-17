@@ -96,22 +96,38 @@ export async function getSkillsGroupedByPageIds(pageIds) {
 export async function syncPageSkills(pageId, skillIds) {
   const ids = [...new Set((skillIds || []).map((id) => Number(id)).filter(Boolean))];
 
-  await query('DELETE FROM page_skills WHERE page_id = ?', [pageId]);
+  try {
+    await query('DELETE FROM page_skills WHERE page_id = ?', [pageId]);
 
-  for (let i = 0; i < ids.length; i += 1) {
-    await query(
-      'INSERT INTO page_skills (page_id, skill_id, sort_order) VALUES (?, ?, ?)',
-      [pageId, ids[i], i]
-    );
+    for (let i = 0; i < ids.length; i += 1) {
+      await query(
+        'INSERT INTO page_skills (page_id, skill_id, sort_order) VALUES (?, ?, ?)',
+        [pageId, ids[i], i]
+      );
+    }
+  } catch (error) {
+    if (error?.code !== 'ER_NO_SUCH_TABLE') throw error;
   }
 
-  const textSkillRows = ids.length
-    ? await query(
-      `SELECT id FROM skills WHERE id IN (${ids.map(() => '?').join(',')})
-       AND (skill_type = 'text' OR skill_type IS NULL) LIMIT 1`,
-      ids
-    ).catch(() => [{ id: ids[0] }])
-    : [];
+  let textSkillRows = [];
+  if (ids.length) {
+    try {
+      textSkillRows = await query(
+        `SELECT id FROM skills WHERE id IN (${ids.map(() => '?').join(',')})
+         AND (skill_type = 'text' OR skill_type IS NULL) LIMIT 1`,
+        ids
+      );
+    } catch (error) {
+      if (error?.code === 'ER_BAD_FIELD_ERROR') {
+        textSkillRows = await query(
+          `SELECT id FROM skills WHERE id IN (${ids.map(() => '?').join(',')}) LIMIT 1`,
+          ids
+        );
+      } else {
+        throw error;
+      }
+    }
+  }
 
   await query('UPDATE fb_pages SET skill_id = ? WHERE id = ?', [textSkillRows[0]?.id || ids[0] || null, pageId]);
 }

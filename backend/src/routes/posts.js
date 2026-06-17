@@ -29,6 +29,30 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 const router = express.Router();
 router.use(authenticate);
 
+const ALLOWED_MEDIA_TYPES = new Set(['none', 'image', 'video']);
+
+function normalizePageId(value) {
+  if (value === '' || value == null) return null;
+  const id = Number(value);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+function resolveMediaType(mediaType, { videoUrl, imageUrl, imagePrompt, fallback = 'none' } = {}) {
+  if (ALLOWED_MEDIA_TYPES.has(mediaType)) return mediaType;
+  if (videoUrl) return 'video';
+  if (imageUrl || String(imagePrompt || '').trim()) return 'image';
+  return ALLOWED_MEDIA_TYPES.has(fallback) ? fallback : 'none';
+}
+
+function normalizeScheduleDate(value) {
+  const raw = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const [y, m, d] = raw.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+  return raw;
+}
+
 const importUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 },
@@ -110,6 +134,11 @@ router.post('/bulk-schedule', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'start_date và times là bắt buộc' });
   }
 
+  const normalizedStartDate = normalizeScheduleDate(start_date);
+  if (!normalizedStartDate) {
+    return res.status(400).json({ error: 'start_date không hợp lệ (YYYY-MM-DD)' });
+  }
+
   const normalizedTimes = times
     .map((t) => String(t).trim().slice(0, 5))
     .filter(Boolean);
@@ -146,9 +175,13 @@ router.post('/bulk-schedule', asyncHandler(async (req, res) => {
       params.push(...accessFilter.params);
     }
     if (page_id) {
-      await assertPageAccess(req.user, page_id);
+      const normalizedPageId = normalizePageId(page_id);
+      if (!normalizedPageId) {
+        return res.status(400).json({ error: 'page_id không hợp lệ' });
+      }
+      await assertPageAccess(req.user, normalizedPageId);
       conditions.push('page_id = ?');
-      params.push(page_id);
+      params.push(normalizedPageId);
     }
 
     posts = await query(
@@ -178,7 +211,7 @@ router.post('/bulk-schedule', asyncHandler(async (req, res) => {
   for (let i = 0; i < posts.length; i += 1) {
     const dayOffset = Math.floor(i / slotsPerDay);
     const time = normalizedTimes[i % slotsPerDay];
-    const date = addDays(start_date, dayOffset);
+    const date = addDays(normalizedStartDate, dayOffset);
     const scheduledAt = `${date} ${time}:00`;
     updates.push({ id: posts[i].id, scheduled_at: scheduledAt });
   }
@@ -536,9 +569,17 @@ router.post('/', asyncHandler(async (req, res) => {
   if (!page_id || !content?.trim()) {
     return res.status(400).json({ error: 'page_id and content are required' });
   }
-  await assertPageAccess(req.user, page_id);
+  const resolvedPageId = normalizePageId(page_id);
+  if (!resolvedPageId) {
+    return res.status(400).json({ error: 'page_id không hợp lệ' });
+  }
+  await assertPageAccess(req.user, resolvedPageId);
 
-  const resolvedMediaType = media_type || (video_url ? 'video' : image_url || image_prompt?.trim() ? 'image' : 'none');
+  const resolvedMediaType = resolveMediaType(media_type, {
+    videoUrl: video_url,
+    imageUrl: image_url,
+    imagePrompt: image_prompt,
+  });
   const resolvedAutoGenerate = auto_generate_image === true
     || auto_generate_image === 1
     || auto_generate_image === '1'
@@ -565,7 +606,7 @@ router.post('/', asyncHandler(async (req, res) => {
   const result = await query(
     'INSERT INTO posts (page_id, topic, content, image_url, image_prompt, auto_generate_image, save_image_local, video_prompt, video_url, video_thumb_url, media_type, status, scheduled_at, created_by_type, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
     [
-      page_id,
+      resolvedPageId,
       topic || '',
       content,
       image_url || null,
@@ -660,8 +701,17 @@ router.put('/:id', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'content is required' });
   }
 
-  const targetPageId = page_id != null ? Number(page_id) : post.page_id;
-  if (page_id != null && targetPageId !== post.page_id) {
+  const targetPageId = page_id !== undefined
+    ? (() => {
+      const normalized = normalizePageId(page_id);
+      if (!normalized) return null;
+      return normalized;
+    })()
+    : post.page_id;
+  if (page_id !== undefined && !targetPageId) {
+    return res.status(400).json({ error: 'page_id không hợp lệ' });
+  }
+  if (page_id !== undefined && targetPageId !== post.page_id) {
     await assertPageAccess(req.user, targetPageId);
   }
 
@@ -677,8 +727,12 @@ router.put('/:id', asyncHandler(async (req, res) => {
   const finalVideoThumb = video_thumb_url !== undefined ? (video_thumb_url || null) : post.video_thumb_url;
   const finalScheduledAt = scheduled_at !== undefined ? (scheduled_at || null) : post.scheduled_at;
 
-  const resolvedMediaType = media_type
-    || (finalVideoUrl ? 'video' : (finalImageUrl || finalImagePrompt) ? 'image' : post.media_type || 'none');
+  const resolvedMediaType = resolveMediaType(media_type, {
+    videoUrl: finalVideoUrl,
+    imageUrl: finalImageUrl,
+    imagePrompt: finalImagePrompt,
+    fallback: post.media_type || 'none',
+  });
 
   const resolvedAutoGenerate = auto_generate_image === true
     || auto_generate_image === 1

@@ -66,10 +66,11 @@ export default function usePostEditor({ post, pages, initialPageId, active, onSa
 
   useEffect(() => {
     if (!active || post?.id || !pages.length) return;
-    setForm((prev) => {
-      if (prev.page_id) return prev;
-      return { ...prev, page_id: resolveDefaultPageId() };
-    });
+    const defaultPageId = resolveDefaultPageId();
+    if (!defaultPageId) return;
+    setForm((prev) => (
+      prev.page_id === defaultPageId ? prev : { ...prev, page_id: defaultPageId }
+    ));
   }, [active, post?.id, pages, initialPageId]);
 
   const selectedPage = pages.find((p) => String(p.id) === String(form.page_id));

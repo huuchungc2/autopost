@@ -206,7 +206,7 @@ export default function Providers() {
     try {
       await api.put(`/providers/${provider.id}`, {
         api_key: editForm.api_key || undefined,
-        model: editForm.model,
+        model: editForm.model?.trim() || undefined,
         api_endpoint: normalizedEndpoint,
         provider_kind: editForm.provider_kind,
         is_active: editForm.is_active,

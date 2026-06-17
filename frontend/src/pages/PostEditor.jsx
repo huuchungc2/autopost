@@ -24,9 +24,17 @@ export default function PostEditor() {
   }, []);
 
   useEffect(() => {
+    if (!isEdit) {
+      setLoading(false);
+      setPost(null);
+    }
+  }, [isEdit]);
+
+  useEffect(() => {
     if (!isEdit) return undefined;
 
     let cancelled = false;
+    setPost(null);
     setLoading(true);
     api.get(`/posts/${id}`)
       .then((response) => {

@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../services/authContext';
-import { WEEK_DAYS as DAYS, skillTypeLabel } from '../config/vi';
+import { skillTypeLabel } from '../config/vi';
 import Skeleton from '../components/ui/Skeleton';
 
 const initialForm = {
@@ -52,9 +52,17 @@ export default function PageForm() {
   }, [isSuperAdmin]);
 
   useEffect(() => {
+    if (!isEdit) {
+      setLoading(false);
+      setForm(initialForm);
+    }
+  }, [isEdit]);
+
+  useEffect(() => {
     if (!isEdit) return undefined;
     let cancelled = false;
     setLoading(true);
+    setForm(initialForm);
     api.get(`/pages/${id}`)
       .then((response) => {
         if (cancelled) return;
@@ -65,8 +73,8 @@ export default function PageForm() {
           page_token: '',
           avatar_url: page.avatar_url || '',
           skill_ids: page.skill_ids || page.skills?.map((s) => s.id) || (page.skill_id ? [Number(page.skill_id)] : []),
-          text_provider_id: page.text_provider_id || '',
-          image_provider_id: page.image_provider_id || '',
+          text_provider_id: page.text_provider_id ? String(page.text_provider_id) : '',
+          image_provider_id: page.image_provider_id ? String(page.image_provider_id) : '',
           is_active: !!page.is_active,
           assign_user_ids: Array.isArray(page.assigned_user_ids)
             ? page.assigned_user_ids.map(Number).filter(Boolean)
@@ -119,15 +127,37 @@ export default function PageForm() {
     }
   };
 
+  const buildPayload = () => {
+    const payload = {
+      name: form.name.trim(),
+      avatar_url: form.avatar_url?.trim() || '',
+      skill_ids: form.skill_ids.map(Number).filter(Boolean),
+      text_provider_id: form.text_provider_id ? Number(form.text_provider_id) : null,
+      image_provider_id: form.image_provider_id ? Number(form.image_provider_id) : null,
+      is_active: form.is_active,
+    };
+    if (!isEdit) {
+      payload.page_id = form.page_id.trim();
+      payload.page_token = form.page_token.trim();
+    } else if (form.page_token?.trim()) {
+      payload.page_token = form.page_token.trim();
+    }
+    if (isSuperAdmin) {
+      payload.assign_user_ids = form.assign_user_ids.map(Number).filter(Boolean);
+    }
+    return payload;
+  };
+
   const handleSubmit = async (event) => {
     event?.preventDefault?.();
     setSaving(true);
     try {
+      const payload = buildPayload();
       if (isEdit) {
-        await api.put(`/pages/${id}`, form);
+        await api.put(`/pages/${id}`, payload);
         showToast('Đã cập nhật fanpage', 'success');
       } else {
-        await api.post('/pages', form);
+        await api.post('/pages', payload);
         showToast('Đã thêm fanpage', 'success');
       }
       navigate('/pages');
@@ -272,7 +302,7 @@ export default function PageForm() {
               <select value={form.text_provider_id} onChange={(e) => handleChange('text_provider_id', e.target.value)}>
                 <option value="">— Chưa chọn —</option>
                 {providers.filter((p) => p.type === 'text' && p.is_active).map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}{p.model ? ` (${p.model})` : ''}</option>
+                  <option key={p.id} value={String(p.id)}>{p.name}{p.model ? ` (${p.model})` : ''}</option>
                 ))}
               </select>
             </label>
@@ -287,7 +317,7 @@ export default function PageForm() {
               <select value={form.image_provider_id} onChange={(e) => handleChange('image_provider_id', e.target.value)}>
                 <option value="">— Chưa chọn —</option>
                 {providers.filter((p) => p.type === 'image' && p.is_active).map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}{p.model ? ` (${p.model})` : ''}</option>
+                  <option key={p.id} value={String(p.id)}>{p.name}{p.model ? ` (${p.model})` : ''}</option>
                 ))}
               </select>
             </label>

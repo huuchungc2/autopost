@@ -26,6 +26,7 @@ export default function BulkSchedule() {
     const params = new URLSearchParams();
     if (pageFilter) params.set('page', pageFilter);
     params.set('limit', '200');
+    setLoading(true);
     api.get(`/posts?${params}`)
       .then((response) => setPosts(response.data.items || []))
       .catch((err) => showToast(err.response?.data?.error || 'Không tải được danh sách bài', 'error'))

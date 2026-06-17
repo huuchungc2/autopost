@@ -27,6 +27,38 @@ function normalizeSkillIds(body) {
   return [];
 }
 
+function normalizeOptionalProviderId(value) {
+  if (value === '' || value === null || value === undefined) return null;
+  const id = Number(value);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+async function resolveAssignableUserIds(userIds) {
+  const ids = (userIds || []).map((id) => Number(id)).filter(Boolean);
+  if (!ids.length) return [];
+  const placeholders = ids.map(() => '?').join(', ');
+  const queries = [
+    {
+      sql: `SELECT id FROM users WHERE id IN (${placeholders})
+            AND deleted_at IS NULL AND role IN ('admin', 'editor')`,
+      params: ids,
+    },
+    {
+      sql: `SELECT id FROM users WHERE id IN (${placeholders})
+            AND role IN ('admin', 'editor')`,
+      params: ids,
+    },
+  ];
+  for (const { sql, params } of queries) {
+    try {
+      return await query(sql, params);
+    } catch (error) {
+      if (error?.code !== 'ER_BAD_FIELD_ERROR') throw error;
+    }
+  }
+  return [];
+}
+
 router.get('/', authenticate, asyncHandler(async (req, res) => {
   const accessibleIds = await getAccessiblePageIds(req.user);
   const { clause, params } = pageIdInClause(accessibleIds, 'fp.id');
@@ -71,25 +103,24 @@ router.post('/', authenticate, canManagePages, asyncHandler(async (req, res) => 
   const skillIds = normalizeSkillIds(req.body);
   if (!name || !page_id || !page_token) return res.status(400).json({ error: 'Missing required fields' });
 
-  if (text_provider_id) await assertProviderAccess(req.user, text_provider_id);
-  if (image_provider_id) await assertProviderAccess(req.user, image_provider_id);
+  const resolvedTextProviderId = normalizeOptionalProviderId(text_provider_id);
+  const resolvedImageProviderId = normalizeOptionalProviderId(image_provider_id);
+
+  if (resolvedTextProviderId) await assertProviderAccess(req.user, resolvedTextProviderId);
+  if (resolvedImageProviderId) await assertProviderAccess(req.user, resolvedImageProviderId);
 
   await verifyFacebookToken(page_id, page_token);
   const tokenExpiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
   const result = await query(
     'INSERT INTO fb_pages (name, page_id, page_token, token_expires_at, token_status, avatar_url, skill_id, text_provider_id, image_provider_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
-    [name, page_id, page_token, tokenExpiresAt, 'valid', avatar_url, skillIds[0] || null, text_provider_id, image_provider_id, is_active]
+    [name, page_id, page_token, tokenExpiresAt, 'valid', avatar_url || null, skillIds[0] || null, resolvedTextProviderId, resolvedImageProviderId, is_active]
   );
   await syncPageSkills(result.insertId, skillIds);
 
   if (!isSuperAdmin(req.user)) {
     await assignPageToUser(req.user.id, result.insertId);
   } else if (Array.isArray(assign_user_ids) && assign_user_ids.length) {
-    const targets = await query(
-      `SELECT id FROM users WHERE id IN (${assign_user_ids.map(() => '?').join(', ')})
-       AND deleted_at IS NULL AND role IN ('admin', 'editor')`,
-      assign_user_ids.map((id) => Number(id)).filter(Boolean)
-    );
+    const targets = await resolveAssignableUserIds(assign_user_ids);
     await assignPageToUsers(result.insertId, targets.map((u) => u.id));
   }
 
@@ -106,46 +137,53 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
     ? normalizeSkillIds(req.body)
     : null;
 
-  const existing = (await query('SELECT page_id, page_token FROM fb_pages WHERE id = ?', [req.params.id]))[0];
+  if (!name?.trim()) {
+    return res.status(400).json({ error: 'Tên fanpage là bắt buộc' });
+  }
+
+  const existing = (await query(
+    `SELECT page_id, page_token, avatar_url, skill_id, text_provider_id, image_provider_id, is_active
+     FROM fb_pages WHERE id = ?`,
+    [req.params.id]
+  ))[0];
   if (!existing) return res.status(404).json({ error: 'Page not found' });
 
   let tokenToUpdate = existing.page_token;
   let tokenStatus = 'valid';
   let tokenExpiresAt = null;
 
-  if (page_token) {
-    await verifyFacebookToken(existing.page_id, page_token);
-    tokenToUpdate = page_token;
+  if (page_token?.trim()) {
+    await verifyFacebookToken(existing.page_id, page_token.trim());
+    tokenToUpdate = page_token.trim();
     tokenExpiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
   }
 
-  if (text_provider_id) await assertProviderAccess(req.user, text_provider_id);
-  if (image_provider_id) await assertProviderAccess(req.user, image_provider_id);
+  const resolvedTextProviderId = text_provider_id !== undefined
+    ? normalizeOptionalProviderId(text_provider_id)
+    : existing.text_provider_id;
+  const resolvedImageProviderId = image_provider_id !== undefined
+    ? normalizeOptionalProviderId(image_provider_id)
+    : existing.image_provider_id;
+  const resolvedAvatarUrl = avatar_url !== undefined ? (avatar_url || null) : existing.avatar_url;
+  const resolvedIsActive = is_active !== undefined ? is_active !== false : !!existing.is_active;
+
+  if (resolvedTextProviderId) await assertProviderAccess(req.user, resolvedTextProviderId);
+  if (resolvedImageProviderId) await assertProviderAccess(req.user, resolvedImageProviderId);
 
   const primarySkillId = skillIds !== null ? (skillIds[0] || null) : undefined;
-  const current = await query('SELECT skill_id FROM fb_pages WHERE id = ?', [req.params.id]);
-  const skillIdToSave = skillIds !== null ? primarySkillId : current[0]?.skill_id;
+  const skillIdToSave = skillIds !== null ? primarySkillId : existing.skill_id;
 
   await query(
     'UPDATE fb_pages SET name = ?, page_token = ?, avatar_url = ?, skill_id = ?, text_provider_id = ?, image_provider_id = ?, is_active = ?, token_expires_at = COALESCE(?, token_expires_at), token_status = ? WHERE id = ?',
-    [name, tokenToUpdate, avatar_url, skillIdToSave, text_provider_id, image_provider_id, is_active, tokenExpiresAt, tokenStatus, req.params.id]
+    [name.trim(), tokenToUpdate, resolvedAvatarUrl, skillIdToSave, resolvedTextProviderId, resolvedImageProviderId, resolvedIsActive, tokenExpiresAt, tokenStatus, req.params.id]
   );
 
   if (skillIds !== null) {
     await syncPageSkills(req.params.id, skillIds);
   }
 
-  // Super admin can assign/unassign page visibility for admin/editor users
   if (isSuperAdmin(req.user) && Array.isArray(assign_user_ids)) {
-    const ids = assign_user_ids.map((id) => Number(id)).filter(Boolean);
-    let targets = [];
-    if (ids.length) {
-      targets = await query(
-        `SELECT id FROM users WHERE id IN (${ids.map(() => '?').join(', ')})
-         AND deleted_at IS NULL AND role IN ('admin', 'editor')`,
-        ids
-      );
-    }
+    const targets = await resolveAssignableUserIds(assign_user_ids);
     await setPageAssignedUsers(req.params.id, targets.map((u) => u.id));
   }
 
@@ -167,12 +205,15 @@ router.get('/:id/topics', authenticate, asyncHandler(async (req, res) => {
 router.post('/:id/topics', authenticate, canManagePages, asyncHandler(async (req, res) => {
   await assertPageAccess(req.user, req.params.id);
   const { day_of_week, topic, post_time = '08:00:00', is_active = true } = req.body;
-  if (day_of_week === undefined || !topic) return res.status(400).json({ error: 'Missing required fields' });
+  const dow = Number(day_of_week);
+  if (!Number.isInteger(dow) || dow < 0 || dow > 6 || !String(topic || '').trim()) {
+    return res.status(400).json({ error: 'Thiếu hoặc sai ngày trong tuần (0–6) / chủ đề' });
+  }
   const result = await query(
     'INSERT INTO content_topics (page_id, day_of_week, topic, post_time, is_active) VALUES (?, ?, ?, ?, ?)',
-    [req.params.id, day_of_week, topic, post_time, is_active]
+    [req.params.id, dow, String(topic).trim(), post_time, is_active]
   );
-  res.status(201).json({ id: result.insertId, page_id: req.params.id, day_of_week, topic, post_time, is_active });
+  res.status(201).json({ id: result.insertId, page_id: req.params.id, day_of_week: dow, topic: String(topic).trim(), post_time, is_active });
 }));
 
 router.put('/:id/token', authenticate, canManagePages, asyncHandler(async (req, res) => {

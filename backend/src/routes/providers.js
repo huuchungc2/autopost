@@ -120,10 +120,17 @@ router.put('/:id', canManageProviders, asyncHandler(async (req, res) => {
   await assertProviderAccess(req.user, req.params.id);
   const { api_key, model, is_active, api_endpoint, provider_kind, name } = req.body;
   const existing = (await query(
-    `SELECT api_key, name, type, template_id, provider_kind, api_endpoint FROM ai_providers WHERE id = ?`,
+    `SELECT api_key, name, type, template_id, provider_kind, api_endpoint, model, is_active
+     FROM ai_providers WHERE id = ?`,
     [req.params.id]
   ))[0];
   if (!existing) return res.status(404).json({ error: 'Provider not found' });
+
+  const resolvedActive = is_active === true || is_active === 1 || is_active === '1' || is_active === 'true'
+    ? true
+    : is_active === false || is_active === 0 || is_active === '0' || is_active === 'false'
+      ? false
+      : !!existing.is_active;
 
   await query(
     `UPDATE ai_providers SET
@@ -134,8 +141,8 @@ router.put('/:id', canManageProviders, asyncHandler(async (req, res) => {
      WHERE id = ?`,
     [
       api_key?.trim() || existing.api_key,
-      model ?? existing.model,
-      is_active ?? true,
+      model !== undefined ? (model?.trim() || null) : existing.model,
+      resolvedActive,
       api_endpoint?.trim() || null,
       provider_kind?.trim() || null,
       name?.trim() || null,
