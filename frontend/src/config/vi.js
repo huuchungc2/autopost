@@ -2,6 +2,7 @@ export const POST_STATUS_LABELS = {
   draft: 'Nháp',
   pending_approval: 'Chờ duyệt',
   scheduled: 'Đã lên lịch',
+  publishing: 'Đang đăng',
   published: 'Đã đăng',
   failed: 'Lỗi',
 };

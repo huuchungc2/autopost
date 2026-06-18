@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS posts (
   video_url TEXT,
   video_thumb_url TEXT,
   media_type ENUM('none','image','video') DEFAULT 'none',
-  status ENUM('draft','pending_approval','scheduled','published','failed') DEFAULT 'draft',
+  status ENUM('draft','pending_approval','scheduled','publishing','published','failed') DEFAULT 'draft',
   scheduled_at DATETIME NULL,
   published_at DATETIME NULL,
   fb_post_id VARCHAR(100),

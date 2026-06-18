@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { CalendarClock, PenLine, Upload, Download, Trash2 } from 'lucide-react';
+import { CalendarClock, PenLine, Upload, Download, Trash2, Send } from 'lucide-react';
 
 import api from '../services/api';
 
@@ -20,6 +20,7 @@ import Badge from '../components/ui/Badge';
 import { useToast } from '../context/ToastContext';
 
 import { mediaTypeLabel, postStatusLabel } from '../config/vi';
+import { canManualPublish, manualPublishLabel } from '../utils/postActions';
 
 
 
@@ -46,6 +47,8 @@ export default function Posts() {
   const [bulkActionSaving, setBulkActionSaving] = useState(false);
 
   const [bulkStatus, setBulkStatus] = useState('');
+
+  const [publishingIds, setPublishingIds] = useState(new Set());
 
   const [selectedIds, setSelectedIds] = useState(new Set());
 
@@ -375,6 +378,16 @@ export default function Posts() {
 
   const handlePublish = async (postId) => {
 
+    if (publishingIds.has(postId)) return;
+
+    const post = posts.find((p) => p.id === postId);
+
+    const label = post ? manualPublishLabel(post) : 'Đăng';
+
+    if (!window.confirm(`${label} bài #${postId} lên Facebook ngay?`)) return;
+
+    setPublishingIds((prev) => new Set(prev).add(postId));
+
     try {
 
       await api.post(`/posts/${postId}/publish`);
@@ -386,6 +399,18 @@ export default function Posts() {
     } catch (err) {
 
       showToast(err.response?.data?.error || 'Đăng bài thất bại', 'error');
+
+    } finally {
+
+      setPublishingIds((prev) => {
+
+        const next = new Set(prev);
+
+        next.delete(postId);
+
+        return next;
+
+      });
 
     }
 
@@ -545,7 +570,7 @@ export default function Posts() {
 
           <option value="">Tất cả trạng thái</option>
 
-          {['draft', 'pending_approval', 'scheduled', 'published', 'failed'].map((s) => (
+          {['draft', 'pending_approval', 'scheduled', 'publishing', 'published', 'failed'].map((s) => (
 
             <option key={s} value={s}>{postStatusLabel(s)}</option>
 
@@ -727,6 +752,8 @@ export default function Posts() {
 
               onRefresh={loadPosts}
 
+              publishing={publishingIds.has(post.id)}
+
             />
 
           ))}
@@ -814,9 +841,22 @@ export default function Posts() {
 
                     <button type="button" className="btn-link" onClick={() => openEdit(post)}>Sửa</button>
 
-                    {post.status === 'draft' && <button type="button" className="btn-link" onClick={() => handlePublish(post.id)}>Đăng</button>}
+                    {canManualPublish(post) && (
+                      <button
+                        type="button"
+                        className="btn-link posts-publish-btn"
+                        onClick={() => handlePublish(post.id)}
+                        disabled={publishingIds.has(post.id)}
+                        title="Đăng thủ công lên Facebook"
+                      >
+                        <Send size={14} />
+                        {publishingIds.has(post.id) ? 'Đang đăng...' : manualPublishLabel(post)}
+                      </button>
+                    )}
 
-                    {post.status === 'pending_approval' && <button type="button" className="btn-link" onClick={() => handleApprove(post.id)}>Duyệt</button>}
+                    {post.status === 'pending_approval' && (
+                      <button type="button" className="btn-link" onClick={() => handleApprove(post.id)}>Duyệt</button>
+                    )}
 
                     <button type="button" className="btn-link" onClick={() => handleDelete(post.id)}>Xóa</button>
 

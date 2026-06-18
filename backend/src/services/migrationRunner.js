@@ -238,3 +238,20 @@ export async function ensureGeminiImageGenerateContent() {
 export async function ensure9RouterImageModel() {
   await runMigrationFile('013_9router_image_model.sql', 'Migration 013 applied: 9Router image model cx/gpt-5.5-image');
 }
+
+async function enumIncludesPublishingStatus() {
+  try {
+    const rows = await query(
+      `SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'posts' AND COLUMN_NAME = 'status' LIMIT 1`
+    );
+    return String(rows[0]?.COLUMN_TYPE || '').includes('publishing');
+  } catch {
+    return false;
+  }
+}
+
+export async function ensurePostsPublishingStatus() {
+  if (await enumIncludesPublishingStatus()) return;
+  await runMigrationFile('014_posts_publishing_status.sql', 'Migration 014 applied: posts.publishing status');
+}

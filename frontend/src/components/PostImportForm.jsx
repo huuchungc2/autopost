@@ -163,7 +163,7 @@ export default function PostImportForm({
         <p className="field-hint">
           File chỉ cần <strong>4 cột</strong>: <strong>noi_dung</strong>, <strong>prompt_anh</strong>,{' '}
           <strong>ngay_dang</strong>, <strong>gio_dang</strong>.
-          Prompt ảnh dùng để AI generate ảnh lên VPS khi chưa có ảnh — có thể xuất ảnh rồi đăng theo lịch.
+          Prompt ảnh dùng để AI generate ảnh lên VPS — xuất ban khuya (mặc định 23:00) hoặc khi đến giờ đăng.
           Ngày/giờ để trống nếu muốn tự chia lịch bên dưới.
         </p>
 
@@ -220,7 +220,7 @@ export default function PostImportForm({
                 onChange={(e) => setAutoGenerateImages(e.target.checked)}
               />
               <span>
-                AI tự xuất ảnh khi đến giờ đăng
+                AI tự xuất ảnh ban khuya + khi đến giờ đăng
                 {rowsWithPrompt.length > 0 ? (
                   <> cho <strong>{rowsWithPrompt.length}</strong> bài có prompt ảnh</>
                 ) : (

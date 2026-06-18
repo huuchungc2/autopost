@@ -4,30 +4,75 @@ import { processPendingJobs } from './jobWorker.js';
 import { postToFacebook } from './fbService.js';
 import { createNotification } from './notifyService.js';
 import { persistFacebookPublishIds } from './postPublishService.js';
-import { ensurePostImageForPublish } from './postImageService.js';
+import { ensurePostImageForPublish, generateImageForPost } from './postImageService.js';
 import { runDueTopicSlots } from './topicSlotService.js';
+import { claimDueScheduledPosts, recoverStuckPublishingPosts } from './publishClaimService.js';
+import { generatePendingPostImages } from './postImageService.js';
 
 let started = false;
+let publishDuePostsRunning = false;
+let runDueTopicSlotsRunning = false;
+let generatePendingImagesRunning = false;
+
+function parseAutoGenerateSchedule() {
+  const hour = Math.min(23, Math.max(0, parseInt(process.env.AUTO_GENERATE_HOUR || '23', 10) || 23));
+  const minute = Math.min(59, Math.max(0, parseInt(process.env.AUTO_GENERATE_MINUTE || '0', 10) || 0));
+  return { hour, minute, cronExpr: `${minute} ${hour} * * *` };
+}
 
 export function startScheduler() {
   if (started || process.env.DISABLE_SCHEDULER === 'true') return;
   started = true;
 
-  cron.schedule('* * * * *', publishDuePosts);
-  cron.schedule('* * * * *', runDueTopicSlots);
+  cron.schedule('* * * * *', () => runExclusive(publishDuePosts, 'publishDuePosts'));
+  cron.schedule('* * * * *', () => runExclusive(runDueTopicSlots, 'runDueTopicSlots'));
   cron.schedule('*/5 * * * *', () => processPendingJobs(5));
   cron.schedule('0 * * * *', checkTokenExpiry);
+
+  const { hour, minute, cronExpr } = parseAutoGenerateSchedule();
+  cron.schedule(cronExpr, () => runExclusive(generatePendingImages, 'generatePendingImages'));
+  console.log(`Nightly image generation scheduled at ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+
+  recoverStuckPublishingPosts().catch((error) => {
+    console.warn('recoverStuckPublishingPosts failed:', error.message);
+  });
 
   console.log('Scheduler started');
 }
 
+async function runExclusive(task, label) {
+  const flags = {
+    publishDuePosts: publishDuePostsRunning,
+    runDueTopicSlots: runDueTopicSlotsRunning,
+    generatePendingImages: generatePendingImagesRunning,
+  };
+  if (flags[label]) return;
+
+  if (label === 'publishDuePosts') publishDuePostsRunning = true;
+  else if (label === 'runDueTopicSlots') runDueTopicSlotsRunning = true;
+  else generatePendingImagesRunning = true;
+
+  try {
+    await task();
+  } catch (error) {
+    console.error(`${label} failed:`, error.message);
+  } finally {
+    if (label === 'publishDuePosts') publishDuePostsRunning = false;
+    else if (label === 'runDueTopicSlots') runDueTopicSlotsRunning = false;
+    else generatePendingImagesRunning = false;
+  }
+}
+
+async function generatePendingImages() {
+  const limit = parseInt(process.env.AUTO_GENERATE_BATCH_LIMIT || '50', 10) || 50;
+  const result = await generatePendingPostImages({ limit });
+  if (result.processed > 0) {
+    console.log(`Nightly images: ${result.ok} ok, ${result.failed} failed (${result.processed} total)`);
+  }
+}
+
 async function publishDuePosts() {
-  const posts = await query(
-    `SELECT p.*, fp.page_id AS fb_page_id, fp.page_token, fp.image_provider_id
-     FROM posts p
-     JOIN fb_pages fp ON fp.id = p.page_id
-     WHERE p.status = 'scheduled' AND p.scheduled_at <= NOW()`
-  );
+  const posts = await claimDueScheduledPosts();
 
   for (const post of posts) {
     try {

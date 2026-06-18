@@ -4,6 +4,7 @@ import { generatePostWithMedia } from './contentGenerationService.js';
 import { postToFacebook } from './fbService.js';
 import { persistFacebookPublishIds } from './postPublishService.js';
 import { createNotification } from './notifyService.js';
+import { claimTopicSlot } from './publishClaimService.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -42,12 +43,8 @@ export async function runDueTopicSlots() {
 
   for (const topic of topics) {
     try {
+      if (!(await claimTopicSlot(topic.id, today))) continue;
       await generateAndPublishTopic(topic);
-      try {
-        await query('UPDATE content_topics SET last_run_date = ? WHERE id = ?', [today, topic.id]);
-      } catch {
-        // last_run_date column may be missing on old DB
-      }
     } catch (error) {
       console.error(`Topic slot ${topic.id} failed:`, error.message);
       await createNotification({

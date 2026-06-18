@@ -2,6 +2,8 @@ import Badge from './ui/Badge';
 import { formatDateTime } from '../utils/date';
 import { mediaSrc } from '../utils/mediaUrl';
 import PostImagePromptActions from './PostImagePromptActions';
+import { canManualPublish, manualPublishLabel } from '../utils/postActions';
+import { Send } from 'lucide-react';
 
 export default function PostCard({
   post,
@@ -13,6 +15,7 @@ export default function PostCard({
   onApprove,
   onDelete,
   onRefresh,
+  publishing = false,
 }) {
   const hasPromptNoImage = post.image_prompt?.trim() && !post.image_url;
 
@@ -49,8 +52,20 @@ export default function PostCard({
         <PostImagePromptActions post={post} onGenerated={onRefresh} />
         <div className="post-card-actions">
           <button type="button" className="btn-link" onClick={() => onEdit?.(post)}>Sửa</button>
-          {post.status === 'draft' && <button type="button" className="btn-link" onClick={() => onPublish?.(post.id)}>Đăng</button>}
-          {post.status === 'pending_approval' && <button type="button" className="btn-link" onClick={() => onApprove?.(post.id)}>Duyệt</button>}
+          {canManualPublish(post) && (
+            <button
+              type="button"
+              className="btn-link posts-publish-btn"
+              onClick={() => onPublish?.(post.id)}
+              disabled={publishing}
+            >
+              <Send size={14} />
+              {publishing ? 'Đang đăng...' : manualPublishLabel(post)}
+            </button>
+          )}
+          {post.status === 'pending_approval' && (
+            <button type="button" className="btn-link" onClick={() => onApprove?.(post.id)}>Duyệt</button>
+          )}
           <button type="button" className="btn-link" onClick={() => onDelete?.(post.id)}>Xóa</button>
         </div>
       </div>

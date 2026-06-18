@@ -4,6 +4,7 @@ const variants = {
   draft: 'badge-draft',
   pending_approval: 'badge-pending',
   scheduled: 'badge-scheduled',
+  publishing: 'badge-pending',
   published: 'badge-published',
   failed: 'badge-failed',
   default: 'badge-default',

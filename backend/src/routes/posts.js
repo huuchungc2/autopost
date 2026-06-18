@@ -4,11 +4,10 @@ import crypto from 'crypto';
 import { query } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { generatePostWithMedia } from '../services/contentGenerationService.js';
-import { generateImage } from '../services/imageService.js';
-import { getPageGenerationConfig, getProviderById } from '../services/providerService.js';
+import { getPageGenerationConfig } from '../services/providerService.js';
 import { postToFacebook } from '../services/fbService.js';
 import { persistFacebookPublishIds } from '../services/postPublishService.js';
-import { ensurePostImageForPublish } from '../services/postImageService.js';
+import { ensurePostImageForPublish, generateImageForPost } from '../services/postImageService.js';
 import { createNotification } from '../services/notifyService.js';
 import {
   getAccessiblePageIds,
@@ -634,34 +633,57 @@ router.post('/', asyncHandler(async (req, res) => {
 router.post('/:id/publish', asyncHandler(async (req, res) => {
   const post = await assertPostAccess(req.user, req.params.id);
 
+  if (post.status === 'published') {
+    return res.status(409).json({ error: 'Bài đã được đăng' });
+  }
+  if (post.status === 'publishing') {
+    return res.status(409).json({ error: 'Bài đang được đăng tự động' });
+  }
+
+  const claim = await query(
+    `UPDATE posts SET status = 'publishing' WHERE id = ? AND status IN ('draft', 'pending_approval', 'scheduled', 'failed')`,
+    [req.params.id]
+  );
+  if (!claim.affectedRows) {
+    return res.status(409).json({ error: 'Không thể đăng bài ở trạng thái hiện tại' });
+  }
+
   const pages = await query('SELECT page_id, page_token, image_provider_id FROM fb_pages WHERE id = ?', [post.page_id]);
   const page = pages[0];
-  if (!page) return res.status(404).json({ error: 'Page not found' });
+  if (!page) {
+    await query('UPDATE posts SET status = ? WHERE id = ?', ['failed', req.params.id]);
+    return res.status(404).json({ error: 'Page not found' });
+  }
 
-  const readyPost = await ensurePostImageForPublish(post, page.image_provider_id);
+  try {
+    const readyPost = await ensurePostImageForPublish(post, page.image_provider_id);
 
-  const response = await postToFacebook({
-    pageId: page.page_id,
-    pageToken: page.page_token,
-    message: readyPost.content,
-    imageUrl: readyPost.media_type === 'image' ? readyPost.image_url : null,
-    videoUrl: readyPost.media_type === 'video' ? readyPost.video_url : null,
-    scheduledPublishTime: readyPost.scheduled_at,
-    published: !readyPost.scheduled_at || new Date(readyPost.scheduled_at) <= new Date(),
-  });
+    const response = await postToFacebook({
+      pageId: page.page_id,
+      pageToken: page.page_token,
+      message: readyPost.content,
+      imageUrl: readyPost.media_type === 'image' ? readyPost.image_url : null,
+      videoUrl: readyPost.media_type === 'video' ? readyPost.video_url : null,
+      scheduledPublishTime: readyPost.scheduled_at,
+      published: !readyPost.scheduled_at || new Date(readyPost.scheduled_at) <= new Date(),
+    });
 
-  const fbIds = await persistFacebookPublishIds(req.params.id, response, {
-    hasImage: readyPost.media_type === 'image',
-    hasVideo: readyPost.media_type === 'video',
-  });
-  const newStatus = post.scheduled_at && new Date(post.scheduled_at) > new Date() ? 'scheduled' : 'published';
-  await query(
-    'UPDATE posts SET status = ?, published_at = IF(? = "published", NOW(), published_at) WHERE id = ?',
-    [newStatus, newStatus, req.params.id]
-  );
-  await createNotification({ type: 'success', title: 'Post published', message: `Post ${req.params.id} was published.`, relatedType: 'post', relatedId: req.params.id });
+    const fbIds = await persistFacebookPublishIds(req.params.id, response, {
+      hasImage: readyPost.media_type === 'image',
+      hasVideo: readyPost.media_type === 'video',
+    });
+    const newStatus = post.scheduled_at && new Date(post.scheduled_at) > new Date() ? 'scheduled' : 'published';
+    await query(
+      'UPDATE posts SET status = ?, published_at = IF(? = "published", NOW(), published_at) WHERE id = ?',
+      [newStatus, newStatus, req.params.id]
+    );
+    await createNotification({ type: 'success', title: 'Post published', message: `Post ${req.params.id} was published.`, relatedType: 'post', relatedId: req.params.id });
 
-  res.json({ message: 'Post published', ...fbIds, status: newStatus });
+    res.json({ message: 'Post published', ...fbIds, status: newStatus });
+  } catch (error) {
+    await query('UPDATE posts SET status = ?, error_message = ? WHERE id = ?', ['failed', error.message, req.params.id]);
+    throw error;
+  }
 }));
 
 router.post('/:id/schedule', asyncHandler(async (req, res) => {
@@ -792,7 +814,10 @@ router.put('/:id', asyncHandler(async (req, res) => {
 
 router.post('/:id/generate-image', asyncHandler(async (req, res) => {
   await assertPostAccess(req.user, req.params.id);
-  const rows = await query('SELECT page_id, image_prompt, save_image_local FROM posts WHERE id = ?', [req.params.id]);
+  const rows = await query(
+    'SELECT id, page_id, image_url, image_prompt, save_image_local FROM posts WHERE id = ?',
+    [req.params.id]
+  );
   const post = rows[0];
   if (!post) return res.status(404).json({ error: 'Post not found' });
 
@@ -802,28 +827,21 @@ router.post('/:id/generate-image', asyncHandler(async (req, res) => {
   }
 
   const pages = await query('SELECT image_provider_id FROM fb_pages WHERE id = ?', [post.page_id]);
-  const imageProvider = await getProviderById(pages[0]?.image_provider_id);
-  if (!imageProvider) {
-    return res.status(400).json({ error: 'Fanpage chưa cấu hình AI provider ảnh' });
-  }
+  const postForGenerate = {
+    ...post,
+    image_prompt: prompt,
+    save_image_local: req.body?.save_image_local != null
+      ? parseBoolDefaultTrue(req.body.save_image_local)
+      : post.save_image_local,
+  };
 
-  const persist = req.body?.save_image_local != null
-    ? parseBoolDefaultTrue(req.body.save_image_local)
-    : post.save_image_local !== 0 && post.save_image_local !== false;
-
-  const imageResult = await generateImage(prompt, imageProvider, { persist });
-
-  if (persist) {
-    await query(
-      'UPDATE posts SET image_url = ?, image_prompt = ?, media_type = ? WHERE id = ?',
-      [imageResult.image_url, imageResult.image_prompt || prompt, 'image', req.params.id]
-    );
-  }
+  const updated = await generateImageForPost(postForGenerate, pages[0]?.image_provider_id);
+  const persist = postForGenerate.save_image_local !== 0 && postForGenerate.save_image_local !== false;
 
   res.json({
     message: persist ? 'Đã xuất ảnh từ prompt' : 'Đã tạo ảnh AI (chưa lưu VPS — dùng khi đăng)',
-    image_url: imageResult.image_url,
-    image_prompt: imageResult.image_prompt || prompt,
+    image_url: updated.image_url,
+    image_prompt: updated.image_prompt,
     media_type: 'image',
     saved: persist,
   });
