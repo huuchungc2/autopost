@@ -1,4 +1,4 @@
--- Lịch xuất ảnh theo từng admin (chỉ fanpage được gán cho user đó)
+-- Nâng cấp bảng lịch cũ (cột id) → theo user_id (chỉ chạy nếu DB cũ dùng schema singleton)
 DROP TABLE IF EXISTS image_schedule_settings;
 
 CREATE TABLE image_schedule_settings (

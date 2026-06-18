@@ -257,27 +257,49 @@ export async function ensurePostsPublishingStatus() {
 }
 
 export async function ensureImageScheduleDb() {
-  if (await columnExists('image_schedule_settings', 'user_id')) return;
-  await runMigrationFile('015_image_schedule_db.sql', 'Migration 015 applied: image schedule DB + job logs');
-}
-
-export async function ensureImageSchedulePerUser() {
-  if (!(await tableExists('image_schedule_settings'))) {
-    await runMigrationFile('015_image_schedule_db.sql', 'Migration 015 applied: image schedule DB + job logs');
-  }
-  if (await columnExists('image_schedule_settings', 'user_id')) {
-    if (!(await columnExists('image_generate_logs', 'schedule_user_id'))) {
+  if (await tableExists('image_schedule_settings')) {
+    if (!(await columnExists('posts', 'image_job_status'))) {
       try {
         await query(
-          `ALTER TABLE image_generate_logs
-           ADD COLUMN schedule_user_id INT NULL AFTER post_id,
-           ADD INDEX idx_image_generate_logs_schedule_user (schedule_user_id)`
+          `ALTER TABLE posts ADD COLUMN image_job_status ENUM('pending','processing','done','failed') NULL DEFAULT NULL AFTER auto_generate_image`
         );
       } catch (error) {
         if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
       }
     }
+    if (!(await tableExists('image_generate_logs'))) {
+      await runMigrationFile('015_image_schedule_db.sql', 'Migration 015 applied: image schedule DB + job logs');
+    }
     return;
   }
-  await runMigrationFile('016_image_schedule_per_user.sql', 'Migration 016 applied: image schedule per admin');
+  await runMigrationFile('015_image_schedule_db.sql', 'Migration 015 applied: image schedule DB + job logs');
+}
+
+async function scheduleSettingsUsesLegacyIdColumn() {
+  if (!(await tableExists('image_schedule_settings'))) return false;
+  return await columnExists('image_schedule_settings', 'id');
+}
+
+export async function ensureImageSchedulePerUser() {
+  if (!(await tableExists('image_schedule_settings'))) {
+    await runMigrationFile('015_image_schedule_db.sql', 'Migration 015 applied: image schedule DB + job logs');
+    return;
+  }
+
+  if (await scheduleSettingsUsesLegacyIdColumn()) {
+    await runMigrationFile('016_image_schedule_per_user.sql', 'Migration 016 applied: image schedule per admin');
+    return;
+  }
+
+  if (!(await columnExists('image_generate_logs', 'schedule_user_id'))) {
+    try {
+      await query(
+        `ALTER TABLE image_generate_logs
+         ADD COLUMN schedule_user_id INT NULL AFTER post_id,
+         ADD INDEX idx_image_generate_logs_schedule_user (schedule_user_id)`
+      );
+    } catch (error) {
+      if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
+    }
+  }
 }
