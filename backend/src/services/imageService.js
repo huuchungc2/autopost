@@ -10,7 +10,7 @@ const DEFAULT_IMAGE_ENDPOINTS = {
 };
 
 const GEMINI_IMAGE_DEFAULT_MODEL = 'gemini-2.5-flash-image-preview';
-const IMAGE_REQUEST_TIMEOUT_MS = 120000;
+const IMAGE_REQUEST_TIMEOUT_MS = 180000;
 
 function wrapImageError(error, fallback = 'Xuất ảnh AI thất bại') {
   const upstream = error?.response?.data;
@@ -98,6 +98,23 @@ async function generateGeminiImage({ apiKey, model, prompt, endpoint, persist = 
   return { image_url: imageUrl, image_prompt: prompt };
 }
 
+function parseOpenAiImageItem(item) {
+  if (!item) return null;
+
+  if (item.b64_json) {
+    const mimeType = 'image/png';
+    const ext = 'png';
+    const buffer = Buffer.from(item.b64_json, 'base64');
+    return { buffer, ext, mimeType, dataUrl: `data:${mimeType};base64,${item.b64_json}` };
+  }
+
+  if (item.url) {
+    return { remoteUrl: item.url };
+  }
+
+  return null;
+}
+
 async function generateDalle({ apiKey, model, prompt, endpoint, persist = true }) {
   const url = endpoint || DEFAULT_IMAGE_ENDPOINTS.openai;
   const response = await axios.post(
@@ -108,7 +125,24 @@ async function generateDalle({ apiKey, model, prompt, endpoint, persist = true }
       timeout: IMAGE_REQUEST_TIMEOUT_MS,
     }
   );
-  const remoteUrl = response.data.data[0].url;
+
+  const parsed = parseOpenAiImageItem(response.data?.data?.[0]);
+  if (!parsed) {
+    throw new Error('OpenAI image API không trả về url hoặc b64_json');
+  }
+
+  if (parsed.dataUrl) {
+    if (!persist) {
+      return { image_url: parsed.dataUrl, image_prompt: prompt, ephemeral: true };
+    }
+    const imageUrl = await storeImageBuffer(parsed.buffer, {
+      ext: parsed.ext,
+      mimeType: parsed.mimeType,
+    });
+    return { image_url: imageUrl, image_prompt: prompt };
+  }
+
+  const remoteUrl = parsed.remoteUrl;
   if (!persist) {
     return { image_url: remoteUrl, image_prompt: prompt, ephemeral: true };
   }
