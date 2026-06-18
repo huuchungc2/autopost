@@ -1,9 +1,15 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
 import { getStorageUsage } from '../services/storageService.js';
 import { getMediaStorageMode, isUsingGoogleDrive } from '../services/mediaStorage.js';
+import {
+  getImageScheduleConfig,
+  saveImageScheduleConfig,
+  getImageGenerateLogs,
+} from '../services/imageScheduleConfig.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,11 +18,14 @@ const publicRoot = path.resolve(__dirname, '../../../public');
 const router = express.Router();
 router.use(authenticate);
 
-router.get('/', (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const maxImagesMb = parseInt(process.env.MAX_IMAGES_MB || '500', 10);
   const maxVideosMb = parseInt(process.env.MAX_VIDEOS_MB || '5000', 10);
   const images = getStorageUsage(path.join(publicRoot, 'images'), maxImagesMb);
   const videos = getStorageUsage(path.join(publicRoot, 'videos'), maxVideosMb);
+  const imageSchedule = ['super_admin', 'admin'].includes(req.user.role)
+    ? await getImageScheduleConfig(req.user.id)
+    : null;
 
   res.json({
     storage: {
@@ -28,11 +37,41 @@ router.get('/', (req, res) => {
     config: {
       max_images_mb: maxImagesMb,
       max_videos_mb: maxVideosMb,
-      auto_generate_hour: process.env.AUTO_GENERATE_HOUR || '23',
-      auto_generate_minute: process.env.AUTO_GENERATE_MINUTE || '0',
       scheduler_enabled: process.env.DISABLE_SCHEDULER !== 'true',
+      image_schedule: imageSchedule,
     },
   });
-});
+}));
+
+router.put('/image-schedule', requireRole('super_admin', 'admin'), asyncHandler(async (req, res) => {
+  const {
+    enabled,
+    start_hour,
+    start_minute,
+    end_hour,
+    end_minute,
+    interval_minutes,
+  } = req.body || {};
+
+  const updated = await saveImageScheduleConfig(req.user.id, {
+    enabled,
+    start_hour,
+    start_minute,
+    end_hour,
+    end_minute,
+    interval_minutes,
+  });
+
+  res.json({
+    message: 'Đã lưu lịch xuất ảnh (chỉ fanpage được gán cho bạn)',
+    image_schedule: updated,
+  });
+}));
+
+router.get('/image-schedule/logs', requireRole('super_admin', 'admin'), asyncHandler(async (req, res) => {
+  const limit = parseInt(req.query.limit || '50', 10);
+  const logs = await getImageGenerateLogs(req.user.id, limit);
+  res.json({ logs });
+}));
 
 export default router;

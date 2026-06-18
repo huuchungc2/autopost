@@ -283,6 +283,43 @@ button {
   text-decoration: none;
 }
 
+.settings-schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.settings-schedule-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.875rem;
+}
+
+.settings-schedule-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--bg-secondary, #f8fafc);
+}
+
+.settings-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.settings-toggle {
+  margin: 0;
+  white-space: nowrap;
+}
+
 .posts-publish-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;

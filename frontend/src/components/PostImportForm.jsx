@@ -220,7 +220,7 @@ export default function PostImportForm({
                 onChange={(e) => setAutoGenerateImages(e.target.checked)}
               />
               <span>
-                AI tự xuất ảnh ban khuya + khi đến giờ đăng
+                AI tự xuất ảnh theo lịch ban đêm (Cài đặt → Lịch xuất ảnh) + khi đến giờ đăng
                 {rowsWithPrompt.length > 0 ? (
                   <> cho <strong>{rowsWithPrompt.length}</strong> bài có prompt ảnh</>
                 ) : (

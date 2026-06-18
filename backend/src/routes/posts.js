@@ -7,7 +7,8 @@ import { generatePostWithMedia } from '../services/contentGenerationService.js';
 import { getPageGenerationConfig } from '../services/providerService.js';
 import { postToFacebook } from '../services/fbService.js';
 import { persistFacebookPublishIds } from '../services/postPublishService.js';
-import { ensurePostImageForPublish, generateImageForPost } from '../services/postImageService.js';
+import { ensurePostImageForPublish } from '../services/postImageService.js';
+import { runImageJobForPostId } from '../services/imageGenerateJobService.js';
 import { createNotification } from '../services/notifyService.js';
 import {
   getAccessiblePageIds,
@@ -376,9 +377,10 @@ router.post('/import', importUpload.single('file'), asyncHandler(async (req, res
   for (const row of rows) {
     await assertPageAccess(req.user, row.page_id);
     const autoGenerateImage = autoGenerateImages && Boolean(String(row.image_prompt || '').trim());
+    const imageJobStatus = autoGenerateImage ? 'pending' : null;
     const result = await query(
-      `INSERT INTO posts (page_id, topic, content, image_url, image_prompt, auto_generate_image, save_image_local, video_prompt, video_url, video_thumb_url, media_type, status, scheduled_at, created_by_type, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, NOW())`,
+      `INSERT INTO posts (page_id, topic, content, image_url, image_prompt, auto_generate_image, image_job_status, save_image_local, video_prompt, video_url, video_thumb_url, media_type, status, scheduled_at, created_by_type, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, NOW())`,
       [
         row.page_id,
         row.topic,
@@ -386,6 +388,7 @@ router.post('/import', importUpload.single('file'), asyncHandler(async (req, res
         row.image_url,
         row.image_prompt,
         autoGenerateImage,
+        imageJobStatus,
         autoGenerateImage ? saveImageLocal : true,
         row.video_prompt,
         row.video_url,
@@ -815,7 +818,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
 router.post('/:id/generate-image', asyncHandler(async (req, res) => {
   await assertPostAccess(req.user, req.params.id);
   const rows = await query(
-    'SELECT id, page_id, image_url, image_prompt, save_image_local FROM posts WHERE id = ?',
+    'SELECT id, page_id, image_url, image_prompt, save_image_local, image_job_status FROM posts WHERE id = ?',
     [req.params.id]
   );
   const post = rows[0];
@@ -826,23 +829,34 @@ router.post('/:id/generate-image', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Bài chưa có prompt ảnh. Thêm prompt trước khi xuất ảnh.' });
   }
 
-  const pages = await query('SELECT image_provider_id FROM fb_pages WHERE id = ?', [post.page_id]);
-  const postForGenerate = {
-    ...post,
-    image_prompt: prompt,
-    save_image_local: req.body?.save_image_local != null
-      ? parseBoolDefaultTrue(req.body.save_image_local)
-      : post.save_image_local,
-  };
+  if (req.body?.prompt && req.body.prompt !== post.image_prompt) {
+    await query('UPDATE posts SET image_prompt = ? WHERE id = ?', [prompt, req.params.id]);
+  }
 
-  const updated = await generateImageForPost(postForGenerate, pages[0]?.image_provider_id);
-  const persist = postForGenerate.save_image_local !== 0 && postForGenerate.save_image_local !== false;
+  if (req.body?.save_image_local != null) {
+    await query('UPDATE posts SET save_image_local = ? WHERE id = ?', [
+      parseBoolDefaultTrue(req.body.save_image_local) ? 1 : 0,
+      req.params.id,
+    ]);
+  }
+
+  const result = await runImageJobForPostId(req.params.id, { source: 'manual' });
+  if (result.skipped && post.image_url) {
+    return res.json({ message: 'Bài đã có ảnh', image_url: post.image_url });
+  }
+  if (result.error) {
+    return res.status(400).json({ error: result.error });
+  }
+
+  const updated = result.post || (await query('SELECT * FROM posts WHERE id = ?', [req.params.id]))[0];
+  const persist = updated.save_image_local !== 0 && updated.save_image_local !== false;
 
   res.json({
     message: persist ? 'Đã xuất ảnh từ prompt' : 'Đã tạo ảnh AI (chưa lưu VPS — dùng khi đăng)',
     image_url: updated.image_url,
     image_prompt: updated.image_prompt,
     media_type: 'image',
+    image_job_status: updated.image_job_status,
     saved: persist,
   });
 }));
