@@ -2,6 +2,7 @@ import Badge from './ui/Badge';
 import { formatDateTime } from '../utils/date';
 import { mediaSrc } from '../utils/mediaUrl';
 import PostImagePromptActions from './PostImagePromptActions';
+import PostErrorDetail from './PostErrorDetail';
 import { canManualPublish, manualPublishLabel } from '../utils/postActions';
 import { Send } from 'lucide-react';
 
@@ -46,6 +47,7 @@ export default function PostCard({
           <Badge status={post.status} />
           <span>{pageName}</span>
         </div>
+        <PostErrorDetail post={post} />
         <h4>{post.topic || `Bài #${post.id}`}</h4>
         <p>{post.content?.slice(0, 120)}{post.content?.length > 120 ? '...' : ''}</p>
         {post.scheduled_at && <small>Lên lịch: {formatDateTime(post.scheduled_at)}</small>}

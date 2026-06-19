@@ -6,6 +6,16 @@ import { useToast } from '../context/ToastContext';
 import { useAuth } from '../services/authContext';
 import { skillTypeLabel } from '../config/vi';
 import Skeleton from '../components/ui/Skeleton';
+import ImageScheduleFields from '../components/ImageScheduleFields';
+
+const defaultImageSchedule = () => ({
+  enabled: false,
+  start_hour: 1,
+  start_minute: 0,
+  end_hour: 5,
+  end_minute: 0,
+  interval_minutes: 10,
+});
 
 const initialForm = {
   name: '',
@@ -17,6 +27,7 @@ const initialForm = {
   image_provider_id: '',
   is_active: true,
   assign_user_ids: [],
+  image_schedule: defaultImageSchedule(),
 };
 
 export default function PageForm() {
@@ -79,6 +90,16 @@ export default function PageForm() {
           assign_user_ids: Array.isArray(page.assigned_user_ids)
             ? page.assigned_user_ids.map(Number).filter(Boolean)
             : [],
+          image_schedule: page.image_schedule
+            ? {
+              enabled: !!page.image_schedule.enabled,
+              start_hour: page.image_schedule.start_hour ?? 1,
+              start_minute: page.image_schedule.start_minute ?? 0,
+              end_hour: page.image_schedule.end_hour ?? 5,
+              end_minute: page.image_schedule.end_minute ?? 0,
+              interval_minutes: page.image_schedule.interval_minutes ?? 10,
+            }
+            : defaultImageSchedule(),
         });
       })
       .catch((err) => {
@@ -127,6 +148,13 @@ export default function PageForm() {
     }
   };
 
+  const handleScheduleChange = (field, value) => {
+    setForm((prev) => ({
+      ...prev,
+      image_schedule: { ...prev.image_schedule, [field]: value },
+    }));
+  };
+
   const buildPayload = () => {
     const payload = {
       name: form.name.trim(),
@@ -135,6 +163,7 @@ export default function PageForm() {
       text_provider_id: form.text_provider_id ? Number(form.text_provider_id) : null,
       image_provider_id: form.image_provider_id ? Number(form.image_provider_id) : null,
       is_active: form.is_active,
+      image_schedule: form.image_schedule,
     };
     if (!isEdit) {
       payload.page_id = form.page_id.trim();
@@ -217,7 +246,7 @@ export default function PageForm() {
         </button>
         <div>
           <h1>{isEdit ? 'Sửa fanpage' : 'Thêm fanpage mới'}</h1>
-          <p>{isEdit ? 'Cập nhật thông tin, skill và provider cho fanpage.' : 'Kết nối fanpage Facebook với token và cấu hình AI.'}</p>
+          <p>{isEdit ? 'Cập nhật thông tin, skill, provider và lịch xuất ảnh cho fanpage.' : 'Kết nối fanpage Facebook với token và cấu hình AI.'}</p>
         </div>
       </div>
 
@@ -326,27 +355,43 @@ export default function PageForm() {
             )}
           </div>
 
+          <ImageScheduleFields
+            value={form.image_schedule}
+            onChange={handleScheduleChange}
+            warn={
+              form.image_schedule?.enabled && !form.image_provider_id
+                ? 'Cần chọn Image Provider phía trên — nếu không job xuất ảnh sẽ lỗi.'
+                : null
+            }
+          />
+
           <label className="checkbox-field field-span-2">
             <input type="checkbox" checked={form.is_active} onChange={(e) => handleChange('is_active', e.target.checked)} />
             Fanpage đang hoạt động
           </label>
 
-          {isSuperAdmin && assignableUsers.length > 0 && (
+          {isSuperAdmin && (
             <div className="field-span-2">
               <span className="field-label">Gán cho admin/biên tập</span>
-              <p className="field-hint">Chọn user sẽ thấy fanpage này.</p>
-              <div className="page-assign-grid">
-                {assignableUsers.map((u) => (
-                  <label key={u.id} className="checkbox-label page-assign-item">
-                    <input
-                      type="checkbox"
-                      checked={form.assign_user_ids.includes(Number(u.id))}
-                      onChange={() => toggleAssignUser(u.id)}
-                    />
-                    {u.name} <small>({u.role})</small>
-                  </label>
-                ))}
-              </div>
+              <p className="field-hint">Chọn user sẽ thấy và quản lý fanpage này (ngoài lịch xuất ảnh riêng ở trên).</p>
+              {assignableUsers.length > 0 ? (
+                <div className="page-assign-grid">
+                  {assignableUsers.map((u) => (
+                    <label key={u.id} className="checkbox-label page-assign-item">
+                      <input
+                        type="checkbox"
+                        checked={form.assign_user_ids.includes(Number(u.id))}
+                        onChange={() => toggleAssignUser(u.id)}
+                      />
+                      {u.name} <small>({u.role})</small>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="field-hint field-hint--warn">
+                  Chưa có admin/biên tập — tạo user tại <Link to="/users">Người dùng</Link> trước.
+                </p>
+              )}
             </div>
           )}
         </div>

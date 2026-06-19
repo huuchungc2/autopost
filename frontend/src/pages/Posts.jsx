@@ -9,6 +9,7 @@ import api from '../services/api';
 import { formatDateTime } from '../utils/date';
 
 import PostCard from '../components/PostCard';
+import PostErrorDetail from '../components/PostErrorDetail';
 import PostImagePromptActions from '../components/PostImagePromptActions';
 
 import { downloadImportTemplate } from '../utils/postImportExport';
@@ -398,7 +399,9 @@ export default function Posts() {
 
     } catch (err) {
 
-      showToast(err.response?.data?.error || 'Đăng bài thất bại', 'error');
+      const msg = err.response?.data?.error || 'Đăng bài thất bại';
+      showToast(`${msg} — bấm dòng lỗi đỏ để xem chi tiết`, 'error');
+      loadPosts();
 
     } finally {
 
@@ -788,7 +791,7 @@ export default function Posts() {
 
                 </th>
 
-                <th>ID</th><th>Fanpage</th><th>Chủ đề</th><th>Trạng thái</th><th>Lên lịch</th><th>Facebook</th><th>Prompt ảnh</th><th>Thao tác</th>
+                <th>ID</th><th>Fanpage</th><th>Chủ đề</th><th>Trạng thái</th><th>Lỗi</th><th>Lên lịch</th><th>Facebook</th><th>Prompt ảnh</th><th>Thao tác</th>
 
               </tr>
 
@@ -821,6 +824,11 @@ export default function Posts() {
                   <td>{post.topic || '—'}</td>
 
                   <td><Badge status={post.status} /></td>
+
+                  <td className="post-error-cell">
+                    <PostErrorDetail post={post} compact />
+                    {!post.error_message && post.status !== 'failed' && post.image_job_status !== 'failed' ? '—' : null}
+                  </td>
 
                   <td>{post.scheduled_at ? formatDateTime(post.scheduled_at) : '—'}</td>
 

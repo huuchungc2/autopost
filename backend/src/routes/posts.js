@@ -661,14 +661,14 @@ router.post('/:id/publish', asyncHandler(async (req, res) => {
   try {
     const readyPost = await ensurePostImageForPublish(post, page.image_provider_id);
 
+    // Đăng thủ công = đăng ngay; không gửi scheduled_at cũ (cron lên lịch xử lý riêng).
     const response = await postToFacebook({
       pageId: page.page_id,
       pageToken: page.page_token,
       message: readyPost.content,
       imageUrl: readyPost.media_type === 'image' ? readyPost.image_url : null,
       videoUrl: readyPost.media_type === 'video' ? readyPost.video_url : null,
-      scheduledPublishTime: readyPost.scheduled_at,
-      published: !readyPost.scheduled_at || new Date(readyPost.scheduled_at) <= new Date(),
+      published: true,
     });
 
     const fbIds = await persistFacebookPublishIds(req.params.id, response, {
@@ -677,7 +677,7 @@ router.post('/:id/publish', asyncHandler(async (req, res) => {
     });
     const newStatus = post.scheduled_at && new Date(post.scheduled_at) > new Date() ? 'scheduled' : 'published';
     await query(
-      'UPDATE posts SET status = ?, published_at = IF(? = "published", NOW(), published_at) WHERE id = ?',
+      'UPDATE posts SET status = ?, published_at = IF(? = "published", NOW(), published_at), error_message = NULL WHERE id = ?',
       [newStatus, newStatus, req.params.id]
     );
     await createNotification({ type: 'success', title: 'Post published', message: `Post ${req.params.id} was published.`, relatedType: 'post', relatedId: req.params.id });

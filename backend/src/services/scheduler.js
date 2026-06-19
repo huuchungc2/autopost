@@ -10,9 +10,15 @@ import { claimDueScheduledPosts, recoverStuckPublishingPosts } from './publishCl
 import { runNextScheduledImageJob } from './imageGenerateJobService.js';
 import { getAssignedPageIds } from './pageAccessService.js';
 import {
+  getEnabledPageImageSchedules,
+  filterPagesWithoutOwnSchedule,
+  touchPageImageScheduleLastRun,
+  isPageScheduleDue,
+  pageScheduleWindowConfig,
+} from './pageImageSchedule.js';
+import {
   getEnabledImageSchedules,
   isWithinImageWindow,
-  formatScheduleTime,
   getZonedNow,
   touchImageScheduleLastRun,
 } from './imageScheduleConfig.js';
@@ -22,6 +28,7 @@ let publishDuePostsRunning = false;
 let runDueTopicSlotsRunning = false;
 let tickImageScheduleRunning = false;
 const nightlyStatsByUser = new Map();
+const nightlyStatsByPage = new Map();
 
 export function startScheduler() {
   if (started || process.env.DISABLE_SCHEDULER === 'true') return;
@@ -35,6 +42,9 @@ export function startScheduler() {
 
   getEnabledImageSchedules().then((rows) => {
     console.log(`Image schedule: ${rows.length} admin đang bật lịch (mỗi admin chỉ fanpage được gán)`);
+  }).catch(() => {});
+  getEnabledPageImageSchedules().then((rows) => {
+    console.log(`Page image schedule: ${rows.length} fanpage đang bật lịch riêng`);
   }).catch(() => {});
 
   recoverStuckPublishingPosts().catch((error) => {
@@ -78,6 +88,10 @@ function windowKey(zonedNow, config) {
   return `${config.user_id}-${zonedNow.dateKey}-${config.start_hour}:${config.start_minute}`;
 }
 
+function pageWindowKey(zonedNow, pageId, config) {
+  return `page-${pageId}-${zonedNow.dateKey}-${config.start_hour}:${config.start_minute}`;
+}
+
 async function flushNightlyStats(userId, userName, stats) {
   if (!stats || (stats.ok <= 0 && stats.failed <= 0)) return;
   await createNotification({
@@ -90,7 +104,74 @@ async function flushNightlyStats(userId, userName, stats) {
   });
 }
 
+async function flushPageNightlyStats(pageId, pageName, stats) {
+  if (!stats || (stats.ok <= 0 && stats.failed <= 0)) return;
+  await createNotification({
+    type: stats.failed > 0 ? 'warning' : 'success',
+    title: 'Xuất ảnh theo lịch fanpage',
+    message: stats.failed > 0
+      ? `${pageName}: ${stats.ok} ảnh OK — ${stats.failed} job hủy (lỗi)`
+      : `${pageName}: đã xuất ${stats.ok} ảnh ban đêm`,
+    relatedType: 'page',
+    relatedId: pageId,
+  });
+}
+
+async function tickPageImageSchedules(zonedNow) {
+  const pages = await getEnabledPageImageSchedules();
+  const activePageIds = new Set();
+
+  for (const page of pages) {
+    const config = pageScheduleWindowConfig(page);
+    const key = pageWindowKey(zonedNow, page.id, config);
+
+    if (!isWithinImageWindow(config, zonedNow)) {
+      const prev = nightlyStatsByPage.get(page.id);
+      if (prev?.lastWindowKey && prev.lastWindowKey !== key) {
+        await flushPageNightlyStats(page.id, page.name, prev);
+        nightlyStatsByPage.delete(page.id);
+      }
+      continue;
+    }
+
+    activePageIds.add(page.id);
+
+    if (!nightlyStatsByPage.has(page.id)) {
+      nightlyStatsByPage.set(page.id, { ok: 0, failed: 0, lastWindowKey: key });
+    }
+    const stats = nightlyStatsByPage.get(page.id);
+    if (stats.lastWindowKey !== key) {
+      await flushPageNightlyStats(page.id, page.name, stats);
+      nightlyStatsByPage.set(page.id, { ok: 0, failed: 0, lastWindowKey: key });
+    }
+
+    if (!isPageScheduleDue(page, zonedNow)) continue;
+
+    const result = await runNextScheduledImageJob([page.id], null);
+    if (!result.processed) continue;
+
+    await touchPageImageScheduleLastRun(page.id);
+    stats.ok += result.ok || 0;
+    stats.failed += result.failed || 0;
+
+    if (result.ok) {
+      console.log(`Page image schedule #${page.id} (${page.name}): +1 ảnh`);
+    }
+  }
+
+  for (const [pageId, stats] of nightlyStatsByPage.entries()) {
+    if (!activePageIds.has(pageId) && stats.lastWindowKey) {
+      const rows = await query('SELECT name FROM fb_pages WHERE id = ?', [pageId]);
+      await flushPageNightlyStats(pageId, rows[0]?.name || `Page #${pageId}`, stats);
+      nightlyStatsByPage.delete(pageId);
+    }
+  }
+}
+
 async function tickImageSchedule() {
+  const zonedNow = getZonedNow();
+  await tickPageImageSchedules(zonedNow);
+
   const schedules = await getEnabledImageSchedules();
   const activeUserIds = new Set();
 
@@ -107,7 +188,6 @@ async function tickImageSchedule() {
       last_run_at: schedule.last_run_at,
     };
 
-    const zonedNow = getZonedNow(config.timezone);
     const key = windowKey(zonedNow, config);
 
     if (!isWithinImageWindow(config, zonedNow)) {
@@ -135,7 +215,7 @@ async function tickImageSchedule() {
       if (elapsed < schedule.interval_minutes * 60 * 1000) continue;
     }
 
-    const pageIds = await getAssignedPageIds(schedule.user_id);
+    const pageIds = await filterPagesWithoutOwnSchedule(await getAssignedPageIds(schedule.user_id));
     if (!pageIds.length) continue;
 
     const result = await runNextScheduledImageJob(pageIds, schedule.user_id);
@@ -181,7 +261,10 @@ async function publishDuePosts() {
         hasImage: readyPost.media_type === 'image',
         hasVideo: readyPost.media_type === 'video',
       });
-      await query('UPDATE posts SET status = ?, published_at = NOW() WHERE id = ?', ['published', post.id]);
+      await query(
+        'UPDATE posts SET status = ?, published_at = NOW(), error_message = NULL WHERE id = ?',
+        ['published', post.id]
+      );
       await createNotification({ type: 'success', title: 'Auto-published', message: `Post #${post.id} published`, relatedType: 'post', relatedId: post.id });
     } catch (error) {
       await query('UPDATE posts SET status = ?, error_message = ? WHERE id = ?', ['failed', error.message, post.id]);

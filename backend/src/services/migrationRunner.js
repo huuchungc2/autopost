@@ -303,3 +303,8 @@ export async function ensureImageSchedulePerUser() {
     }
   }
 }
+
+export async function ensurePageImageSchedule() {
+  if (await columnExists('fb_pages', 'image_schedule_enabled')) return;
+  await runMigrationFile('017_page_image_schedule.sql', 'Migration 017 applied: page image schedule columns');
+}

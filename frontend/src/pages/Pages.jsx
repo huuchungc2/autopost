@@ -49,8 +49,8 @@ export default function Pages() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Fanpage</h1>
           <p className="mt-1 text-sm text-slate-600">
             {isSuperAdmin
-              ? 'Quản lý tất cả fanpage — gán cho admin khi tạo mới / khi sửa.'
-              : 'Fanpage được gán — admin có thể thêm fanpage mới.'}
+              ? 'Quản lý tất cả fanpage — Sửa fanpage để bật lịch xuất ảnh và gán admin.'
+              : 'Fanpage được gán — Sửa fanpage để bật lịch xuất ảnh ban đêm.'}
           </p>
         </div>
         {canManagePages && (

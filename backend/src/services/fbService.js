@@ -5,6 +5,16 @@ import { resolveImageForPublish, resolveLocalImagePath } from './mediaStorage.js
 
 const apiBase = process.env.FB_GRAPH_API || 'https://graph.facebook.com/v19.0';
 
+function captionText(message) {
+  const text = String(message ?? '').trim();
+  return text || null;
+}
+
+function appendCaption(form, message, field = 'message') {
+  const text = captionText(message);
+  if (text) form.append(field, text);
+}
+
 export async function verifyFacebookToken(pageId, pageToken) {
   try {
     const response = await axios.get(`${apiBase}/${pageId}`, {
@@ -43,14 +53,15 @@ export async function postToFacebook({
 }
 
 async function publishFeed({ pageId, pageToken, message, scheduledUnix, published }) {
-  const response = await axios.post(`${apiBase}/${pageId}/feed`, null, {
-    params: {
-      message,
-      access_token: pageToken,
-      published: scheduledUnix ? false : published,
-      scheduled_publish_time: scheduledUnix,
-    },
-  });
+  const params = {
+    access_token: pageToken,
+    published: scheduledUnix ? false : published,
+  };
+  const caption = captionText(message);
+  if (caption) params.message = caption;
+  if (scheduledUnix) params.scheduled_publish_time = scheduledUnix;
+
+  const response = await axios.post(`${apiBase}/${pageId}/feed`, null, { params });
   return response.data;
 }
 
@@ -63,7 +74,7 @@ async function publishPhoto({ pageId, pageToken, message, imageUrl, scheduledUni
       filename: resolved.filename,
       contentType: resolved.mimeType,
     });
-    form.append('message', message || '');
+    appendCaption(form, message);
     form.append('access_token', pageToken);
     if (scheduledUnix) {
       form.append('published', 'false');
@@ -81,7 +92,7 @@ async function publishPhoto({ pageId, pageToken, message, imageUrl, scheduledUni
   if (localPath) {
     const form = new FormData();
     form.append('source', fs.createReadStream(localPath));
-    form.append('message', message || '');
+    appendCaption(form, message);
     form.append('access_token', pageToken);
     if (scheduledUnix) {
       form.append('published', 'false');
@@ -98,15 +109,16 @@ async function publishPhoto({ pageId, pageToken, message, imageUrl, scheduledUni
   const remoteUrl = resolved?.remoteUrl
     || (imageUrl?.startsWith('http') ? imageUrl : `${process.env.PUBLIC_BASE_URL || 'http://localhost:3001'}${imageUrl}`);
 
-  const response = await axios.post(`${apiBase}/${pageId}/photos`, null, {
-    params: {
-      url: remoteUrl,
-      message,
-      access_token: pageToken,
-      published: scheduledUnix ? false : published,
-      scheduled_publish_time: scheduledUnix,
-    },
-  });
+  const params = {
+    url: remoteUrl,
+    access_token: pageToken,
+    published: scheduledUnix ? false : published,
+  };
+  const caption = captionText(message);
+  if (caption) params.message = caption;
+  if (scheduledUnix) params.scheduled_publish_time = scheduledUnix;
+
+  const response = await axios.post(`${apiBase}/${pageId}/photos`, null, { params });
   return response.data;
 }
 
@@ -115,7 +127,7 @@ async function publishVideo({ pageId, pageToken, message, videoUrl, scheduledUni
   if (localPath) {
     const form = new FormData();
     form.append('source', fs.createReadStream(localPath));
-    form.append('description', message || '');
+    appendCaption(form, message, 'description');
     form.append('access_token', pageToken);
     if (scheduledUnix) {
       form.append('published', 'false');
@@ -131,15 +143,16 @@ async function publishVideo({ pageId, pageToken, message, videoUrl, scheduledUni
     return response.data;
   }
 
-  const response = await axios.post(`${apiBase}/${pageId}/videos`, null, {
-    params: {
-      file_url: videoUrl.startsWith('http') ? videoUrl : `${process.env.PUBLIC_BASE_URL || 'http://localhost:3001'}${videoUrl}`,
-      description: message,
-      access_token: pageToken,
-      published: scheduledUnix ? false : published,
-      scheduled_publish_time: scheduledUnix,
-    },
-  });
+  const params = {
+    file_url: videoUrl.startsWith('http') ? videoUrl : `${process.env.PUBLIC_BASE_URL || 'http://localhost:3001'}${videoUrl}`,
+    access_token: pageToken,
+    published: scheduledUnix ? false : published,
+  };
+  const caption = captionText(message);
+  if (caption) params.description = caption;
+  if (scheduledUnix) params.scheduled_publish_time = scheduledUnix;
+
+  const response = await axios.post(`${apiBase}/${pageId}/videos`, null, { params });
   return response.data;
 }
 

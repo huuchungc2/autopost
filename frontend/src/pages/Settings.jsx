@@ -151,7 +151,8 @@ export default function Settings() {
               <h3>Lịch xuất ảnh AI</h3>
               <p className="field-hint">
                 Lịch riêng của bạn — chỉ xuất ảnh bài thuộc{' '}
-                <strong>{imageSchedule.page_count ?? 0} fanpage được gán</strong>.
+                <strong>{imageSchedule.page_count ?? 0} fanpage được gán</strong>
+                {' '}(fanpage chưa bật lịch riêng tại Fanpage → Sửa).
                 Mỗi fanpage dùng AI provider ảnh của chính fanpage đó. Giờ Việt Nam ({imageSchedule.timezone}).
               </p>
             </div>

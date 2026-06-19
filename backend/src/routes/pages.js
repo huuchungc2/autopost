@@ -15,6 +15,10 @@ import {
 } from '../services/pageAccessService.js';
 import { assertProviderAccess } from '../services/providerAccessService.js';
 import { enrichPagesWithSkills, getPageSkills, syncPageSkills } from '../services/pageSkillsService.js';
+import {
+  normalizePageImageSchedule,
+  parsePageImageScheduleInput,
+} from '../services/pageImageSchedule.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 const router = express.Router();
@@ -31,6 +35,23 @@ function normalizeOptionalProviderId(value) {
   if (value === '' || value === null || value === undefined) return null;
   const id = Number(value);
   return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+function pageScheduleSqlValues(schedule) {
+  return [
+    schedule.enabled ? 1 : 0,
+    schedule.start_hour,
+    schedule.start_minute,
+    schedule.end_hour,
+    schedule.end_minute,
+    schedule.interval_minutes,
+  ];
+}
+
+function attachImageSchedule(pageRow) {
+  if (!pageRow) return pageRow;
+  const image_schedule = normalizePageImageSchedule(pageRow);
+  return { ...pageRow, image_schedule };
 }
 
 async function resolveAssignableUserIds(userIds) {
@@ -79,7 +100,10 @@ router.get('/:id', authenticate, asyncHandler(async (req, res) => {
   await assertPageAccess(req.user, req.params.id);
   const pages = await query(
     `SELECT id, name, page_id, page_token, avatar_url, skill_id, text_provider_id, image_provider_id,
-            is_active, token_status, token_expires_at, created_at
+            is_active, token_status, token_expires_at, created_at,
+            image_schedule_enabled, image_schedule_start_hour, image_schedule_start_minute,
+            image_schedule_end_hour, image_schedule_end_minute, image_schedule_interval_minutes,
+            image_schedule_last_run_at
      FROM fb_pages WHERE id = ?`,
     [req.params.id]
   );
@@ -88,7 +112,7 @@ router.get('/:id', authenticate, asyncHandler(async (req, res) => {
   const page = pages[0];
   const assigned_user_ids = isSuperAdmin(req.user) ? await getPageAssignedUserIds(req.params.id) : undefined;
   res.json({
-    ...page,
+    ...attachImageSchedule(page),
     skills,
     skill_ids: skills.map((s) => s.id),
     ...(assigned_user_ids !== undefined ? { assigned_user_ids } : {}),
@@ -99,21 +123,34 @@ router.post('/', authenticate, canManagePages, asyncHandler(async (req, res) => 
   const {
     name, page_id, page_token, avatar_url, text_provider_id, image_provider_id, is_active = true,
     assign_user_ids = [],
+    image_schedule: imageScheduleInput,
   } = req.body;
   const skillIds = normalizeSkillIds(req.body);
   if (!name || !page_id || !page_token) return res.status(400).json({ error: 'Missing required fields' });
 
   const resolvedTextProviderId = normalizeOptionalProviderId(text_provider_id);
   const resolvedImageProviderId = normalizeOptionalProviderId(image_provider_id);
+  const pageSchedule = parsePageImageScheduleInput(imageScheduleInput);
 
   if (resolvedTextProviderId) await assertProviderAccess(req.user, resolvedTextProviderId);
   if (resolvedImageProviderId) await assertProviderAccess(req.user, resolvedImageProviderId);
 
   await verifyFacebookToken(page_id, page_token);
   const tokenExpiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+  const scheduleValues = pageScheduleSqlValues(pageSchedule);
   const result = await query(
-    'INSERT INTO fb_pages (name, page_id, page_token, token_expires_at, token_status, avatar_url, skill_id, text_provider_id, image_provider_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
-    [name, page_id, page_token, tokenExpiresAt, 'valid', avatar_url || null, skillIds[0] || null, resolvedTextProviderId, resolvedImageProviderId, is_active]
+    `INSERT INTO fb_pages (
+       name, page_id, page_token, token_expires_at, token_status, avatar_url, skill_id,
+       text_provider_id, image_provider_id, is_active,
+       image_schedule_enabled, image_schedule_start_hour, image_schedule_start_minute,
+       image_schedule_end_hour, image_schedule_end_minute, image_schedule_interval_minutes,
+       created_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+    [
+      name, page_id, page_token, tokenExpiresAt, 'valid', avatar_url || null, skillIds[0] || null,
+      resolvedTextProviderId, resolvedImageProviderId, is_active,
+      ...scheduleValues,
+    ]
   );
   await syncPageSkills(result.insertId, skillIds);
 
@@ -132,6 +169,7 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
   const {
     name, page_token, avatar_url, text_provider_id, image_provider_id, is_active,
     assign_user_ids,
+    image_schedule: imageScheduleInput,
   } = req.body;
   const skillIds = req.body.skill_ids !== undefined || req.body.skill_id !== undefined
     ? normalizeSkillIds(req.body)
@@ -142,7 +180,9 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
   }
 
   const existing = (await query(
-    `SELECT page_id, page_token, avatar_url, skill_id, text_provider_id, image_provider_id, is_active
+    `SELECT page_id, page_token, avatar_url, skill_id, text_provider_id, image_provider_id, is_active,
+            image_schedule_enabled, image_schedule_start_hour, image_schedule_start_minute,
+            image_schedule_end_hour, image_schedule_end_minute, image_schedule_interval_minutes
      FROM fb_pages WHERE id = ?`,
     [req.params.id]
   ))[0];
@@ -172,10 +212,28 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
 
   const primarySkillId = skillIds !== null ? (skillIds[0] || null) : undefined;
   const skillIdToSave = skillIds !== null ? primarySkillId : existing.skill_id;
+  const pageSchedule = imageScheduleInput !== undefined
+    ? parsePageImageScheduleInput(imageScheduleInput, normalizePageImageSchedule(existing))
+    : null;
+  const scheduleValues = pageSchedule ? pageScheduleSqlValues(pageSchedule) : null;
 
   await query(
-    'UPDATE fb_pages SET name = ?, page_token = ?, avatar_url = ?, skill_id = ?, text_provider_id = ?, image_provider_id = ?, is_active = ?, token_expires_at = COALESCE(?, token_expires_at), token_status = ? WHERE id = ?',
-    [name.trim(), tokenToUpdate, resolvedAvatarUrl, skillIdToSave, resolvedTextProviderId, resolvedImageProviderId, resolvedIsActive, tokenExpiresAt, tokenStatus, req.params.id]
+    scheduleValues
+      ? `UPDATE fb_pages SET name = ?, page_token = ?, avatar_url = ?, skill_id = ?, text_provider_id = ?, image_provider_id = ?, is_active = ?,
+         image_schedule_enabled = ?, image_schedule_start_hour = ?, image_schedule_start_minute = ?,
+         image_schedule_end_hour = ?, image_schedule_end_minute = ?, image_schedule_interval_minutes = ?,
+         token_expires_at = COALESCE(?, token_expires_at), token_status = ? WHERE id = ?`
+      : `UPDATE fb_pages SET name = ?, page_token = ?, avatar_url = ?, skill_id = ?, text_provider_id = ?, image_provider_id = ?, is_active = ?, token_expires_at = COALESCE(?, token_expires_at), token_status = ? WHERE id = ?`,
+    scheduleValues
+      ? [
+        name.trim(), tokenToUpdate, resolvedAvatarUrl, skillIdToSave, resolvedTextProviderId, resolvedImageProviderId, resolvedIsActive,
+        ...scheduleValues,
+        tokenExpiresAt, tokenStatus, req.params.id,
+      ]
+      : [
+        name.trim(), tokenToUpdate, resolvedAvatarUrl, skillIdToSave, resolvedTextProviderId, resolvedImageProviderId, resolvedIsActive,
+        tokenExpiresAt, tokenStatus, req.params.id,
+      ]
   );
 
   if (skillIds !== null) {
