@@ -1,4 +1,5 @@
 import XLSX from 'xlsx';
+import { normalizeImportContent } from '../utils/importTextNormalize.js';
 
 export const MAX_IMPORT_ROWS = 500;
 
@@ -264,7 +265,7 @@ export function normalizeImportRows(rows, defaultPageId) {
 
   for (const row of rows) {
     const line = row._line || '?';
-    const content = String(row.noi_dung || '').trim();
+    const content = normalizeImportContent(row.noi_dung || '').trim();
 
     if (!content) {
       errors.push({ line, error: 'Thiếu nội dung (noi_dung)' });

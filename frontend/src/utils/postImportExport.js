@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { normalizeImportContent } from './importTextNormalize';
 
 const HEADER_ALIASES = {
   noi_dung: ['noi_dung', 'content', 'noi_dung_bai', 'caption'],
@@ -69,12 +70,13 @@ function parseSheetRows(data) {
       row[field] = cells[idx] ?? '';
     }
 
-    const content = String(row.noi_dung || '').trim();
+    const content = normalizeImportContent(row.noi_dung || '').trim();
     if (!content) {
       errors.push(`Dòng ${row._line}: thiếu nội dung`);
       continue;
     }
 
+    row.noi_dung = content;
     rows.push(row);
   }
 

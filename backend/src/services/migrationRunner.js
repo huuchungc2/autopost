@@ -324,5 +324,12 @@ async function tableUsesUtf8mb4(tableName) {
 
 export async function ensureUtf8mb4TextColumns() {
   if (await tableUsesUtf8mb4('posts')) return;
+
+  try {
+    await query('ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+  } catch (error) {
+    console.warn('ALTER DATABASE utf8mb4 skipped (cần quyền admin DB):', error.message);
+  }
+
   await runMigrationFile('018_utf8mb4_text_columns.sql', 'Migration 018 applied: utf8mb4 for posts text');
 }

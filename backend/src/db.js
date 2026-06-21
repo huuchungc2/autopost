@@ -35,9 +35,23 @@ export async function getDbCharsetInfo() {
       `SELECT @@character_set_client AS client, @@character_set_connection AS connection`
     );
     const collation = tableRows[0]?.TABLE_COLLATION || null;
+    const emojiReady = String(collation || '').startsWith('utf8mb4');
+
+    let emoji_roundtrip = null;
+    if (emojiReady) {
+      try {
+        const probe = '🚐';
+        const [rows] = await pool.execute('SELECT ? AS emoji', [probe]);
+        emoji_roundtrip = rows[0]?.emoji === probe;
+      } catch {
+        emoji_roundtrip = false;
+      }
+    }
+
     return {
       posts_table_collation: collation,
-      emoji_ready: String(collation || '').startsWith('utf8mb4'),
+      emoji_ready: emojiReady && emoji_roundtrip !== false,
+      emoji_roundtrip,
       connection_charset: sessionRows[0]?.connection || null,
     };
   } catch (error) {
