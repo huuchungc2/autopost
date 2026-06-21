@@ -1,39 +1,39 @@
 /**
  * Excel/Word trên Windows đôi khi lưu icon bằng Private Use Area (font Symbol)
  * thay vì emoji Unicode 4-byte. Web không có font đó → hiện ô vuông/ký tự lạ.
- * Map các mã hay gặp sang emoji chuẩn.
+ *
+ * Quy tắc hay gặp: emoji U+1F690 → PUA U+F690 (giữ 3 hex cuối).
+ * Map tay cho ngoại lệ + thử quy tắc 0x1F000 + (pua - 0xF000).
  */
 const PUA_TO_EMOJI = new Map([
   [0xf190, '📌'],
   [0xf085, '✅'],
   [0xf075, '✔'],
-  [0xf690, '🚐'],
-  [0xf691, '🚑'],
-  [0xf692, '🚒'],
-  [0xf693, '🚓'],
-  [0xf694, '🚔'],
-  [0xf695, '🚕'],
-  [0xf696, '🚖'],
-  [0xf697, '🚗'],
-  [0xf698, '🚘'],
-  [0xf699, '🚙'],
-  [0xf69a, '🚚'],
-  [0xf69b, '🚛'],
-  [0xf69c, '🚜'],
-  [0xf4f7, '📲'],
-  [0xf4ac, '💬'],
-  [0xf310, '🌐'],
-  [0xf1d8, '✈'],
   [0xf004, '❤'],
   [0xf086, '💬'],
+  [0xf1d8, '✈'],
 ]);
+
+function puaToStandardEmoji(code) {
+  if (PUA_TO_EMOJI.has(code)) return PUA_TO_EMOJI.get(code);
+
+  const candidate = 0x1f000 + (code - 0xf000);
+  if (candidate >= 0x1f300 && candidate <= 0x1faff) {
+    try {
+      return String.fromCodePoint(candidate);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
 
 function replacePrivateUseSymbols(text) {
   let out = '';
   for (const char of text) {
     const code = char.codePointAt(0);
     if (code >= 0xf000 && code <= 0xf8ff) {
-      out += PUA_TO_EMOJI.get(code) || char;
+      out += puaToStandardEmoji(code) || char;
     } else {
       out += char;
     }
