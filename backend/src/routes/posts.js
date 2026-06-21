@@ -26,6 +26,7 @@ import {
 } from '../services/postImportExportService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { isScheduledInFuture } from '../utils/scheduleTime.js';
+import { normalizeImportContent } from '../utils/importTextNormalize.js';
 
 const router = express.Router();
 router.use(authenticate);
@@ -572,6 +573,10 @@ router.post('/', asyncHandler(async (req, res) => {
   if (!page_id || !content?.trim()) {
     return res.status(400).json({ error: 'page_id and content are required' });
   }
+  const normalizedContent = normalizeImportContent(content).trim();
+  if (!normalizedContent) {
+    return res.status(400).json({ error: 'content is required' });
+  }
   const resolvedPageId = normalizePageId(page_id);
   if (!resolvedPageId) {
     return res.status(400).json({ error: 'page_id không hợp lệ' });
@@ -611,7 +616,7 @@ router.post('/', asyncHandler(async (req, res) => {
     [
       resolvedPageId,
       topic || '',
-      content,
+      normalizedContent,
       image_url || null,
       image_prompt || null,
       resolvedAutoGenerate,
@@ -727,6 +732,10 @@ router.put('/:id', asyncHandler(async (req, res) => {
   if (!content?.trim()) {
     return res.status(400).json({ error: 'content is required' });
   }
+  const normalizedContent = normalizeImportContent(content).trim();
+  if (!normalizedContent) {
+    return res.status(400).json({ error: 'content is required' });
+  }
 
   const targetPageId = page_id !== undefined
     ? (() => {
@@ -800,7 +809,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
     [
       targetPageId,
       finalTopic,
-      content.trim(),
+      normalizedContent,
       finalImageUrl,
       finalImagePrompt,
       resolvedAutoGenerate,

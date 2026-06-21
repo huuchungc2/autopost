@@ -1,5 +1,6 @@
 import { generateText } from './aiService.js';
 import { generateImage } from './imageService.js';
+import { normalizeImportContent } from '../utils/importTextNormalize.js';
 
 const DEFAULT_TEXT_RULES = `Viết bài Facebook bằng tiếng Việt, hấp dẫn, có emoji phù hợp.`;
 
@@ -98,14 +99,14 @@ export function parseGenerationResponse(rawText, mediaMode = 'image') {
 
   if (parsed?.content) {
     return {
-      content: String(parsed.content).trim(),
+      content: normalizeImportContent(parsed.content).trim(),
       image_prompt: parsed.image_prompt ? String(parsed.image_prompt).trim() : '',
       video_prompt: parsed.video_prompt ? String(parsed.video_prompt).trim() : '',
     };
   }
 
   return {
-    content: String(rawText || '').trim(),
+    content: normalizeImportContent(rawText).trim(),
     image_prompt: '',
     video_prompt: '',
     parseFailed: true,
