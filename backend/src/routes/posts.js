@@ -25,6 +25,7 @@ import {
   MAX_IMPORT_ROWS,
 } from '../services/postImportExportService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { isScheduledInFuture } from '../utils/scheduleTime.js';
 
 const router = express.Router();
 router.use(authenticate);
@@ -675,7 +676,7 @@ router.post('/:id/publish', asyncHandler(async (req, res) => {
       hasImage: readyPost.media_type === 'image',
       hasVideo: readyPost.media_type === 'video',
     });
-    const newStatus = post.scheduled_at && new Date(post.scheduled_at) > new Date() ? 'scheduled' : 'published';
+    const newStatus = isScheduledInFuture(post.scheduled_at) ? 'scheduled' : 'published';
     await query(
       'UPDATE posts SET status = ?, published_at = IF(? = "published", NOW(), published_at), error_message = NULL WHERE id = ?',
       [newStatus, newStatus, req.params.id]
@@ -684,7 +685,8 @@ router.post('/:id/publish', asyncHandler(async (req, res) => {
 
     res.json({ message: 'Post published', ...fbIds, status: newStatus });
   } catch (error) {
-    await query('UPDATE posts SET status = ?, error_message = ? WHERE id = ?', ['failed', error.message, req.params.id]);
+    const statusAfterError = isScheduledInFuture(post.scheduled_at) ? 'scheduled' : 'failed';
+    await query('UPDATE posts SET status = ?, error_message = ? WHERE id = ?', [statusAfterError, error.message, req.params.id]);
     throw error;
   }
 }));

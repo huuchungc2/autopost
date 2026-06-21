@@ -6,7 +6,7 @@ import { CalendarClock, PenLine, Upload, Download, Trash2, Send } from 'lucide-r
 
 import api from '../services/api';
 
-import { formatDateTime } from '../utils/date';
+import { formatDateTime, parseApiDate } from '../utils/date';
 
 import PostCard from '../components/PostCard';
 import PostErrorDetail from '../components/PostErrorDetail';
@@ -385,7 +385,14 @@ export default function Posts() {
 
     const label = post ? manualPublishLabel(post) : 'Đăng';
 
-    if (!window.confirm(`${label} bài #${postId} lên Facebook ngay?`)) return;
+    let confirmText = `${label} bài #${postId} lên Facebook ngay?`;
+    if (post?.status === 'scheduled' && post.scheduled_at) {
+      const scheduled = parseApiDate(post.scheduled_at);
+      if (scheduled && scheduled.getTime() > Date.now()) {
+        confirmText = `Bài #${postId} lên lịch ${formatDateTime(post.scheduled_at)}.\n\nĐăng ngay sẽ bỏ qua giờ hẹn. Tiếp tục?`;
+      }
+    }
+    if (!window.confirm(confirmText)) return;
 
     setPublishingIds((prev) => new Set(prev).add(postId));
 

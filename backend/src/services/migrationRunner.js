@@ -309,20 +309,20 @@ export async function ensurePageImageSchedule() {
   await runMigrationFile('017_page_image_schedule.sql', 'Migration 017 applied: page image schedule columns');
 }
 
-async function columnCharset(tableName, columnName) {
+async function tableUsesUtf8mb4(tableName) {
   try {
     const rows = await query(
-      `SELECT CHARACTER_SET_NAME FROM information_schema.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
-      [tableName, columnName]
+      `SELECT TABLE_COLLATION FROM information_schema.TABLES
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1`,
+      [tableName]
     );
-    return rows[0]?.CHARACTER_SET_NAME || null;
+    return String(rows[0]?.TABLE_COLLATION || '').startsWith('utf8mb4');
   } catch {
-    return null;
+    return false;
   }
 }
 
 export async function ensureUtf8mb4TextColumns() {
-  if ((await columnCharset('posts', 'content')) === 'utf8mb4') return;
+  if (await tableUsesUtf8mb4('posts')) return;
   await runMigrationFile('018_utf8mb4_text_columns.sql', 'Migration 018 applied: utf8mb4 for posts text');
 }

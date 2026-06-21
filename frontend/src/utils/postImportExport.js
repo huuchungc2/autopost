@@ -16,6 +16,25 @@ function normalizeHeader(cell) {
     .replace(/\s+/g, '_');
 }
 
+function cellDisplayText(cell) {
+  if (cell == null || cell === '') return '';
+  if (typeof cell === 'object' && cell !== null) {
+    if (cell.w != null) return String(cell.w).trim();
+    if (cell.v != null) return String(cell.v).trim();
+    return '';
+  }
+  return String(cell).trim();
+}
+
+function readSheetRow(sheet, rowIndex, colCount) {
+  const cells = [];
+  for (let col = 0; col < colCount; col += 1) {
+    const addr = XLSX.utils.encode_cell({ r: rowIndex, c: col });
+    cells.push(cellDisplayText(sheet[addr]));
+  }
+  return cells;
+}
+
 function parseSheetRows(data) {
   let headerRowIndex = -1;
   let fieldIndex = {};
@@ -42,7 +61,7 @@ function parseSheetRows(data) {
   const errors = [];
 
   for (let i = headerRowIndex + 1; i < data.length; i += 1) {
-    const cells = data[i].map((cell) => String(cell ?? '').trim());
+    const cells = data[i].map((cell) => cellDisplayText(cell));
     if (cells.every((c) => !c)) continue;
 
     const row = { _line: i + 1 };
@@ -69,7 +88,15 @@ export function parseImportExcel(arrayBuffer) {
     return { rows: [], errors: ['File Excel trống'] };
   }
 
-  const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  const ref = sheet['!ref'];
+  if (!ref) {
+    return { rows: [], errors: ['File Excel trống'] };
+  }
+  const range = XLSX.utils.decode_range(ref);
+  const data = [];
+  for (let r = range.s.r; r <= range.e.r; r += 1) {
+    data.push(readSheetRow(sheet, r, range.e.c + 1));
+  }
   return parseSheetRows(data);
 }
 

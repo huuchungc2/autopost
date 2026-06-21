@@ -37,7 +37,7 @@
   --status-failed-text: #DC2626;
   --status-failed-bg: #FEF2F2;
   --font-display: 'Plus Jakarta Sans', sans-serif;
-  --font-body: 'Inter', sans-serif;
+  --font-body: 'Inter', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --sidebar-width: 240px;
   --sidebar-width-collapsed: 64px;

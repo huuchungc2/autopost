@@ -4,7 +4,9 @@ import { query } from '../db.js';
 export async function claimDueScheduledPosts(limit = 20) {
   const due = await query(
     `SELECT id FROM posts
-     WHERE status = 'scheduled' AND scheduled_at <= NOW()
+     WHERE status = 'scheduled'
+       AND scheduled_at IS NOT NULL
+       AND scheduled_at <= NOW()
      ORDER BY scheduled_at ASC
      LIMIT ?`,
     [limit]
