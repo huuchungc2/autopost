@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS posts (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (page_id) REFERENCES fb_pages(id),
   FOREIGN KEY (created_by) REFERENCES users(id)
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS image_schedule_settings (
   user_id INT PRIMARY KEY,

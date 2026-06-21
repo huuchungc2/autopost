@@ -49,8 +49,8 @@ export default function PostErrorDetail({ post, compact = false }) {
   const { subtitle, message, hint } = resolveErrorContext(post);
   const previewSource = String(post?.error_message || '').trim()
     || (post?.status === 'failed' ? 'Đăng thất bại' : 'Lỗi xử lý bài');
-  const preview = compact && previewSource.length > 72
-    ? `${previewSource.slice(0, 72)}…`
+  const preview = previewSource.length > 120
+    ? `${previewSource.slice(0, 120)}…`
     : previewSource;
 
   return (
@@ -59,11 +59,17 @@ export default function PostErrorDetail({ post, compact = false }) {
         type="button"
         className={`post-error-detail${compact ? ' post-error-detail--compact' : ''}`}
         onClick={() => setOpen(true)}
-        title="Bấm để xem chi tiết lỗi"
+        title={previewSource}
+        aria-label={`Xem lỗi bài #${post.id}: ${previewSource}`}
       >
-        <AlertCircle size={14} aria-hidden />
-        <span className="post-error-detail-text">{preview}</span>
-        {!compact && <span className="post-error-detail-link">Xem chi tiết</span>}
+        <AlertCircle size={compact ? 16 : 14} aria-hidden />
+        {!compact && (
+          <>
+            <span className="post-error-detail-text">{preview}</span>
+            <span className="post-error-detail-link">Xem chi tiết</span>
+          </>
+        )}
+        {compact && <span className="post-error-detail-sr">Xem lỗi</span>}
       </button>
 
       <Modal

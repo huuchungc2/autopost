@@ -308,3 +308,21 @@ export async function ensurePageImageSchedule() {
   if (await columnExists('fb_pages', 'image_schedule_enabled')) return;
   await runMigrationFile('017_page_image_schedule.sql', 'Migration 017 applied: page image schedule columns');
 }
+
+async function columnCharset(tableName, columnName) {
+  try {
+    const rows = await query(
+      `SELECT CHARACTER_SET_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+      [tableName, columnName]
+    );
+    return rows[0]?.CHARACTER_SET_NAME || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function ensureUtf8mb4TextColumns() {
+  if ((await columnCharset('posts', 'content')) === 'utf8mb4') return;
+  await runMigrationFile('018_utf8mb4_text_columns.sql', 'Migration 018 applied: utf8mb4 for posts text');
+}

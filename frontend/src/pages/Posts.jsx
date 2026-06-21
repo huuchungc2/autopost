@@ -791,7 +791,7 @@ export default function Posts() {
 
                 </th>
 
-                <th>ID</th><th>Fanpage</th><th>Chủ đề</th><th>Trạng thái</th><th>Lỗi</th><th>Lên lịch</th><th>Facebook</th><th>Prompt ảnh</th><th>Thao tác</th>
+                <th>ID</th><th>Fanpage</th><th>Chủ đề</th><th>Trạng thái</th><th>Lỗi</th><th>Lên lịch</th><th>Prompt ảnh</th><th>Thao tác</th>
 
               </tr>
 
@@ -831,15 +831,6 @@ export default function Posts() {
                   </td>
 
                   <td>{post.scheduled_at ? formatDateTime(post.scheduled_at) : '—'}</td>
-
-                  <td className="post-fb-ids">
-                    {post.fb_post_id ? (
-                      <small>
-                        Post: {post.fb_post_id}
-                        {post.fb_photo_id ? <><br />Ảnh: {post.fb_photo_id}</> : null}
-                      </small>
-                    ) : '—'}
-                  </td>
 
                   <td>
                     <PostImagePromptActions post={post} onGenerated={loadPosts} compact />
