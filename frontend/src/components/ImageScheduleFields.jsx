@@ -41,6 +41,7 @@ export default function ImageScheduleFields({
           <h2 className="page-form-section-title">Lịch xuất ảnh AI (tuỳ chọn)</h2>
           <p className="field-hint">
             {hint || 'Bật để AI tự vẽ ảnh ban đêm cho bài chưa có ảnh trên fanpage này. Giờ Việt Nam.'}
+            {' '}Bật/tắt được lưu ngay khi sửa fanpage.
           </p>
         </div>
         <label className="page-skill-option settings-toggle">

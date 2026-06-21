@@ -18,6 +18,7 @@ import { enrichPagesWithSkills, getPageSkills, syncPageSkills } from '../service
 import {
   normalizePageImageSchedule,
   parsePageImageScheduleInput,
+  releaseInFlightImageJobsForPages,
 } from '../services/pageImageSchedule.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -235,6 +236,10 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
         tokenExpiresAt, tokenStatus, req.params.id,
       ]
   );
+
+  if (pageSchedule && !pageSchedule.enabled) {
+    await releaseInFlightImageJobsForPages([Number(req.params.id)]);
+  }
 
   if (skillIds !== null) {
     await syncPageSkills(req.params.id, skillIds);

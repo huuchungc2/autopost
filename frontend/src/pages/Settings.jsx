@@ -7,7 +7,7 @@ import { useAuth } from '../services/authContext';
 import { computeMaxImagesPerNight, formatScheduleTime } from '../utils/imageSchedule';
 
 const defaultScheduleForm = (schedule) => ({
-  enabled: schedule?.enabled ?? true,
+  enabled: schedule?.enabled ?? false,
   start_hour: schedule?.start_hour ?? 1,
   start_minute: schedule?.start_minute ?? 0,
   end_hour: schedule?.end_hour ?? 5,
@@ -77,6 +77,43 @@ export default function Settings() {
     setScheduleForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const persistImageSchedule = async (nextForm, { toastOnSuccess = true } = {}) => {
+    setScheduleSaving(true);
+    try {
+      const response = await api.put('/settings/image-schedule', nextForm);
+      setSettings((prev) => ({
+        ...prev,
+        config: {
+          ...prev.config,
+          image_schedule: response.data.image_schedule,
+        },
+      }));
+      setScheduleForm(defaultScheduleForm(response.data.image_schedule));
+      if (toastOnSuccess) {
+        showToast(
+          nextForm.enabled ? 'Đã bật lịch xuất ảnh' : 'Đã tắt lịch xuất ảnh — không tạo ảnh mới theo lịch',
+          'success'
+        );
+      }
+      return response.data.image_schedule;
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Lưu lịch thất bại', 'error');
+      throw err;
+    } finally {
+      setScheduleSaving(false);
+    }
+  };
+
+  const handleScheduleEnabledChange = async (checked) => {
+    const nextForm = { ...scheduleForm, enabled: checked };
+    setScheduleForm(nextForm);
+    try {
+      await persistImageSchedule(nextForm);
+    } catch {
+      setScheduleForm((prev) => ({ ...prev, enabled: !checked }));
+    }
+  };
+
   const handleStartTimeChange = (value) => {
     const { hour, minute } = parseTimeInput(value);
     setScheduleForm((prev) => ({ ...prev, start_hour: hour, start_minute: minute }));
@@ -88,26 +125,16 @@ export default function Settings() {
   };
 
   const saveImageSchedule = async () => {
-    setScheduleSaving(true);
     try {
-      const response = await api.put('/settings/image-schedule', scheduleForm);
-      setSettings((prev) => ({
-        ...prev,
-        config: {
-          ...prev.config,
-          image_schedule: response.data.image_schedule,
-        },
-      }));
-      setScheduleForm(defaultScheduleForm(response.data.image_schedule));
+      await persistImageSchedule(scheduleForm, { toastOnSuccess: false });
       showToast('Đã lưu lịch xuất ảnh', 'success');
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Lưu lịch thất bại', 'error');
-    } finally {
-      setScheduleSaving(false);
+    } catch {
+      // toast shown in persistImageSchedule
     }
   };
 
   const imageSchedule = settings?.config?.image_schedule;
+  const pageSchedulesEnabled = settings?.config?.page_image_schedules_enabled || [];
 
   return (
     <div className="page-shell">
@@ -154,18 +181,26 @@ export default function Settings() {
                 <strong>{imageSchedule.page_count ?? 0} fanpage được gán</strong>
                 {' '}(fanpage chưa bật lịch riêng tại Fanpage → Sửa).
                 Mỗi fanpage dùng AI provider ảnh của chính fanpage đó. Giờ Việt Nam ({imageSchedule.timezone}).
+                {' '}Bật/tắt được lưu ngay; giờ/cách nhau cần bấm Lưu bên dưới.
               </p>
             </div>
             <label className="page-skill-option settings-toggle">
               <input
                 type="checkbox"
                 checked={scheduleForm.enabled}
-                onChange={(e) => handleScheduleChange('enabled', e.target.checked)}
-                disabled={!canEditSchedule}
+                onChange={(e) => handleScheduleEnabledChange(e.target.checked)}
+                disabled={!canEditSchedule || scheduleSaving}
               />
               <span>{scheduleForm.enabled ? 'Đang bật' : 'Đang tắt'}</span>
             </label>
           </div>
+
+          {canEditSchedule && !scheduleForm.enabled && pageSchedulesEnabled.length > 0 && (
+            <p className="field-hint field-hint--warn" style={{ marginBottom: 12 }}>
+              Lịch admin đã tắt, nhưng {pageSchedulesEnabled.length} fanpage vẫn bật lịch riêng:{' '}
+              {pageSchedulesEnabled.map((p) => p.name).join(', ')}. Vào Fanpage → Sửa để tắt.
+            </p>
+          )}
 
           {canEditSchedule && imageSchedule.page_count === 0 && scheduleForm.enabled && (
             <p className="field-hint field-hint--warn" style={{ marginBottom: 12 }}>

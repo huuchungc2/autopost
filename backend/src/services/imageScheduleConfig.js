@@ -164,6 +164,14 @@ export async function saveImageScheduleConfig(userId, updates) {
   return getImageScheduleConfig(userId);
 }
 
+export async function isUserImageScheduleEnabled(userId) {
+  const rows = await query(
+    'SELECT enabled FROM image_schedule_settings WHERE user_id = ? LIMIT 1',
+    [userId]
+  );
+  return rows[0]?.enabled === 1 || rows[0]?.enabled === true;
+}
+
 export async function getEnabledImageSchedules() {
   return query(
     `SELECT s.*, u.name AS user_name

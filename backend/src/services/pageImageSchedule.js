@@ -119,3 +119,51 @@ export function isPageScheduleDue(pageRow, zonedNow = null) {
   }
   return true;
 }
+
+function truthyFlag(value) {
+  return value === 1 || value === true;
+}
+
+export async function isPageImageScheduleEnabled(pageId) {
+  try {
+    const rows = await query(
+      'SELECT image_schedule_enabled FROM fb_pages WHERE id = ? AND is_active = true LIMIT 1',
+      [pageId]
+    );
+    return truthyFlag(rows[0]?.image_schedule_enabled);
+  } catch (error) {
+    if (error?.code === 'ER_BAD_FIELD_ERROR') return false;
+    throw error;
+  }
+}
+
+/** Trả job ảnh đang processing về pending khi tắt lịch (không hủy request AI đang chạy). */
+export async function releaseInFlightImageJobsForPages(pageIds) {
+  if (!pageIds?.length) return 0;
+  const placeholders = pageIds.map(() => '?').join(', ');
+  const result = await query(
+    `UPDATE posts
+     SET image_job_status = 'pending'
+     WHERE page_id IN (${placeholders})
+       AND image_job_status = 'processing'
+       AND (image_url IS NULL OR image_url = '')`,
+    pageIds
+  );
+  return result.affectedRows || 0;
+}
+
+export async function getEnabledPageImageSchedulesForUser(userId) {
+  try {
+    return await query(
+      `SELECT fp.id, fp.name
+       FROM fb_pages fp
+       JOIN user_pages up ON up.page_id = fp.id
+       WHERE up.user_id = ? AND fp.is_active = true AND fp.image_schedule_enabled = true
+       ORDER BY fp.name ASC`,
+      [userId]
+    );
+  } catch (error) {
+    if (error?.code === 'ER_BAD_FIELD_ERROR') return [];
+    throw error;
+  }
+}

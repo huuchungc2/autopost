@@ -148,14 +148,32 @@ export default function PageForm() {
     }
   };
 
-  const handleScheduleChange = (field, value) => {
+  const handleScheduleChange = async (field, value) => {
+    const nextSchedule = { ...form.image_schedule, [field]: value };
     setForm((prev) => ({
       ...prev,
-      image_schedule: { ...prev.image_schedule, [field]: value },
+      image_schedule: nextSchedule,
     }));
+
+    if (field === 'enabled' && isEdit) {
+      try {
+        await api.put(`/pages/${id}`, buildPayload({ image_schedule: nextSchedule }));
+        showToast(
+          value ? 'Đã bật lịch xuất ảnh fanpage' : 'Đã tắt lịch xuất ảnh fanpage',
+          'success'
+        );
+      } catch (err) {
+        setForm((prev) => ({
+          ...prev,
+          image_schedule: { ...prev.image_schedule, enabled: !value },
+        }));
+        showToast(err.response?.data?.error || 'Không lưu được lịch fanpage', 'error');
+      }
+    }
   };
 
-  const buildPayload = () => {
+  const buildPayload = (overrides = {}) => {
+    const imageSchedule = overrides.image_schedule ?? form.image_schedule;
     const payload = {
       name: form.name.trim(),
       avatar_url: form.avatar_url?.trim() || '',
@@ -163,7 +181,7 @@ export default function PageForm() {
       text_provider_id: form.text_provider_id ? Number(form.text_provider_id) : null,
       image_provider_id: form.image_provider_id ? Number(form.image_provider_id) : null,
       is_active: form.is_active,
-      image_schedule: form.image_schedule,
+      image_schedule: imageSchedule,
     };
     if (!isEdit) {
       payload.page_id = form.page_id.trim();

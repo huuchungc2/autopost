@@ -9,6 +9,12 @@ import {
   saveImageScheduleConfig,
   getImageGenerateLogs,
 } from '../services/imageScheduleConfig.js';
+import {
+  getEnabledPageImageSchedulesForUser,
+  filterPagesWithoutOwnSchedule,
+  releaseInFlightImageJobsForPages,
+} from '../services/pageImageSchedule.js';
+import { getAssignedPageIds } from '../services/pageAccessService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -26,6 +32,9 @@ router.get('/', asyncHandler(async (req, res) => {
   const imageSchedule = ['super_admin', 'admin'].includes(req.user.role)
     ? await getImageScheduleConfig(req.user.id)
     : null;
+  const pageImageSchedules = imageSchedule
+    ? await getEnabledPageImageSchedulesForUser(req.user.id)
+    : [];
 
   res.json({
     storage: {
@@ -39,6 +48,7 @@ router.get('/', asyncHandler(async (req, res) => {
       max_videos_mb: maxVideosMb,
       scheduler_enabled: process.env.DISABLE_SCHEDULER !== 'true',
       image_schedule: imageSchedule,
+      page_image_schedules_enabled: pageImageSchedules,
     },
   });
 }));
@@ -61,6 +71,11 @@ router.put('/image-schedule', requireRole('super_admin', 'admin'), asyncHandler(
     end_minute,
     interval_minutes,
   });
+
+  if (enabled === false || enabled === 0 || enabled === '0') {
+    const pageIds = await filterPagesWithoutOwnSchedule(await getAssignedPageIds(req.user.id));
+    await releaseInFlightImageJobsForPages(pageIds);
+  }
 
   res.json({
     message: 'Đã lưu lịch xuất ảnh (chỉ fanpage được gán cho bạn)',

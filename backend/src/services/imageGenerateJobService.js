@@ -1,5 +1,17 @@
 import { query } from '../db.js';
 import { generateImageForPost } from './postImageCore.js';
+import { isUserImageScheduleEnabled } from './imageScheduleConfig.js';
+import { isPageImageScheduleEnabled } from './pageImageSchedule.js';
+
+async function isScheduleEnabledForJob(scheduleUserId, pageIds) {
+  if (scheduleUserId) {
+    return isUserImageScheduleEnabled(scheduleUserId);
+  }
+  if (pageIds?.length === 1) {
+    return isPageImageScheduleEnabled(pageIds[0]);
+  }
+  return false;
+}
 
 export async function logImageGenerate(postId, status, errorMessage, source = 'schedule', scheduleUserId = null) {
   await query(
@@ -64,6 +76,14 @@ export async function runImageJobForPost(post, { source = 'schedule', scheduleUs
     return { processed: 0, skipped: true };
   }
 
+  if (source === 'schedule' && !(await isScheduleEnabledForJob(scheduleUserId, pageIds))) {
+    await query(
+      `UPDATE posts SET image_job_status = 'pending' WHERE id = ? AND image_job_status = 'processing'`,
+      [post.id]
+    );
+    return { processed: 0, skipped: true };
+  }
+
   await logImageGenerate(post.id, 'processing', null, source, scheduleUserId);
 
   try {
@@ -94,9 +114,15 @@ export async function runImageJobForPost(post, { source = 'schedule', scheduleUs
 /** Job lịch của 1 admin — chỉ fanpage được gán cho admin đó. */
 export async function runNextScheduledImageJob(pageIds, scheduleUserId) {
   if (!pageIds?.length) return { processed: 0, ok: 0, failed: 0 };
+  if (!(await isScheduleEnabledForJob(scheduleUserId, pageIds))) {
+    return { processed: 0, ok: 0, failed: 0 };
+  }
 
   const post = await findNextPostForImageJob(pageIds);
   if (!post) return { processed: 0, ok: 0, failed: 0 };
+  if (!(await isScheduleEnabledForJob(scheduleUserId, pageIds))) {
+    return { processed: 0, ok: 0, failed: 0 };
+  }
 
   return runImageJobForPost(post, { source: 'schedule', scheduleUserId, pageIds });
 }
