@@ -24,4 +24,25 @@ export async function query(sql, params = []) {
   return rows;
 }
 
+/** Kiểm tra DB có lưu emoji 4-byte (🚐 📌) — cần utf8mb4. */
+export async function getDbCharsetInfo() {
+  try {
+    const tableRows = await query(
+      `SELECT TABLE_COLLATION FROM information_schema.TABLES
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'posts' LIMIT 1`
+    );
+    const sessionRows = await query(
+      `SELECT @@character_set_client AS client, @@character_set_connection AS connection`
+    );
+    const collation = tableRows[0]?.TABLE_COLLATION || null;
+    return {
+      posts_table_collation: collation,
+      emoji_ready: String(collation || '').startsWith('utf8mb4'),
+      connection_charset: sessionRows[0]?.connection || null,
+    };
+  } catch (error) {
+    return { emoji_ready: false, error: error.message };
+  }
+}
+
 export default pool;
