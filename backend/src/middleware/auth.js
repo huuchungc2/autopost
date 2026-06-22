@@ -5,11 +5,14 @@ const jwtSecret = process.env.JWT_SECRET || 'replace_with_strong_secret';
 
 export async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) {
+  const queryToken = req.query?.access_token;
+  const token = authHeader?.startsWith('Bearer ')
+    ? authHeader.split(' ')[1]
+    : (typeof queryToken === 'string' ? queryToken : null);
+
+  if (!token) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-
-  const token = authHeader.split(' ')[1];
   try {
     const payload = jwt.verify(token, jwtSecret);
     const users = await query(

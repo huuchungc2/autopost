@@ -9,6 +9,7 @@ import {
 } from '../utils/bulkScheduleAssign';
 import { parseImportExcel, downloadImportTemplate } from '../utils/postImportExport';
 import api from '../services/api';
+import { saveImagePersistLabel, useMediaStorage } from '../hooks/useMediaStorage';
 
 export default function PostImportForm({
   pages = [],
@@ -29,6 +30,7 @@ export default function PostImportForm({
   const [times, setTimes] = useState([...DEFAULT_DAILY_SLOTS]);
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const { imagesOnDrive } = useMediaStorage();
 
   useEffect(() => {
     if (initialPageId && pages.some((p) => String(p.id) === String(initialPageId))) {
@@ -165,7 +167,7 @@ export default function PostImportForm({
         <p className="field-hint">
           File chỉ cần <strong>4 cột</strong>: <strong>noi_dung</strong>, <strong>prompt_anh</strong>,{' '}
           <strong>ngay_dang</strong>, <strong>gio_dang</strong>.
-          Prompt ảnh dùng để AI generate ảnh lên VPS — xuất ban khuya (mặc định 23:00) hoặc khi đến giờ đăng.
+          Prompt ảnh dùng để AI generate ảnh{imagesOnDrive ? ' lên Google Drive' : ' lên VPS'} — xuất ban khuya (mặc định 23:00) hoặc khi đến giờ đăng.
           Ngày/giờ để trống nếu muốn tự chia lịch bên dưới.
         </p>
 
@@ -239,9 +241,7 @@ export default function PostImportForm({
                   checked={saveImageLocal}
                   onChange={(e) => setSaveImageLocal(e.target.checked)}
                 />
-                <span>
-                  Lưu ảnh AI lên VPS trước khi đăng (bỏ tick = đăng thẳng URL ảnh AI lên Facebook, không lưu server)
-                </span>
+                <span>{saveImagePersistLabel(imagesOnDrive)}</span>
               </label>
             )}
           </>

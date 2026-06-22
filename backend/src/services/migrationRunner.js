@@ -333,3 +333,22 @@ export async function ensureUtf8mb4TextColumns() {
 
   await runMigrationFile('018_utf8mb4_text_columns.sql', 'Migration 018 applied: utf8mb4 for posts text');
 }
+
+export async function ensureAppSettingsTable() {
+  if (await tableExists('app_settings')) return;
+  await runMigrationFile('019_app_settings.sql', 'Migration 019 applied: app_settings for media storage');
+}
+
+}
+
+export async function ensureFbPagesComposio() {
+  if (!(await columnExists('fb_pages', 'token_source'))) {
+    await runMigrationFile('020_fb_pages_composio.sql', 'Migration 020 applied: fb_pages Composio token columns');
+    await runMigrationFile('021_fb_pages_dual_tokens.sql', 'Migration 021 applied: dual page tokens');
+  } else if (!(await columnExists('fb_pages', 'composio_page_token'))) {
+    await runMigrationFile('021_fb_pages_dual_tokens.sql', 'Migration 021 applied: dual page tokens');
+  }
+  if (!(await columnExists('fb_pages', 'manual_token_status'))) {
+    await runMigrationFile('022_fb_pages_token_health.sql', 'Migration 022 applied: per-token health columns');
+  }
+}

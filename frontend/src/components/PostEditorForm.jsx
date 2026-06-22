@@ -1,6 +1,7 @@
 import VideoUpload from './VideoUpload';
 import FacebookPreview from './FacebookPreview';
 import Button from './ui/Button';
+import { saveImagePersistLabel, useMediaStorage } from '../hooks/useMediaStorage';
 
 export default function PostEditorForm({
   form,
@@ -16,6 +17,8 @@ export default function PostEditorForm({
   handleGenerateImage,
   showPreview = true,
 }) {
+  const { imagesOnDrive } = useMediaStorage();
+
   return (
     <div className="edit-post-layout post-editor">
       <div className="modal-form post-editor-form">
@@ -96,7 +99,7 @@ export default function PostEditorForm({
               checked={form.save_image_local}
               onChange={(e) => setField('save_image_local', e.target.checked)}
             />
-            <span>Lưu ảnh AI lên VPS (bỏ tick = đăng thẳng URL ảnh AI lên Facebook)</span>
+            <span>{saveImagePersistLabel(imagesOnDrive)}</span>
           </label>
         )}
 

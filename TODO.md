@@ -1,6 +1,21 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-06-15 (implementation pass)
+> Cập nhật: 2026-06-22
+
+## Done in v0.2.x (recent)
+
+### Composio + dual token
+- [x] Composio config lưu DB (`app_settings`) — UI Cài đặt → Composio
+- [x] Mỗi fanpage 2 token: `page_token` (manual) + `composio_page_token`
+- [x] `token_source` = token đang active; tự chuyển manual ↔ composio khi đăng lỗi
+- [x] Kiểm tra hiệu lực từng token (`debug_token` / verify) — cron mỗi giờ
+- [x] Refresh Composio **chỉ khi expired** (không refresh sớm / không cron 6h)
+- [x] Migration `019`–`022` — xem `docs/TOKENS_AND_COMPOSIO.md`
+- [x] PageForm: 2 token + ưu tiên active; Pages list: trạng thái M/C
+
+### Google Drive + storage (nếu đã deploy)
+- [x] `MAX_IMAGES_MB` 5GB, UI Drive trong Cài đặt
+- [x] Ảnh `gdrive://` — proxy khi đăng FB
 
 ## Done in v0.2.0
 
@@ -29,4 +44,9 @@
 - [ ] content_templates CRUD
 - [ ] Encrypt API keys at rest
 - [ ] VPS deploy scripts + Nginx config in repo
-- [ ] Tailwind migration (currently custom CSS aligned with PRD tokens)
+- [ ] Cập nhật PRD §4.2 token management theo dual-token + Composio
+
+## Tài liệu
+
+- Token & Composio: [`docs/TOKENS_AND_COMPOSIO.md`](docs/TOKENS_AND_COMPOSIO.md)
+- Deploy: [`DEPLOY.md`](DEPLOY.md)

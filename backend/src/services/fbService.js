@@ -26,6 +26,32 @@ export async function verifyFacebookToken(pageId, pageToken) {
   }
 }
 
+/**
+ * Lấy hạn token thật từ Graph API debug_token (dùng chính page token làm access_token).
+ * Trả null nếu không gọi được — caller fallback verifyFacebookToken.
+ */
+export async function inspectFacebookToken(pageToken) {
+  const token = String(pageToken || '').trim();
+  if (!token) return null;
+  try {
+    const response = await axios.get(`${apiBase}/debug_token`, {
+      params: { input_token: token, access_token: token },
+    });
+    const data = response.data?.data;
+    if (!data) return null;
+    const expiresAt = data.expires_at
+      ? new Date(data.expires_at * 1000)
+      : (data.data_access_expires_at ? new Date(data.data_access_expires_at * 1000) : null);
+    return {
+      isValid: !!data.is_valid,
+      expiresAt,
+      scopes: data.scopes || [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function postToFacebook({
   pageId,
   pageToken,

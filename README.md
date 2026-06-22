@@ -60,6 +60,17 @@ npm run dev
 
 Xem [DEPLOY.md](./DEPLOY.md) — hướng dẫn deploy production (Nginx, PM2, MySQL, SSL).
 
+## Tài liệu
+
+| File | Nội dung |
+|------|----------|
+| [DEPLOY.md](./DEPLOY.md) | Deploy VPS, Nginx, PM2 |
+| [docs/README.md](./docs/README.md) | **Index tài liệu** — đọc trước khi đào code |
+| [docs/TOKENS_AND_COMPOSIO.md](./docs/TOKENS_AND_COMPOSIO.md) | Token Facebook dual manual + Composio, kiểm tra hiệu lực |
+| [TODO.md](./TODO.md) | Tiến độ & checklist |
+| [CHANGELOG.md](./CHANGELOG.md) | Lịch sử thay đổi |
+| [PROJECT_PROGRESS.md](./PROJECT_PROGRESS.md) | Tổng quan đã làm |
+
 ## Lưu ý
 
 - Backend chạy trên `http://localhost:3001`

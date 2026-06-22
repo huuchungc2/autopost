@@ -7,6 +7,7 @@ import { useAuth } from '../services/authContext';
 import { computeMaxImagesPerNight, formatScheduleTime } from '../utils/imageSchedule';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
+import { invalidateMediaStorageCache } from '../hooks/useMediaStorage';
 
 const defaultScheduleForm = (schedule) => ({
   enabled: schedule?.enabled ?? false,
@@ -38,11 +39,37 @@ export default function Settings() {
   const { showToast } = useToast();
   const { user } = useAuth();
   const canEditSchedule = ['super_admin', 'admin'].includes(user?.role);
+  const canEditMediaStorage = user?.role === 'super_admin';
+  const [mediaForm, setMediaForm] = useState(null);
+  const [mediaSaving, setMediaSaving] = useState(false);
+  const [mediaTesting, setMediaTesting] = useState(false);
+  const [composioForm, setComposioForm] = useState(null);
+  const [composioSaving, setComposioSaving] = useState(false);
+  const [composioLinking, setComposioLinking] = useState(false);
 
   useEffect(() => {
     api.get('/settings').then((r) => {
       setSettings(r.data);
       setScheduleForm(defaultScheduleForm(r.data?.config?.image_schedule));
+      const drive = r.data?.storage?.google_drive;
+      if (drive) {
+        setMediaForm({
+          media_storage: drive.media_storage || 'local',
+          google_drive_folder_id: drive.folder_id || '',
+          google_drive_service_account_json: '',
+        });
+      }
+      const composio = r.data?.config?.composio;
+      if (composio) {
+        setComposioForm({
+          composio_api_key: '',
+          composio_facebook_auth_config_id: composio.auth_config_id || '',
+          composio_default_user_id: composio.default_user_id || '',
+          composio_default_connected_account_id: composio.default_connected_account_id || '',
+          composio_facebook_toolkit_version: composio.facebook_toolkit_version || '20260616_00',
+          composio_auto_fallback: composio.auto_fallback_on_token_error !== false,
+        });
+      }
     }).catch(console.error);
   }, []);
 
@@ -137,6 +164,135 @@ export default function Settings() {
 
   const imageSchedule = settings?.config?.image_schedule;
   const pageSchedulesEnabled = settings?.config?.page_image_schedules_enabled || [];
+  const driveStatus = settings?.storage?.google_drive;
+  const composioStatus = settings?.config?.composio;
+
+  const handleMediaChange = (field, value) => {
+    setMediaForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const saveMediaStorage = async () => {
+    if (!mediaForm) return;
+    setMediaSaving(true);
+    try {
+      const payload = {
+        media_storage: mediaForm.media_storage,
+        google_drive_folder_id: mediaForm.google_drive_folder_id,
+      };
+      if (mediaForm.google_drive_service_account_json?.trim()) {
+        payload.google_drive_service_account_json = mediaForm.google_drive_service_account_json.trim();
+      }
+      const response = await api.put('/settings/media-storage', payload);
+      setSettings((prev) => ({
+        ...prev,
+        storage: {
+          ...prev.storage,
+          media_mode: response.data.media_storage.media_storage,
+          images_on_drive: response.data.media_storage.media_storage === 'google_drive',
+          google_drive: response.data.media_storage,
+        },
+      }));
+      setMediaForm((prev) => ({
+        ...prev,
+        media_storage: response.data.media_storage.media_storage,
+        google_drive_folder_id: response.data.media_storage.folder_id || '',
+        google_drive_service_account_json: '',
+      }));
+      showToast('Đã lưu cấu hình Google Drive', 'success');
+      invalidateMediaStorageCache();
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Lưu cấu hình thất bại', 'error');
+    } finally {
+      setMediaSaving(false);
+    }
+  };
+
+  const testDriveConnection = async () => {
+    setMediaTesting(true);
+    try {
+      const response = await api.post('/settings/media-storage/test');
+      const name = response.data?.folder?.folder_name || response.data?.folder?.folder_id;
+      showToast(`Kết nối Drive OK — folder: ${name}`, 'success');
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Kiểm tra Drive thất bại', 'error');
+    } finally {
+      setMediaTesting(false);
+    }
+  };
+
+  const handleComposioChange = (field, value) => {
+    setComposioForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const saveComposioSettings = async () => {
+    if (!composioForm) return;
+    setComposioSaving(true);
+    try {
+      const payload = {
+        composio_facebook_auth_config_id: composioForm.composio_facebook_auth_config_id,
+        composio_default_user_id: composioForm.composio_default_user_id,
+        composio_default_connected_account_id: composioForm.composio_default_connected_account_id,
+        composio_facebook_toolkit_version: composioForm.composio_facebook_toolkit_version,
+        composio_auto_fallback: composioForm.composio_auto_fallback,
+      };
+      if (composioForm.composio_api_key?.trim()) {
+        payload.composio_api_key = composioForm.composio_api_key.trim();
+      }
+      const response = await api.put('/settings/composio', payload);
+      setSettings((prev) => ({
+        ...prev,
+        config: { ...prev.config, composio: response.data.composio },
+      }));
+      setComposioForm((prev) => ({
+        ...prev,
+        composio_api_key: '',
+        composio_facebook_auth_config_id: response.data.composio.auth_config_id || '',
+        composio_default_user_id: response.data.composio.default_user_id || '',
+        composio_default_connected_account_id: response.data.composio.default_connected_account_id || '',
+        composio_facebook_toolkit_version: response.data.composio.facebook_toolkit_version || prev.composio_facebook_toolkit_version,
+        composio_auto_fallback: response.data.composio.auto_fallback_on_token_error !== false,
+      }));
+      showToast('Đã lưu cấu hình Composio', 'success');
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Lưu Composio thất bại', 'error');
+    } finally {
+      setComposioSaving(false);
+    }
+  };
+
+  const createComposioConnectLink = async () => {
+    setComposioLinking(true);
+    try {
+      const response = await api.post('/settings/composio/connect-link', {
+        composio_default_user_id: composioForm?.composio_default_user_id,
+      });
+      const url = response.data?.redirect_url;
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+        showToast('Đã mở link kết nối Facebook — hoàn tất OAuth rồi cập nhật Connected Account ID', 'success');
+      }
+      if (response.data?.connected_account_id) {
+        handleComposioChange('composio_default_connected_account_id', response.data.connected_account_id);
+      }
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Tạo link Composio thất bại', 'error');
+    } finally {
+      setComposioLinking(false);
+    }
+  };
+
+  const refreshComposioStatus = async () => {
+    try {
+      const response = await api.get('/settings/composio');
+      setSettings((prev) => ({
+        ...prev,
+        config: { ...prev.config, composio: response.data.composio },
+      }));
+      showToast('Đã làm mới trạng thái Composio', 'success');
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Không tải được Composio', 'error');
+    }
+  };
 
   return (
     <div className="page-shell">
@@ -155,12 +311,20 @@ export default function Settings() {
           <div className="card card-stat">
             <h3>Lưu trữ ảnh</h3>
             <p>{settings.storage.images_on_drive ? 'Google Drive' : 'VPS (local)'}</p>
-            <small>{settings.storage.media_mode || 'local'}</small>
+            <small>
+              {settings.storage.images_on_drive
+                ? 'Ảnh AI lưu Drive — đăng FB tải từ Drive'
+                : (settings.storage.media_mode || 'local')}
+            </small>
           </div>
           <div className="card card-stat">
             <h3>Lưu trữ ảnh (VPS)</h3>
             <p>{settings.storage.images.usedMb} MB ({settings.storage.images.percent}%)</p>
-            <small>Tối đa {settings.config.max_images_mb} MB</small>
+            <small>
+              {settings.storage.images_on_drive
+                ? 'Chỉ cache tạm khi đăng FB'
+                : `Tối đa ${settings.config.max_images_mb} MB`}
+            </small>
           </div>
           <div className="card card-stat">
             <h3>Lưu trữ video</h3>
@@ -172,6 +336,202 @@ export default function Settings() {
             <p>{settings.config.scheduler_enabled ? 'Bật' : 'Tắt'}</p>
             <small>Cron đăng bài & xuất ảnh</small>
           </div>
+          {composioStatus && (
+            <div className="card card-stat">
+              <h3>Composio FB</h3>
+              <p>{composioStatus.configured ? 'Đã cấu hình' : 'Chưa cấu hình'}</p>
+              <small>
+                {composioStatus.connection?.status
+                  ? `Connection: ${composioStatus.connection.status}`
+                  : (composioStatus.auto_fallback_on_token_error ? 'Auto-fallback bật' : 'Auto-fallback tắt')}
+              </small>
+            </div>
+          )}
+        </div>
+      )}
+
+      {driveStatus && mediaForm && (
+        <div className="card settings-media-storage" style={{ marginTop: 24 }}>
+          <div className="settings-section-header">
+            <div>
+              <h3>Google Drive — lưu &amp; đăng ảnh</h3>
+              <p className="field-hint">
+                Ảnh AI/import lưu dạng <code>gdrive://FILE_ID</code> trên Drive.
+                Khi đăng Facebook, server tải ảnh từ Drive rồi upload lên Graph API — không cần lưu lâu trên VPS.
+                Giới hạn hiển thị VPS: {settings?.config?.max_images_mb || 5000} MB (ảnh trên Drive không tính vào đây).
+              </p>
+            </div>
+            <span className={`badge ${driveStatus.drive_configured ? 'badge-published' : 'badge-default'}`}>
+              {driveStatus.drive_configured ? 'Drive đã cấu hình' : 'Chưa cấu hình'}
+            </span>
+          </div>
+
+          <div className="settings-drive-status" style={{ marginBottom: 16 }}>
+            <p className="field-hint">
+              Chế độ hiện tại: <strong>{driveStatus.media_storage === 'google_drive' ? 'Google Drive' : 'VPS local'}</strong>
+              {driveStatus.service_account?.client_email && (
+                <> — Service account: <code>{driveStatus.service_account.client_email}</code></>
+              )}
+              {driveStatus.credentials_source && (
+                <> (credentials: {driveStatus.credentials_source})</>
+              )}
+              {driveStatus.folder_id_source && (
+                <> — Folder: {driveStatus.folder_id_source}</>
+              )}
+            </p>
+          </div>
+
+          {canEditMediaStorage ? (
+            <>
+              <div className="settings-schedule-grid">
+                <label>
+                  Nơi lưu ảnh
+                  <select
+                    value={mediaForm.media_storage}
+                    onChange={(e) => handleMediaChange('media_storage', e.target.value)}
+                  >
+                    <option value="google_drive">Google Drive (khuyến nghị)</option>
+                    <option value="local">VPS local</option>
+                  </select>
+                </label>
+                <label>
+                  Google Drive Folder ID
+                  <input
+                    type="text"
+                    placeholder="1AbCdEf..."
+                    value={mediaForm.google_drive_folder_id}
+                    onChange={(e) => handleMediaChange('google_drive_folder_id', e.target.value)}
+                  />
+                </label>
+              </div>
+
+              <label style={{ display: 'block', marginTop: 12 }}>
+                Service Account JSON
+                <textarea
+                  rows={5}
+                  placeholder={driveStatus.has_stored_credentials || driveStatus.credentials_source === 'env'
+                    ? 'Để trống nếu giữ JSON hiện tại — dán JSON mới để thay'
+                    : 'Dán toàn bộ JSON service account từ Google Cloud'}
+                  value={mediaForm.google_drive_service_account_json}
+                  onChange={(e) => handleMediaChange('google_drive_service_account_json', e.target.value)}
+                />
+              </label>
+
+              <p className="field-hint" style={{ marginTop: 8 }}>
+                Tạo folder Drive → Share với email service account (quyền Editor).
+                Cấu hình Composio chỉ lưu database (Cài đặt). Mỗi fanpage có thể lưu song song token thủ công + Composio.
+              </p>
+
+              <div style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
+                <Button type="button" onClick={saveMediaStorage} disabled={mediaSaving}>
+                  {mediaSaving ? 'Đang lưu...' : 'Lưu cấu hình Drive'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={testDriveConnection}
+                  disabled={mediaTesting || !driveStatus.drive_configured}
+                >
+                  {mediaTesting ? 'Đang kiểm tra...' : 'Kiểm tra kết nối Drive'}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <p className="field-hint">Chỉ super admin mới chỉnh cấu hình Google Drive.</p>
+          )}
+        </div>
+      )}
+
+      {composioStatus && composioForm && (
+        <div className="card settings-composio" style={{ marginTop: 24 }}>
+          <div className="settings-section-header">
+            <div>
+              <h3>Composio — token Facebook</h3>
+              <p className="field-hint">
+                Cấu hình Composio lưu database. Hệ thống kiểm tra token còn hiệu lực; chỉ lấy token Composio mới khi token đã hết hạn.
+              </p>
+            </div>
+            <span className={`badge ${composioStatus.configured ? 'badge-published' : 'badge-default'}`}>
+              {composioStatus.configured ? 'Đã cấu hình' : 'Chưa cấu hình'}
+            </span>
+          </div>
+
+          {composioStatus.api_key_preview && (
+            <p className="field-hint" style={{ marginBottom: 12 }}>
+              API key: <code>{composioStatus.api_key_preview}</code>
+              {composioStatus.api_key_source && <> ({composioStatus.api_key_source})</>}
+              {composioStatus.connection?.status && (
+                <> — Connection: <strong>{composioStatus.connection.status}</strong></>
+              )}
+            </p>
+          )}
+
+          {canEditMediaStorage ? (
+            <>
+              <div className="settings-schedule-grid">
+                <label>
+                  Composio API Key
+                  <input
+                    type="password"
+                    placeholder={composioStatus.has_stored_api_key ? 'Để trống = giữ key hiện tại' : 'ak_...'}
+                    value={composioForm.composio_api_key}
+                    onChange={(e) => handleComposioChange('composio_api_key', e.target.value)}
+                  />
+                </label>
+                <label>
+                  Auth Config ID
+                  <input
+                    value={composioForm.composio_facebook_auth_config_id}
+                    onChange={(e) => handleComposioChange('composio_facebook_auth_config_id', e.target.value)}
+                    placeholder="ac_..."
+                  />
+                </label>
+                <label>
+                  User ID
+                  <input
+                    value={composioForm.composio_default_user_id}
+                    onChange={(e) => handleComposioChange('composio_default_user_id', e.target.value)}
+                  />
+                </label>
+                <label>
+                  Connected Account ID
+                  <input
+                    value={composioForm.composio_default_connected_account_id}
+                    onChange={(e) => handleComposioChange('composio_default_connected_account_id', e.target.value)}
+                    placeholder="ca_..."
+                  />
+                </label>
+              </div>
+
+              <label className="page-skill-option" style={{ marginTop: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={composioForm.composio_auto_fallback}
+                  onChange={(e) => handleComposioChange('composio_auto_fallback', e.target.checked)}
+                />
+                <span>Tự chuyển token khi đăng lỗi (manual ↔ Composio trên từng fanpage)</span>
+              </label>
+
+              <div style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
+                <Button type="button" onClick={saveComposioSettings} disabled={composioSaving}>
+                  {composioSaving ? 'Đang lưu...' : 'Lưu cấu hình Composio'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={createComposioConnectLink}
+                  disabled={composioLinking || !composioStatus.configured}
+                >
+                  {composioLinking ? 'Đang tạo link...' : 'Kết nối Facebook (OAuth)'}
+                </Button>
+                <Button type="button" variant="secondary" onClick={refreshComposioStatus}>
+                  Làm mới trạng thái
+                </Button>
+              </div>
+            </>
+          ) : (
+            <p className="field-hint">Chỉ super admin mới chỉnh cấu hình Composio.</p>
+          )}
         </div>
       )}
 

@@ -43,6 +43,7 @@ export const WEEK_DAYS = [
 
 export const TOKEN_STATUS_LABELS = {
   valid: 'Hợp lệ',
+  expiring: 'Sắp hết hạn',
   expired: 'Hết hạn',
   missing: 'Chưa có',
   invalid: 'Không hợp lệ',

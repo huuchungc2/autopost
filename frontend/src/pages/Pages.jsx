@@ -99,13 +99,20 @@ export default function Pages() {
                     <span className={`token-badge token-${page.token_status}`}>
                       {tokenStatusLabel(page.token_status)}
                     </span>
+                    <span className="badge badge-default" title="Token đang dùng khi đăng bài">
+                      {page.token_source === 'composio' ? 'Active: Composio' : 'Active: Manual'}
+                    </span>
                     {page.page_token_preview && (
-                      <code className="text-muted" style={{ fontSize: 'var(--text-xs)', wordBreak: 'break-all' }} title="Xem trước — bấm Token để xem đủ">
-                        {page.page_token_preview}
-                      </code>
+                      <div className="text-muted" style={{ fontSize: 'var(--text-xs)' }}>
+                        M: {tokenStatusLabel(page.manual_token_status || 'unknown')}
+                        {page.manual_token_expires_at ? ` · ${formatDateTime(page.manual_token_expires_at)}` : ''}
+                      </div>
                     )}
-                    {page.token_expires_at && (
-                      <span className="text-muted" style={{ fontSize: 'var(--text-xs)' }}>Hết hạn: {formatDateTime(page.token_expires_at)}</span>
+                    {(page.composio_page_token_preview || page.composio_token_status) && (
+                      <div className="text-muted" style={{ fontSize: 'var(--text-xs)' }}>
+                        C: {tokenStatusLabel(page.composio_token_status || 'unknown')}
+                        {page.composio_token_expires_at ? ` · ${formatDateTime(page.composio_token_expires_at)}` : ''}
+                      </div>
                     )}
                   </div>
                 </td>

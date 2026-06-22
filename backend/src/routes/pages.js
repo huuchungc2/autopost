@@ -2,7 +2,23 @@ import express from 'express';
 import { query } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { canManagePages } from '../middleware/rbac.js';
-import { verifyFacebookToken } from '../services/fbService.js';
+import { verifyFacebookToken, inspectFacebookToken } from '../services/fbService.js';
+import {
+  fetchFacebookPageFromComposio,
+  getComposioDefaults,
+  getConnectedAccountStatus,
+  createComposioFacebookLink,
+  isComposioConfigured,
+  syncComposioPageTokenForPage,
+} from '../services/composioService.js';
+import {
+  getActiveTokenSource,
+  hasComposioPageToken,
+  hasManualPageToken,
+  resolveInitialActiveSource,
+  tokenPreview,
+} from '../services/pageTokenService.js';
+import { computeTokenStatus, syncSummaryTokenFields } from '../services/tokenHealthService.js';
 import {
   getAccessiblePageIds,
   assertPageAccess,
@@ -81,14 +97,162 @@ async function resolveAssignableUserIds(userIds) {
   return [];
 }
 
+function normalizeTokenSource(value) {
+  return value === 'composio' ? 'composio' : 'manual';
+}
+
+async function resolveDualTokensForSave({
+  page_id,
+  page_token,
+  composio_user_id,
+  composio_connected_account_id,
+  sync_composio,
+  existing,
+}) {
+  let manualToken = existing?.page_token ? String(existing.page_token) : '';
+  let composioToken = existing?.composio_page_token ? String(existing.composio_page_token) : '';
+  let composioUserId = composio_user_id !== undefined ? composio_user_id : existing?.composio_user_id;
+  let composioConnectedAccountId = composio_connected_account_id !== undefined
+    ? composio_connected_account_id
+    : existing?.composio_connected_account_id;
+  let resolvedName = null;
+  let avatarUrl = null;
+
+  let manualExpiresAt = existing?.manual_token_expires_at || null;
+  let manualStatus = existing?.manual_token_status || 'unknown';
+  let composioExpiresAt = existing?.composio_token_expires_at || null;
+  let composioStatus = existing?.composio_token_status || 'unknown';
+
+  if (page_token?.trim()) {
+    await verifyFacebookToken(page_id, page_token.trim());
+    manualToken = page_token.trim();
+    const inspected = await inspectFacebookToken(manualToken);
+    if (inspected) {
+      manualExpiresAt = inspected.expiresAt;
+      manualStatus = inspected.isValid ? computeTokenStatus(inspected.expiresAt) : 'expired';
+    } else {
+      manualStatus = 'valid';
+      manualExpiresAt = manualExpiresAt || new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+    }
+  }
+
+  if (sync_composio) {
+    if (!isComposioConfigured()) {
+      const error = new Error('Composio chưa cấu hình — vào Cài đặt → Composio');
+      error.status = 400;
+      throw error;
+    }
+    const synced = await fetchFacebookPageFromComposio(page_id, {
+      composio_user_id: composioUserId,
+      composio_connected_account_id: composioConnectedAccountId,
+    });
+    composioToken = synced.page_token;
+    composioUserId = synced.composio_user_id;
+    composioConnectedAccountId = synced.composio_connected_account_id;
+    resolvedName = synced.name;
+    avatarUrl = synced.avatar_url || null;
+    const inspected = await inspectFacebookToken(composioToken);
+    if (inspected) {
+      composioExpiresAt = inspected.expiresAt;
+      composioStatus = inspected.isValid ? computeTokenStatus(inspected.expiresAt) : 'expired';
+    } else {
+      composioStatus = 'valid';
+      composioExpiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+    }
+  }
+
+  if (!manualToken?.trim() && !composioToken?.trim()) {
+    const error = new Error('Cần ít nhất token thủ công hoặc đồng bộ Composio');
+    error.status = 400;
+    throw error;
+  }
+
+  const token_source = existing?.token_source
+    ? normalizeTokenSource(existing.token_source)
+    : resolveInitialActiveSource({ manualToken, composioToken });
+  const summary = syncSummaryTokenFields({
+    token_source,
+    page_token: manualToken,
+    composio_page_token: composioToken,
+    manual_token_status: manualStatus,
+    manual_token_expires_at: manualExpiresAt,
+    composio_token_status: composioStatus,
+    composio_token_expires_at: composioExpiresAt,
+  });
+
+  return {
+    page_token: manualToken || '',
+    composio_page_token: composioToken || null,
+    composio_user_id: composioUserId || null,
+    composio_connected_account_id: composioConnectedAccountId || null,
+    token_source,
+    manual_token_status: manualStatus,
+    manual_token_expires_at: manualExpiresAt,
+    composio_token_status: composioStatus,
+    composio_token_expires_at: composioExpiresAt,
+    resolved_name: resolvedName,
+    avatar_url: avatarUrl,
+    tokenExpiresAt: summary.token_expires_at,
+    tokenStatus: summary.token_status,
+  };
+}
+
+async function applyComposioSyncToPage(pageId) {
+  const synced = await syncComposioPageTokenForPage(pageId);
+  return { synced, tokenExpiresAt: synced.token_expires_at };
+}
+
+router.get('/composio/config', authenticate, canManagePages, asyncHandler(async (req, res) => {
+  const defaults = getComposioDefaults();
+  let connection = null;
+  if (defaults.default_connected_account_id && isComposioConfigured()) {
+    try {
+      connection = await getConnectedAccountStatus(defaults.default_connected_account_id);
+    } catch (error) {
+      connection = { error: error.message };
+    }
+  }
+  res.json({ ...defaults, connection });
+}));
+
+router.post('/composio/connect-link', authenticate, canManagePages, asyncHandler(async (req, res) => {
+  const link = await createComposioFacebookLink(req.body?.composio_user_id);
+  res.json({
+    message: 'Mở link để hoàn tất kết nối Facebook trên Composio',
+    ...link,
+  });
+}));
+
+router.post('/composio/preview-sync', authenticate, canManagePages, asyncHandler(async (req, res) => {
+  const { page_id, composio_user_id, composio_connected_account_id } = req.body || {};
+  if (!page_id?.trim()) return res.status(400).json({ error: 'page_id is required' });
+  const synced = await fetchFacebookPageFromComposio(page_id.trim(), {
+    composio_user_id,
+    composio_connected_account_id,
+  });
+  res.json({
+    message: 'Lấy token từ Composio thành công',
+    page_id: page_id.trim(),
+    page_name: synced.name,
+    avatar_url: synced.avatar_url,
+    composio_user_id: synced.composio_user_id,
+    composio_connected_account_id: synced.composio_connected_account_id,
+    token_preview: `${synced.page_token.slice(0, 8)}…${synced.page_token.slice(-6)}`,
+  });
+}));
+
 router.get('/', authenticate, asyncHandler(async (req, res) => {
   const accessibleIds = await getAccessiblePageIds(req.user);
   const { clause, params } = pageIdInClause(accessibleIds, 'fp.id');
   const pages = await query(
     `SELECT fp.id, fp.name, fp.page_id, fp.avatar_url, fp.is_active, fp.token_status,
-            fp.token_expires_at,
+            fp.token_expires_at, fp.token_source,
+            fp.manual_token_status, fp.composio_token_status,
+            fp.manual_token_expires_at, fp.composio_token_expires_at,
+            fp.composio_connected_account_id,
             fp.skill_id, fp.text_provider_id, fp.image_provider_id, fp.created_at,
-            CONCAT(LEFT(fp.page_token, 8), '…', RIGHT(fp.page_token, 6)) AS page_token_preview
+            CONCAT(LEFT(fp.page_token, 8), '…', RIGHT(fp.page_token, 6)) AS page_token_preview,
+            CONCAT(LEFT(fp.composio_page_token, 8), '…', RIGHT(fp.composio_page_token, 6)) AS composio_page_token_preview
      FROM fb_pages fp
      WHERE 1=1${clause}
      ORDER BY fp.name ASC`,
@@ -100,8 +264,10 @@ router.get('/', authenticate, asyncHandler(async (req, res) => {
 router.get('/:id', authenticate, asyncHandler(async (req, res) => {
   await assertPageAccess(req.user, req.params.id);
   const pages = await query(
-    `SELECT id, name, page_id, page_token, avatar_url, skill_id, text_provider_id, image_provider_id,
-            is_active, token_status, token_expires_at, created_at,
+    `SELECT id, name, page_id, page_token, composio_page_token, avatar_url, skill_id, text_provider_id, image_provider_id,
+            is_active, token_status, token_expires_at, token_source,
+            manual_token_status, manual_token_expires_at, composio_token_status, composio_token_expires_at,
+            composio_user_id, composio_connected_account_id, created_at,
             image_schedule_enabled, image_schedule_start_hour, image_schedule_start_minute,
             image_schedule_end_hour, image_schedule_end_minute, image_schedule_interval_minutes,
             image_schedule_last_run_at
@@ -114,6 +280,8 @@ router.get('/:id', authenticate, asyncHandler(async (req, res) => {
   const assigned_user_ids = isSuperAdmin(req.user) ? await getPageAssignedUserIds(req.params.id) : undefined;
   res.json({
     ...attachImageSchedule(page),
+    page_token_preview: tokenPreview(page.page_token),
+    composio_page_token_preview: tokenPreview(page.composio_page_token),
     skills,
     skill_ids: skills.map((s) => s.id),
     ...(assigned_user_ids !== undefined ? { assigned_user_ids } : {}),
@@ -125,9 +293,12 @@ router.post('/', authenticate, canManagePages, asyncHandler(async (req, res) => 
     name, page_id, page_token, avatar_url, text_provider_id, image_provider_id, is_active = true,
     assign_user_ids = [],
     image_schedule: imageScheduleInput,
+    composio_user_id,
+    composio_connected_account_id,
+    sync_composio = false,
   } = req.body;
   const skillIds = normalizeSkillIds(req.body);
-  if (!name || !page_id || !page_token) return res.status(400).json({ error: 'Missing required fields' });
+  if (!name || !page_id) return res.status(400).json({ error: 'Thiếu tên hoặc Page ID' });
 
   const resolvedTextProviderId = normalizeOptionalProviderId(text_provider_id);
   const resolvedImageProviderId = normalizeOptionalProviderId(image_provider_id);
@@ -136,19 +307,40 @@ router.post('/', authenticate, canManagePages, asyncHandler(async (req, res) => 
   if (resolvedTextProviderId) await assertProviderAccess(req.user, resolvedTextProviderId);
   if (resolvedImageProviderId) await assertProviderAccess(req.user, resolvedImageProviderId);
 
-  await verifyFacebookToken(page_id, page_token);
-  const tokenExpiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+  const resolvedToken = await resolveDualTokensForSave({
+    page_id,
+    page_token,
+    composio_user_id,
+    composio_connected_account_id,
+    sync_composio: !!sync_composio,
+  });
   const scheduleValues = pageScheduleSqlValues(pageSchedule);
   const result = await query(
     `INSERT INTO fb_pages (
-       name, page_id, page_token, token_expires_at, token_status, avatar_url, skill_id,
+       name, page_id, page_token, composio_page_token, token_source, composio_user_id, composio_connected_account_id,
+       manual_token_status, manual_token_expires_at, composio_token_status, composio_token_expires_at,
+       token_expires_at, token_status, avatar_url, skill_id,
        text_provider_id, image_provider_id, is_active,
        image_schedule_enabled, image_schedule_start_hour, image_schedule_start_minute,
        image_schedule_end_hour, image_schedule_end_minute, image_schedule_interval_minutes,
        created_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
     [
-      name, page_id, page_token, tokenExpiresAt, 'valid', avatar_url || null, skillIds[0] || null,
+      resolvedToken.resolved_name || name,
+      page_id,
+      resolvedToken.page_token,
+      resolvedToken.composio_page_token,
+      resolvedToken.token_source,
+      resolvedToken.composio_user_id,
+      resolvedToken.composio_connected_account_id,
+      resolvedToken.manual_token_status,
+      resolvedToken.manual_token_expires_at,
+      resolvedToken.composio_token_status,
+      resolvedToken.composio_token_expires_at,
+      resolvedToken.tokenExpiresAt,
+      resolvedToken.tokenStatus,
+      avatar_url || resolvedToken.avatar_url || null,
+      skillIds[0] || null,
       resolvedTextProviderId, resolvedImageProviderId, is_active,
       ...scheduleValues,
     ]
@@ -171,6 +363,10 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
     name, page_token, avatar_url, text_provider_id, image_provider_id, is_active,
     assign_user_ids,
     image_schedule: imageScheduleInput,
+    composio_user_id,
+    composio_connected_account_id,
+    sync_composio,
+    token_source: tokenSourceInput,
   } = req.body;
   const skillIds = req.body.skill_ids !== undefined || req.body.skill_id !== undefined
     ? normalizeSkillIds(req.body)
@@ -181,7 +377,10 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
   }
 
   const existing = (await query(
-    `SELECT page_id, page_token, avatar_url, skill_id, text_provider_id, image_provider_id, is_active,
+    `SELECT page_id, page_token, composio_page_token, avatar_url, skill_id, text_provider_id, image_provider_id, is_active,
+            token_source, token_status, token_expires_at,
+            manual_token_status, manual_token_expires_at, composio_token_status, composio_token_expires_at,
+            composio_user_id, composio_connected_account_id,
             image_schedule_enabled, image_schedule_start_hour, image_schedule_start_minute,
             image_schedule_end_hour, image_schedule_end_minute, image_schedule_interval_minutes
      FROM fb_pages WHERE id = ?`,
@@ -189,14 +388,50 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
   ))[0];
   if (!existing) return res.status(404).json({ error: 'Page not found' });
 
-  let tokenToUpdate = existing.page_token;
-  let tokenStatus = 'valid';
-  let tokenExpiresAt = null;
+  const shouldSyncComposio = !!sync_composio;
+  const shouldUpdateManual = page_token?.trim();
+  const shouldUpdateTokens = shouldSyncComposio || shouldUpdateManual;
 
-  if (page_token?.trim()) {
-    await verifyFacebookToken(existing.page_id, page_token.trim());
-    tokenToUpdate = page_token.trim();
-    tokenExpiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+  let manualToken = existing.page_token;
+  let composioToken = existing.composio_page_token;
+  let composioUserId = composio_user_id !== undefined ? composio_user_id : existing.composio_user_id;
+  let composioConnectedAccountId = composio_connected_account_id !== undefined
+    ? composio_connected_account_id
+    : existing.composio_connected_account_id;
+  let tokenStatus = existing.token_status || 'valid';
+  let tokenExpiresAt = existing.token_expires_at || null;
+  let manualTokenStatus = existing.manual_token_status || 'unknown';
+  let manualTokenExpiresAt = existing.manual_token_expires_at || null;
+  let composioTokenStatus = existing.composio_token_status || 'unknown';
+  let composioTokenExpiresAt = existing.composio_token_expires_at || null;
+  let token_source = tokenSourceInput !== undefined
+    ? normalizeTokenSource(tokenSourceInput)
+    : (existing.token_source || 'manual');
+
+  if (shouldUpdateTokens) {
+    const resolvedToken = await resolveDualTokensForSave({
+      page_id: existing.page_id,
+      page_token: shouldUpdateManual ? page_token : undefined,
+      composio_user_id: composioUserId,
+      composio_connected_account_id: composioConnectedAccountId,
+      sync_composio: shouldSyncComposio,
+      existing,
+    });
+    manualToken = resolvedToken.page_token;
+    composioToken = resolvedToken.composio_page_token;
+    composioUserId = resolvedToken.composio_user_id;
+    composioConnectedAccountId = resolvedToken.composio_connected_account_id;
+    tokenStatus = resolvedToken.tokenStatus;
+    tokenExpiresAt = resolvedToken.tokenExpiresAt;
+    manualTokenStatus = resolvedToken.manual_token_status;
+    manualTokenExpiresAt = resolvedToken.manual_token_expires_at;
+    composioTokenStatus = resolvedToken.composio_token_status;
+    composioTokenExpiresAt = resolvedToken.composio_token_expires_at;
+    if (tokenSourceInput === undefined) {
+      token_source = resolvedToken.token_source;
+    }
+  } else if (!hasManualPageToken(existing) && !hasComposioPageToken(existing)) {
+    return res.status(400).json({ error: 'Fanpage cần ít nhất một token' });
   }
 
   const resolvedTextProviderId = text_provider_id !== undefined
@@ -220,19 +455,28 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
 
   await query(
     scheduleValues
-      ? `UPDATE fb_pages SET name = ?, page_token = ?, avatar_url = ?, skill_id = ?, text_provider_id = ?, image_provider_id = ?, is_active = ?,
+      ? `UPDATE fb_pages SET name = ?, page_token = ?, composio_page_token = ?, token_source = ?, composio_user_id = ?, composio_connected_account_id = ?,
+         manual_token_status = ?, manual_token_expires_at = ?, composio_token_status = ?, composio_token_expires_at = ?,
+         avatar_url = ?, skill_id = ?, text_provider_id = ?, image_provider_id = ?, is_active = ?,
          image_schedule_enabled = ?, image_schedule_start_hour = ?, image_schedule_start_minute = ?,
          image_schedule_end_hour = ?, image_schedule_end_minute = ?, image_schedule_interval_minutes = ?,
          token_expires_at = COALESCE(?, token_expires_at), token_status = ? WHERE id = ?`
-      : `UPDATE fb_pages SET name = ?, page_token = ?, avatar_url = ?, skill_id = ?, text_provider_id = ?, image_provider_id = ?, is_active = ?, token_expires_at = COALESCE(?, token_expires_at), token_status = ? WHERE id = ?`,
+      : `UPDATE fb_pages SET name = ?, page_token = ?, composio_page_token = ?, token_source = ?, composio_user_id = ?, composio_connected_account_id = ?,
+         manual_token_status = ?, manual_token_expires_at = ?, composio_token_status = ?, composio_token_expires_at = ?,
+         avatar_url = ?, skill_id = ?, text_provider_id = ?, image_provider_id = ?, is_active = ?,
+         token_expires_at = COALESCE(?, token_expires_at), token_status = ? WHERE id = ?`,
     scheduleValues
       ? [
-        name.trim(), tokenToUpdate, resolvedAvatarUrl, skillIdToSave, resolvedTextProviderId, resolvedImageProviderId, resolvedIsActive,
+        name.trim(), manualToken, composioToken, token_source, composioUserId, composioConnectedAccountId,
+        manualTokenStatus, manualTokenExpiresAt, composioTokenStatus, composioTokenExpiresAt,
+        resolvedAvatarUrl, skillIdToSave, resolvedTextProviderId, resolvedImageProviderId, resolvedIsActive,
         ...scheduleValues,
         tokenExpiresAt, tokenStatus, req.params.id,
       ]
       : [
-        name.trim(), tokenToUpdate, resolvedAvatarUrl, skillIdToSave, resolvedTextProviderId, resolvedImageProviderId, resolvedIsActive,
+        name.trim(), manualToken, composioToken, token_source, composioUserId, composioConnectedAccountId,
+        manualTokenStatus, manualTokenExpiresAt, composioTokenStatus, composioTokenExpiresAt,
+        resolvedAvatarUrl, skillIdToSave, resolvedTextProviderId, resolvedImageProviderId, resolvedIsActive,
         tokenExpiresAt, tokenStatus, req.params.id,
       ]
   );
@@ -279,6 +523,20 @@ router.post('/:id/topics', authenticate, canManagePages, asyncHandler(async (req
   res.status(201).json({ id: result.insertId, page_id: req.params.id, day_of_week: dow, topic: String(topic).trim(), post_time, is_active });
 }));
 
+router.post('/:id/composio/sync', authenticate, canManagePages, asyncHandler(async (req, res) => {
+  await assertPageAccess(req.user, req.params.id);
+  const { synced, tokenExpiresAt } = await applyComposioSyncToPage(req.params.id);
+  res.json({
+    message: 'Đã đồng bộ token Composio',
+    page_name: synced.name,
+    token_expires_at: tokenExpiresAt,
+    composio_page_token_preview: tokenPreview(synced.composio_page_token),
+    composio_token_status: synced.composio_token_status,
+    composio_token_expires_at: synced.composio_token_expires_at,
+    token_source: synced.token_source,
+  });
+}));
+
 router.put('/:id/token', authenticate, canManagePages, asyncHandler(async (req, res) => {
   await assertPageAccess(req.user, req.params.id);
   const { page_token } = req.body;
@@ -286,24 +544,50 @@ router.put('/:id/token', authenticate, canManagePages, asyncHandler(async (req, 
   const page = (await query('SELECT page_id FROM fb_pages WHERE id = ?', [req.params.id]))[0];
   if (!page) return res.status(404).json({ error: 'Page not found' });
   await verifyFacebookToken(page.page_id, page_token);
-  const tokenExpiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
-  await query('UPDATE fb_pages SET page_token = ?, token_expires_at = ?, token_status = ? WHERE id = ?', [page_token, tokenExpiresAt, 'valid', req.params.id]);
+  const inspected = await inspectFacebookToken(page_token);
+  const manualExpiresAt = inspected?.expiresAt || new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+  const manualStatus = inspected
+    ? (inspected.isValid ? computeTokenStatus(manualExpiresAt) : 'expired')
+    : 'valid';
+  await query(
+    `UPDATE fb_pages SET page_token = ?, manual_token_expires_at = ?, manual_token_status = ?,
+         token_expires_at = ?, token_status = ?, token_source = 'manual' WHERE id = ?`,
+    [page_token, manualExpiresAt, manualStatus, manualExpiresAt, manualStatus, req.params.id]
+  );
   res.json({ message: 'Token updated' });
 }));
 
 router.post('/:id/verify-token', authenticate, canManagePages, asyncHandler(async (req, res) => {
   await assertPageAccess(req.user, req.params.id);
-  const page = (await query('SELECT page_id, page_token, name FROM fb_pages WHERE id = ?', [req.params.id]))[0];
+  const page = (await query(
+    `SELECT page_id, page_token, composio_page_token, name, token_source,
+            composio_user_id, composio_connected_account_id
+     FROM fb_pages WHERE id = ?`,
+    [req.params.id]
+  ))[0];
   if (!page) return res.status(404).json({ error: 'Page not found' });
   try {
-    const fb = await verifyFacebookToken(page.page_id, page.page_token);
+    const results = [];
+    if (hasManualPageToken(page)) {
+      const fb = await verifyFacebookToken(page.page_id, page.page_token);
+      results.push({ source: 'manual', ok: true, fb_name: fb.name });
+    }
+    if (hasComposioPageToken(page) || isComposioConfigured()) {
+      await applyComposioSyncToPage(req.params.id);
+      const refreshed = (await query(
+        'SELECT composio_page_token, token_source FROM fb_pages WHERE id = ?',
+        [req.params.id]
+      ))[0];
+      const fb = await verifyFacebookToken(page.page_id, refreshed.composio_page_token);
+      results.push({ source: 'composio', ok: true, fb_name: fb.name, token_source: refreshed.token_source });
+    }
     await query('UPDATE fb_pages SET token_status = ? WHERE id = ?', ['valid', req.params.id]);
     res.json({
       ok: true,
       message: 'Token hợp lệ',
-      fb_page_id: fb.id,
-      fb_name: fb.name,
-      matches_configured_page: String(fb.id) === String(page.page_id),
+      active_source: getActiveTokenSource(page),
+      tokens: results,
+      matches_configured_page: results.every((r) => r.ok),
     });
   } catch (error) {
     await query('UPDATE fb_pages SET token_status = ? WHERE id = ?', ['expired', req.params.id]);

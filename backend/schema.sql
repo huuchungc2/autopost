@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS fb_pages (
   name VARCHAR(255) NOT NULL,
   page_id VARCHAR(100) UNIQUE NOT NULL,
   page_token TEXT NOT NULL,
+  composio_page_token TEXT NULL,
+  token_source ENUM('manual', 'composio') NOT NULL DEFAULT 'manual',
   token_expires_at DATETIME NULL,
   token_status ENUM('valid','expiring','expired') DEFAULT 'valid',
   avatar_url TEXT,

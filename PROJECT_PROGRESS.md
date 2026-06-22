@@ -1,8 +1,17 @@
 # AutoPost Project Progress
 
-> Cập nhật: 2026-06-15 — v0.2.0
+> Cập nhật: 2026-06-22
 
-## ✅ Đã hoàn thành
+## ✅ Đã hoàn thành (mới)
+
+### Token Facebook + Composio
+- Dual token mỗi fanpage: manual + Composio (DB), không ghi đè lẫn nhau
+- Cấu hình Composio global trong **Cài đặt** (database, không `.env`)
+- Kiểm tra hiệu lực token qua Graph API; cron mỗi giờ
+- Auto-switch token khi đăng lỗi; refresh Composio chỉ khi token **expired**
+- Chi tiết: [`docs/TOKENS_AND_COMPOSIO.md`](docs/TOKENS_AND_COMPOSIO.md)
+
+## ✅ Đã hoàn thành (v0.2.0)
 
 ### Backend
 - Auth JWT + bcrypt + RBAC + must_change_password

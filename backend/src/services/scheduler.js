@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { query } from '../db.js';
 import { processPendingJobs } from './jobWorker.js';
 import { postToFacebook } from './fbService.js';
+import { publishToFacebookWithFallback } from './facebookPublishService.js';
 import { createNotification } from './notifyService.js';
 import { persistFacebookPublishIds } from './postPublishService.js';
 import { ensurePostImageForPublish } from './postImageService.js';
@@ -22,6 +23,7 @@ import {
   getZonedNow,
   touchImageScheduleLastRun,
 } from './imageScheduleConfig.js';
+import { checkAllPageTokens } from './tokenHealthService.js';
 
 let started = false;
 let publishDuePostsRunning = false;
@@ -38,7 +40,7 @@ export function startScheduler() {
   cron.schedule('* * * * *', () => runExclusive(runDueTopicSlots, 'runDueTopicSlots'));
   cron.schedule('* * * * *', () => runExclusive(tickImageSchedule, 'tickImageSchedule'));
   cron.schedule('*/5 * * * *', () => processPendingJobs(5));
-  cron.schedule('0 * * * *', checkTokenExpiry);
+  cron.schedule('0 * * * *', () => runExclusive(checkPageTokens, 'checkPageTokens'));
 
   getEnabledImageSchedules().then((rows) => {
     console.log(`Image schedule: ${rows.length} admin đang bật lịch (mỗi admin chỉ fanpage được gán)`);
@@ -249,9 +251,9 @@ async function publishDuePosts() {
   for (const post of posts) {
     try {
       const readyPost = await ensurePostImageForPublish(post, post.image_provider_id);
-      const response = await postToFacebook({
+      const response = await publishToFacebookWithFallback({
+        internalPageId: post.page_id,
         pageId: readyPost.fb_page_id,
-        pageToken: readyPost.page_token,
         message: readyPost.content,
         imageUrl: readyPost.media_type === 'image' ? readyPost.image_url : null,
         videoUrl: readyPost.media_type === 'video' ? readyPost.video_url : null,
@@ -273,29 +275,35 @@ async function publishDuePosts() {
   }
 }
 
-async function checkTokenExpiry() {
-  const pages = await query('SELECT id, name, token_expires_at, token_status FROM fb_pages WHERE is_active = true');
-  const now = Date.now();
-  const sevenDays = 7 * 24 * 60 * 60 * 1000;
+async function checkPageTokens() {
+  const results = await checkAllPageTokens(query);
 
-  for (const page of pages) {
-    if (!page.token_expires_at) continue;
-    const expires = new Date(page.token_expires_at).getTime();
-    let status = 'valid';
-    if (expires <= now) status = 'expired';
-    else if (expires - now <= sevenDays) status = 'expiring';
-
-    if (status !== page.token_status) {
-      await query('UPDATE fb_pages SET token_status = ? WHERE id = ?', [status, page.id]);
-      if (status !== 'valid') {
+  for (const item of results) {
+    if (!item.ok) {
+      await createNotification({
+        type: 'warning',
+        title: 'Kiểm tra token thất bại',
+        message: `Fanpage "${item.name}": ${item.error}`,
+        relatedType: 'page',
+        relatedId: item.id,
+      });
+      continue;
+    }
+    const health = item.health || {};
+    for (const [label, status, expiresAt, prevStatus] of [
+      ['Thủ công', health.manual_token_status, health.manual_token_expires_at, item.prevManualStatus],
+      ['Composio', health.composio_token_status, health.composio_token_expires_at, item.prevComposioStatus],
+    ]) {
+      if ((status === 'expired' || status === 'expiring') && status !== prevStatus) {
         await createNotification({
           type: status === 'expired' ? 'error' : 'warning',
-          title: `Token ${status}`,
-          message: `Page "${page.name}" token is ${status}`,
+          title: `Token ${label} ${status === 'expired' ? 'hết hạn' : 'sắp hết hạn'}`,
+          message: `Fanpage "${item.name}" — token ${label}${expiresAt ? ` (đến ${new Date(expiresAt).toLocaleString('vi-VN')})` : ''}${item.composioRefreshed && label === 'Composio' ? ' — đã lấy token mới' : ''}`,
           relatedType: 'page',
-          relatedId: page.id,
+          relatedId: item.id,
         });
       }
     }
   }
 }
+

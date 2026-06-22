@@ -182,7 +182,13 @@ export default function Generate() {
 
       setPreview(response.data);
 
-      showToast(`Đã tạo bài #${response.data.id}`, 'success');
+      const queuedImage = response.data.auto_generate_image && !response.data.image_url;
+      showToast(
+        queuedImage
+          ? `Đã tạo bài #${response.data.id} — ảnh sẽ xuất theo lịch ban đêm`
+          : `Đã tạo bài #${response.data.id}`,
+        'success'
+      );
 
       setTopic('');
 

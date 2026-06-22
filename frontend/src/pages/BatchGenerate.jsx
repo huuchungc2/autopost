@@ -197,7 +197,7 @@ export default function BatchGenerate() {
           <h3>Cách 1: AI tạo nhiều bài, bạn tự quyết đăng</h3>
           <ol className="batch-help-steps">
             <li>Nhập danh sách <strong>chủ đề</strong> (không cần chọn giờ).</li>
-            <li><strong>Lưu</strong> → <strong>Chạy AI</strong> — tất cả bài vào <strong>Chờ duyệt</strong>.</li>
+            <li><strong>Lưu</strong> → <strong>Chạy AI</strong> — tất cả bài vào <strong>Chờ duyệt</strong> (có prompt ảnh; ảnh xuất ban đêm nếu bật lịch).</li>
             <li>Vào <Link to="/posts">Bài viết</Link> → xem/sửa → <strong>lên lịch</strong> hoặc <strong>đăng</strong> theo ý.</li>
           </ol>
         </div>

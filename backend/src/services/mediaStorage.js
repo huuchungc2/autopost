@@ -3,12 +3,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import {
   downloadDriveFileBuffer,
-  downloadDriveFileStream,
   driveFileIdFromUrl,
   drivePreviewUrl,
   isGoogleDriveConfigured,
   uploadBufferToDrive,
 } from './googleDriveService.js';
+import { getEffectiveMediaStorage } from './appSettingsService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,7 +17,7 @@ const publicRoot = path.resolve(__dirname, '../../../public');
 
 /** local | google_drive — mặc định Drive nếu đã cấu hình */
 export function getMediaStorageMode() {
-  const configured = process.env.MEDIA_STORAGE || '';
+  const configured = getEffectiveMediaStorage();
   if (configured === 'local') return 'local';
   if (configured === 'google_drive') return 'google_drive';
   return isGoogleDriveConfigured() ? 'google_drive' : 'local';

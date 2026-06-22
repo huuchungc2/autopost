@@ -118,7 +118,7 @@ DISABLE_SCHEDULER=false
 AUTO_GENERATE_HOUR=23
 AUTO_GENERATE_MINUTE=0
 
-MAX_IMAGES_MB=500
+MAX_IMAGES_MB=5000
 MAX_VIDEOS_MB=5000
 MAX_VIDEO_UPLOAD_MB=500
 
@@ -248,7 +248,18 @@ cd ../frontend
 VITE_API_BASE_URL=https://autopost.yourdomain.com/api npm run build
 ```
 
-## 10. Bảo mật
+## 10. Composio (token Facebook OAuth)
+
+Cấu hình **trên UI** (super admin), lưu database — không cần biến `COMPOSIO_*` trong `.env`.
+
+1. Deploy + restart API (migration `019`–`022` tự chạy).
+2. **Cài đặt → Composio**: API key, Auth Config ID, User ID, Connected Account ID (`ca_...` trạng thái **ACTIVE**).
+3. Bật **Tự chuyển token khi đăng lỗi**.
+4. Mỗi fanpage: token thủ công (tuỳ chọn) + **Đồng bộ token Composio**.
+
+Chi tiết kiến trúc token: [`docs/TOKENS_AND_COMPOSIO.md`](docs/TOKENS_AND_COMPOSIO.md).
+
+## 11. Bảo mật
 
 - `.env` không commit lên git
 - Đổi `SEED_ADMIN_PASSWORD` sau login
@@ -256,7 +267,7 @@ VITE_API_BASE_URL=https://autopost.yourdomain.com/api npm run build
 - Port 3001 không mở ra internet (chỉ Nginx proxy)
 - Backup DB: `mysqldump autopost_db > backup.sql`
 
-## 11. Xử lý lỗi thường gặp
+## 12. Xử lý lỗi thường gặp
 
 | Lỗi | Nguyên nhân | Cách fix |
 |-----|-------------|----------|
@@ -264,4 +275,5 @@ VITE_API_BASE_URL=https://autopost.yourdomain.com/api npm run build
 | Facebook không post được ảnh | `PUBLIC_BASE_URL` sai hoặc HTTP | Dùng HTTPS + domain public |
 | Upload video 413 | Nginx limit | `client_max_body_size 520M` |
 | Scheduler không chạy | `DISABLE_SCHEDULER=true` | Sửa `.env`, restart PM2 |
-| Token FB hết hạn | Cron check mỗi giờ | Cập nhật token trong Pages |
+| Token FB hết hạn | Cron check mỗi giờ | Xem trạng thái M/C trên Pages; dán token manual hoặc đồng bộ Composio — xem `docs/TOKENS_AND_COMPOSIO.md` |
+| Composio chưa ACTIVE | OAuth chưa hoàn tất | Cài đặt → Composio → Kết nối Facebook; dùng connected account `ACTIVE` |

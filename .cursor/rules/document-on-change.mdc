@@ -1,0 +1,47 @@
+---
+description: Ghi chép MD khi làm feature/fix — tránh phải đọc lại codebase mỗi lần hỏi
+alwaysApply: true
+---
+
+# Ghi chép khi thay đổi (bắt buộc)
+
+Mọi task **hoàn thành** (feature, fix, refactor có hành vi mới, migration, config vận hành) phải **cập nhật tài liệu trong cùng phiên** — không chỉ commit code.
+
+## Việc phải làm trước khi kết thúc task
+
+1. **CHANGELOG.md** — thêm bullet vào `[Unreleased]` (what + why ngắn).
+2. **TODO.md** — tick `[x]` mục liên quan; thêm mục mới nếu còn việc follow-up.
+3. **Tài liệu chủ đề** — nếu đủ lớn, tạo/cập nhật `docs/<CHỦ-ĐỀ>.md` (kiến trúc, luồng, DB, API, UI, checklist deploy).
+4. **DEPLOY.md** — nếu đổi env, migration, cron, smoke test, hoặc xử lý lỗi production.
+5. **PROJECT_PROGRESS.md** — cập nhật ngày + 2–5 dòng tóm tắt nếu là milestone đáng kể.
+
+## Map: ghi ở đâu
+
+| Loại thay đổi | File |
+|---------------|------|
+| Token, FB, Composio | `docs/TOKENS_AND_COMPOSIO.md` |
+| Drive, media, storage | `docs/` hoặc mục trong DEPLOY |
+| UI/design system | `frontend/DESIGN_SYSTEM.md` |
+| API/route mới | bullet CHANGELOG + doc chủ đề |
+| Migration SQL | doc chủ đề + DEPLOY smoke/migration |
+| Quy trình vận hành | DEPLOY.md |
+
+Index tổng: `docs/README.md`.
+
+## Nội dung tối thiểu trong doc chủ đề
+
+- **Tóm tắt** 1 đoạn (người đọc hiểu không cần mở code).
+- **Luồng** chính (bullet hoặc bảng).
+- **DB / config** (cột, key, UI path).
+- **File code** then chốt (đường dẫn service/route).
+- **Checklist** deploy hoặc debug nếu có.
+
+## Không làm
+
+- Không để user hỏi lại "cái này hoạt động sao?" mà chỉ trả lời bằng đọc codebase.
+- Không viết doc dài trùng code; ưu tiên **hành vi & quyết định**, không paste implementation.
+- Không bỏ qua doc vì "task nhỏ" nếu đổi hành vi user-facing hoặc vận hành.
+
+## Khi user hỏi về tính năng đã có
+
+Đọc `docs/README.md` → doc chủ đề → CHANGELOG/TODO trước; chỉ grep codebase khi doc thiếu hoặc lệch thực tế (khi đó **sửa doc luôn**).

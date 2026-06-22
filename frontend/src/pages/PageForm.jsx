@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../services/authContext';
-import { skillTypeLabel } from '../config/vi';
+import { skillTypeLabel, tokenStatusLabel } from '../config/vi';
 import Skeleton from '../components/ui/Skeleton';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
@@ -23,6 +23,10 @@ const initialForm = {
   name: '',
   page_id: '',
   page_token: '',
+  composio_user_id: '',
+  composio_connected_account_id: '',
+  token_source: 'manual',
+  composio_synced: false,
   avatar_url: '',
   skill_ids: [],
   text_provider_id: '',
@@ -47,6 +51,24 @@ export default function PageForm() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [showEditToken, setShowEditToken] = useState(false);
+  const [composioConfig, setComposioConfig] = useState(null);
+  const [composioSyncing, setComposioSyncing] = useState(false);
+  const [hasComposioToken, setHasComposioToken] = useState(false);
+  const [composioTokenPreview, setComposioTokenPreview] = useState('');
+  const [tokenHealth, setTokenHealth] = useState(null);
+
+  useEffect(() => {
+    api.get('/pages/composio/config')
+      .then((r) => {
+        setComposioConfig(r.data);
+        setForm((prev) => ({
+          ...prev,
+          composio_user_id: prev.composio_user_id || r.data?.default_user_id || '',
+          composio_connected_account_id: prev.composio_connected_account_id || r.data?.default_connected_account_id || '',
+        }));
+      })
+      .catch(() => setComposioConfig({ configured: false }));
+  }, []);
 
   useEffect(() => {
     const requests = [api.get('/skills'), api.get('/providers')];
@@ -84,6 +106,10 @@ export default function PageForm() {
           name: page.name || '',
           page_id: page.page_id || '',
           page_token: '',
+          composio_user_id: page.composio_user_id || '',
+          composio_connected_account_id: page.composio_connected_account_id || '',
+          token_source: page.token_source || 'manual',
+          composio_synced: !!page.composio_page_token,
           avatar_url: page.avatar_url || '',
           skill_ids: page.skill_ids || page.skills?.map((s) => s.id) || (page.skill_id ? [Number(page.skill_id)] : []),
           text_provider_id: page.text_provider_id ? String(page.text_provider_id) : '',
@@ -102,6 +128,14 @@ export default function PageForm() {
               interval_minutes: page.image_schedule.interval_minutes ?? 10,
             }
             : defaultImageSchedule(),
+        });
+        setHasComposioToken(!!page.composio_page_token);
+        setComposioTokenPreview(page.composio_page_token_preview || '');
+        setTokenHealth({
+          manual_token_status: page.manual_token_status,
+          manual_token_expires_at: page.manual_token_expires_at,
+          composio_token_status: page.composio_token_status,
+          composio_token_expires_at: page.composio_token_expires_at,
         });
       })
       .catch((err) => {
@@ -174,6 +208,59 @@ export default function PageForm() {
     }
   };
 
+  const previewComposioSync = async () => {
+    if (!form.page_id?.trim()) {
+      showToast('Nhập Page ID trước', 'error');
+      return;
+    }
+    setComposioSyncing(true);
+    try {
+      const response = await api.post('/pages/composio/preview-sync', {
+        page_id: form.page_id.trim(),
+        composio_user_id: form.composio_user_id?.trim() || undefined,
+        composio_connected_account_id: form.composio_connected_account_id?.trim() || undefined,
+      });
+      setForm((prev) => ({
+        ...prev,
+        name: prev.name || response.data.page_name || prev.name,
+        avatar_url: prev.avatar_url || response.data.avatar_url || prev.avatar_url,
+        composio_user_id: response.data.composio_user_id || prev.composio_user_id,
+        composio_connected_account_id: response.data.composio_connected_account_id || prev.composio_connected_account_id,
+        composio_synced: true,
+      }));
+      setHasComposioToken(true);
+      setComposioTokenPreview(response.data.token_preview || '');
+      showToast(`Composio OK — ${response.data.page_name || response.data.page_id} (${response.data.token_preview})`, 'success');
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Không lấy được token từ Composio', 'error');
+    } finally {
+      setComposioSyncing(false);
+    }
+  };
+
+  const syncComposioOnPage = async () => {
+    if (!isEdit) return previewComposioSync();
+    setComposioSyncing(true);
+    try {
+      const response = await api.post(`/pages/${id}/composio/sync`);
+      setHasComposioToken(true);
+      setComposioTokenPreview(response.data.composio_page_token_preview || '');
+      setForm((prev) => ({ ...prev, composio_synced: true }));
+      if (response.data.composio_token_status) {
+        setTokenHealth((prev) => ({
+          ...prev,
+          composio_token_status: response.data.composio_token_status,
+          composio_token_expires_at: response.data.token_expires_at,
+        }));
+      }
+      showToast('Đã đồng bộ token Composio', 'success');
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Đồng bộ Composio thất bại', 'error');
+    } finally {
+      setComposioSyncing(false);
+    }
+  };
+
   const buildPayload = (overrides = {}) => {
     const imageSchedule = overrides.image_schedule ?? form.image_schedule;
     const payload = {
@@ -184,11 +271,15 @@ export default function PageForm() {
       image_provider_id: form.image_provider_id ? Number(form.image_provider_id) : null,
       is_active: form.is_active,
       image_schedule: imageSchedule,
+      composio_user_id: form.composio_user_id?.trim() || undefined,
+      composio_connected_account_id: form.composio_connected_account_id?.trim() || undefined,
+      token_source: form.token_source,
+      sync_composio: !isEdit && form.composio_synced,
     };
     if (!isEdit) {
       payload.page_id = form.page_id.trim();
-      payload.page_token = form.page_token.trim();
-    } else if (form.page_token?.trim()) {
+    }
+    if (form.page_token?.trim()) {
       payload.page_token = form.page_token.trim();
     }
     if (isSuperAdmin) {
@@ -286,29 +377,94 @@ export default function PageForm() {
             />
           </label>
 
-          <label className="field-span-2">
-            Page Access Token
-            <div className="token-input-row">
-              <input
-                type={showEditToken ? 'text' : 'password'}
-                value={form.page_token}
-                onChange={(e) => handleChange('page_token', e.target.value)}
-                placeholder={isEdit ? 'Để trống = giữ token cũ' : 'Dán Page Access Token'}
-                required={!isEdit}
-              />
-              {isEdit && (
-                <>
-                  <Button type="button" variant="secondary" size="sm" onClick={() => setShowEditToken((v) => !v)}>
-                    {showEditToken ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </Button>
-                  <Button type="button" variant="secondary" size="sm" onClick={loadTokenIntoForm}>
-                    Nạp từ DB
-                  </Button>
-                </>
+          <div className="field-span-2 page-form-section">
+            <h2 className="page-form-section-title">Kết nối Facebook — 2 token</h2>
+            <p className="field-hint" style={{ marginBottom: 12 }}>
+              Mỗi fanpage lưu <strong>token thủ công</strong> và <strong>token Composio</strong> riêng trong DB.
+              Hệ thống tự kiểm tra token còn hiệu lực (Graph API) mỗi giờ — chỉ lấy token Composio mới khi token **đã hết hạn**.
+            </p>
+            {tokenHealth && (
+              <p className="field-hint" style={{ marginBottom: 12 }}>
+                Manual: {tokenStatusLabel(tokenHealth.manual_token_status || 'unknown')}
+                {tokenHealth.manual_token_expires_at ? ` · ${new Date(tokenHealth.manual_token_expires_at).toLocaleString('vi-VN')}` : ''}
+                {' · '}
+                Composio: {tokenStatusLabel(tokenHealth.composio_token_status || 'unknown')}
+                {tokenHealth.composio_token_expires_at ? ` · ${new Date(tokenHealth.composio_token_expires_at).toLocaleString('vi-VN')}` : ''}
+              </p>
+            )}
+
+            <label className="field-span-2">
+              Page Access Token (thủ công)
+              <div className="token-input-row">
+                <input
+                  type={showEditToken ? 'text' : 'password'}
+                  value={form.page_token}
+                  onChange={(e) => handleChange('page_token', e.target.value)}
+                  placeholder={isEdit ? 'Để trống = giữ token thủ công hiện tại' : 'Dán token Graph API (tuỳ chọn nếu có Composio)'}
+                />
+                {isEdit && (
+                  <>
+                    <Button type="button" variant="secondary" size="sm" onClick={() => setShowEditToken((v) => !v)}>
+                      {showEditToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </Button>
+                    <Button type="button" variant="secondary" size="sm" onClick={loadTokenIntoForm}>
+                      Nạp từ DB
+                    </Button>
+                  </>
+                )}
+              </div>
+            </label>
+
+            <div className="page-form-section" style={{ marginTop: 16 }}>
+              <h3 className="page-form-section-title" style={{ fontSize: 'var(--text-sm)' }}>Token Composio</h3>
+              {!composioConfig?.configured && (
+                <p className="field-hint field-hint--warn">
+                  Chưa cấu hình Composio — vào <Link to="/settings">Cài đặt → Composio</Link>
+                </p>
               )}
+              <div className="settings-schedule-grid">
+                <label>
+                  Composio User ID
+                  <input
+                    value={form.composio_user_id}
+                    onChange={(e) => handleChange('composio_user_id', e.target.value)}
+                    placeholder="pg-test-..."
+                  />
+                </label>
+                <label>
+                  Connected Account ID
+                  <input
+                    value={form.composio_connected_account_id}
+                    onChange={(e) => handleChange('composio_connected_account_id', e.target.value)}
+                    placeholder="ca_..."
+                  />
+                </label>
+              </div>
+              {(hasComposioToken || composioTokenPreview) && (
+                <p className="field-hint">
+                  Composio token: <code>{composioTokenPreview || 'đã lưu'}</code>
+                </p>
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={syncComposioOnPage}
+                disabled={composioSyncing || !composioConfig?.configured}
+                style={{ marginTop: 8 }}
+              >
+                {composioSyncing ? 'Đang đồng bộ...' : (isEdit ? 'Đồng bộ token Composio' : 'Kiểm tra + lấy token Composio')}
+              </Button>
             </div>
-            <span className="field-hint">Token dùng để đăng bài lên fanpage qua Graph API.</span>
-          </label>
+
+            <label style={{ marginTop: 16 }}>
+              Ưu tiên đăng bài bằng
+              <select value={form.token_source} onChange={(e) => handleChange('token_source', e.target.value)}>
+                <option value="manual">Token thủ công</option>
+                <option value="composio">Token Composio</option>
+              </select>
+              <span className="field-hint">Tự đổi khi token active lỗi lúc đăng bài.</span>
+            </label>
+          </div>
 
           <label className="field-span-2">
             Avatar URL

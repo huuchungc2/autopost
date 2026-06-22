@@ -1,26 +1,32 @@
 import { google } from 'googleapis';
 import { Readable } from 'stream';
+import {
+  getEffectiveDriveCredentials,
+  getEffectiveDriveFolderId,
+  isDriveConfiguredFromSettings,
+} from './appSettingsService.js';
 
 let driveClient = null;
 
+export function resetDriveClient() {
+  driveClient = null;
+}
+
 function getCredentials() {
-  const raw = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON;
-  if (!raw?.trim()) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    console.error('GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON is not valid JSON');
-    return null;
-  }
+  return getEffectiveDriveCredentials();
+}
+
+function getFolderId() {
+  return getEffectiveDriveFolderId();
 }
 
 export function isGoogleDriveConfigured() {
-  return !!(getCredentials() && process.env.GOOGLE_DRIVE_FOLDER_ID);
+  return isDriveConfiguredFromSettings();
 }
 
 function getDrive() {
   if (!isGoogleDriveConfigured()) {
-    throw new Error('Google Drive chưa cấu hình — xem .env.example');
+    throw new Error('Google Drive chưa cấu hình — vào Cài đặt hoặc xem .env.example');
   }
   if (!driveClient) {
     const auth = new google.auth.GoogleAuth({
@@ -38,7 +44,7 @@ export async function uploadBufferToDrive(buffer, filename, mimeType) {
   const created = await drive.files.create({
     requestBody: {
       name: filename,
-      parents: [process.env.GOOGLE_DRIVE_FOLDER_ID],
+      parents: [getFolderId()],
     },
     media: { mimeType, body: stream },
     fields: 'id',
@@ -74,6 +80,20 @@ export async function downloadDriveFileBuffer(fileId) {
     chunks.push(chunk);
   }
   return Buffer.concat(chunks);
+}
+
+export async function testDriveConnection() {
+  const drive = getDrive();
+  const folderId = getFolderId();
+  const folder = await drive.files.get({
+    fileId: folderId,
+    fields: 'id,name,mimeType',
+  });
+  return {
+    folder_id: folder.data.id,
+    folder_name: folder.data.name,
+    mime_type: folder.data.mimeType,
+  };
 }
 
 export function driveFileIdFromUrl(url) {

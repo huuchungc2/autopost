@@ -1,5 +1,4 @@
 import { generateText } from './aiService.js';
-import { generateImage } from './imageService.js';
 import { normalizeImportContent } from '../utils/importTextNormalize.js';
 
 const DEFAULT_TEXT_RULES = `Viết bài Facebook bằng tiếng Việt, hấp dẫn, có emoji phù hợp.`;
@@ -123,6 +122,16 @@ export function buildFallbackVideoPrompt(topic, content) {
   return `Short vertical social video (9:16) about "${topic}". Scene: ${snippet}. Smooth camera movement, cinematic, no on-screen text.`;
 }
 
+export function buildImageQueueFields({ image_prompt, image_url }) {
+  const prompt = String(image_prompt || '').trim();
+  const needsImage = Boolean(prompt) && !image_url;
+  return {
+    auto_generate_image: needsImage,
+    image_job_status: needsImage ? 'pending' : null,
+    save_image_local: true,
+  };
+}
+
 export async function generatePostWithMedia({
   topic,
   userPrompt,
@@ -147,16 +156,13 @@ export async function generatePostWithMedia({
 
   if (mode === 'image') {
     image_prompt = parsed.image_prompt || buildFallbackImagePrompt(topic, parsed.content);
-    if (config.imageProvider) {
-      const imageResult = await generateImage(image_prompt, config.imageProvider);
-      image_url = imageResult.image_url;
-      image_prompt = imageResult.image_prompt || image_prompt;
-    }
-    resolvedMediaType = image_url ? 'image' : 'none';
+    resolvedMediaType = image_prompt ? 'image' : 'none';
   } else if (mode === 'video') {
     video_prompt = parsed.video_prompt || buildFallbackVideoPrompt(topic, parsed.content);
     resolvedMediaType = 'video';
   }
+
+  const queue = buildImageQueueFields({ image_prompt, image_url });
 
   return {
     content: parsed.content,
@@ -165,5 +171,6 @@ export async function generatePostWithMedia({
     video_prompt,
     media_type: resolvedMediaType,
     parseFailed: parsed.parseFailed || false,
+    ...queue,
   };
 }

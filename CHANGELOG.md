@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added — Composio & dual token
+- Composio settings in DB + UI (Settings → Composio)
+- Per-page dual tokens: `page_token` + `composio_page_token` with `token_source` active pointer
+- `tokenHealthService`: Graph API validity check per token; hourly cron `checkPageTokens`
+- Auto-switch manual ↔ Composio on publish token errors
+- Composio refresh only when token status is `expired` (not proactive 6h sync)
+- Migrations `019`–`022`; docs: `docs/TOKENS_AND_COMPOSIO.md`
+
 ## [0.2.0] — 2026-06-15
 
 ### Added — Backend

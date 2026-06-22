@@ -5,7 +5,7 @@ import { query } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { generatePostWithMedia } from '../services/contentGenerationService.js';
 import { getPageGenerationConfig } from '../services/providerService.js';
-import { postToFacebook } from '../services/fbService.js';
+import { publishToFacebookWithFallback } from '../services/facebookPublishService.js';
 import { persistFacebookPublishIds } from '../services/postPublishService.js';
 import { ensurePostImageForPublish } from '../services/postImageService.js';
 import { runImageJobForPostId } from '../services/imageGenerateJobService.js';
@@ -455,14 +455,17 @@ router.post('/generate', asyncHandler(async (req, res) => {
 
   const status = scheduled_at ? 'scheduled' : 'pending_approval';
   const result = await query(
-    `INSERT INTO posts (page_id, topic, content, image_url, image_prompt, video_prompt, media_type, status, scheduled_at, created_by_type, created_by, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'auto', ?, NOW())`,
+    `INSERT INTO posts (page_id, topic, content, image_url, image_prompt, auto_generate_image, image_job_status, save_image_local, video_prompt, media_type, status, scheduled_at, created_by_type, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'auto', ?, NOW())`,
     [
       page_id,
       topic,
       generated.content,
       generated.image_url,
       generated.image_prompt,
+      generated.auto_generate_image,
+      generated.image_job_status,
+      generated.save_image_local,
       generated.video_prompt,
       generated.media_type,
       status,
@@ -480,6 +483,8 @@ router.post('/generate', asyncHandler(async (req, res) => {
     image_prompt: generated.image_prompt,
     video_prompt: generated.video_prompt,
     media_type: generated.media_type,
+    auto_generate_image: generated.auto_generate_image,
+    image_job_status: generated.image_job_status,
     skill_id: config.activeTextSkill?.id || null,
     skill_name: config.activeTextSkill?.name || null,
   });
@@ -668,9 +673,9 @@ router.post('/:id/publish', asyncHandler(async (req, res) => {
     const readyPost = await ensurePostImageForPublish(post, page.image_provider_id);
 
     // Đăng thủ công = đăng ngay; không gửi scheduled_at cũ (cron lên lịch xử lý riêng).
-    const response = await postToFacebook({
+    const response = await publishToFacebookWithFallback({
+      internalPageId: post.page_id,
       pageId: page.page_id,
-      pageToken: page.page_token,
       message: readyPost.content,
       imageUrl: readyPost.media_type === 'image' ? readyPost.image_url : null,
       videoUrl: readyPost.media_type === 'video' ? readyPost.video_url : null,
@@ -863,7 +868,7 @@ router.post('/:id/generate-image', asyncHandler(async (req, res) => {
   const persist = updated.save_image_local !== 0 && updated.save_image_local !== false;
 
   res.json({
-    message: persist ? 'Đã xuất ảnh từ prompt' : 'Đã tạo ảnh AI (chưa lưu VPS — dùng khi đăng)',
+    message: persist ? 'Đã xuất ảnh từ prompt' : 'Đã tạo ảnh AI (chưa lưu — dùng URL tạm khi đăng)',
     image_url: updated.image_url,
     image_prompt: updated.image_prompt,
     media_type: 'image',
