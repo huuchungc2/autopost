@@ -55,6 +55,8 @@ export default function PageForm() {
   const [composioSyncing, setComposioSyncing] = useState(false);
   const [hasComposioToken, setHasComposioToken] = useState(false);
   const [composioTokenPreview, setComposioTokenPreview] = useState('');
+  const [hasManualToken, setHasManualToken] = useState(false);
+  const [manualTokenPreview, setManualTokenPreview] = useState('');
   const [tokenHealth, setTokenHealth] = useState(null);
 
   useEffect(() => {
@@ -131,6 +133,8 @@ export default function PageForm() {
         });
         setHasComposioToken(!!page.composio_page_token);
         setComposioTokenPreview(page.composio_page_token_preview || '');
+        setHasManualToken(!!page.page_token);
+        setManualTokenPreview(page.page_token_preview || '');
         setTokenHealth({
           manual_token_status: page.manual_token_status,
           manual_token_expires_at: page.manual_token_expires_at,
@@ -395,6 +399,12 @@ export default function PageForm() {
 
             <label className="field-span-2">
               Page Access Token (thủ công)
+              {(hasManualToken || manualTokenPreview) && !form.page_token?.trim() && (
+                <span className="field-hint" style={{ display: 'block', marginBottom: 6 }}>
+                  Đã lưu trong DB: <code>{manualTokenPreview || 'có token'}</code>
+                  {' '}— ô bên dưới để trống sẽ <strong>giữ nguyên</strong>, không xóa.
+                </span>
+              )}
               <div className="token-input-row">
                 <input
                   type={showEditToken ? 'text' : 'password'}

@@ -111,6 +111,11 @@ export async function saveMediaStorageSettings(updates = {}) {
 
   if (updates.google_drive_folder_id !== undefined) {
     const folderId = String(updates.google_drive_folder_id || '').trim();
+    if (folderId.includes('@')) {
+      const error = new Error('Folder ID không phải email — mở folder trên Google Drive, copy ID từ URL (dạng 1AbCdEf...)');
+      error.status = 400;
+      throw error;
+    }
     entries.push([KEYS.GOOGLE_DRIVE_FOLDER_ID, folderId]);
   }
 
@@ -161,19 +166,27 @@ function parseBoolSetting(value, defaultValue = false) {
 }
 
 export function getEffectiveComposioApiKey() {
-  return getCachedSetting(KEYS.COMPOSIO_API_KEY)?.trim() || '';
+  const fromDb = getCachedSetting(KEYS.COMPOSIO_API_KEY)?.trim();
+  if (fromDb) return fromDb;
+  return process.env.COMPOSIO_API_KEY?.trim() || '';
 }
 
 export function getEffectiveComposioAuthConfigId() {
-  return getCachedSetting(KEYS.COMPOSIO_FACEBOOK_AUTH_CONFIG_ID)?.trim() || '';
+  const fromDb = getCachedSetting(KEYS.COMPOSIO_FACEBOOK_AUTH_CONFIG_ID)?.trim();
+  if (fromDb) return fromDb;
+  return process.env.COMPOSIO_FACEBOOK_AUTH_CONFIG_ID?.trim() || '';
 }
 
 export function getEffectiveComposioUserId() {
-  return getCachedSetting(KEYS.COMPOSIO_DEFAULT_USER_ID)?.trim() || '';
+  const fromDb = getCachedSetting(KEYS.COMPOSIO_DEFAULT_USER_ID)?.trim();
+  if (fromDb) return fromDb;
+  return process.env.COMPOSIO_DEFAULT_USER_ID?.trim() || '';
 }
 
 export function getEffectiveComposioConnectedAccountId() {
-  return getCachedSetting(KEYS.COMPOSIO_DEFAULT_CONNECTED_ACCOUNT_ID)?.trim() || '';
+  const fromDb = getCachedSetting(KEYS.COMPOSIO_DEFAULT_CONNECTED_ACCOUNT_ID)?.trim();
+  if (fromDb) return fromDb;
+  return process.env.COMPOSIO_DEFAULT_CONNECTED_ACCOUNT_ID?.trim() || '';
 }
 
 export function getEffectiveComposioToolkitVersion() {
@@ -200,11 +213,20 @@ export function isComposioConfiguredFromSettings() {
 
 export function getComposioSettingsStatus() {
   const apiKey = getEffectiveComposioApiKey();
+  const missing = [];
+  if (!apiKey) missing.push('composio_api_key');
+  if (!getEffectiveComposioAuthConfigId()) missing.push('composio_facebook_auth_config_id');
+  if (!getEffectiveComposioUserId()) missing.push('composio_default_user_id');
+  if (!getEffectiveComposioConnectedAccountId()) missing.push('composio_default_connected_account_id');
+
   return {
     configured: isComposioConfiguredFromSettings(),
+    missing_fields: missing,
     api_key_preview: maskApiKey(apiKey),
     has_stored_api_key: !!getCachedSetting(KEYS.COMPOSIO_API_KEY)?.trim(),
-    api_key_source: getCachedSetting(KEYS.COMPOSIO_API_KEY)?.trim() ? 'database' : null,
+    api_key_source: getCachedSetting(KEYS.COMPOSIO_API_KEY)?.trim()
+      ? 'database'
+      : (process.env.COMPOSIO_API_KEY?.trim() ? 'env' : null),
     auth_config_id: getEffectiveComposioAuthConfigId() || null,
     default_user_id: getEffectiveComposioUserId() || null,
     default_connected_account_id: getEffectiveComposioConnectedAccountId() || null,
@@ -251,4 +273,29 @@ export async function saveComposioSettings(updates = {}) {
   }
 
   return getComposioSettingsStatus();
+}
+
+/** Khởi động: điền từng trường Composio từ .env nếu DB chưa có (UI đọc DB + env fallback). */
+export async function seedComposioFromEnvIfEmpty() {
+  const updates = {};
+  if (!getCachedSetting(KEYS.COMPOSIO_API_KEY)?.trim() && process.env.COMPOSIO_API_KEY?.trim()) {
+    updates.composio_api_key = process.env.COMPOSIO_API_KEY;
+  }
+  if (!getCachedSetting(KEYS.COMPOSIO_FACEBOOK_AUTH_CONFIG_ID)?.trim() && process.env.COMPOSIO_FACEBOOK_AUTH_CONFIG_ID?.trim()) {
+    updates.composio_facebook_auth_config_id = process.env.COMPOSIO_FACEBOOK_AUTH_CONFIG_ID;
+  }
+  if (!getCachedSetting(KEYS.COMPOSIO_DEFAULT_USER_ID)?.trim() && process.env.COMPOSIO_DEFAULT_USER_ID?.trim()) {
+    updates.composio_default_user_id = process.env.COMPOSIO_DEFAULT_USER_ID;
+  }
+  if (!getCachedSetting(KEYS.COMPOSIO_DEFAULT_CONNECTED_ACCOUNT_ID)?.trim() && process.env.COMPOSIO_DEFAULT_CONNECTED_ACCOUNT_ID?.trim()) {
+    updates.composio_default_connected_account_id = process.env.COMPOSIO_DEFAULT_CONNECTED_ACCOUNT_ID;
+  }
+  if (!getCachedSetting(KEYS.COMPOSIO_FACEBOOK_TOOLKIT_VERSION)?.trim() && process.env.COMPOSIO_FACEBOOK_TOOLKIT_VERSION?.trim()) {
+    updates.composio_facebook_toolkit_version = process.env.COMPOSIO_FACEBOOK_TOOLKIT_VERSION;
+  }
+  if (!getCachedSetting(KEYS.COMPOSIO_AUTO_FALLBACK)?.trim() && process.env.COMPOSIO_AUTO_FALLBACK !== undefined) {
+    updates.composio_auto_fallback = process.env.COMPOSIO_AUTO_FALLBACK !== 'false';
+  }
+  if (Object.keys(updates).length === 0) return;
+  await saveComposioSettings(updates);
 }

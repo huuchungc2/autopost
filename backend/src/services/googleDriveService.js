@@ -82,9 +82,25 @@ export async function downloadDriveFileBuffer(fileId) {
   return Buffer.concat(chunks);
 }
 
-export async function testDriveConnection() {
-  const drive = getDrive();
-  const folderId = getFolderId();
+export async function testDriveConnection(overrides = {}) {
+  const folderId = overrides.folderId?.trim() || getFolderId();
+  const credentials = overrides.credentials || getCredentials();
+  if (!folderId || !credentials) {
+    const error = new Error('Thiếu Folder ID hoặc Service Account JSON');
+    error.status = 400;
+    throw error;
+  }
+  if (folderId.includes('@')) {
+    const error = new Error('Folder ID không phải email — copy ID từ URL folder Drive');
+    error.status = 400;
+    throw error;
+  }
+
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: ['https://www.googleapis.com/auth/drive.file'],
+  });
+  const drive = google.drive({ version: 'v3', auth });
   const folder = await drive.files.get({
     fileId: folderId,
     fields: 'id,name,mimeType',

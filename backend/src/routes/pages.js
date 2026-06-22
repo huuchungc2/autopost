@@ -101,6 +101,19 @@ function normalizeTokenSource(value) {
   return value === 'composio' ? 'composio' : 'manual';
 }
 
+/** Không ghi đè token đang có bằng chuỗi rỗng khi lưu fanpage. */
+function preserveExistingTokens({ manualToken, composioToken, existing }) {
+  let manual = manualToken;
+  let composio = composioToken;
+  if (!String(manual || '').trim() && hasManualPageToken(existing)) {
+    manual = existing.page_token;
+  }
+  if (!String(composio || '').trim() && hasComposioPageToken(existing)) {
+    composio = existing.composio_page_token;
+  }
+  return { manualToken: manual, composioToken: composio };
+}
+
 async function resolveDualTokensForSave({
   page_id,
   page_token,
@@ -433,6 +446,12 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
   } else if (!hasManualPageToken(existing) && !hasComposioPageToken(existing)) {
     return res.status(400).json({ error: 'Fanpage cần ít nhất một token' });
   }
+
+  ({ manualToken, composioToken } = preserveExistingTokens({
+    manualToken,
+    composioToken,
+    existing,
+  }));
 
   const resolvedTextProviderId = text_provider_id !== undefined
     ? normalizeOptionalProviderId(text_provider_id)

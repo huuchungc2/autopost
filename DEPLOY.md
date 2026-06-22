@@ -165,7 +165,7 @@ server {
     client_max_body_size 520M;
 
     location /api {
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3001;   # PHẢI khớp PORT trong backend/.env (VD 3002 nếu .env PORT=3002)
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -271,9 +271,48 @@ Chi tiết kiến trúc token: [`docs/TOKENS_AND_COMPOSIO.md`](docs/TOKENS_AND_C
 
 | Lỗi | Nguyên nhân | Cách fix |
 |-----|-------------|----------|
-| Frontend gọi `localhost:3001` | Build thiếu `VITE_API_BASE_URL` | Build lại với env đúng |
+| Frontend gọi `localhost:3001` | Build thiếu `VITE_API_BASE_URL` | `grep -r localhost frontend/dist` — build lại: `VITE_API_BASE_URL=https://DOMAIN/api npm run build` |
+| Login: Không kết nối server | API URL build sai / Nginx port sai / PM2 down | Các lệnh chẩn đoán ở mục dưới |
+| `/api/health` 502 Bad Gateway | Nginx trỏ sai port (VD backend `:3002`, nginx `:3001`) | Sửa `proxy_pass http://127.0.0.1:$PORT` khớp `backend/.env` |
 | Facebook không post được ảnh | `PUBLIC_BASE_URL` sai hoặc HTTP | Dùng HTTPS + domain public |
 | Upload video 413 | Nginx limit | `client_max_body_size 520M` |
 | Scheduler không chạy | `DISABLE_SCHEDULER=true` | Sửa `.env`, restart PM2 |
 | Token FB hết hạn | Cron check mỗi giờ | Xem trạng thái M/C trên Pages; dán token manual hoặc đồng bộ Composio — xem `docs/TOKENS_AND_COMPOSIO.md` |
 | Composio chưa ACTIVE | OAuth chưa hoàn tất | Cài đặt → Composio → Kết nối Facebook; dùng connected account `ACTIVE` |
+
+### Login: «Không kết nối được server» (ERR_NETWORK)
+
+Chạy lần lượt trên VPS:
+
+```bash
+# 1) Backend còn sống? Port nào?
+pm2 list | grep autopost
+grep ^PORT= /var/www/autopost/backend/.env
+curl -s http://127.0.0.1:3001/api/health || true
+curl -s http://127.0.0.1:3002/api/health || true
+
+# 2) Nginx proxy đúng port chưa?
+grep proxy_pass /etc/nginx/sites-enabled/autopost
+
+# 3) Từ ngoài (qua domain) — thay DOMAIN
+curl -s https://DOMAIN/api/health
+
+# 4) Frontend build có nhầm localhost không?
+grep -r "localhost:300" /var/www/autopost/frontend/dist/assets/*.js | head -3
+```
+
+**Fix thường gặp** (backend log của bạn: `listening on :3002`):
+
+```bash
+# A) Sửa Nginx — proxy_pass phải là 3002 nếu .env PORT=3002
+sudo nano /etc/nginx/sites-available/autopost
+#   location /api { proxy_pass http://127.0.0.1:3002; ... }
+sudo nginx -t && sudo systemctl reload nginx
+
+# B) Build lại frontend — DOMAIN = URL public (có https), có /api
+cd /var/www/autopost/frontend
+VITE_API_BASE_URL=https://DOMAIN/api npm run build
+sudo systemctl reload nginx
+```
+
+PM2 tên process có thể là `autopost-backend` hoặc `autopost-api` — dùng đúng tên trong `pm2 logs`.

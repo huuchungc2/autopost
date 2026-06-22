@@ -167,6 +167,26 @@ export default function Settings() {
   const driveStatus = settings?.storage?.google_drive;
   const composioStatus = settings?.config?.composio;
 
+  const canTestDrive = useMemo(() => {
+    if (!mediaForm) return false;
+    const folderId = mediaForm.google_drive_folder_id?.trim();
+    const hasJson = !!mediaForm.google_drive_service_account_json?.trim();
+    const hasStored = driveStatus?.has_stored_credentials || driveStatus?.credentials_source === 'env';
+    return !!(folderId && (hasJson || hasStored) && !folderId.includes('@'));
+  }, [mediaForm, driveStatus]);
+
+  const hasComposioApiKey = useMemo(() => {
+    if (!composioForm || !composioStatus) return false;
+    return !!(composioForm.composio_api_key?.trim() || composioStatus.has_stored_api_key || composioStatus.api_key_source === 'env');
+  }, [composioForm, composioStatus]);
+
+  const composioMissingLabels = {
+    composio_api_key: 'API Key',
+    composio_facebook_auth_config_id: 'Auth Config ID',
+    composio_default_user_id: 'User ID',
+    composio_default_connected_account_id: 'Connected Account ID',
+  };
+
   const handleMediaChange = (field, value) => {
     setMediaForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -210,7 +230,13 @@ export default function Settings() {
   const testDriveConnection = async () => {
     setMediaTesting(true);
     try {
-      const response = await api.post('/settings/media-storage/test');
+      const payload = {
+        google_drive_folder_id: mediaForm?.google_drive_folder_id?.trim(),
+      };
+      if (mediaForm?.google_drive_service_account_json?.trim()) {
+        payload.google_drive_service_account_json = mediaForm.google_drive_service_account_json.trim();
+      }
+      const response = await api.post('/settings/media-storage/test', payload);
       const name = response.data?.folder?.folder_name || response.data?.folder?.folder_id;
       showToast(`Kết nối Drive OK — folder: ${name}`, 'success');
     } catch (err) {
@@ -269,7 +295,7 @@ export default function Settings() {
       const url = response.data?.redirect_url;
       if (url) {
         window.open(url, '_blank', 'noopener,noreferrer');
-        showToast('Đã mở link kết nối Facebook — hoàn tất OAuth rồi cập nhật Connected Account ID', 'success');
+        showToast('Đã mở tab Composio — đăng nhập Facebook xong thì bấm «Kiểm tra kết nối»', 'success');
       }
       if (response.data?.connected_account_id) {
         handleComposioChange('composio_default_connected_account_id', response.data.connected_account_id);
@@ -284,11 +310,20 @@ export default function Settings() {
   const refreshComposioStatus = async () => {
     try {
       const response = await api.get('/settings/composio');
+      const composio = response.data.composio;
       setSettings((prev) => ({
         ...prev,
-        config: { ...prev.config, composio: response.data.composio },
+        config: { ...prev.config, composio },
       }));
-      showToast('Đã làm mới trạng thái Composio', 'success');
+      setComposioForm((prev) => prev ? ({
+        ...prev,
+        composio_facebook_auth_config_id: composio.auth_config_id || '',
+        composio_default_user_id: composio.default_user_id || '',
+        composio_default_connected_account_id: composio.default_connected_account_id || '',
+        composio_facebook_toolkit_version: composio.facebook_toolkit_version || prev.composio_facebook_toolkit_version,
+        composio_auto_fallback: composio.auto_fallback_on_token_error !== false,
+      }) : prev);
+      showToast('Đã kiểm tra — xem trạng thái kết nối phía trên', 'success');
     } catch (err) {
       showToast(err.response?.data?.error || 'Không tải được Composio', 'error');
     }
@@ -356,9 +391,9 @@ export default function Settings() {
             <div>
               <h3>Google Drive — lưu &amp; đăng ảnh</h3>
               <p className="field-hint">
-                Ảnh AI/import lưu dạng <code>gdrive://FILE_ID</code> trên Drive.
-                Khi đăng Facebook, server tải ảnh từ Drive rồi upload lên Graph API — không cần lưu lâu trên VPS.
-                Giới hạn hiển thị VPS: {settings?.config?.max_images_mb || 5000} MB (ảnh trên Drive không tính vào đây).
+                AutoPost <strong>không dùng đăng nhập Google OAuth</strong> — server cần Service Account JSON
+                (tài khoản robot từ Google Cloud) để upload ảnh lên folder bạn chỉ định.
+                Ảnh lưu dạng <code>gdrive://FILE_ID</code>. Khi đăng Facebook, server tải từ Drive rồi upload Graph API.
               </p>
             </div>
             <span className={`badge ${driveStatus.drive_configured ? 'badge-published' : 'badge-default'}`}>
@@ -398,7 +433,7 @@ export default function Settings() {
                   Google Drive Folder ID
                   <input
                     type="text"
-                    placeholder="1AbCdEf..."
+                    placeholder="1AbCdEf... (từ URL folder, không phải email)"
                     value={mediaForm.google_drive_folder_id}
                     onChange={(e) => handleMediaChange('google_drive_folder_id', e.target.value)}
                   />
@@ -418,8 +453,10 @@ export default function Settings() {
               </label>
 
               <p className="field-hint" style={{ marginTop: 8 }}>
-                Tạo folder Drive → Share với email service account (quyền Editor).
-                Cấu hình Composio chỉ lưu database (Cài đặt). Mỗi fanpage có thể lưu song song token thủ công + Composio.
+                1) Tạo Service Account trên Google Cloud → tải JSON.
+                2) Tạo folder Drive → Share với <code>client_email</code> trong JSON (quyền Editor).
+                3) Copy Folder ID từ URL (<code>drive.google.com/.../folders/<strong>ID_Ở_ĐÂY</strong></code>).
+                4) Dán JSON + Folder ID → <strong>Kiểm tra kết nối</strong> (không cần lưu trước) → Lưu.
               </p>
 
               <div style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
@@ -430,11 +467,16 @@ export default function Settings() {
                   type="button"
                   variant="secondary"
                   onClick={testDriveConnection}
-                  disabled={mediaTesting || !driveStatus.drive_configured}
+                  disabled={mediaTesting || !canTestDrive}
                 >
                   {mediaTesting ? 'Đang kiểm tra...' : 'Kiểm tra kết nối Drive'}
                 </Button>
               </div>
+              {!canTestDrive && mediaForm.media_storage === 'google_drive' && (
+                <p className="field-hint field-hint--warn" style={{ marginTop: 8 }}>
+                  Cần Folder ID hợp lệ + Service Account JSON (dán mới hoặc đã lưu trước đó).
+                </p>
+              )}
             </>
           ) : (
             <p className="field-hint">Chỉ super admin mới chỉnh cấu hình Google Drive.</p>
@@ -448,7 +490,9 @@ export default function Settings() {
             <div>
               <h3>Composio — token Facebook</h3>
               <p className="field-hint">
-                Cấu hình Composio lưu database. Hệ thống kiểm tra token còn hiệu lực; chỉ lấy token Composio mới khi token đã hết hạn.
+                Cấu hình lưu <strong>database</strong>. Khi đăng bài, server đọc token từng fanpage trong DB
+                (manual hoặc Composio theo <code>token_source</code>), dùng API key + ID ở đây để gọi Composio khi cần.
+                Lưu xong → vào <strong>Fanpage → Đồng bộ token Composio</strong> cho từng page.
               </p>
             </div>
             <span className={`badge ${composioStatus.configured ? 'badge-published' : 'badge-default'}`}>
@@ -456,12 +500,23 @@ export default function Settings() {
             </span>
           </div>
 
+          {composioStatus.missing_fields?.length > 0 && !composioStatus.configured && (
+            <p className="field-hint field-hint--warn" style={{ marginBottom: 12 }}>
+              Thiếu: {composioStatus.missing_fields.map((f) => composioMissingLabels[f] || f).join(', ')}.
+              {composioStatus.api_key_source === 'env' && (
+                <> Restart backend sau khi thêm vào <code>.env</code> để tự seed vào DB.</>
+              )}
+            </p>
+          )}
+
           {composioStatus.api_key_preview && (
             <p className="field-hint" style={{ marginBottom: 12 }}>
               API key: <code>{composioStatus.api_key_preview}</code>
               {composioStatus.api_key_source && <> ({composioStatus.api_key_source})</>}
               {composioStatus.connection?.status && (
-                <> — Connection: <strong>{composioStatus.connection.status}</strong></>
+                <> — Kết nối FB: <strong>{composioStatus.connection.status}</strong>
+                  {composioStatus.connection.is_active ? ' (OK)' : ' (chưa sẵn sàng)'}
+                </>
               )}
             </p>
           )}
@@ -514,20 +569,26 @@ export default function Settings() {
 
               <div style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
                 <Button type="button" onClick={saveComposioSettings} disabled={composioSaving}>
-                  {composioSaving ? 'Đang lưu...' : 'Lưu cấu hình Composio'}
+                  {composioSaving ? 'Đang lưu...' : 'Lưu vào database'}
                 </Button>
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={createComposioConnectLink}
-                  disabled={composioLinking || !composioStatus.configured}
+                  disabled={composioLinking || !hasComposioApiKey}
+                  title="Chỉ cần khi chưa có Connected Account hoặc kết nối hết hạn"
                 >
-                  {composioLinking ? 'Đang tạo link...' : 'Kết nối Facebook (OAuth)'}
+                  {composioLinking ? 'Đang mở tab...' : 'Đăng nhập Facebook qua Composio'}
                 </Button>
                 <Button type="button" variant="secondary" onClick={refreshComposioStatus}>
-                  Làm mới trạng thái
+                  Kiểm tra kết nối
                 </Button>
               </div>
+              <p className="field-hint" style={{ marginTop: 10 }}>
+                <strong>Lưu vào database</strong> — ghi API key và ID; đăng bài đọc từ đây.
+                {' '}<strong>Đăng nhập Facebook qua Composio</strong> — mở tab cấp quyền FB (lần đầu hoặc token hết hạn).
+                {' '}<strong>Kiểm tra kết nối</strong> — hỏi Composio xem <code>ca_...</code> còn ACTIVE không.
+              </p>
             </>
           ) : (
             <p className="field-hint">Chỉ super admin mới chỉnh cấu hình Composio.</p>

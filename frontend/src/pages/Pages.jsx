@@ -102,17 +102,23 @@ export default function Pages() {
                     <span className="badge badge-default" title="Token đang dùng khi đăng bài">
                       {page.token_source === 'composio' ? 'Active: Composio' : 'Active: Manual'}
                     </span>
-                    {page.page_token_preview && (
+                    {page.page_token_preview ? (
                       <div className="text-muted" style={{ fontSize: 'var(--text-xs)' }}>
-                        M: {tokenStatusLabel(page.manual_token_status || 'unknown')}
+                        M: <code>{page.page_token_preview}</code>
+                        {' · '}{tokenStatusLabel(page.manual_token_status || 'unknown')}
                         {page.manual_token_expires_at ? ` · ${formatDateTime(page.manual_token_expires_at)}` : ''}
                       </div>
+                    ) : (
+                      <div className="text-muted" style={{ fontSize: 'var(--text-xs)' }}>M: chưa có token thủ công</div>
                     )}
-                    {(page.composio_page_token_preview || page.composio_token_status) && (
+                    {page.composio_page_token_preview ? (
                       <div className="text-muted" style={{ fontSize: 'var(--text-xs)' }}>
-                        C: {tokenStatusLabel(page.composio_token_status || 'unknown')}
+                        C: <code>{page.composio_page_token_preview}</code>
+                        {' · '}{tokenStatusLabel(page.composio_token_status || 'unknown')}
                         {page.composio_token_expires_at ? ` · ${formatDateTime(page.composio_token_expires_at)}` : ''}
                       </div>
+                    ) : (
+                      <div className="text-muted" style={{ fontSize: 'var(--text-xs)' }}>C: chưa có token Composio</div>
                     )}
                   </div>
                 </td>

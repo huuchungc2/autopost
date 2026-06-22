@@ -7,10 +7,10 @@ import Button from '../components/ui/Button';
 function loginErrorMessage(err) {
   if (err.response?.data?.error) return err.response.data.error;
   if (err.code === 'ERR_NETWORK' || !err.response) {
-    return 'Không kết nối được server — kiểm tra backend (pm2 logs autopost-api) và VITE_API_BASE_URL lúc build frontend.';
+    return 'Không kết nối được server — backend chưa chạy, Nginx sai port, hoặc frontend build thiếu VITE_API_BASE_URL (xem DEPLOY.md §12).';
   }
   if (err.response?.status >= 500) {
-    return `Lỗi server (${err.response.status}) — chạy: pm2 logs autopost-api`;
+    return `Lỗi server (${err.response.status}) — pm2 logs autopost-backend (hoặc autopost-api)`;
   }
   return 'Đăng nhập thất bại';
 }

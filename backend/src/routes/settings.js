@@ -14,12 +14,13 @@ import {
   saveMediaStorageSettings,
   getComposioSettingsStatus,
   saveComposioSettings,
+  getEffectiveDriveCredentials,
+  getEffectiveComposioApiKey,
 } from '../services/appSettingsService.js';
 import { testDriveConnection } from '../services/googleDriveService.js';
 import {
   createComposioFacebookLink,
   getConnectedAccountStatus,
-  isComposioConfigured,
 } from '../services/composioService.js';
 import {
   getEnabledPageImageSchedulesForUser,
@@ -146,11 +147,26 @@ router.put('/media-storage', requireRole('super_admin'), asyncHandler(async (req
 }));
 
 router.post('/media-storage/test', requireRole('super_admin'), asyncHandler(async (req, res) => {
+  const { google_drive_folder_id, google_drive_service_account_json } = req.body || {};
   const status = getMediaStorageStatus();
-  if (!status.drive_configured) {
-    return res.status(400).json({ error: 'Google Drive chưa cấu hình đủ (folder + service account)' });
+
+  let credentials = getEffectiveDriveCredentials();
+  if (google_drive_service_account_json?.trim()) {
+    try {
+      credentials = JSON.parse(google_drive_service_account_json.trim());
+    } catch {
+      return res.status(400).json({ error: 'Service account JSON không hợp lệ' });
+    }
   }
-  const result = await testDriveConnection();
+
+  const folderId = google_drive_folder_id?.trim() || status.folder_id;
+  if (!credentials || !folderId) {
+    return res.status(400).json({
+      error: 'Cần Folder ID + Service Account JSON (dán JSON hoặc lưu cấu hình trước)',
+    });
+  }
+
+  const result = await testDriveConnection({ folderId, credentials });
   res.json({
     message: 'Kết nối Google Drive thành công',
     folder: result,
@@ -179,7 +195,7 @@ router.put('/composio', requireRole('super_admin'), asyncHandler(async (req, res
 }));
 
 router.post('/composio/connect-link', requireRole('super_admin'), asyncHandler(async (req, res) => {
-  if (!isComposioConfigured()) {
+  if (!getEffectiveComposioApiKey()?.trim()) {
     return res.status(400).json({ error: 'Lưu Composio API key trước khi tạo link kết nối' });
   }
   const link = await createComposioFacebookLink(req.body?.composio_default_user_id);
