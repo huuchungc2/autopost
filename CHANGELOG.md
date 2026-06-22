@@ -9,7 +9,7 @@
 - Settings: Composio UI (field thiếu, nhãn nút rõ); fanpage preview token; chặn ghi đè token rỗng
 - Composio: chỉ đọc từ database — bỏ fallback/seed từ `.env`
 - Đồng bộ Composio: fix `token_status` truncated (`unknown` → `valid` trên cột legacy)
-- Fanpage: tự hiện cấu hình Composio từ Cài đặt; token Composio riêng dòng; ID tuỳ chỉnh ẩn mặc định
+- Fanpage: tự hiện cấu hình Composio từ Cài đặt; ô readonly `composio_page_token`; fix hiển thị hạn token Composio sau đồng bộ
 
 ### Added — Composio & dual token
 - Composio settings in DB + UI (Settings → Composio)

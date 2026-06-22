@@ -259,15 +259,25 @@ export default function PageForm() {
       const response = await api.post(`/pages/${id}/composio/sync`);
       setHasComposioToken(true);
       setComposioTokenPreview(response.data.composio_page_token_preview || '');
-      setForm((prev) => ({ ...prev, composio_synced: true }));
+      setForm((prev) => ({
+        ...prev,
+        composio_synced: true,
+        token_source: response.data.token_source || prev.token_source,
+      }));
       if (response.data.composio_token_status) {
         setTokenHealth((prev) => ({
           ...prev,
           composio_token_status: response.data.composio_token_status,
-          composio_token_expires_at: response.data.token_expires_at,
+          composio_token_expires_at: response.data.composio_token_expires_at,
         }));
       }
-      showToast('Đã đồng bộ token Composio', 'success');
+      const preview = response.data.composio_page_token_preview || '';
+      showToast(
+        preview
+          ? `Đã lưu token Composio vào DB: ${preview}`
+          : 'Đã đồng bộ token Composio',
+        'success'
+      );
     } catch (err) {
       showToast(err.response?.data?.error || 'Đồng bộ Composio thất bại', 'error');
     } finally {
@@ -397,9 +407,19 @@ export default function PageForm() {
           <div className="field-span-2 page-form-section">
             <h2 className="page-form-section-title">Kết nối Facebook — 2 token</h2>
             <p className="field-hint" style={{ marginBottom: 12 }}>
-              Mỗi fanpage lưu <strong>token thủ công</strong> và <strong>token Composio</strong> riêng trong DB.
-              Hệ thống tự kiểm tra token còn hiệu lực (Graph API) mỗi giờ — chỉ lấy token Composio mới khi token **đã hết hạn**.
+              Mỗi fanpage lưu <strong>2 token riêng</strong> trong database (<code>fb_pages</code>):
+              {' '}<code>page_token</code> (thủ công) và <code>composio_page_token</code> (từ Composio).
+              Đồng bộ Composio chỉ ghi vào <code>composio_page_token</code> — không đè token thủ công.
             </p>
+            {form.token_source && (
+              <p className="field-hint" style={{ marginBottom: 12 }}>
+                Token đang dùng khi đăng bài:{' '}
+                <strong>{form.token_source === 'composio' ? 'Composio' : 'Thủ công'}</strong>
+                {form.token_source === 'manual' && hasComposioToken && (
+                  <> — đổi sang Composio ở ô «Ưu tiên đăng bài» bên dưới</>
+                )}
+              </p>
+            )}
             {tokenHealth && (
               <p className="field-hint" style={{ marginBottom: 12 }}>
                 Manual: {tokenStatusLabel(tokenHealth.manual_token_status || 'unknown')}
@@ -411,7 +431,7 @@ export default function PageForm() {
             )}
 
             <label className="field-span-2">
-              Page Access Token (thủ công)
+              Page Access Token (thủ công) — cột <code>page_token</code>
               {(hasManualToken || manualTokenPreview) && !form.page_token?.trim() && (
                 <span className="field-hint" style={{ display: 'block', marginBottom: 6 }}>
                   Đã lưu trong DB: <code>{manualTokenPreview || 'có token'}</code>
@@ -438,6 +458,27 @@ export default function PageForm() {
               </div>
             </label>
 
+            <label className="field-span-2" style={{ marginTop: 8 }}>
+              Page Access Token (Composio) — cột <code>composio_page_token</code>
+              {(hasComposioToken || composioTokenPreview) ? (
+                <span className="field-hint" style={{ display: 'block', marginBottom: 6, marginTop: 6 }}>
+                  Đã lưu trong DB: <code>{composioTokenPreview || 'có token'}</code>
+                  {' '}— lấy bằng nút <strong>Đồng bộ token Composio</strong> bên dưới.
+                </span>
+              ) : (
+                <span className="field-hint field-hint--warn" style={{ display: 'block', marginBottom: 6, marginTop: 6 }}>
+                  Chưa có — bấm <strong>Đồng bộ token Composio</strong> sau khi Cài đặt Composio OK.
+                </span>
+              )}
+              <input
+                type="text"
+                readOnly
+                value={composioTokenPreview || (hasComposioToken ? 'đã lưu (ẩn)' : '')}
+                placeholder="Chưa đồng bộ — token xuất hiện ở đây sau khi đồng bộ"
+                className="token-readonly"
+              />
+            </label>
+
             <div className="page-form-section" style={{ marginTop: 16 }}>
               <h3 className="page-form-section-title" style={{ fontSize: 'var(--text-sm)' }}>Token Composio</h3>
               {!composioConfig?.configured ? (
@@ -458,11 +499,7 @@ export default function PageForm() {
                   )}
                 </p>
               )}
-              {(hasComposioToken || composioTokenPreview) ? (
-                <p className="field-hint" style={{ marginBottom: 8 }}>
-                  Token Composio (fanpage): <code>{composioTokenPreview || 'đã lưu trong DB'}</code>
-                </p>
-              ) : composioConfig?.configured && (
+              {(hasComposioToken || composioTokenPreview) ? null : composioConfig?.configured && (
                 <p className="field-hint field-hint--warn" style={{ marginBottom: 8 }}>
                   Chưa có token Composio cho fanpage này — bấm Đồng bộ bên dưới.
                 </p>
