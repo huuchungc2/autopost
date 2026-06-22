@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Copy, Sparkles } from 'lucide-react';
+import Button from './ui/Button';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -46,20 +47,21 @@ export default function PostImagePromptActions({
         <p className="post-prompt-hint">Có prompt ảnh, chưa render — copy để vẽ tay hoặc dùng AI.</p>
       )}
       <div className="post-prompt-actions-row">
-        <button type="button" className="btn btn-secondary btn-sm" onClick={copyPrompt} title={prompt}>
+        <Button type="button" variant="secondary" size="sm" onClick={copyPrompt} title={prompt}>
           <Copy size={14} />
           Copy prompt
-        </button>
+        </Button>
         {showGenerate && needsImage && (
-          <button
+          <Button
             type="button"
-            className="btn btn-secondary btn-sm"
+            variant="secondary"
+            size="sm"
             onClick={handleGenerate}
             disabled={generating}
           >
             <Sparkles size={14} />
             {generating ? 'Đang xuất...' : 'AI xuất ảnh'}
-          </button>
+          </Button>
         )}
       </div>
     </div>

@@ -15,6 +15,8 @@ import PostImagePromptActions from '../components/PostImagePromptActions';
 import { downloadImportTemplate } from '../utils/postImportExport';
 
 import Skeleton from '../components/ui/Skeleton';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 
 import Badge from '../components/ui/Badge';
 
@@ -500,69 +502,46 @@ export default function Posts() {
 
     <div className="page-shell">
 
-      <div className="page-header">
-
-        <div>
-
-          <h1>Bài viết</h1>
-
-          <p>Quản lý bài đăng — import Excel hoặc lên lịch hàng loạt theo giờ mỗi ngày.</p>
-
-        </div>
-
-        <div className="header-actions">
-
-          <button type="button" className="btn btn-secondary" onClick={handleDownloadTemplate}>
-
-            <Download size={16} />
-
-            File mẫu Excel
-
-          </button>
-
-          <button type="button" className="btn btn-secondary" onClick={openImport}>
-
-            <Upload size={16} />
-
-            Import Excel
-
-          </button>
-
-          {schedulablePosts.length > 0 && (
-
-            <button
-
+      <PageHeader
+        title="Bài viết"
+        description="Quản lý bài đăng — import Excel hoặc lên lịch hàng loạt theo giờ mỗi ngày."
+        actions={
+          <>
+            <Button type="button" variant="secondary" onClick={handleDownloadTemplate}>
+              <Download size={16} />
+              File mẫu Excel
+            </Button>
+            <Button type="button" variant="secondary" onClick={openImport}>
+              <Upload size={16} />
+              Import Excel
+            </Button>
+            {schedulablePosts.length > 0 && (
+              <Button type="button" variant="secondary" onClick={openBulkSchedule}>
+                <CalendarClock size={16} />
+                Lên lịch hàng loạt ({bulkTargetIds.length})
+              </Button>
+            )}
+            <Button type="button" className="post-create-btn" onClick={openCreate}>
+              <PenLine size={16} />
+              Viết bài tay
+            </Button>
+            <Button
               type="button"
-
-              className="btn btn-secondary"
-
-              onClick={openBulkSchedule}
-
+              variant={view === 'grid' ? 'default' : 'secondary'}
+              onClick={() => setView('grid')}
             >
-
-              <CalendarClock size={16} />
-
-              Lên lịch hàng loạt ({bulkTargetIds.length})
-
-            </button>
-
-          )}
-
-          <button type="button" className="btn btn-primary post-create-btn" onClick={openCreate}>
-
-            <PenLine size={16} />
-
-            Viết bài tay
-
-          </button>
-
-          <button type="button" className={`btn btn-secondary ${view === 'grid' ? 'active' : ''}`} onClick={() => setView('grid')}>Lưới</button>
-
-          <button type="button" className={`btn btn-secondary ${view === 'table' ? 'active' : ''}`} onClick={() => setView('table')}>Bảng</button>
-
-        </div>
-
-      </div>
+              Lưới
+            </Button>
+            <Button
+              type="button"
+              variant={view === 'table' ? 'default' : 'secondary'}
+              onClick={() => setView('table')}
+            >
+              Bảng
+            </Button>
+          </>
+        }
+      />
 
 
 
@@ -654,53 +633,35 @@ export default function Posts() {
 
             </select>
 
-            <button
-
+            <Button
               type="button"
-
-              className="btn btn-secondary btn-sm"
-
+              variant="secondary"
+              size="sm"
               onClick={handleBulkStatus}
-
               disabled={!bulkStatus || bulkActionSaving}
-
             >
-
               Áp dụng
+            </Button>
 
-            </button>
-
-            <button
-
+            <Button
               type="button"
-
-              className="btn btn-secondary btn-sm posts-bulk-delete-btn"
-
+              variant="destructive"
+              size="sm"
+              className="posts-bulk-delete-btn"
               onClick={handleBulkDelete}
-
               disabled={bulkActionSaving}
-
             >
-
               <Trash2 size={14} />
-
               Xóa đã chọn
+            </Button>
 
-            </button>
-
-            <button
-
+            <Button
               type="button"
-
-              className="btn-link"
-
+              variant="link"
               onClick={() => { setSelectedIds(new Set()); setBulkStatus(''); }}
-
             >
-
               Bỏ chọn
-
-            </button>
+            </Button>
 
           </div>
 
@@ -722,7 +683,7 @@ export default function Posts() {
 
           {' '}
 
-          <button type="button" className="btn-link" onClick={toggleSelectAllSchedulable}>Chọn bài lên lịch</button>
+          <Button type="button" variant="link" onClick={toggleSelectAllSchedulable}>Chọn bài lên lịch</Button>
 
         </p>
 
@@ -845,26 +806,27 @@ export default function Posts() {
 
                   <td>
 
-                    <button type="button" className="btn-link" onClick={() => openEdit(post)}>Sửa</button>
+                    <Button type="button" variant="link" onClick={() => openEdit(post)}>Sửa</Button>
 
                     {canManualPublish(post) && (
-                      <button
+                      <Button
                         type="button"
-                        className="btn-link posts-publish-btn"
+                        variant="link"
+                        className="posts-publish-btn"
                         onClick={() => handlePublish(post.id)}
                         disabled={publishingIds.has(post.id)}
                         title="Đăng thủ công lên Facebook"
                       >
                         <Send size={14} />
                         {publishingIds.has(post.id) ? 'Đang đăng...' : manualPublishLabel(post)}
-                      </button>
+                      </Button>
                     )}
 
                     {post.status === 'pending_approval' && (
-                      <button type="button" className="btn-link" onClick={() => handleApprove(post.id)}>Duyệt</button>
+                      <Button type="button" variant="link" onClick={() => handleApprove(post.id)}>Duyệt</Button>
                     )}
 
-                    <button type="button" className="btn-link" onClick={() => handleDelete(post.id)}>Xóa</button>
+                    <Button type="button" variant="link" onClick={() => handleDelete(post.id)}>Xóa</Button>
 
                   </td>
 
@@ -886,19 +848,15 @@ export default function Posts() {
 
         <div className="posts-pagination">
 
-          <button type="button" className="btn btn-secondary btn-sm" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-
+          <Button type="button" variant="secondary" size="sm" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
             Trước
-
-          </button>
+          </Button>
 
           <span>Trang {currentPage} / {totalPages} — {totalPosts} bài</span>
 
-          <button type="button" className="btn btn-secondary btn-sm" disabled={currentPage >= totalPages} onClick={() => goToPage(currentPage + 1)}>
-
+          <Button type="button" variant="secondary" size="sm" disabled={currentPage >= totalPages} onClick={() => goToPage(currentPage + 1)}>
             Sau
-
-          </button>
+          </Button>
 
         </div>
 

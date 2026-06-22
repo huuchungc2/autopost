@@ -11,6 +11,8 @@ import VideoUpload from '../components/VideoUpload';
 import FacebookPreview from '../components/FacebookPreview';
 
 import { useToast } from '../context/ToastContext';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 
 
 
@@ -262,17 +264,10 @@ export default function Generate() {
 
     <div className="page-shell">
 
-      <div className="page-header">
-
-        <div>
-
-          <h1>Tạo bài</h1>
-
-          <p>AI: 1 lần gọi → nội dung + prompt ảnh/video theo skill fanpage.</p>
-
-        </div>
-
-      </div>
+      <PageHeader
+        title="Tạo bài"
+        description="AI: 1 lần gọi → nội dung + prompt ảnh/video theo skill fanpage."
+      />
 
 
 
@@ -296,11 +291,11 @@ export default function Generate() {
 
           <p>Tự nhập nội dung, chọn ảnh/video, lên lịch hoặc lưu nháp — không qua AI.</p>
 
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/posts/new')}>
+          <Button type="button" onClick={() => navigate('/posts/new')}>
 
             Mở trình viết bài
 
-          </button>
+          </Button>
 
         </div>
 
@@ -450,11 +445,11 @@ export default function Generate() {
 
               <label>Lên lịch<input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} /></label>
 
-              <button type="button" className="btn btn-primary" onClick={handleGenerateText} disabled={isLoading || !topic || !pageId || !skillReady}>
+              <Button type="button" onClick={handleGenerateText} disabled={isLoading || !topic || !pageId || !skillReady}>
 
                 {isLoading ? 'Đang tạo...' : 'Tạo bài AI'}
 
-              </button>
+              </Button>
 
             </>
 
@@ -470,11 +465,11 @@ export default function Generate() {
 
               <label>Lên lịch<input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} /></label>
 
-              <button type="button" className="btn btn-primary" onClick={handleGenerateVideo} disabled={isLoading || !pageId}>
+              <Button type="button" onClick={handleGenerateVideo} disabled={isLoading || !pageId}>
 
                 {isLoading ? 'Đang lưu...' : 'Tạo bài video'}
 
-              </button>
+              </Button>
 
             </>
 

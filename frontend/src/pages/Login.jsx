@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../services/authContext';
 import api from '../services/api';
+import Button from '../components/ui/Button';
 
 function loginErrorMessage(err) {
   if (err.response?.data?.error) return err.response.data.error;
@@ -50,22 +51,28 @@ export default function Login() {
 
   return (
     <div className="login-page">
-      <form className="login-form" onSubmit={handleSubmit}>
-        <h1>AutoPost</h1>
-        <p>Đăng nhập để tiếp tục.</p>
-        {error && <div className="form-error">{error}</div>}
-        <label>
-          Email hoặc username
-          <input name="login" type="text" autoComplete="username" required placeholder="admin hoặc admin@autopost.local" />
-        </label>
-        <label>
-          Mật khẩu
-          <input name="password" type="password" autoComplete="current-password" required />
-        </label>
-        <button type="submit" className="btn-primary" disabled={submitting || loading}>
-          {submitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
-        </button>
-      </form>
+      <div className="login-card">
+        <div className="login-brand">
+          <div className="login-logo" aria-hidden>AP</div>
+          <h1>AutoPost</h1>
+          <p>Đăng nhập để quản lý bài viết và lịch đăng</p>
+        </div>
+
+        <form className="login-form" onSubmit={handleSubmit}>
+          {error && <div className="form-error">{error}</div>}
+          <label>
+            Email hoặc username
+            <input name="login" type="text" autoComplete="username" required placeholder="admin hoặc admin@autopost.local" />
+          </label>
+          <label>
+            Mật khẩu
+            <input name="password" type="password" autoComplete="current-password" required />
+          </label>
+          <Button type="submit" disabled={submitting || loading} className="w-full">
+            {submitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }

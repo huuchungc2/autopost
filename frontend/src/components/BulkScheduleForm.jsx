@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
+import Button from './ui/Button';
 import {
   DEFAULT_DAILY_SLOTS,
   buildBulkSchedulePlan,
@@ -72,9 +73,9 @@ export default function BulkScheduleForm({
             </button>
           </div>
         ))}
-        <button type="button" className="btn btn-secondary btn-sm" onClick={addSlot}>
+        <Button type="button" variant="secondary" size="sm" onClick={addSlot}>
           <Plus size={14} /> Thêm khung giờ
-        </button>
+        </Button>
       </div>
 
       {summary && (
@@ -108,15 +109,14 @@ export default function BulkScheduleForm({
       )}
 
       <div className="post-editor-page-footer">
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>Huỷ</button>
-        <button
+        <Button type="button" variant="secondary" onClick={onCancel}>Huỷ</Button>
+        <Button
           type="button"
-          className="btn btn-primary"
           onClick={handleSubmit}
           disabled={saving || !count || !times.some(Boolean)}
         >
           {saving ? 'Đang lưu...' : `Lên lịch ${count} bài`}
-        </button>
+        </Button>
       </div>
     </div>
   );

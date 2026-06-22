@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
 import api from '../services/api';
 import PostImportForm from '../components/PostImportForm';
 import { useToast } from '../context/ToastContext';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 
 export default function PostImport() {
   const [searchParams] = useSearchParams();
@@ -34,21 +35,15 @@ export default function PostImport() {
 
   return (
     <div className="page-shell post-import-page">
-      <div className="page-header post-editor-page-header">
-        <button
-          type="button"
-          className="btn btn-secondary post-editor-back-btn"
-          onClick={handleClose}
-          aria-label="Quay lại danh sách bài viết"
-        >
-          <ArrowLeft size={18} />
-          Quay lại
-        </button>
-        <div>
-          <h1>Import Excel</h1>
-          <p>Tải file mẫu → chọn fanpage → upload để tạo bài và lên lịch.</p>
-        </div>
-      </div>
+      <PageHeader
+        back={{
+          onClick: handleClose,
+          label: 'Quay lại',
+          ariaLabel: 'Quay lại danh sách bài viết',
+        }}
+        title="Import Excel"
+        description="Tải file mẫu → chọn fanpage → upload để tạo bài và lên lịch."
+      />
 
       <div className="card post-import-card">
         <PostImportForm
@@ -58,15 +53,14 @@ export default function PostImport() {
           onError={handleError}
           footer={({ handleSubmit, saving, canSubmit, rowCount }) => (
             <div className="post-editor-page-footer">
-              <button type="button" className="btn btn-secondary" onClick={handleClose}>Huỷ</button>
-              <button
+              <Button type="button" variant="secondary" onClick={handleClose}>Huỷ</Button>
+              <Button
                 type="button"
-                className="btn btn-primary"
                 onClick={handleSubmit}
                 disabled={!canSubmit}
               >
                 {saving ? 'Đang import...' : `Import ${rowCount} bài`}
-              </button>
+              </Button>
             </div>
           )}
         />

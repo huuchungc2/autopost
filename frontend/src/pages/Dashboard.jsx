@@ -3,9 +3,13 @@ import api from '../services/api';
 import Calendar from '../components/Calendar';
 import Badge from '../components/ui/Badge';
 import Skeleton from '../components/ui/Skeleton';
+import PageHeader from '../components/ui/PageHeader';
+import { StatCard } from '../components/ui/Card';
+import Button from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../services/authContext';
 import { compareApiDates, formatDateTime } from '../utils/date';
+import { FileText, Facebook, Cpu, Users } from 'lucide-react';
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -92,9 +96,9 @@ export default function Dashboard() {
       <div className="page-shell">
         <div className="card">
           <p className="form-error">{loadError || 'Không tải được bảng tin'}</p>
-          <button type="button" className="btn btn-primary" onClick={() => setReloadKey((k) => k + 1)}>
+          <Button type="button" onClick={() => setReloadKey((k) => k + 1)}>
             Thử lại
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -102,32 +106,35 @@ export default function Dashboard() {
 
   return (
     <div className="page-shell">
-      <div className="page-header">
-        <div>
-          <h1>Bảng tin</h1>
-          <p>
-            {isSuperAdmin
-              ? 'Tổng quan toàn bộ hệ thống AutoPost.'
-              : 'Tổng quan fanpage và bài viết được gán cho bạn.'}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Bảng tin"
+        description={
+          isSuperAdmin
+            ? 'Tổng quan toàn bộ hệ thống AutoPost.'
+            : 'Tổng quan fanpage và bài viết được gán cho bạn.'
+        }
+        actions={
+          <Button onClick={() => navigate('/generate')}>
+            Tạo bài mới
+          </Button>
+        }
+      />
 
       {loadError && (
         <div className="card modal-alert modal-alert--error" style={{ marginBottom: 16 }}>
           <p style={{ margin: 0 }}>{loadError}</p>
-          <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={() => setReloadKey((k) => k + 1)}>
+          <Button variant="secondary" size="sm" style={{ marginTop: 8 }} onClick={() => setReloadKey((k) => k + 1)}>
             Tải lại
-          </button>
+          </Button>
         </div>
       )}
 
       <div className="dashboard-grid">
-        <div className="card card-stat"><h3>Bài viết</h3><p>{stats.posts}</p></div>
-        <div className="card card-stat"><h3>Fanpage</h3><p>{stats.pages}</p></div>
-        <div className="card card-stat"><h3>AI Provider</h3><p>{stats.providers}</p></div>
+        <StatCard icon={<FileText size={20} />} iconTone="blue" label="Bài viết" value={stats.posts} />
+        <StatCard icon={<Facebook size={20} />} iconTone="green" label="Fanpage" value={stats.pages} />
+        <StatCard icon={<Cpu size={20} />} iconTone="amber" label="AI Provider" value={stats.providers} />
         {isSuperAdmin && (
-          <div className="card card-stat"><h3>Người dùng</h3><p>{stats.users}</p></div>
+          <StatCard icon={<Users size={20} />} iconTone="slate" label="Người dùng" value={stats.users} />
         )}
       </div>
 
@@ -153,10 +160,8 @@ export default function Dashboard() {
       </div>
 
       <div className="card" style={{ marginTop: 24 }}>
-        <div className="page-header" style={{ padding: 0, marginBottom: 16 }}>
-          <h3>Lịch đăng sắp tới</h3>
-          {filterDate && <small>Lọc: {filterDate.split('-').reverse().join('/')}</small>}
-        </div>
+        <h3>Lịch đăng sắp tới</h3>
+        {filterDate && <small>Lọc: {filterDate.split('-').reverse().join('/')}</small>}
         <div className="table-wrapper">
           <table className="table">
             <thead>

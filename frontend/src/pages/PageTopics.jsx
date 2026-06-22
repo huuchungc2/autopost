@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { WEEK_DAYS as DAYS } from '../config/vi';
 import Skeleton from '../components/ui/Skeleton';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 
 export default function PageTopics() {
   const { id } = useParams();
@@ -65,16 +66,15 @@ export default function PageTopics() {
 
   return (
     <div className="page-shell post-editor-page">
-      <div className="page-header post-editor-page-header">
-        <button type="button" className="btn btn-secondary post-editor-back-btn" onClick={() => navigate('/pages')}>
-          <ArrowLeft size={18} />
-          Quay lại
-        </button>
-        <div>
-          <h1>Chủ đề tự động</h1>
-          <p>{pageName ? `Lịch nội dung cho ${pageName}` : 'Thêm chủ đề theo ngày trong tuần'}</p>
-        </div>
-      </div>
+      <PageHeader
+        back={{
+          onClick: () => navigate('/pages'),
+          label: 'Quay lại',
+          ariaLabel: 'Quay lại danh sách fanpage',
+        }}
+        title="Chủ đề tự động"
+        description={pageName ? `Lịch nội dung cho ${pageName}` : 'Thêm chủ đề theo ngày trong tuần'}
+      />
 
       <div className="card form-card">
         <div className="modal-section" style={{ marginTop: 0, paddingTop: 0, border: 'none' }}>
@@ -106,7 +106,7 @@ export default function PageTopics() {
               />
             </label>
           </div>
-          <button type="button" className="btn btn-primary" onClick={addTopic}>Thêm vào lịch</button>
+          <Button type="button" onClick={addTopic}>Thêm vào lịch</Button>
         </div>
 
         <div className="modal-section">

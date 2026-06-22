@@ -4,6 +4,8 @@ import api from '../services/api';
 import { roleLabel } from '../config/vi';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../services/authContext';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 
 const initialForm = {
   name: '',
@@ -190,12 +192,10 @@ export default function UserManagement() {
 
   return (
     <div className="page-shell">
-      <div className="page-header">
-        <div>
-          <h1>Quản lý người dùng</h1>
-          <p>{isSuperAdmin ? 'Super admin gán fanpage và AI provider cho admin/editor.' : 'Quản lý admin và biên tập — gán fanpage, provider.'}</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Quản lý người dùng"
+        description={isSuperAdmin ? 'Super admin gán fanpage và AI provider cho admin/editor.' : 'Quản lý admin và biên tập — gán fanpage, provider.'}
+      />
 
       {migrationWarning && (
         <div className="card modal-alert modal-alert--error" style={{ marginBottom: 16 }}>
@@ -268,8 +268,8 @@ export default function UserManagement() {
         )}
 
         <div className="header-actions" style={{ marginTop: 16 }}>
-          <button type="button" className="btn btn-primary" onClick={handleSubmit}>{editingId ? 'Cập nhật' : 'Tạo'}</button>
-          {editingId && <button type="button" className="btn btn-secondary" onClick={resetForm}>Huỷ</button>}
+          <Button type="button" onClick={handleSubmit}>{editingId ? 'Cập nhật' : 'Tạo'}</Button>
+          {editingId && <Button type="button" variant="secondary" onClick={resetForm}>Huỷ</Button>}
         </div>
       </div>
 
@@ -293,8 +293,8 @@ export default function UserManagement() {
                 <td>{user.role === 'super_admin' ? 'Tất cả' : (user.assigned_provider_count ?? '—')}</td>
                 <td>{user.is_active ? 'Có' : 'Không'}</td>
                 <td>
-                  <button type="button" className="btn-link" onClick={() => handleEdit(user)}>Sửa</button>
-                  <button type="button" className="btn-link" onClick={() => handleDelete(user.id)}>Xóa</button>
+                  <Button type="button" variant="link" onClick={() => handleEdit(user)}>Sửa</Button>
+                  <Button type="button" variant="link" onClick={() => handleDelete(user.id)}>Xóa</Button>
                 </td>
               </tr>
             ))}

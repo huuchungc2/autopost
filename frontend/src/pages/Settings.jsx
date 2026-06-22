@@ -5,6 +5,8 @@ import useNotifications from '../hooks/useNotifications';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../services/authContext';
 import { computeMaxImagesPerNight, formatScheduleTime } from '../utils/imageSchedule';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 
 const defaultScheduleForm = (schedule) => ({
   enabled: schedule?.enabled ?? false,
@@ -138,13 +140,15 @@ export default function Settings() {
 
   return (
     <div className="page-shell">
-      <div className="page-header">
-        <div>
-          <h1>Cài đặt</h1>
-          <p>Cấu hình hệ thống và thông báo.</p>
-        </div>
-        <button type="button" className="btn btn-secondary" onClick={markAllRead}>Đánh dấu tất cả đã đọc</button>
-      </div>
+      <PageHeader
+        title="Cài đặt"
+        description="Cấu hình hệ thống và thông báo."
+        actions={(
+          <Button type="button" variant="secondary" onClick={markAllRead}>
+            Đánh dấu tất cả đã đọc
+          </Button>
+        )}
+      />
 
       {settings && (
         <div className="dashboard-grid">
@@ -256,14 +260,13 @@ export default function Settings() {
           </div>
 
           {canEditSchedule ? (
-            <button
+            <Button
               type="button"
-              className="btn btn-primary"
               onClick={saveImageSchedule}
               disabled={scheduleSaving}
             >
               {scheduleSaving ? 'Đang lưu...' : 'Lưu lịch xuất ảnh'}
-            </button>
+            </Button>
           ) : (
             <p className="field-hint">Chỉ admin mới chỉnh lịch xuất ảnh.</p>
           )}
@@ -316,7 +319,7 @@ export default function Settings() {
                   <td>{item.message}</td>
                   <td>
                     {!item.is_read && (
-                      <button type="button" className="btn-link" onClick={() => markRead(item.id)}>Đánh dấu đã đọc</button>
+                      <Button type="button" variant="link" onClick={() => markRead(item.id)}>Đánh dấu đã đọc</Button>
                     )}
                   </td>
                 </tr>

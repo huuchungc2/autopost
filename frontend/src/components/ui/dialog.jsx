@@ -10,7 +10,7 @@ const DialogClose = DialogPrimitive.Close;
 const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
-    className={cn('fixed inset-0 z-50 bg-slate-950/50', className)}
+    className={cn('fixed inset-0 z-50 bg-[rgba(9,9,11,0.5)]', className)}
     {...props}
   />
 ));
@@ -22,7 +22,7 @@ const DialogContent = React.forwardRef(({ className, children, ...props }, ref) 
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-1/2 top-1/2 z-50 w-[min(680px,calc(100vw-24px))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-slate-200 bg-white p-6 shadow-lg outline-none',
+        'fixed left-1/2 top-1/2 z-50 w-[min(680px,calc(100vw-24px))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-surface p-6 shadow-lg outline-none',
         className
       )}
       {...props}
@@ -41,7 +41,7 @@ DialogHeader.displayName = 'DialogHeader';
 const DialogTitle = React.forwardRef(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn('text-lg font-semibold leading-none tracking-tight', className)}
+    className={cn('text-lg font-semibold leading-none tracking-tight text-foreground', className)}
     {...props}
   />
 ));
@@ -50,7 +50,7 @@ DialogTitle.displayName = DialogPrimitive.Title.displayName;
 const DialogDescription = React.forwardRef(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn('text-sm text-slate-500', className)}
+    className={cn('text-sm text-foreground-secondary', className)}
     {...props}
   />
 ));
@@ -73,4 +73,3 @@ export {
   DialogTitle,
   DialogDescription,
 };
-

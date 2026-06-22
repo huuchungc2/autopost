@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import Modal from './ui/Modal';
+import Button from './ui/Button';
 import { postStatusLabel } from '../config/vi';
 
 function getErrorHint(message) {
@@ -78,9 +79,9 @@ export default function PostErrorDetail({ post, compact = false }) {
         subtitle={subtitle}
         onClose={() => setOpen(false)}
         footer={(
-          <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
+          <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
             Đóng
-          </button>
+          </Button>
         )}
       >
         <div className="post-error-modal">

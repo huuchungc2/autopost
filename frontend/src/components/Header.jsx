@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Menu, LogOut, KeyRound, Zap } from 'lucide-react';
+import { Menu, LogOut, KeyRound } from 'lucide-react';
 import { useAuth } from '../services/authContext';
 import { getPageTitle } from '../config/navConfig';
 import NotificationDropdown from './NotificationDropdown';
@@ -22,9 +22,7 @@ export default function Header({ isMobile, pathname, sidebarCollapsed, onSidebar
           >
             <Menu size={22} />
           </button>
-          <span className="header-mobile-logo" aria-hidden>
-            <Zap size={18} strokeWidth={2.25} />
-          </span>
+          <span className="header-mobile-logo" aria-hidden>AP</span>
           <span className="header-title">{pageTitle}</span>
         </div>
         <div className="header-right">
@@ -54,7 +52,10 @@ export default function Header({ isMobile, pathname, sidebarCollapsed, onSidebar
         >
           <Menu size={20} />
         </button>
-        <span className="header-title">AutoPost</span>
+        <div>
+          <span className="header-page-label">AutoPost</span>
+          <span className="header-title">{pageTitle}</span>
+        </div>
       </div>
       <div className="header-right">
         <NotificationDropdown />

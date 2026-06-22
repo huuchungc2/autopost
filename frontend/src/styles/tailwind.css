@@ -2,3 +2,53 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-[var(--bg-base)] text-foreground antialiased;
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+  }
+
+  h1, h2, h3, h4 {
+    @apply text-foreground font-semibold tracking-tight;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .ui-input {
+    @apply flex h-10 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground;
+    @apply placeholder:text-foreground-tertiary;
+    @apply focus-visible:outline-none focus-visible:border-primary-border;
+    box-shadow: none;
+  }
+
+  .ui-input:focus-visible {
+    box-shadow: 0 0 0 3px var(--color-primary-subtle);
+  }
+
+  .ui-input:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+
+  .ui-label {
+    @apply text-sm font-medium text-foreground-secondary;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

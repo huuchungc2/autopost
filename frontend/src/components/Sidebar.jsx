@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getNavGroupsForRole } from '../config/navConfig';
 
 export default function Sidebar({ role, collapsed, onToggle }) {
@@ -9,9 +9,7 @@ export default function Sidebar({ role, collapsed, onToggle }) {
     <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
       <div className="sidebar-header">
         <div className="sidebar-brand">
-          <span className="sidebar-brand-icon" aria-hidden>
-            <Zap size={20} strokeWidth={2.25} />
-          </span>
+          <span className="sidebar-brand-icon" aria-hidden>AP</span>
           {!collapsed && <span className="sidebar-logo">AutoPost</span>}
         </div>
         <button

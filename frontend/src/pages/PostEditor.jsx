@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
 import api from '../services/api';
 import PostEditorForm from '../components/PostEditorForm';
 import usePostEditor from '../hooks/usePostEditor';
 import Skeleton from '../components/ui/Skeleton';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 import { useToast } from '../context/ToastContext';
 
 export default function PostEditor() {
@@ -90,21 +91,15 @@ export default function PostEditor() {
 
   return (
     <div className="page-shell post-editor-page">
-      <div className="page-header post-editor-page-header">
-        <button
-          type="button"
-          className="btn btn-secondary post-editor-back-btn"
-          onClick={handleClose}
-          aria-label="Quay lại danh sách bài viết"
-        >
-          <ArrowLeft size={18} />
-          Quay lại
-        </button>
-        <div>
-          <h1>{title}</h1>
-          <p>{subtitle}</p>
-        </div>
-      </div>
+      <PageHeader
+        back={{
+          onClick: handleClose,
+          label: 'Quay lại',
+          ariaLabel: 'Quay lại danh sách bài viết',
+        }}
+        title={title}
+        description={subtitle}
+      />
 
       <PostEditorForm
         form={editor.form}
@@ -121,15 +116,14 @@ export default function PostEditor() {
       />
 
       <div className="post-editor-page-footer">
-        <button type="button" className="btn btn-secondary" onClick={handleClose}>Huỷ</button>
-        <button
+        <Button type="button" variant="secondary" onClick={handleClose}>Huỷ</Button>
+        <Button
           type="button"
-          className="btn btn-primary"
           onClick={editor.handleSubmit}
           disabled={editor.saving || !editor.canSave}
         >
           {editor.saving ? 'Đang lưu...' : isEdit ? 'Cập nhật' : 'Tạo bài'}
-        </button>
+        </Button>
       </div>
     </div>
   );

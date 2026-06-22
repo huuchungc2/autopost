@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../services/api';
+import PageHeader from '../components/ui/PageHeader';
 import { formatDateTime } from '../utils/date';
 
 export default function ActivityLog() {
@@ -18,12 +19,10 @@ export default function ActivityLog() {
 
   return (
     <div className="page-shell">
-      <div className="page-header">
-        <div>
-          <h1>Nhật ký hoạt động</h1>
-          <p>Các thao tác gần đây của người dùng và hệ thống.</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Nhật ký hoạt động"
+        description="Các thao tác gần đây của người dùng và hệ thống."
+      />
       <div className="card">
         {error && <div className="form-error">{error}</div>}
         {!error && logs.length === 0 && <p>Chưa có nhật ký nào.</p>}

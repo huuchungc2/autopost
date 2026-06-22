@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import api from '../services/api';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 import ProviderFamilyCard from '../components/ProviderFamilyCard';
 import { ProviderSetupPanel } from '../components/ProviderSetupPanel';
 import { useToast } from '../context/ToastContext';
@@ -261,18 +263,16 @@ export default function Providers() {
 
   return (
     <div className="page-shell providers-page">
-      <div className="page-header">
-        <div>
-          <h1>AI Provider</h1>
-          <p>Thêm API key cho từng nhà cung cấp — form nhập liệu hiện ở <strong>khung phía dưới</strong> khi bấm Cấu hình.</p>
-        </div>
-        <div className="header-actions">
-          <button type="button" className="btn btn-secondary" onClick={openCustomPanel}>
+      <PageHeader
+        title="AI Provider"
+        description={<>Thêm API key cho từng nhà cung cấp — form nhập liệu hiện ở <strong>khung phía dưới</strong> khi bấm Cấu hình.</>}
+        actions={(
+          <Button type="button" variant="secondary" onClick={openCustomPanel}>
             <Plus size={18} />
             Provider tùy chỉnh
-          </button>
-        </div>
-      </div>
+          </Button>
+        )}
+      />
 
       <div className="provider-flow-card card">
         <h2 className="provider-flow-title">Luồng sử dụng</h2>

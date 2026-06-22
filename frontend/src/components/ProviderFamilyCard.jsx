@@ -1,4 +1,5 @@
 import { Check, Plus, Settings2 } from 'lucide-react';
+import Button from './ui/Button';
 
 function ProviderSlot({
   slotLabel,
@@ -50,13 +51,15 @@ function ProviderSlot({
       )}
 
       {hasTemplate && (
-        <button
+        <Button
           type="button"
-          className={`btn btn-sm ${configured ? 'btn-secondary' : 'btn-primary'} provider-slot-config-btn`}
+          variant={configured ? 'secondary' : 'default'}
+          size="sm"
+          className="provider-slot-config-btn"
           onClick={() => onOpenAdd(template, slotLabel)}
         >
           {configured ? <><Plus size={14} /> Thêm</> : <><Settings2 size={14} /> Cấu hình</>}
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { KeyRound, X } from 'lucide-react';
+import Button from './ui/Button';
 
 export function ProviderSetupPanel({
   title,
@@ -33,10 +34,10 @@ export function ProviderSetupPanel({
             <h2>{title}</h2>
             {subtitle && <p>{subtitle}</p>}
           </div>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Đóng">
+          <Button type="button" variant="secondary" size="sm" onClick={onClose} aria-label="Đóng">
             <X size={16} />
             Đóng
-          </button>
+          </Button>
         </header>
 
         {template && (
@@ -118,15 +119,14 @@ export function ProviderSetupPanel({
         </div>
 
         <div className="provider-setup-footer">
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>Huỷ</button>
-          <button
+          <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>Huỷ</Button>
+          <Button
             type="button"
-            className="btn btn-primary"
             onClick={onSave}
             disabled={saving || (requireApiKey && !apiKey.trim())}
           >
             {saving ? 'Đang lưu...' : saveLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </section>

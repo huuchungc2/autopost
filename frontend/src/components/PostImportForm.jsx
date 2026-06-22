@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Download, Upload } from 'lucide-react';
+import Button from './ui/Button';
 import {
   DEFAULT_DAILY_SLOTS,
   buildBulkSchedulePlan,
@@ -124,9 +125,9 @@ export default function PostImportForm({
 
   const defaultFooter = (
     <>
-      <button type="button" className="btn btn-primary" onClick={handleSubmit} disabled={!canSubmit}>
+      <Button type="button" onClick={handleSubmit} disabled={!canSubmit}>
         {saving ? 'Đang import...' : `Import ${parsed.rows.length} bài`}
-      </button>
+      </Button>
     </>
   );
 
@@ -149,15 +150,16 @@ export default function PostImportForm({
         </label>
 
         <div className="header-actions" style={{ marginBottom: 16 }}>
-          <button
+          <Button
             type="button"
-            className="btn btn-secondary btn-sm"
+            variant="secondary"
+            size="sm"
             onClick={handleDownloadTemplate}
             disabled={downloading}
           >
             <Download size={14} />
             {downloading ? 'Đang tải...' : 'Tải file mẫu Excel'}
-          </button>
+          </Button>
         </div>
 
         <p className="field-hint">

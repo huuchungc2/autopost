@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Copy, Eye, EyeOff } from 'lucide-react';
+import { Copy, Eye, EyeOff } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { formatDateTime } from '../utils/date';
 import { tokenStatusLabel } from '../config/vi';
 import Skeleton from '../components/ui/Skeleton';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 
 export default function PageToken() {
   const { id } = useParams();
@@ -90,16 +92,15 @@ export default function PageToken() {
 
   return (
     <div className="page-shell post-editor-page">
-      <div className="page-header post-editor-page-header">
-        <button type="button" className="btn btn-secondary post-editor-back-btn" onClick={() => navigate('/pages')}>
-          <ArrowLeft size={18} />
-          Quay lại
-        </button>
-        <div>
-          <h1>{tokenDetail?.name || 'Token fanpage'}</h1>
-          <p>Xem, copy và kiểm tra token với Facebook Graph API</p>
-        </div>
-      </div>
+      <PageHeader
+        back={{
+          onClick: () => navigate('/pages'),
+          label: 'Quay lại',
+          ariaLabel: 'Quay lại danh sách fanpage',
+        }}
+        title={tokenDetail?.name || 'Token fanpage'}
+        description="Xem, copy và kiểm tra token với Facebook Graph API"
+      />
 
       {tokenDetail && (
         <div className="card form-card token-view-panel">
@@ -129,16 +130,16 @@ export default function PageToken() {
               rows={4}
             />
             <div className="token-view-actions">
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowToken((v) => !v)}>
+              <Button type="button" variant="secondary" size="sm" onClick={() => setShowToken((v) => !v)}>
                 {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
                 {showToken ? 'Ẩn' : 'Hiện'}
-              </button>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={copyToken}>
+              </Button>
+              <Button type="button" variant="secondary" size="sm" onClick={copyToken}>
                 <Copy size={16} /> Sao chép
-              </button>
-              <button type="button" className="btn btn-primary btn-sm" onClick={verifyToken} disabled={verifying}>
+              </Button>
+              <Button type="button" size="sm" onClick={verifyToken} disabled={verifying}>
                 {verifying ? 'Đang kiểm tra...' : 'Kiểm tra FB'}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -171,9 +172,9 @@ export default function PageToken() {
                   placeholder="Dán Page Access Token mới..."
                 />
               </label>
-              <button type="button" className="btn btn-primary" onClick={updateToken}>
+              <Button type="button" onClick={updateToken}>
                 Lưu token mới
-              </button>
+              </Button>
             </div>
           </div>
         </div>

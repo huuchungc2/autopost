@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../services/authContext';
 import { useToast } from '../context/ToastContext';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 
 export default function ChangePassword() {
   const [oldPassword, setOldPassword] = useState('');
@@ -30,12 +32,10 @@ export default function ChangePassword() {
 
   return (
     <div className="page-shell">
-      <div className="page-header">
-        <div>
-          <h1>Đổi mật khẩu</h1>
-          <p>{user?.must_change_password ? 'Bạn cần đổi mật khẩu trước khi tiếp tục.' : 'Cập nhật mật khẩu tài khoản của bạn.'}</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Đổi mật khẩu"
+        description={user?.must_change_password ? 'Bạn cần đổi mật khẩu trước khi tiếp tục.' : 'Cập nhật mật khẩu tài khoản của bạn.'}
+      />
       <div className="card form-card">
         <form className="form-grid" onSubmit={handleSubmit}>
           <label>
@@ -46,7 +46,7 @@ export default function ChangePassword() {
             Mật khẩu mới
             <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} />
           </label>
-          <button type="submit" className="btn btn-primary">Lưu mật khẩu</button>
+          <Button type="submit">Lưu mật khẩu</Button>
         </form>
       </div>
     </div>

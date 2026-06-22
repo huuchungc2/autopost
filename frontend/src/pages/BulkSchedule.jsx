@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CalendarClock } from 'lucide-react';
+import { CalendarClock } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import BulkScheduleForm from '../components/BulkScheduleForm';
 import { useToast } from '../context/ToastContext';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 
 const SCHEDULABLE = new Set(['draft', 'pending_approval']);
 
@@ -66,25 +68,31 @@ export default function BulkSchedule() {
 
   return (
     <div className="page-shell post-editor-page">
-      <div className="page-header post-editor-page-header">
-        <button type="button" className="btn btn-secondary post-editor-back-btn" onClick={() => navigate('/posts')}>
-          <ArrowLeft size={18} />
-          Quay lại
-        </button>
-        <div>
-          <h1><CalendarClock size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />Lên lịch hàng loạt</h1>
-          <p>
+      <PageHeader
+        back={{
+          onClick: () => navigate('/posts'),
+          label: 'Quay lại',
+          ariaLabel: 'Quay lại danh sách bài viết',
+        }}
+        title={(
+          <>
+            <CalendarClock size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />
+            Lên lịch hàng loạt
+          </>
+        )}
+        description={(
+          <>
             Chọn giờ đăng mỗi ngày — hệ thống tự chia <strong>{targetIds.length}</strong> bài theo thứ tự
-          </p>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       {loading ? (
         <p className="text-muted">Đang tải...</p>
       ) : targetIds.length === 0 ? (
         <div className="card form-card">
           <p className="text-muted">Không có bài nào có thể lên lịch (chỉ bài nháp hoặc chờ duyệt).</p>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/posts')}>Quay lại danh sách</button>
+          <Button type="button" variant="secondary" onClick={() => navigate('/posts')}>Quay lại danh sách</Button>
         </div>
       ) : (
         <BulkScheduleForm

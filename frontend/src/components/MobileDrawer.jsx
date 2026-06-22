@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { X, Zap, KeyRound, LogOut } from 'lucide-react';
+import { X, KeyRound, LogOut } from 'lucide-react';
 import { getNavGroupsForRole } from '../config/navConfig';
 
 export default function MobileDrawer({ open, role, user, onClose, onLogout, onChangePassword }) {
@@ -13,9 +13,7 @@ export default function MobileDrawer({ open, role, user, onClose, onLogout, onCh
       <aside className="mobile-drawer">
         <div className="mobile-drawer-header">
           <div className="mobile-drawer-brand">
-            <span className="mobile-drawer-brand-icon" aria-hidden>
-              <Zap size={20} strokeWidth={2.25} />
-            </span>
+            <span className="mobile-drawer-brand-icon" aria-hidden>AP</span>
             <div>
               <div className="mobile-drawer-title">AutoPost</div>
               <div className="mobile-drawer-subtitle">{user?.name || 'Người dùng'}</div>

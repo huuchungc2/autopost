@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import Button from './ui/Button';
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -17,9 +18,9 @@ export default class ErrorBoundary extends Component {
           <div className="card">
             <h2>Đã xảy ra lỗi</h2>
             <p>Vui lòng tải lại trang hoặc liên hệ quản trị viên.</p>
-            <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
+            <Button type="button" onClick={() => window.location.reload()}>
               Tải lại
-            </button>
+            </Button>
           </div>
         </div>
       );

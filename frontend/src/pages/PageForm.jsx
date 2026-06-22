@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../services/authContext';
 import { skillTypeLabel } from '../config/vi';
 import Skeleton from '../components/ui/Skeleton';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 import ImageScheduleFields from '../components/ImageScheduleFields';
 
 const defaultImageSchedule = () => ({
@@ -257,16 +259,15 @@ export default function PageForm() {
 
   return (
     <div className="page-shell post-editor-page">
-      <div className="page-header post-editor-page-header">
-        <button type="button" className="btn btn-secondary post-editor-back-btn" onClick={() => navigate('/pages')}>
-          <ArrowLeft size={18} />
-          Quay lại
-        </button>
-        <div>
-          <h1>{isEdit ? 'Sửa fanpage' : 'Thêm fanpage mới'}</h1>
-          <p>{isEdit ? 'Cập nhật thông tin, skill, provider và lịch xuất ảnh cho fanpage.' : 'Kết nối fanpage Facebook với token và cấu hình AI.'}</p>
-        </div>
-      </div>
+      <PageHeader
+        back={{
+          onClick: () => navigate('/pages'),
+          label: 'Quay lại',
+          ariaLabel: 'Quay lại danh sách fanpage',
+        }}
+        title={isEdit ? 'Sửa fanpage' : 'Thêm fanpage mới'}
+        description={isEdit ? 'Cập nhật thông tin, skill, provider và lịch xuất ảnh cho fanpage.' : 'Kết nối fanpage Facebook với token và cấu hình AI.'}
+      />
 
       <form className="card form-card modal-form" onSubmit={handleSubmit}>
         <div className="modal-form-grid">
@@ -297,12 +298,12 @@ export default function PageForm() {
               />
               {isEdit && (
                 <>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowEditToken((v) => !v)}>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setShowEditToken((v) => !v)}>
                     {showEditToken ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={loadTokenIntoForm}>
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={loadTokenIntoForm}>
                     Nạp từ DB
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
@@ -415,10 +416,10 @@ export default function PageForm() {
         </div>
 
         <div className="post-editor-page-footer">
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/pages')}>Huỷ</button>
-          <button type="submit" className="btn btn-primary" disabled={saving}>
+          <Button type="button" variant="secondary" onClick={() => navigate('/pages')}>Huỷ</Button>
+          <Button type="submit" disabled={saving}>
             {saving ? 'Đang lưu...' : isEdit ? 'Lưu thay đổi' : 'Tạo fanpage'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import api from '../services/api';
 import useJobPolling from '../hooks/useJobPolling';
 import { useToast } from '../context/ToastContext';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 import { jobStatusLabel } from '../config/vi';
 import {
   INTERVAL_OPTIONS,
@@ -176,12 +178,10 @@ export default function BatchGenerate() {
 
   return (
     <div className="page-shell">
-      <div className="page-header">
-        <div>
-          <h1>Tạo bài hàng loạt</h1>
-          <p>Hai cách dùng — chọn tab phù hợp.</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Tạo bài hàng loạt"
+        description="Hai cách dùng — chọn tab phù hợp."
+      />
 
       <div className="tabs" style={{ marginBottom: 16 }}>
         <button type="button" className={mode === 'bulk' ? 'tab active' : 'tab'} onClick={() => setMode('bulk')}>
@@ -234,9 +234,9 @@ export default function BatchGenerate() {
                 </select>
               </label>
               <div className="batch-settings-actions">
-                <button type="button" className="btn btn-secondary btn-sm" onClick={applyIntervalToDaily}>
+                <Button type="button" variant="secondary" size="sm" onClick={applyIntervalToDaily}>
                   Sắp xếp lại giờ
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -271,22 +271,22 @@ export default function BatchGenerate() {
                 onChange={(e) => handleJobChange(index, 'scheduled_time', e.target.value)}
               />
             )}
-            <button type="button" className="btn-link" onClick={() => removeJob(index)} disabled={jobs.length <= 1}>
+            <Button type="button" variant="link" onClick={() => removeJob(index)} disabled={jobs.length <= 1}>
               Xóa
-            </button>
+            </Button>
           </div>
         ))}
 
         <div className="header-actions batch-actions" style={{ marginTop: 16 }}>
-          <button type="button" className="btn btn-secondary" onClick={addJob}>+ Thêm chủ đề</button>
-          <button type="button" className="btn btn-secondary" onClick={() => addMultipleJobs(5)}>+ Thêm 5</button>
-          <button type="button" className="btn btn-primary" onClick={handleSave} disabled={isLoading || !pageId}>
+          <Button type="button" variant="secondary" onClick={addJob}>+ Thêm chủ đề</Button>
+          <Button type="button" variant="secondary" onClick={() => addMultipleJobs(5)}>+ Thêm 5</Button>
+          <Button type="button" onClick={handleSave} disabled={isLoading || !pageId}>
             {mode === 'bulk' ? 'Lưu & chuẩn bị' : 'Lưu lịch hằng ngày'}
-          </button>
+          </Button>
           {mode === 'bulk' && batchId && (
-            <button type="button" className="btn btn-secondary" onClick={processBatch} disabled={isLoading}>
+            <Button type="button" variant="secondary" onClick={processBatch} disabled={isLoading}>
               Chạy AI
-            </button>
+            </Button>
           )}
         </div>
 

@@ -1,5 +1,6 @@
 import VideoUpload from './VideoUpload';
 import FacebookPreview from './FacebookPreview';
+import Button from './ui/Button';
 
 export default function PostEditorForm({
   form,
@@ -100,14 +101,14 @@ export default function PostEditorForm({
         )}
 
         {form.media_type !== 'video' && activePrompt?.trim() && isEdit && (
-          <button
+          <Button
             type="button"
-            className="btn btn-secondary"
+            variant="secondary"
             onClick={handleGenerateImage}
             disabled={generatingImage}
           >
             {generatingImage ? 'Đang xuất ảnh...' : 'Xuất ảnh từ prompt'}
-          </button>
+          </Button>
         )}
 
         <label>

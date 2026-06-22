@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Upload, FileText, PenLine } from 'lucide-react';
+import { Upload, PenLine } from 'lucide-react';
 import api from '../services/api';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 import { skillTypeLabel, SKILL_TYPE_HINTS } from '../config/vi';
 
 const initialForm = {
@@ -160,14 +162,10 @@ export default function Skills() {
 
   return (
     <div className="page-shell">
-      <div className="page-header">
-        <div>
-          <h1>Skill AI</h1>
-          <p>
-            System prompt cho AI — gắn vào fanpage ở <Link to="/pages">Fanpage</Link> để dùng khi tạo bài / auto đăng bài.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Skill AI"
+        description={<>System prompt cho AI — gắn vào fanpage ở <Link to="/pages">Fanpage</Link> để dùng khi tạo bài / auto đăng bài.</>}
+      />
 
       <div className="card form-card skill-form-card">
         <h2>{editingId ? 'Sửa Skill' : 'Tạo Skill mới'}</h2>
@@ -256,13 +254,13 @@ export default function Skills() {
         )}
 
         <div className="header-actions" style={{ marginTop: 16 }}>
-          <button type="button" className="btn btn-primary" onClick={handleSubmit} disabled={loadingDetail}>
+          <Button type="button" onClick={handleSubmit} disabled={loadingDetail}>
             {editingId ? 'Cập nhật' : 'Tạo skill'}
-          </button>
+          </Button>
           {editingId && (
-            <button type="button" className="btn btn-secondary" onClick={resetForm}>
+            <Button type="button" variant="secondary" onClick={resetForm}>
               Huỷ
-            </button>
+            </Button>
           )}
         </div>
         {message && (
@@ -314,12 +312,12 @@ export default function Skills() {
                   <small className="text-muted">{skill.prompt_length || 0} ký tự</small>
                 </td>
                 <td>
-                  <button type="button" className="btn-link" onClick={() => handleEdit(skill)} disabled={loadingDetail}>
+                  <Button type="button" variant="link" onClick={() => handleEdit(skill)} disabled={loadingDetail}>
                     Sửa
-                  </button>
-                  <button type="button" className="btn-link" onClick={() => handleDelete(skill)}>
+                  </Button>
+                  <Button type="button" variant="link" onClick={() => handleDelete(skill)}>
                     Xóa
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
