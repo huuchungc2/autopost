@@ -251,6 +251,7 @@ router.post('/composio/preview-sync', authenticate, canManagePages, asyncHandler
     composio_user_id: synced.composio_user_id,
     composio_connected_account_id: synced.composio_connected_account_id,
     token_preview: `${synced.page_token.slice(0, 8)}…${synced.page_token.slice(-6)}`,
+    composio_page_token: synced.page_token,
   });
 }));
 
@@ -549,6 +550,7 @@ router.post('/:id/composio/sync', authenticate, canManagePages, asyncHandler(asy
     message: 'Đã đồng bộ token Composio',
     page_name: synced.name,
     token_expires_at: tokenExpiresAt,
+    composio_page_token: synced.composio_page_token,
     composio_page_token_preview: tokenPreview(synced.composio_page_token),
     composio_token_status: synced.composio_token_status,
     composio_token_expires_at: synced.composio_token_expires_at,

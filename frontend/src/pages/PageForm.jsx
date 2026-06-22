@@ -23,6 +23,7 @@ const initialForm = {
   name: '',
   page_id: '',
   page_token: '',
+  composio_page_token: '',
   composio_user_id: '',
   composio_connected_account_id: '',
   token_source: 'manual',
@@ -51,6 +52,7 @@ export default function PageForm() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [showEditToken, setShowEditToken] = useState(false);
+  const [showComposioToken, setShowComposioToken] = useState(false);
   const [composioConfig, setComposioConfig] = useState(null);
   const [composioSyncing, setComposioSyncing] = useState(false);
   const [hasComposioToken, setHasComposioToken] = useState(false);
@@ -118,6 +120,7 @@ export default function PageForm() {
           name: page.name || '',
           page_id: page.page_id || '',
           page_token: '',
+          composio_page_token: '',
           composio_user_id: pageUserId || defaults?.default_user_id || '',
           composio_connected_account_id: pageAccountId || defaults?.default_connected_account_id || '',
           token_source: page.token_source || 'manual',
@@ -192,9 +195,23 @@ export default function PageForm() {
       const response = await api.get(`/pages/${id}`);
       setForm((prev) => ({ ...prev, page_token: response.data.page_token || '' }));
       setShowEditToken(true);
-      showToast('Đã nạp token hiện tại', 'success');
+      showToast('Đã nạp token thủ công', 'success');
     } catch (err) {
       showToast(err.response?.data?.error || 'Không tải được token', 'error');
+    }
+  };
+
+  const loadComposioTokenIntoForm = async () => {
+    if (!isEdit) return;
+    try {
+      const response = await api.get(`/pages/${id}`);
+      const token = response.data.composio_page_token || '';
+      setForm((prev) => ({ ...prev, composio_page_token: token }));
+      setHasComposioToken(!!token);
+      setShowComposioToken(!!token);
+      showToast(token ? 'Đã nạp token Composio' : 'Fanpage chưa có token Composio — bấm Đồng bộ', token ? 'success' : 'error');
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Không tải được token Composio', 'error');
     }
   };
 
@@ -240,11 +257,13 @@ export default function PageForm() {
         avatar_url: prev.avatar_url || response.data.avatar_url || prev.avatar_url,
         composio_user_id: response.data.composio_user_id || prev.composio_user_id,
         composio_connected_account_id: response.data.composio_connected_account_id || prev.composio_connected_account_id,
+        composio_page_token: response.data.composio_page_token || '',
         composio_synced: true,
       }));
       setHasComposioToken(true);
       setComposioTokenPreview(response.data.token_preview || '');
-      showToast(`Composio OK — ${response.data.page_name || response.data.page_id} (${response.data.token_preview})`, 'success');
+      setShowComposioToken(!!response.data.composio_page_token);
+      showToast(`Composio OK — ${response.data.page_name || response.data.page_id}`, 'success');
     } catch (err) {
       showToast(err.response?.data?.error || 'Không lấy được token từ Composio', 'error');
     } finally {
@@ -257,13 +276,16 @@ export default function PageForm() {
     setComposioSyncing(true);
     try {
       const response = await api.post(`/pages/${id}/composio/sync`);
-      setHasComposioToken(true);
+      const fullToken = response.data.composio_page_token || '';
+      setHasComposioToken(!!fullToken);
       setComposioTokenPreview(response.data.composio_page_token_preview || '');
       setForm((prev) => ({
         ...prev,
+        composio_page_token: fullToken,
         composio_synced: true,
         token_source: response.data.token_source || prev.token_source,
       }));
+      setShowComposioToken(!!fullToken);
       if (response.data.composio_token_status) {
         setTokenHealth((prev) => ({
           ...prev,
@@ -271,13 +293,7 @@ export default function PageForm() {
           composio_token_expires_at: response.data.composio_token_expires_at,
         }));
       }
-      const preview = response.data.composio_page_token_preview || '';
-      showToast(
-        preview
-          ? `Đã lưu token Composio vào DB: ${preview}`
-          : 'Đã đồng bộ token Composio',
-        'success'
-      );
+      showToast(fullToken ? 'Đã đồng bộ và hiển thị token Composio' : 'Đã đồng bộ token Composio', 'success');
     } catch (err) {
       showToast(err.response?.data?.error || 'Đồng bộ Composio thất bại', 'error');
     } finally {
@@ -434,8 +450,7 @@ export default function PageForm() {
               Page Access Token (thủ công) — cột <code>page_token</code>
               {(hasManualToken || manualTokenPreview) && !form.page_token?.trim() && (
                 <span className="field-hint" style={{ display: 'block', marginBottom: 6 }}>
-                  Đã lưu trong DB: <code>{manualTokenPreview || 'có token'}</code>
-                  {' '}— ô bên dưới để trống sẽ <strong>giữ nguyên</strong>, không xóa.
+                  Đã lưu trong DB — bấm <strong>Nạp từ DB</strong> để xem đủ token.
                 </span>
               )}
               <div className="token-input-row">
@@ -460,23 +475,34 @@ export default function PageForm() {
 
             <label className="field-span-2" style={{ marginTop: 8 }}>
               Page Access Token (Composio) — cột <code>composio_page_token</code>
-              {(hasComposioToken || composioTokenPreview) ? (
+              {(hasComposioToken || composioTokenPreview) && !form.composio_page_token?.trim() && (
                 <span className="field-hint" style={{ display: 'block', marginBottom: 6, marginTop: 6 }}>
-                  Đã lưu trong DB: <code>{composioTokenPreview || 'có token'}</code>
-                  {' '}— lấy bằng nút <strong>Đồng bộ token Composio</strong> bên dưới.
-                </span>
-              ) : (
-                <span className="field-hint field-hint--warn" style={{ display: 'block', marginBottom: 6, marginTop: 6 }}>
-                  Chưa có — bấm <strong>Đồng bộ token Composio</strong> sau khi Cài đặt Composio OK.
+                  Đã lưu trong DB — bấm <strong>Nạp từ DB</strong> để xem đủ token (giống token thủ công).
                 </span>
               )}
-              <input
-                type="text"
-                readOnly
-                value={composioTokenPreview || (hasComposioToken ? 'đã lưu (ẩn)' : '')}
-                placeholder="Chưa đồng bộ — token xuất hiện ở đây sau khi đồng bộ"
-                className="token-readonly"
-              />
+              {!hasComposioToken && !composioTokenPreview && (
+                <span className="field-hint field-hint--warn" style={{ display: 'block', marginBottom: 6, marginTop: 6 }}>
+                  Chưa có — bấm <strong>Đồng bộ token Composio</strong> bên dưới.
+                </span>
+              )}
+              <div className="token-input-row">
+                <input
+                  type={showComposioToken ? 'text' : 'password'}
+                  readOnly
+                  value={form.composio_page_token}
+                  placeholder={isEdit ? 'Nạp từ DB hoặc Đồng bộ để xem token' : 'Đồng bộ Composio để lấy token'}
+                />
+                {isEdit && (
+                  <>
+                    <Button type="button" variant="secondary" size="sm" onClick={() => setShowComposioToken((v) => !v)}>
+                      {showComposioToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </Button>
+                    <Button type="button" variant="secondary" size="sm" onClick={loadComposioTokenIntoForm}>
+                      Nạp từ DB
+                    </Button>
+                  </>
+                )}
+              </div>
             </label>
 
             <div className="page-form-section" style={{ marginTop: 16 }}>
