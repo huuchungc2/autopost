@@ -37,7 +37,7 @@ export async function assertPageAccess(user, pageId) {
 }
 
 export async function assertPostAccess(user, postId) {
-  const rows = await query('SELECT page_id FROM posts WHERE id = ?', [postId]);
+  const rows = await query('SELECT * FROM posts WHERE id = ?', [postId]);
   const post = rows[0];
   if (!post) {
     const error = new Error('Post not found');
