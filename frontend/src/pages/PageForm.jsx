@@ -58,16 +58,19 @@ export default function PageForm() {
   const [hasManualToken, setHasManualToken] = useState(false);
   const [manualTokenPreview, setManualTokenPreview] = useState('');
   const [tokenHealth, setTokenHealth] = useState(null);
+  const [showComposioOverrides, setShowComposioOverrides] = useState(false);
+
+  const applyComposioDefaults = (prev, defaults) => ({
+    ...prev,
+    composio_user_id: prev.composio_user_id || defaults?.default_user_id || '',
+    composio_connected_account_id: prev.composio_connected_account_id || defaults?.default_connected_account_id || '',
+  });
 
   useEffect(() => {
     api.get('/pages/composio/config')
       .then((r) => {
         setComposioConfig(r.data);
-        setForm((prev) => ({
-          ...prev,
-          composio_user_id: prev.composio_user_id || r.data?.default_user_id || '',
-          composio_connected_account_id: prev.composio_connected_account_id || r.data?.default_connected_account_id || '',
-        }));
+        setForm((prev) => applyComposioDefaults(prev, r.data));
       })
       .catch(() => setComposioConfig({ configured: false }));
   }, []);
@@ -100,16 +103,23 @@ export default function PageForm() {
     let cancelled = false;
     setLoading(true);
     setForm(initialForm);
-    api.get(`/pages/${id}`)
-      .then((response) => {
+    Promise.all([api.get(`/pages/${id}`), api.get('/pages/composio/config')])
+      .then(([pageRes, composioRes]) => {
         if (cancelled) return;
-        const page = response.data;
+        const page = pageRes.data;
+        const defaults = composioRes.data;
+        setComposioConfig(defaults);
+        const pageUserId = page.composio_user_id || '';
+        const pageAccountId = page.composio_connected_account_id || '';
+        const usesOverrides = !!(pageUserId && pageUserId !== (defaults?.default_user_id || ''))
+          || !!(pageAccountId && pageAccountId !== (defaults?.default_connected_account_id || ''));
+        setShowComposioOverrides(usesOverrides);
         setForm({
           name: page.name || '',
           page_id: page.page_id || '',
           page_token: '',
-          composio_user_id: page.composio_user_id || '',
-          composio_connected_account_id: page.composio_connected_account_id || '',
+          composio_user_id: pageUserId || defaults?.default_user_id || '',
+          composio_connected_account_id: pageAccountId || defaults?.default_connected_account_id || '',
           token_source: page.token_source || 'manual',
           composio_synced: !!page.composio_page_token,
           avatar_url: page.avatar_url || '',
@@ -267,6 +277,7 @@ export default function PageForm() {
 
   const buildPayload = (overrides = {}) => {
     const imageSchedule = overrides.image_schedule ?? form.image_schedule;
+    const useOverrides = showComposioOverrides;
     const payload = {
       name: form.name.trim(),
       avatar_url: form.avatar_url?.trim() || '',
@@ -275,11 +286,13 @@ export default function PageForm() {
       image_provider_id: form.image_provider_id ? Number(form.image_provider_id) : null,
       is_active: form.is_active,
       image_schedule: imageSchedule,
-      composio_user_id: form.composio_user_id?.trim() || undefined,
-      composio_connected_account_id: form.composio_connected_account_id?.trim() || undefined,
       token_source: form.token_source,
       sync_composio: !isEdit && form.composio_synced,
     };
+    if (useOverrides) {
+      payload.composio_user_id = form.composio_user_id?.trim() || undefined;
+      payload.composio_connected_account_id = form.composio_connected_account_id?.trim() || undefined;
+    }
     if (!isEdit) {
       payload.page_id = form.page_id.trim();
     }
@@ -427,33 +440,60 @@ export default function PageForm() {
 
             <div className="page-form-section" style={{ marginTop: 16 }}>
               <h3 className="page-form-section-title" style={{ fontSize: 'var(--text-sm)' }}>Token Composio</h3>
-              {!composioConfig?.configured && (
+              {!composioConfig?.configured ? (
                 <p className="field-hint field-hint--warn">
-                  Chưa cấu hình Composio — vào <Link to="/settings">Cài đặt → Composio</Link>
+                  Chưa cấu hình Composio — vào <Link to="/settings">Cài đặt → Composio</Link> → Lưu vào database
+                </p>
+              ) : (
+                <p className="field-hint" style={{ marginBottom: 8 }}>
+                  Dùng cấu hình chung từ <strong>Cài đặt</strong>
+                  {composioConfig.default_user_id && (
+                    <> — User: <code>{composioConfig.default_user_id}</code></>
+                  )}
+                  {composioConfig.default_connected_account_id && (
+                    <> · Account: <code>{composioConfig.default_connected_account_id}</code></>
+                  )}
+                  {composioConfig.connection?.status && (
+                    <> · FB: <strong>{composioConfig.connection.status}</strong></>
+                  )}
                 </p>
               )}
-              <div className="settings-schedule-grid">
-                <label>
-                  Composio User ID
-                  <input
-                    value={form.composio_user_id}
-                    onChange={(e) => handleChange('composio_user_id', e.target.value)}
-                    placeholder="pg-test-..."
-                  />
-                </label>
-                <label>
-                  Connected Account ID
-                  <input
-                    value={form.composio_connected_account_id}
-                    onChange={(e) => handleChange('composio_connected_account_id', e.target.value)}
-                    placeholder="ca_..."
-                  />
-                </label>
-              </div>
-              {(hasComposioToken || composioTokenPreview) && (
-                <p className="field-hint">
-                  Composio token: <code>{composioTokenPreview || 'đã lưu'}</code>
+              {(hasComposioToken || composioTokenPreview) ? (
+                <p className="field-hint" style={{ marginBottom: 8 }}>
+                  Token Composio (fanpage): <code>{composioTokenPreview || 'đã lưu trong DB'}</code>
                 </p>
+              ) : composioConfig?.configured && (
+                <p className="field-hint field-hint--warn" style={{ marginBottom: 8 }}>
+                  Chưa có token Composio cho fanpage này — bấm Đồng bộ bên dưới.
+                </p>
+              )}
+              <label className="page-skill-option" style={{ marginBottom: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={showComposioOverrides}
+                  onChange={(e) => setShowComposioOverrides(e.target.checked)}
+                />
+                <span>Tuỳ chỉnh User ID / Connected Account (khác Cài đặt)</span>
+              </label>
+              {showComposioOverrides && (
+                <div className="settings-schedule-grid">
+                  <label>
+                    Composio User ID
+                    <input
+                      value={form.composio_user_id}
+                      onChange={(e) => handleChange('composio_user_id', e.target.value)}
+                      placeholder={composioConfig?.default_user_id || 'pg-test-...'}
+                    />
+                  </label>
+                  <label>
+                    Connected Account ID
+                    <input
+                      value={form.composio_connected_account_id}
+                      onChange={(e) => handleChange('composio_connected_account_id', e.target.value)}
+                      placeholder={composioConfig?.default_connected_account_id || 'ca_...'}
+                    />
+                  </label>
+                </div>
               )}
               <Button
                 type="button"

@@ -22,16 +22,26 @@ export function isTokenInvalid(status) {
   return status === 'expired';
 }
 
+/** Cột `token_status` (legacy) chỉ ENUM valid|expiring|expired — không có unknown. */
+export function toSummaryTokenStatus(status) {
+  if (status === 'valid' || status === 'expiring' || status === 'expired') return status;
+  return 'valid';
+}
+
 export function syncSummaryTokenFields(pageRow) {
   const activeSource = getActiveTokenSource(pageRow);
   if (activeSource === 'composio') {
     return {
-      token_status: pageRow.composio_token_status || computeTokenStatus(pageRow.composio_token_expires_at),
+      token_status: toSummaryTokenStatus(
+        pageRow.composio_token_status || computeTokenStatus(pageRow.composio_token_expires_at)
+      ),
       token_expires_at: pageRow.composio_token_expires_at || null,
     };
   }
   return {
-    token_status: pageRow.manual_token_status || computeTokenStatus(pageRow.manual_token_expires_at),
+    token_status: toSummaryTokenStatus(
+      pageRow.manual_token_status || computeTokenStatus(pageRow.manual_token_expires_at)
+    ),
     token_expires_at: pageRow.manual_token_expires_at || null,
   };
 }
