@@ -131,7 +131,7 @@ node scripts/test-composio-publish.js --dry-run   # chỉ lấy token 3 fanpage
 node scripts/test-composio-publish.js             # đăng 1 bài text test / fanpage
 ```
 
-Cần `COMPOSIO_*` trong `.env` hoặc cấu hình đã seed vào DB. Bài test có prefix `[AutoPost test Composio]` — xóa trên FB sau khi verify.
+Cần cấu hình Composio đã **Lưu vào database** (Cài đặt → Composio). Bài test có prefix `[AutoPost test Composio]` — xóa trên FB sau khi verify.
 
 
 - **Token thủ công** hết hạn: không tự renew — cần dán lại hoặc dùng Composio.

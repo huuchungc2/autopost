@@ -250,14 +250,15 @@ VITE_API_BASE_URL=https://autopost.yourdomain.com/api npm run build
 
 ## 10. Composio (token Facebook OAuth)
 
-Cấu hình **trên UI** (super admin), lưu database — không cần biến `COMPOSIO_*` trong `.env`.
+Cấu hình **chỉ trên UI** (super admin) → lưu bảng `app_settings` — **không** dùng biến `COMPOSIO_*` trong `.env`.
 
 1. Deploy + restart API (migration `019`–`022` tự chạy).
-2. **Cài đặt → Composio**: API key, Auth Config ID, User ID, Connected Account ID (`ca_...` trạng thái **ACTIVE**).
-3. Bật **Tự chuyển token khi đăng lỗi**.
-4. Mỗi fanpage: token thủ công (tuỳ chọn) + **Đồng bộ token Composio**.
+2. **Cài đặt → Composio** → **Lưu vào database**: API key, Auth Config ID, User ID, Connected Account ID (`ca_...` **ACTIVE**).
+3. **Kiểm tra kết nối** — trạng thái `ACTIVE`.
+4. Bật **Tự chuyển token khi đăng lỗi**.
+5. Mỗi fanpage: **Đồng bộ token Composio**.
 
-Chi tiết kiến trúc token: [`docs/TOKENS_AND_COMPOSIO.md`](docs/TOKENS_AND_COMPOSIO.md).
+Chi tiết: [`docs/TOKENS_AND_COMPOSIO.md`](docs/TOKENS_AND_COMPOSIO.md).
 
 ## 11. Bảo mật
 

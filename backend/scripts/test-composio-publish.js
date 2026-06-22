@@ -1,6 +1,6 @@
 /**
  * Test đăng 1 bài text lên mỗi fanpage bằng token lấy từ Composio.
- * Không cần MySQL — đọc COMPOSIO_* từ .env.
+ * Đọc cấu hình Composio từ database (Cài đặt → Composio) — cùng nguồn với app.
  *
  *   node scripts/test-composio-publish.js
  *   node scripts/test-composio-publish.js --dry-run   # chỉ lấy token, không đăng
@@ -8,6 +8,13 @@
 import dotenv from 'dotenv';
 import { Composio } from '@composio/core';
 import { postToFacebook } from '../src/services/fbService.js';
+import { loadAppSettings } from '../src/services/appSettingsService.js';
+import {
+  getEffectiveComposioApiKey,
+  getEffectiveComposioUserId,
+  getEffectiveComposioConnectedAccountId,
+  getEffectiveComposioToolkitVersion,
+} from '../src/services/appSettingsService.js';
 
 dotenv.config();
 
@@ -20,10 +27,11 @@ const PAGE_IDS = [
 const GET_PAGES_TOOL_SLUG = 'FACEBOOK_GET_USER_PAGES';
 const dryRun = process.argv.includes('--dry-run');
 
-function requireEnv(name) {
-  const v = process.env[name]?.trim();
-  if (!v) throw new Error(`Thiếu ${name} trong .env`);
-  return v;
+function requireSetting(name, value) {
+  if (!value?.trim()) {
+    throw new Error(`Thiếu ${name} — vào Cài đặt → Composio → Lưu vào database`);
+  }
+  return value.trim();
 }
 
 function extractPages(result) {
@@ -52,10 +60,11 @@ async function fetchPageToken(composio, userId, connectedAccountId, pageId) {
 }
 
 async function main() {
-  const apiKey = requireEnv('COMPOSIO_API_KEY');
-  const userId = requireEnv('COMPOSIO_DEFAULT_USER_ID');
-  const connectedAccountId = requireEnv('COMPOSIO_DEFAULT_CONNECTED_ACCOUNT_ID');
-  const toolkitVersion = process.env.COMPOSIO_FACEBOOK_TOOLKIT_VERSION?.trim() || '20260616_00';
+  await loadAppSettings();
+  const apiKey = requireSetting('composio_api_key', getEffectiveComposioApiKey());
+  const userId = requireSetting('composio_default_user_id', getEffectiveComposioUserId());
+  const connectedAccountId = requireSetting('composio_default_connected_account_id', getEffectiveComposioConnectedAccountId());
+  const toolkitVersion = getEffectiveComposioToolkitVersion();
 
   const composio = new Composio({
     apiKey,

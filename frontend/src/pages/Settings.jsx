@@ -177,7 +177,7 @@ export default function Settings() {
 
   const hasComposioApiKey = useMemo(() => {
     if (!composioForm || !composioStatus) return false;
-    return !!(composioForm.composio_api_key?.trim() || composioStatus.has_stored_api_key || composioStatus.api_key_source === 'env');
+    return !!(composioForm.composio_api_key?.trim() || composioStatus.has_stored_api_key);
   }, [composioForm, composioStatus]);
 
   const composioMissingLabels = {
@@ -503,9 +503,7 @@ export default function Settings() {
           {composioStatus.missing_fields?.length > 0 && !composioStatus.configured && (
             <p className="field-hint field-hint--warn" style={{ marginBottom: 12 }}>
               Thiếu: {composioStatus.missing_fields.map((f) => composioMissingLabels[f] || f).join(', ')}.
-              {composioStatus.api_key_source === 'env' && (
-                <> Restart backend sau khi thêm vào <code>.env</code> để tự seed vào DB.</>
-              )}
+              Điền đủ rồi bấm <strong>Lưu vào database</strong>.
             </p>
           )}
 

@@ -6,9 +6,8 @@
 - `migrationRunner.js`: stray `}` broke backend startup on deploy
 - `facebookPublishService.js`: import `isComposioAutoFallbackEnabled` from correct module
 - Settings: Google Drive test trước khi lưu; validate Folder ID (không nhận email)
-- Settings: Composio seed từng trường thiếu từ `.env` khi restart; hiển thị field còn thiếu
-- Settings: Composio nút «Lưu vào database», «Đăng nhập Facebook qua Composio», «Kiểm tra kết nối»
-- Fanpage: hiển thị preview token manual/composio (ô sửa để trống không xóa); backend chặn ghi đè token rỗng
+- Settings: Composio UI (field thiếu, nhãn nút rõ); fanpage preview token; chặn ghi đè token rỗng
+- Composio: chỉ đọc từ database — bỏ fallback/seed từ `.env`
 
 ### Added — Composio & dual token
 - Composio settings in DB + UI (Settings → Composio)
