@@ -1,5 +1,6 @@
 import { postToFacebook } from './fbService.js';
-import { isComposioAutoFallbackEnabled, isComposioConfigured, syncComposioPageTokenForPage } from './composioService.js';
+import { isComposioConfigured, syncComposioPageTokenForPage } from './composioService.js';
+import { isComposioAutoFallbackEnabled } from './appSettingsService.js';
 import {
   isTokenInvalid,
   refreshComposioTokenIfInvalid,

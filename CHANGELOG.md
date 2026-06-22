@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- `migrationRunner.js`: stray `}` broke backend startup on deploy
+- `facebookPublishService.js`: import `isComposioAutoFallbackEnabled` from correct module
+
 ### Added — Composio & dual token
 - Composio settings in DB + UI (Settings → Composio)
 - Per-page dual tokens: `page_token` + `composio_page_token` with `token_source` active pointer

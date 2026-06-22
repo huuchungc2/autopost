@@ -339,8 +339,6 @@ export async function ensureAppSettingsTable() {
   await runMigrationFile('019_app_settings.sql', 'Migration 019 applied: app_settings for media storage');
 }
 
-}
-
 export async function ensureFbPagesComposio() {
   if (!(await columnExists('fb_pages', 'token_source'))) {
     await runMigrationFile('020_fb_pages_composio.sql', 'Migration 020 applied: fb_pages Composio token columns');
