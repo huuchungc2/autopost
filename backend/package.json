@@ -8,7 +8,8 @@
     "dev": "nodemon src/app.js",
     "start": "node src/app.js",
     "seed": "node seed-admin.js",
-    "seed:all": "node seed-admin.js"
+    "seed:all": "node seed-admin.js",
+    "test:composio-publish": "node scripts/test-composio-publish.js"
   },
   "dependencies": {
     "@composio/core": "^0.11.0",

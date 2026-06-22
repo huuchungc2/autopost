@@ -123,7 +123,16 @@ backend/migrations/
 4. Bật **Tự chuyển token khi đăng lỗi**.
 5. Connection Composio phải **ACTIVE** (không dùng `INITIATED`).
 
-## Lưu ý vận hành
+## Kiểm thử Composio (không cần MySQL)
+
+```bash
+cd backend
+node scripts/test-composio-publish.js --dry-run   # chỉ lấy token 3 fanpage
+node scripts/test-composio-publish.js             # đăng 1 bài text test / fanpage
+```
+
+Cần `COMPOSIO_*` trong `.env` hoặc cấu hình đã seed vào DB. Bài test có prefix `[AutoPost test Composio]` — xóa trên FB sau khi verify.
+
 
 - **Token thủ công** hết hạn: không tự renew — cần dán lại hoặc dùng Composio.
 - **Composio** hết hạn: hệ thống tự lấy token mới khi check ra `expired` hoặc khi đăng lỗi.

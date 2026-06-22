@@ -9,6 +9,7 @@
 - Auto-switch manual ↔ Composio on publish token errors
 - Composio refresh only when token status is `expired` (not proactive 6h sync)
 - Migrations `019`–`022`; docs: `docs/TOKENS_AND_COMPOSIO.md`
+- Script `npm run test:composio-publish` — smoke test đăng bài qua Composio (3 fanpage)
 
 ## [0.2.0] — 2026-06-15
 
