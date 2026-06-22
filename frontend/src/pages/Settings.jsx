@@ -323,7 +323,26 @@ export default function Settings() {
         composio_facebook_toolkit_version: composio.facebook_toolkit_version || prev.composio_facebook_toolkit_version,
         composio_auto_fallback: composio.auto_fallback_on_token_error !== false,
       }) : prev);
-      showToast('Đã kiểm tra — xem trạng thái kết nối phía trên', 'success');
+
+      if (!composio.configured) {
+        const missing = (composio.missing_fields || [])
+          .map((f) => composioMissingLabels[f] || f)
+          .join(', ');
+        showToast(missing ? `Chưa đủ cấu hình — thiếu: ${missing}` : 'Chưa đủ cấu hình Composio', 'error');
+        return;
+      }
+      if (composio.connection?.error) {
+        showToast(`Composio lỗi: ${composio.connection.error}`, 'error');
+        return;
+      }
+      const status = composio.connection?.status;
+      if (status === 'ACTIVE') {
+        showToast('Kết nối Facebook: ACTIVE — sẵn sàng đồng bộ token fanpage', 'success');
+      } else if (status) {
+        showToast(`Kết nối Facebook: ${status} — bấm «Đăng nhập Facebook qua Composio»`, 'error');
+      } else {
+        showToast('Đã tải cấu hình — chưa kiểm tra được trạng thái ca_...', 'error');
+      }
     } catch (err) {
       showToast(err.response?.data?.error || 'Không tải được Composio', 'error');
     }
@@ -511,6 +530,11 @@ export default function Settings() {
             <p className="field-hint" style={{ marginBottom: 12 }}>
               API key: <code>{composioStatus.api_key_preview}</code>
               {composioStatus.api_key_source && <> ({composioStatus.api_key_source})</>}
+              {composioStatus.connection?.error && (
+                <span className="field-hint field-hint--warn" style={{ display: 'block' }}>
+                  Lỗi kiểm tra: {composioStatus.connection.error}
+                </span>
+              )}
               {composioStatus.connection?.status && (
                 <> — Kết nối FB: <strong>{composioStatus.connection.status}</strong>
                   {composioStatus.connection.is_active ? ' (OK)' : ' (chưa sẵn sàng)'}
