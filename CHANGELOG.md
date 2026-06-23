@@ -2,7 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+- Folder Google Drive riêng từng fanpage (`fb_pages.google_drive_folder_id`) — ảnh AI/upload vào subfolder, fallback folder gốc Cài đặt; doc `docs/GOOGLE_DRIVE.md`
+
 ### Fixed
+- `/posts`: giữ filter, trang phân trang, chế độ lưới/bảng (URL) và scroll khi quay lại từ Sửa/Import/Lên lịch
 - `migrationRunner.js`: stray `}` broke backend startup on deploy
 - `facebookPublishService.js`: import `isComposioAutoFallbackEnabled` from correct module
 - Settings: Google Drive test trước khi lưu; validate Folder ID (không nhận email)

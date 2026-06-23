@@ -7,6 +7,7 @@ import Skeleton from '../components/ui/Skeleton';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 import { useToast } from '../context/ToastContext';
+import { postsListPath } from '../utils/postsListState';
 
 export default function PostEditor() {
   const { id } = useParams();
@@ -44,7 +45,7 @@ export default function PostEditor() {
       .catch((err) => {
         if (!cancelled) {
           showToast(err.response?.data?.error || 'Không tải được bài viết', 'error');
-          navigate('/posts', { replace: true });
+          navigate(postsListPath(searchParams), { replace: true });
         }
       })
       .finally(() => {
@@ -56,7 +57,7 @@ export default function PostEditor() {
     };
   }, [id, isEdit, navigate, showToast]);
 
-  const handleClose = () => navigate('/posts');
+  const handleClose = () => navigate(postsListPath(searchParams));
 
   const handleSaved = () => {
     showToast(isEdit ? 'Đã cập nhật bài viết' : 'Đã tạo bài viết', 'success');

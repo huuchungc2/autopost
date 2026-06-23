@@ -1,8 +1,12 @@
 # AutoPost Project Progress
 
-> Cập nhật: 2026-06-22
+> Cập nhật: 2026-06-23
 
 ## ✅ Đã hoàn thành (mới)
+
+### Google Drive — folder riêng fanpage
+- Mỗi fanpage gán `google_drive_folder_id` (PageForm); ảnh AI/upload vào subfolder, fallback folder gốc Cài đặt
+- Migration `023`; doc [`docs/GOOGLE_DRIVE.md`](docs/GOOGLE_DRIVE.md)
 
 ### Token Facebook + Composio
 - Dual token mỗi fanpage: manual + Composio (DB), không ghi đè lẫn nhau

@@ -32,6 +32,7 @@ const initialForm = {
   skill_ids: [],
   text_provider_id: '',
   image_provider_id: '',
+  google_drive_folder_id: '',
   is_active: true,
   assign_user_ids: [],
   image_schedule: defaultImageSchedule(),
@@ -61,6 +62,7 @@ export default function PageForm() {
   const [manualTokenPreview, setManualTokenPreview] = useState('');
   const [tokenHealth, setTokenHealth] = useState(null);
   const [showComposioOverrides, setShowComposioOverrides] = useState(false);
+  const [driveTesting, setDriveTesting] = useState(false);
 
   const applyComposioDefaults = (prev, defaults) => ({
     ...prev,
@@ -129,6 +131,7 @@ export default function PageForm() {
           skill_ids: page.skill_ids || page.skills?.map((s) => s.id) || (page.skill_id ? [Number(page.skill_id)] : []),
           text_provider_id: page.text_provider_id ? String(page.text_provider_id) : '',
           image_provider_id: page.image_provider_id ? String(page.image_provider_id) : '',
+          google_drive_folder_id: page.google_drive_folder_id || '',
           is_active: !!page.is_active,
           assign_user_ids: Array.isArray(page.assigned_user_ids)
             ? page.assigned_user_ids.map(Number).filter(Boolean)
@@ -310,6 +313,7 @@ export default function PageForm() {
       skill_ids: form.skill_ids.map(Number).filter(Boolean),
       text_provider_id: form.text_provider_id ? Number(form.text_provider_id) : null,
       image_provider_id: form.image_provider_id ? Number(form.image_provider_id) : null,
+      google_drive_folder_id: form.google_drive_folder_id?.trim() || null,
       is_active: form.is_active,
       image_schedule: imageSchedule,
       token_source: form.token_source,
@@ -329,6 +333,34 @@ export default function PageForm() {
       payload.assign_user_ids = form.assign_user_ids.map(Number).filter(Boolean);
     }
     return payload;
+  };
+
+  const testDriveFolder = async () => {
+    const folderId = form.google_drive_folder_id?.trim();
+    if (!folderId) {
+      showToast('Nhập Folder ID trước — hoặc để trống để dùng folder gốc trong Cài đặt', 'error');
+      return;
+    }
+    setDriveTesting(true);
+    try {
+      if (isEdit) {
+        const response = await api.post(`/pages/${id}/drive-folder/test`, {
+          google_drive_folder_id: folderId,
+        });
+        const name = response.data?.folder?.folder_name || folderId;
+        showToast(`Folder OK: ${name}`, 'success');
+      } else {
+        const response = await api.post('/settings/media-storage/test', {
+          google_drive_folder_id: folderId,
+        });
+        const name = response.data?.folder?.folder_name || folderId;
+        showToast(`Folder OK: ${name}`, 'success');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Kiểm tra folder thất bại', 'error');
+    } finally {
+      setDriveTesting(false);
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -641,6 +673,32 @@ export default function PageForm() {
             {!providers.some((p) => p.type === 'image') && (
               <span className="field-hint field-hint--warn">Chưa có image provider — <Link to="/providers">tạo trước</Link></span>
             )}
+          </div>
+
+          <div className="page-form-section field-span-2">
+            <h2 className="page-form-section-title">Google Drive — folder ảnh riêng</h2>
+            <p className="field-hint page-form-section-hint">
+              Mỗi fanpage có thể có folder Drive riêng — ảnh AI và upload sẽ vào folder này thay vì folder gốc trong{' '}
+              <Link to="/settings">Cài đặt</Link>.
+              Tạo subfolder trên Drive → Share với service account (Editor) → copy Folder ID từ URL.
+            </p>
+            <label>
+              Google Drive Folder ID (tuỳ chọn)
+              <input
+                value={form.google_drive_folder_id}
+                onChange={(e) => handleChange('google_drive_folder_id', e.target.value)}
+                placeholder="Để trống = dùng folder gốc trong Cài đặt"
+              />
+            </label>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={testDriveFolder}
+              disabled={driveTesting || !form.google_drive_folder_id?.trim()}
+              style={{ marginTop: 8 }}
+            >
+              {driveTesting ? 'Đang kiểm tra...' : 'Kiểm tra folder Drive'}
+            </Button>
           </div>
 
           <ImageScheduleFields

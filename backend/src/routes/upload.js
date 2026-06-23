@@ -49,7 +49,8 @@ router.post('/image', imageUpload.single('image'), async (req, res) => {
   try {
     await validateImageUpload(req.file);
     if (isUsingGoogleDrive()) {
-      const url = await storeUploadedImage(req.file);
+      const pageId = req.query.page_id || req.body?.page_id || null;
+      const url = await storeUploadedImage(req.file, { pageId: pageId ? Number(pageId) : null });
       return res.json({ url, storage: 'google_drive' });
     }
     res.json({ url: `/images/${req.file.filename}`, storage: 'local' });

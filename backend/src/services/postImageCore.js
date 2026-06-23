@@ -21,7 +21,7 @@ export async function generateImageForPost(post, imageProviderId) {
   }
 
   const persist = wantsSaveImageLocal(post);
-  const imageResult = await generateImage(prompt, imageProvider, { persist });
+  const imageResult = await generateImage(prompt, imageProvider, { persist, pageId: post.page_id });
 
   if (persist) {
     await query(

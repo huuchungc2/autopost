@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS fb_pages (
   skill_id INT NULL,
   text_provider_id INT NULL,
   image_provider_id INT NULL,
+  google_drive_folder_id VARCHAR(128) NULL,
   is_active BOOLEAN DEFAULT true,
   image_schedule_enabled BOOLEAN NOT NULL DEFAULT false,
   image_schedule_start_hour TINYINT UNSIGNED NOT NULL DEFAULT 1,

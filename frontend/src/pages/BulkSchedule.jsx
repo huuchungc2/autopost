@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import BulkScheduleForm from '../components/BulkScheduleForm';
 import { useToast } from '../context/ToastContext';
+import { postsListPath } from '../utils/postsListState';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 
@@ -23,6 +24,8 @@ export default function BulkSchedule() {
     () => idsParam.split(',').map((id) => Number(id)).filter(Boolean),
     [idsParam]
   );
+
+  const returnToPosts = () => navigate(postsListPath(searchParams));
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -58,7 +61,7 @@ export default function BulkSchedule() {
         `Đã lên lịch ${response.data.scheduled_count} bài — ${response.data.days} ngày × ${response.data.slots_per_day} bài/ngày`,
         'success'
       );
-      navigate('/posts');
+      returnToPosts();
     } catch (err) {
       showToast(err.response?.data?.error || 'Lên lịch hàng loạt thất bại', 'error');
     } finally {
@@ -70,7 +73,7 @@ export default function BulkSchedule() {
     <div className="page-shell post-editor-page">
       <PageHeader
         back={{
-          onClick: () => navigate('/posts'),
+          onClick: returnToPosts,
           label: 'Quay lại',
           ariaLabel: 'Quay lại danh sách bài viết',
         }}
@@ -92,13 +95,13 @@ export default function BulkSchedule() {
       ) : targetIds.length === 0 ? (
         <div className="card form-card">
           <p className="text-muted">Không có bài nào có thể lên lịch (chỉ bài nháp hoặc chờ duyệt).</p>
-          <Button type="button" variant="secondary" onClick={() => navigate('/posts')}>Quay lại danh sách</Button>
+          <Button type="button" variant="secondary" onClick={returnToPosts}>Quay lại danh sách</Button>
         </div>
       ) : (
         <BulkScheduleForm
           postCount={targetIds.length}
           onSubmit={handleSubmit}
-          onCancel={() => navigate('/posts')}
+          onCancel={returnToPosts}
           saving={saving}
         />
       )}

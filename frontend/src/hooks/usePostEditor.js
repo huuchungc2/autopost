@@ -105,6 +105,7 @@ export default function usePostEditor({ post, pages, initialPageId, active, onSa
       formData.append('image', file);
       const response = await api.post('/upload/image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        params: form.page_id ? { page_id: form.page_id } : {},
       });
       setForm((prev) => ({
         ...prev,

@@ -16,6 +16,7 @@
 ### Google Drive + storage (nếu đã deploy)
 - [x] `MAX_IMAGES_MB` 5GB, UI Drive trong Cài đặt
 - [x] Ảnh `gdrive://` — proxy khi đăng FB
+- [x] Folder Drive riêng từng fanpage — PageForm + migration `023`
 
 ## Done in v0.2.0
 

@@ -475,7 +475,8 @@ export default function Settings() {
                 1) Tạo Service Account trên Google Cloud → tải JSON.
                 2) Tạo folder Drive → Share với <code>client_email</code> trong JSON (quyền Editor).
                 3) Copy Folder ID từ URL (<code>drive.google.com/.../folders/<strong>ID_Ở_ĐÂY</strong></code>).
-                4) Dán JSON + Folder ID → <strong>Kiểm tra kết nối</strong> (không cần lưu trước) → Lưu.
+                4) Dán JSON + Folder ID gốc → <strong>Kiểm tra kết nối</strong> → Lưu.
+                {' '}Mỗi fanpage có thể gán folder riêng tại <strong>Fanpage → Sửa</strong> (ảnh vào subfolder, không lộn xộn).
               </p>
 
               <div style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>

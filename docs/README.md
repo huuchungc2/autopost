@@ -7,6 +7,7 @@
 | Doc | Khi nào đọc |
 |-----|-------------|
 | [TOKENS_AND_COMPOSIO.md](./TOKENS_AND_COMPOSIO.md) | Token FB manual + Composio, dual token, kiểm tra hiệu lực, đăng bài |
+| [GOOGLE_DRIVE.md](./GOOGLE_DRIVE.md) | Drive Service Account, folder gốc, folder riêng từng fanpage |
 | [../DEPLOY.md](../DEPLOY.md) | Deploy VPS, PM2, Nginx, migration, smoke test, lỗi production |
 | [../TODO.md](../TODO.md) | Đã làm / còn lại |
 | [../CHANGELOG.md](../CHANGELOG.md) | Thay đổi theo phiên bản |

@@ -37,6 +37,9 @@ import {
   releaseInFlightImageJobsForPages,
 } from '../services/pageImageSchedule.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { testDriveConnection } from '../services/googleDriveService.js';
+import { getEffectiveDriveCredentials } from '../services/appSettingsService.js';
+import { getDriveFolderIdForPage, normalizeDriveFolderId } from '../services/pageDriveService.js';
 
 const router = express.Router();
 
@@ -264,7 +267,7 @@ router.get('/', authenticate, asyncHandler(async (req, res) => {
             fp.manual_token_status, fp.composio_token_status,
             fp.manual_token_expires_at, fp.composio_token_expires_at,
             fp.composio_connected_account_id,
-            fp.skill_id, fp.text_provider_id, fp.image_provider_id, fp.created_at,
+            fp.skill_id, fp.text_provider_id, fp.image_provider_id, fp.google_drive_folder_id, fp.created_at,
             CONCAT(LEFT(fp.page_token, 8), '…', RIGHT(fp.page_token, 6)) AS page_token_preview,
             CONCAT(LEFT(fp.composio_page_token, 8), '…', RIGHT(fp.composio_page_token, 6)) AS composio_page_token_preview
      FROM fb_pages fp
@@ -282,6 +285,7 @@ router.get('/:id', authenticate, asyncHandler(async (req, res) => {
             is_active, token_status, token_expires_at, token_source,
             manual_token_status, manual_token_expires_at, composio_token_status, composio_token_expires_at,
             composio_user_id, composio_connected_account_id, created_at,
+            google_drive_folder_id,
             image_schedule_enabled, image_schedule_start_hour, image_schedule_start_minute,
             image_schedule_end_hour, image_schedule_end_minute, image_schedule_interval_minutes,
             image_schedule_last_run_at
@@ -310,6 +314,7 @@ router.post('/', authenticate, canManagePages, asyncHandler(async (req, res) => 
     composio_user_id,
     composio_connected_account_id,
     sync_composio = false,
+    google_drive_folder_id,
   } = req.body;
   const skillIds = normalizeSkillIds(req.body);
   if (!name || !page_id) return res.status(400).json({ error: 'Thiếu tên hoặc Page ID' });
@@ -328,17 +333,20 @@ router.post('/', authenticate, canManagePages, asyncHandler(async (req, res) => 
     composio_connected_account_id,
     sync_composio: !!sync_composio,
   });
+  const pageDriveFolderId = google_drive_folder_id !== undefined
+    ? normalizeDriveFolderId(google_drive_folder_id)
+    : null;
   const scheduleValues = pageScheduleSqlValues(pageSchedule);
   const result = await query(
     `INSERT INTO fb_pages (
        name, page_id, page_token, composio_page_token, token_source, composio_user_id, composio_connected_account_id,
        manual_token_status, manual_token_expires_at, composio_token_status, composio_token_expires_at,
        token_expires_at, token_status, avatar_url, skill_id,
-       text_provider_id, image_provider_id, is_active,
+       text_provider_id, image_provider_id, google_drive_folder_id, is_active,
        image_schedule_enabled, image_schedule_start_hour, image_schedule_start_minute,
        image_schedule_end_hour, image_schedule_end_minute, image_schedule_interval_minutes,
        created_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
     [
       resolvedToken.resolved_name || name,
       page_id,
@@ -355,7 +363,7 @@ router.post('/', authenticate, canManagePages, asyncHandler(async (req, res) => 
       resolvedToken.tokenStatus,
       avatar_url || resolvedToken.avatar_url || null,
       skillIds[0] || null,
-      resolvedTextProviderId, resolvedImageProviderId, is_active,
+      resolvedTextProviderId, resolvedImageProviderId, pageDriveFolderId, is_active,
       ...scheduleValues,
     ]
   );
@@ -381,6 +389,7 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
     composio_connected_account_id,
     sync_composio,
     token_source: tokenSourceInput,
+    google_drive_folder_id,
   } = req.body;
   const skillIds = req.body.skill_ids !== undefined || req.body.skill_id !== undefined
     ? normalizeSkillIds(req.body)
@@ -395,6 +404,7 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
             token_source, token_status, token_expires_at,
             manual_token_status, manual_token_expires_at, composio_token_status, composio_token_expires_at,
             composio_user_id, composio_connected_account_id,
+            google_drive_folder_id,
             image_schedule_enabled, image_schedule_start_hour, image_schedule_start_minute,
             image_schedule_end_hour, image_schedule_end_minute, image_schedule_interval_minutes
      FROM fb_pages WHERE id = ?`,
@@ -472,31 +482,34 @@ router.put('/:id', authenticate, canManagePages, asyncHandler(async (req, res) =
     ? parsePageImageScheduleInput(imageScheduleInput, normalizePageImageSchedule(existing))
     : null;
   const scheduleValues = pageSchedule ? pageScheduleSqlValues(pageSchedule) : null;
+  const resolvedDriveFolderId = google_drive_folder_id !== undefined
+    ? normalizeDriveFolderId(google_drive_folder_id)
+    : existing.google_drive_folder_id;
 
   await query(
     scheduleValues
       ? `UPDATE fb_pages SET name = ?, page_token = ?, composio_page_token = ?, token_source = ?, composio_user_id = ?, composio_connected_account_id = ?,
          manual_token_status = ?, manual_token_expires_at = ?, composio_token_status = ?, composio_token_expires_at = ?,
-         avatar_url = ?, skill_id = ?, text_provider_id = ?, image_provider_id = ?, is_active = ?,
+         avatar_url = ?, skill_id = ?, text_provider_id = ?, image_provider_id = ?, google_drive_folder_id = ?, is_active = ?,
          image_schedule_enabled = ?, image_schedule_start_hour = ?, image_schedule_start_minute = ?,
          image_schedule_end_hour = ?, image_schedule_end_minute = ?, image_schedule_interval_minutes = ?,
          token_expires_at = COALESCE(?, token_expires_at), token_status = ? WHERE id = ?`
       : `UPDATE fb_pages SET name = ?, page_token = ?, composio_page_token = ?, token_source = ?, composio_user_id = ?, composio_connected_account_id = ?,
          manual_token_status = ?, manual_token_expires_at = ?, composio_token_status = ?, composio_token_expires_at = ?,
-         avatar_url = ?, skill_id = ?, text_provider_id = ?, image_provider_id = ?, is_active = ?,
+         avatar_url = ?, skill_id = ?, text_provider_id = ?, image_provider_id = ?, google_drive_folder_id = ?, is_active = ?,
          token_expires_at = COALESCE(?, token_expires_at), token_status = ? WHERE id = ?`,
     scheduleValues
       ? [
         name.trim(), manualToken, composioToken, token_source, composioUserId, composioConnectedAccountId,
         manualTokenStatus, manualTokenExpiresAt, composioTokenStatus, composioTokenExpiresAt,
-        resolvedAvatarUrl, skillIdToSave, resolvedTextProviderId, resolvedImageProviderId, resolvedIsActive,
+        resolvedAvatarUrl, skillIdToSave, resolvedTextProviderId, resolvedImageProviderId, resolvedDriveFolderId, resolvedIsActive,
         ...scheduleValues,
         tokenExpiresAt, tokenStatus, req.params.id,
       ]
       : [
         name.trim(), manualToken, composioToken, token_source, composioUserId, composioConnectedAccountId,
         manualTokenStatus, manualTokenExpiresAt, composioTokenStatus, composioTokenExpiresAt,
-        resolvedAvatarUrl, skillIdToSave, resolvedTextProviderId, resolvedImageProviderId, resolvedIsActive,
+        resolvedAvatarUrl, skillIdToSave, resolvedTextProviderId, resolvedImageProviderId, resolvedDriveFolderId, resolvedIsActive,
         tokenExpiresAt, tokenStatus, req.params.id,
       ]
   );
@@ -541,6 +554,36 @@ router.post('/:id/topics', authenticate, canManagePages, asyncHandler(async (req
     [req.params.id, dow, String(topic).trim(), post_time, is_active]
   );
   res.status(201).json({ id: result.insertId, page_id: req.params.id, day_of_week: dow, topic: String(topic).trim(), post_time, is_active });
+}));
+
+router.post('/:id/drive-folder/test', authenticate, canManagePages, asyncHandler(async (req, res) => {
+  await assertPageAccess(req.user, req.params.id);
+  const credentials = getEffectiveDriveCredentials();
+  if (!credentials) {
+    return res.status(400).json({ error: 'Chưa cấu hình Service Account — vào Cài đặt → Google Drive' });
+  }
+
+  const bodyFolderId = req.body?.google_drive_folder_id;
+  const folderId = bodyFolderId !== undefined
+    ? normalizeDriveFolderId(bodyFolderId)
+    : await getDriveFolderIdForPage(req.params.id);
+
+  if (!folderId) {
+    return res.status(400).json({
+      error: 'Cần Folder ID fanpage hoặc folder gốc trong Cài đặt',
+    });
+  }
+
+  const result = await testDriveConnection({ folderId, credentials });
+  res.json({
+    message: 'Kết nối folder Drive thành công',
+    folder: result,
+    resolved_from: bodyFolderId !== undefined && bodyFolderId !== ''
+      ? 'page_form'
+      : (await query('SELECT google_drive_folder_id FROM fb_pages WHERE id = ?', [req.params.id]))[0]?.google_drive_folder_id
+        ? 'page'
+        : 'global',
+  });
 }));
 
 router.post('/:id/composio/sync', authenticate, canManagePages, asyncHandler(async (req, res) => {

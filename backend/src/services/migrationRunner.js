@@ -350,3 +350,8 @@ export async function ensureFbPagesComposio() {
     await runMigrationFile('022_fb_pages_token_health.sql', 'Migration 022 applied: per-token health columns');
   }
 }
+
+export async function ensureFbPagesDriveFolder() {
+  if (await columnExists('fb_pages', 'google_drive_folder_id')) return;
+  await runMigrationFile('023_fb_pages_drive_folder.sql', 'Migration 023 applied: per-page Drive folder');
+}

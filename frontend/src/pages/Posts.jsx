@@ -24,6 +24,12 @@ import { useToast } from '../context/ToastContext';
 
 import { mediaTypeLabel, postStatusLabel } from '../config/vi';
 import { canManualPublish, manualPublishLabel } from '../utils/postActions';
+import {
+  postsListView,
+  postsSubPath,
+  restorePostsListScroll,
+  savePostsListScroll,
+} from '../utils/postsListState';
 
 
 
@@ -45,7 +51,10 @@ export default function Posts() {
 
   const [loading, setLoading] = useState(true);
 
-  const [view, setView] = useState('table');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const [view, setView] = useState(() => postsListView(searchParams));
 
   const [bulkActionSaving, setBulkActionSaving] = useState(false);
 
@@ -54,9 +63,6 @@ export default function Posts() {
   const [publishingIds, setPublishingIds] = useState(new Set());
 
   const [selectedIds, setSelectedIds] = useState(new Set());
-
-  const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
 
   const { showToast } = useToast();
 
@@ -126,40 +132,39 @@ export default function Posts() {
 
   const pageNameById = (id) => pages.find((p) => String(p.id) === String(id))?.name || id;
 
-  const buildImportPath = () => {
-    const params = new URLSearchParams();
-    if (filters.page) params.set('page', filters.page);
-    const query = params.toString();
-    return query ? `/posts/import?${query}` : '/posts/import';
-  };
+  const buildImportPath = () => postsSubPath('/posts/import', searchParams);
 
   const openImport = () => {
+    savePostsListScroll();
     navigate(buildImportPath());
   };
 
-  const buildEditorPath = (postId = null) => {
-    const params = new URLSearchParams();
-    if (filters.page) params.set('page', filters.page);
-    const query = params.toString();
-    if (postId) {
-      return query ? `/posts/${postId}/edit?${query}` : `/posts/${postId}/edit`;
-    }
-    return query ? `/posts/new?${query}` : '/posts/new';
-  };
+  const buildEditorPath = (postId = null) => (
+    postId
+      ? postsSubPath(`/posts/${postId}/edit`, searchParams)
+      : postsSubPath('/posts/new', searchParams)
+  );
 
   const openCreate = () => {
+    savePostsListScroll();
     navigate(buildEditorPath());
   };
 
   const openEdit = (post) => {
+    savePostsListScroll();
     navigate(buildEditorPath(post.id));
   };
 
   useEffect(() => {
-
+    setView(postsListView(searchParams));
     loadPosts();
-
   }, [searchParams]);
+
+  useEffect(() => {
+    if (loading) return undefined;
+    const frame = requestAnimationFrame(() => restorePostsListScroll());
+    return () => cancelAnimationFrame(frame);
+  }, [loading, posts]);
 
 
 
@@ -202,6 +207,14 @@ export default function Posts() {
     : schedulablePosts.map((p) => p.id);
 
 
+
+  const setViewMode = (mode) => {
+    setView(mode);
+    const next = new URLSearchParams(searchParams);
+    if (mode === 'grid') next.set('view', 'grid');
+    else next.delete('view');
+    setSearchParams(next);
+  };
 
   const setFilter = (key, value) => {
 
@@ -473,11 +486,10 @@ export default function Posts() {
 
 
   const openBulkSchedule = () => {
-    const params = new URLSearchParams();
-    if (selectedSchedulableIds.length) params.set('ids', selectedSchedulableIds.join(','));
-    if (filters.page) params.set('page', filters.page);
-    const query = params.toString();
-    navigate(query ? `/posts/bulk-schedule?${query}` : '/posts/bulk-schedule');
+    savePostsListScroll();
+    navigate(postsSubPath('/posts/bulk-schedule', searchParams, {
+      ids: selectedSchedulableIds.length ? selectedSchedulableIds.join(',') : undefined,
+    }));
   };
 
   const handleDownloadTemplate = async () => {
@@ -528,14 +540,14 @@ export default function Posts() {
             <Button
               type="button"
               variant={view === 'grid' ? 'default' : 'secondary'}
-              onClick={() => setView('grid')}
+              onClick={() => setViewMode('grid')}
             >
               Lưới
             </Button>
             <Button
               type="button"
               variant={view === 'table' ? 'default' : 'secondary'}
-              onClick={() => setView('table')}
+              onClick={() => setViewMode('table')}
             >
               Bảng
             </Button>

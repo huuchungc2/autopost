@@ -9,6 +9,7 @@ import {
   uploadBufferToDrive,
 } from './googleDriveService.js';
 import { getEffectiveMediaStorage } from './appSettingsService.js';
+import { getDriveFolderIdForPage } from './pageDriveService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,11 +43,17 @@ function saveImageBufferLocal(buffer, ext = 'png') {
  * Lưu ảnh — Drive nếu bật, không thì local VPS.
  * Trả về path/URL lưu trong DB (gdrive://ID hoặc /images/...).
  */
-export async function storeImageBuffer(buffer, { ext = 'png', mimeType = 'image/png' } = {}) {
+export async function storeImageBuffer(buffer, {
+  ext = 'png',
+  mimeType = 'image/png',
+  pageId = null,
+  driveFolderId = null,
+} = {}) {
   const filename = `autopost-${Date.now()}.${ext}`;
 
   if (isUsingGoogleDrive()) {
-    const fileId = await uploadBufferToDrive(buffer, filename, mimeType);
+    const folderId = driveFolderId || await getDriveFolderIdForPage(pageId);
+    const fileId = await uploadBufferToDrive(buffer, filename, mimeType, folderId);
     return `gdrive://${fileId}`;
   }
 

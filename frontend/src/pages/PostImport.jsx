@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import PostImportForm from '../components/PostImportForm';
 import { useToast } from '../context/ToastContext';
+import { postsListPath } from '../utils/postsListState';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 
@@ -18,7 +19,7 @@ export default function PostImport() {
     api.get('/pages').then((r) => setPages(r.data)).catch(console.error);
   }, []);
 
-  const handleClose = () => navigate('/posts');
+  const handleClose = () => navigate(postsListPath(searchParams));
 
   const handleImported = (result) => {
     const parts = [`Đã import ${result.created_count} bài`];
@@ -26,7 +27,7 @@ export default function PostImport() {
     if (result.auto_generate_image_count) parts.push(`${result.auto_generate_image_count} sẽ xuất ảnh ban khuya / khi đăng`);
     if (result.errors?.length) parts.push(`${result.errors.length} dòng lỗi import`);
     showToast(parts.join(' — '), 'success');
-    navigate('/posts');
+    navigate(postsListPath(searchParams));
   };
 
   const handleError = (message) => {

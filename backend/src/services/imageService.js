@@ -58,7 +58,7 @@ function extractGeminiImagePart(data) {
   return parts.find((part) => part.inlineData?.mimeType?.startsWith('image/'));
 }
 
-async function generateGeminiImage({ apiKey, model, prompt, endpoint, persist = true }) {
+async function generateGeminiImage({ apiKey, model, prompt, endpoint, persist = true, pageId = null }) {
   const finalUrl = buildGeminiImageUrl(endpoint, model, apiKey);
   const response = await axios.post(
     finalUrl,
@@ -94,7 +94,7 @@ async function generateGeminiImage({ apiKey, model, prompt, endpoint, persist = 
     };
   }
 
-  const imageUrl = await storeImageBuffer(buffer, { ext, mimeType });
+  const imageUrl = await storeImageBuffer(buffer, { ext, mimeType, pageId });
   return { image_url: imageUrl, image_prompt: prompt };
 }
 
@@ -115,7 +115,7 @@ function parseOpenAiImageItem(item) {
   return null;
 }
 
-async function generateDalle({ apiKey, model, prompt, endpoint, persist = true }) {
+async function generateDalle({ apiKey, model, prompt, endpoint, persist = true, pageId = null }) {
   const url = endpoint || DEFAULT_IMAGE_ENDPOINTS.openai;
   const response = await axios.post(
     url,
@@ -138,6 +138,7 @@ async function generateDalle({ apiKey, model, prompt, endpoint, persist = true }
     const imageUrl = await storeImageBuffer(parsed.buffer, {
       ext: parsed.ext,
       mimeType: parsed.mimeType,
+      pageId,
     });
     return { image_url: imageUrl, image_prompt: prompt };
   }
@@ -147,11 +148,11 @@ async function generateDalle({ apiKey, model, prompt, endpoint, persist = true }
     return { image_url: remoteUrl, image_prompt: prompt, ephemeral: true };
   }
   const { buffer, ext, mimeType } = await downloadBuffer(remoteUrl);
-  const imageUrl = await storeImageBuffer(buffer, { ext, mimeType });
+  const imageUrl = await storeImageBuffer(buffer, { ext, mimeType, pageId });
   return { image_url: imageUrl, image_prompt: prompt };
 }
 
-async function generateIdeogram({ apiKey, prompt, endpoint, persist = true }) {
+async function generateIdeogram({ apiKey, prompt, endpoint, persist = true, pageId = null }) {
   const url = endpoint || DEFAULT_IMAGE_ENDPOINTS.ideogram;
   const response = await axios.post(
     url,
@@ -167,12 +168,13 @@ async function generateIdeogram({ apiKey, prompt, endpoint, persist = true }) {
     return { image_url: remoteUrl, image_prompt: prompt, ephemeral: true };
   }
   const { buffer, ext, mimeType } = await downloadBuffer(remoteUrl);
-  const imageUrl = await storeImageBuffer(buffer, { ext, mimeType });
+  const imageUrl = await storeImageBuffer(buffer, { ext, mimeType, pageId });
   return { image_url: imageUrl, image_prompt: prompt };
 }
 
 export async function generateImage(prompt, providerConfig = null, options = {}) {
   const persist = options.persist !== false;
+  const pageId = options.pageId ?? null;
   const kind = resolveProviderKind(providerConfig);
   const apiKey = providerConfig?.api_key
     || (kind === 'gemini' ? process.env.GEMINI_API_KEY : null)
@@ -189,13 +191,13 @@ export async function generateImage(prompt, providerConfig = null, options = {})
   return callWithRateLimit(rateKind, async () => {
     try {
       if (kind === 'gemini') {
-        return await generateGeminiImage({ apiKey, model, prompt, endpoint, persist });
+        return await generateGeminiImage({ apiKey, model, prompt, endpoint, persist, pageId });
       }
       if (kind === 'ideogram') {
-        return await generateIdeogram({ apiKey, prompt, endpoint, persist });
+        return await generateIdeogram({ apiKey, prompt, endpoint, persist, pageId });
       }
       if (kind === 'openai') {
-        return await generateDalle({ apiKey, model, prompt, endpoint, persist });
+        return await generateDalle({ apiKey, model, prompt, endpoint, persist, pageId });
       }
       throw Object.assign(
         new Error(`Loại image provider "${kind}" chưa được hỗ trợ — dùng Gemini, OpenAI hoặc Ideogram`),
@@ -216,7 +218,7 @@ export async function validateImageUpload(file) {
   return true;
 }
 
-export async function storeUploadedImage(file) {
+export async function storeUploadedImage(file, { pageId = null } = {}) {
   const ext = file.originalname?.split('.').pop() || 'jpg';
-  return storeImageBuffer(file.buffer, { ext, mimeType: file.mimetype });
+  return storeImageBuffer(file.buffer, { ext, mimeType: file.mimetype, pageId });
 }

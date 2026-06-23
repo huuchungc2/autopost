@@ -38,13 +38,17 @@ function getDrive() {
   return driveClient;
 }
 
-export async function uploadBufferToDrive(buffer, filename, mimeType) {
+export async function uploadBufferToDrive(buffer, filename, mimeType, folderIdOverride = null) {
   const drive = getDrive();
+  const folderId = folderIdOverride?.trim() || getFolderId();
+  if (!folderId) {
+    throw new Error('Google Drive chưa có Folder ID — cấu hình trong Cài đặt hoặc fanpage');
+  }
   const stream = Readable.from(buffer);
   const created = await drive.files.create({
     requestBody: {
       name: filename,
-      parents: [getFolderId()],
+      parents: [folderId],
     },
     media: { mimeType, body: stream },
     fields: 'id',
