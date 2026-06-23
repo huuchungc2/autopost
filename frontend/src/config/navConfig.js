@@ -9,6 +9,7 @@ import {
   Users,
   History,
   Settings,
+  UsersRound,
 } from 'lucide-react';
 
 export const navGroups = [
@@ -24,6 +25,7 @@ export const navGroups = [
     label: 'Nội dung',
     items: [
       { to: '/posts', label: 'Bài viết', icon: FileText, roles: ['super_admin', 'admin', 'editor'] },
+      { to: '/groups', label: 'Group', icon: UsersRound, roles: ['super_admin', 'admin', 'editor'] },
       { to: '/generate', label: 'Tạo bài', icon: Sparkles, roles: ['super_admin', 'admin', 'editor'] },
       { to: '/batch-generate', label: 'Hàng loạt', icon: Layers, roles: ['super_admin', 'admin', 'editor'] },
     ],
@@ -66,6 +68,9 @@ export function getNavGroupsForRole(role) {
 export function getPageTitle(pathname) {
   if (pathname === '/posts/new') return 'Viết bài tay';
   if (pathname === '/posts/import') return 'Import Excel';
+  if (pathname === '/groups/import') return 'Import Group';
+  if (pathname === '/groups/drafts') return 'Group Drafts';
+  if (pathname.startsWith('/groups')) return 'Group';
   if (/^\/posts\/\d+\/edit$/.test(pathname)) return 'Sửa bài viết';
   for (const group of navGroups) {
     for (const item of group.items) {
@@ -77,7 +82,7 @@ export function getPageTitle(pathname) {
   return 'AutoPost';
 }
 
-export const mobileBottomRoutes = ['/', '/posts', '/generate'];
+export const mobileBottomRoutes = ['/', '/posts', '/groups', '/generate'];
 
 export function isSecondaryRoute(pathname) {
   return !mobileBottomRoutes.some((route) =>

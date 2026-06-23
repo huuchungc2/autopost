@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "GroupFlow — FB Group Auto Poster",
+  "version": "1.0.0",
+  "description": "Đăng bài FB Group, comment chéo, Radar Lead — đồng bộ tidien.xyz",
+  "permissions": [
+    "storage",
+    "alarms",
+    "downloads",
+    "sidePanel",
+    "tabs",
+    "activeTab",
+    "scripting",
+    "notifications",
+    "webRequest"
+  ],
+  "host_permissions": [
+    "https://www.facebook.com/*",
+    "https://tidien.xyz/*",
+    "http://localhost:3001/*",
+    "https://www.googleapis.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.facebook.com/*"],
+      "js": ["selectors.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "GroupFlow"
+  }
+}

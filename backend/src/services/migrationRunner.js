@@ -355,3 +355,24 @@ export async function ensureFbPagesDriveFolder() {
   if (await columnExists('fb_pages', 'google_drive_folder_id')) return;
   await runMigrationFile('023_fb_pages_drive_folder.sql', 'Migration 023 applied: per-page Drive folder');
 }
+
+export async function ensureGroupPostsTables() {
+  if (await tableExists('group_posts')) return;
+  await runMigrationFile('024_group_posts.sql', 'Migration 024 applied: group_posts + extension API keys');
+}
+
+export async function ensureGroupPostDraftsTable() {
+  if (await tableExists('group_post_drafts')) return;
+  await runMigrationFile('025_group_post_drafts.sql', 'Migration 025 applied: group_post_drafts');
+}
+
+export async function ensureGroupPostNameSharedDrafts() {
+  if (!(await tableExists('group_posts'))) return;
+  if (!(await columnExists('group_posts', 'group_name'))) {
+    await runMigrationFile('026_group_name_shared_drafts.sql', 'Migration 026 applied: group_name + shared drafts');
+    return;
+  }
+  if (!(await tableExists('group_post_draft_pulls'))) {
+    await runMigrationFile('026_group_name_shared_drafts.sql', 'Migration 026 applied: group_post_draft_pulls');
+  }
+}

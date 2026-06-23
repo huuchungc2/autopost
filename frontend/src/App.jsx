@@ -5,6 +5,9 @@ import Dashboard from './pages/Dashboard';
 import Posts from './pages/Posts';
 import PostEditor from './pages/PostEditor';
 import PostImport from './pages/PostImport';
+import GroupPosts from './pages/GroupPosts';
+import GroupDrafts from './pages/GroupDrafts';
+import GroupImport from './pages/GroupImport';
 import Generate from './pages/Generate';
 import BatchGenerate from './pages/BatchGenerate';
 import Pages from './pages/Pages';
@@ -34,6 +37,9 @@ function App() {
             <Route path="posts/new" element={<PostEditor />} />
             <Route path="posts/import" element={<PostImport />} />
             <Route path="posts/:id/edit" element={<PostEditor />} />
+            <Route path="groups" element={<GroupPosts />} />
+            <Route path="groups/import" element={<GroupImport />} />
+            <Route path="groups/drafts" element={<GroupDrafts />} />
             <Route path="generate" element={<Generate />} />
             <Route path="batch-generate" element={<BatchGenerate />} />
             <Route path="pages" element={<Pages />} />

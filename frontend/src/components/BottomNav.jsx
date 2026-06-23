@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FileText, Sparkles, Menu } from 'lucide-react';
+import { LayoutDashboard, FileText, Sparkles, Menu, UsersRound } from 'lucide-react';
 import { isSecondaryRoute } from '../config/navConfig';
 
 const tabItems = [
   { to: '/', label: 'Trang chủ', icon: LayoutDashboard, end: true },
   { to: '/posts', label: 'Bài viết', icon: FileText },
+  { to: '/groups', label: 'Group', icon: UsersRound },
   { to: '/generate', label: 'Tạo bài', icon: Sparkles, primary: true },
 ];
 

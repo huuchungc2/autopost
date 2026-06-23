@@ -3,6 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- **GroupFlow website UI polish** — Settings extension key, `/groups` filter + chi tiết/comment, import preview, drafts pagination, Dashboard GroupFlow, mobile nav Group
+- **Group shared drafts + group_name** — migration `026`, admin import chia sẻ team, sửa/re-pull draft, `group_name` sync từ extension
+- **Group API** — `GET /extension-key`, `GET /stats`, `GET /:id/comments`, lọc search/ngày/user
+- **Draft pull API** — `POST/GET /drafts`, `GET /drafts/pull`, migration `025_group_post_drafts.sql`
+- Extension nút **Tải từ website** → merge queue local
+- **GroupFlow** — Chrome extension `GroupFlow/fb-group-poster/`
+- Backend API `/api/group-posts/*` + migration `024`; doc `docs/GROUPFLOW.md`
 - Folder Google Drive riêng từng fanpage (`fb_pages.google_drive_folder_id`) — ảnh AI/upload vào subfolder, fallback folder gốc Cài đặt; doc `docs/GOOGLE_DRIVE.md`
 
 ### Fixed

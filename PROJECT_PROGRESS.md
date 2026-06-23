@@ -4,6 +4,11 @@
 
 ## ✅ Đã hoàn thành (mới)
 
+### GroupFlow — Chrome extension FB Group
+- Extension `GroupFlow/fb-group-poster/`: đăng group, generate ảnh, comment chéo, lịch, Drive local, Radar Lead
+- Backend `/api/group-posts/*` + migration `024`–`025`; doc [`docs/GROUPFLOW.md`](docs/GROUPFLOW.md)
+- **Website UI đầy đủ**: shared draft team, sửa/re-pull, `group_name`, Settings API key, Dashboard
+
 ### Google Drive — folder riêng fanpage
 - Mỗi fanpage gán `google_drive_folder_id` (PageForm); ảnh AI/upload vào subfolder, fallback folder gốc Cài đặt
 - Migration `023`; doc [`docs/GOOGLE_DRIVE.md`](docs/GOOGLE_DRIVE.md)

@@ -9,7 +9,7 @@ import Button from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../services/authContext';
 import { compareApiDates, formatDateTime } from '../utils/date';
-import { FileText, Facebook, Cpu, Users } from 'lucide-react';
+import { FileText, Facebook, Cpu, Users, UsersRound } from 'lucide-react';
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -31,6 +31,7 @@ export default function Dashboard() {
           { key: 'posts', promise: api.get('/posts', { params: { limit: 500 } }) },
           { key: 'pages', promise: api.get('/pages') },
           { key: 'providers', promise: api.get('/providers') },
+          { key: 'groupStats', promise: api.get('/group-posts/stats') },
         ];
         if (isSuperAdmin) {
           requests.push({ key: 'users', promise: api.get('/users') });
@@ -50,7 +51,8 @@ export default function Dashboard() {
         const postsList = Array.isArray(postsPayload) ? postsPayload : (postsPayload?.items || []);
         const pagesData = getData(1, 'fanpage');
         const providersData = getData(2, 'provider');
-        const usersData = isSuperAdmin ? getData(3, 'người dùng') : null;
+        const groupStats = results[3].status === 'fulfilled' ? results[3].value.data : null;
+        const usersData = isSuperAdmin ? getData(4, 'người dùng') : null;
 
         setPosts(postsList);
         const byStatus = postsList.reduce((acc, p) => {
@@ -64,6 +66,7 @@ export default function Dashboard() {
           providers: Array.isArray(providersData) ? providersData.length : 0,
           users: isSuperAdmin && Array.isArray(usersData) ? usersData.length : null,
           byStatus,
+          group: groupStats,
         });
 
         if (errors.length) {
@@ -132,11 +135,40 @@ export default function Dashboard() {
       <div className="dashboard-grid">
         <StatCard icon={<FileText size={20} />} iconTone="blue" label="Bài viết" value={stats.posts} />
         <StatCard icon={<Facebook size={20} />} iconTone="green" label="Fanpage" value={stats.pages} />
+        <StatCard
+          icon={<UsersRound size={20} />}
+          iconTone="slate"
+          label="Group đã đăng"
+          value={stats.group?.total_posts ?? '—'}
+        />
         <StatCard icon={<Cpu size={20} />} iconTone="amber" label="AI Provider" value={stats.providers} />
         {isSuperAdmin && (
           <StatCard icon={<Users size={20} />} iconTone="slate" label="Người dùng" value={stats.users} />
         )}
       </div>
+
+      {stats.group && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <h3 style={{ margin: 0 }}>GroupFlow</h3>
+            <Button variant="secondary" size="sm" onClick={() => navigate('/groups')}>Xem bài đã đăng</Button>
+          </div>
+          <div className="status-chips" style={{ marginTop: 12 }}>
+            <button type="button" className="status-chip" onClick={() => navigate('/groups')}>
+              <Badge>7 ngày</Badge> {stats.group.posts_last_7_days} bài
+            </button>
+            <button type="button" className="status-chip" onClick={() => navigate('/groups')}>
+              <Badge>Comment</Badge> {stats.group.total_comments}
+            </button>
+            <button type="button" className="status-chip" onClick={() => navigate('/groups/drafts')}>
+              <Badge>Chờ tải</Badge> {stats.group.my_pending_drafts}
+            </button>
+            <button type="button" className="status-chip" onClick={() => navigate('/groups/drafts')}>
+              <Badge>Shared</Badge> {stats.group.shared_drafts_total ?? 0} draft team
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="dashboard-split">
         <div className="card">

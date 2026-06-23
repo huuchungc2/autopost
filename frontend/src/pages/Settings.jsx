@@ -8,6 +8,7 @@ import { computeMaxImagesPerNight, formatScheduleTime } from '../utils/imageSche
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 import { invalidateMediaStorageCache } from '../hooks/useMediaStorage';
+import GroupExtensionSettings from '../components/GroupExtensionSettings';
 
 const defaultScheduleForm = (schedule) => ({
   enabled: schedule?.enabled ?? false,
@@ -403,6 +404,8 @@ export default function Settings() {
           )}
         </div>
       )}
+
+      <GroupExtensionSettings />
 
       {driveStatus && mediaForm && (
         <div className="card settings-media-storage" style={{ marginTop: 24 }}>

@@ -3145,3 +3145,41 @@ body.mobile-menu-open {
 @media (max-width: 900px) {
   .header-menu-btn { display: none; }
 }
+
+/* GroupFlow website UI */
+.group-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+}
+.group-filters-row .input { max-width: 220px; min-width: 140px; }
+.input-icon-wrap { position: relative; flex: 1; min-width: 180px; max-width: 320px; }
+.input-icon-wrap .input { width: 100%; padding-left: 36px; max-width: none; }
+.input-icon-wrap .input-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.clickable-row { cursor: pointer; }
+.clickable-row:hover td { background: var(--bg-muted); }
+.detail-dl { display: grid; grid-template-columns: 120px 1fr; gap: 8px 16px; margin: 0; }
+.detail-dl dt { font-weight: 600; color: var(--text-secondary); margin: 0; }
+.detail-dl dd { margin: 0; }
+.detail-pre { white-space: pre-wrap; word-break: break-word; }
+.settings-groupflow-grid { display: grid; gap: 16px; }
+.settings-groupflow-meta {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.settings-groupflow-meta p { margin: 4px 0 0; }
+.input-with-actions { display: flex; gap: 6px; align-items: stretch; }
+.input-with-actions .input { flex: 1; font-family: ui-monospace, monospace; font-size: 13px; }
+.input.mono { font-family: ui-monospace, monospace; font-size: 13px; }
+.group-import-onboarding h4 { font-size: 15px; }
+.row-actions { display: flex; gap: 4px; align-items: center; }

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GroupFlow</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="logo">🤖 GroupFlow</div>
+    <div class="fb-user" id="fbUserLabel">— <span class="dot" id="fbDot"></span></div>
+  </header>
+
+  <nav class="tabs" id="tabBar">
+    <button data-tab="create" class="active">📝 Tạo Bài</button>
+    <button data-tab="comment">💬 Comment <span class="badge" id="commentBadge"></span></button>
+    <button data-tab="radar">📡 Radar <span class="badge" id="radarBadge"></span></button>
+    <button data-tab="activity">📋 Log</button>
+    <button data-tab="settings">⚙️</button>
+  </nav>
+
+  <main class="content">
+    <!-- TẠO BÀI -->
+    <section id="tab-create" class="tab-panel active">
+      <div class="card">
+        <div class="toggle-row">
+          <button type="button" id="srcExcel" class="toggle active">📂 Excel</button>
+          <button type="button" id="srcManual" class="toggle">✏️ Nhập tay</button>
+        </div>
+        <div id="excelPanel">
+          <input type="file" id="excelFile" accept=".csv,.xlsx,.xls" />
+          <p class="hint">Cột: noi_dung | prompt_anh | ngay_dang | gio_dang</p>
+        </div>
+        <div id="manualPanel" class="hidden">
+          <textarea id="manualText" rows="5" placeholder="Nội dung bài..."></textarea>
+          <div class="row">
+            <input type="date" id="manualDate" />
+            <input type="time" id="manualTime" />
+          </div>
+          <button type="button" id="btnAddManual" class="btn outline">+ Thêm vào danh sách</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <strong>Danh sách bài</strong>
+          <div>
+            <button type="button" id="btnPullWeb" class="btn outline sm">⬇ Tải từ website</button>
+            <button type="button" id="btnGenAll" class="btn outline sm">⚡ Generate tất cả</button>
+          </div>
+        </div>
+        <div id="postList" class="list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <strong>Chọn nhóm</strong>
+          <button type="button" id="btnExtract" class="btn outline sm">↻ Extract</button>
+        </div>
+        <input type="search" id="groupSearch" placeholder="Tìm group..." />
+        <label class="check-row"><input type="checkbox" id="selectAllGroups" /> Extracted Groups (<span id="groupCount">0</span>)</label>
+        <div id="groupList" class="list scroll"></div>
+      </div>
+
+      <div id="progressBox" class="card hidden">
+        <div class="progress-bar"><div id="progressFill"></div></div>
+        <div id="progressLog" class="log"></div>
+      </div>
+    </section>
+
+    <!-- COMMENT -->
+    <section id="tab-comment" class="tab-panel">
+      <div class="card-head">
+        <strong>Comment chéo</strong>
+        <button type="button" id="btnRefreshComments" class="btn outline sm">↻ Làm mới</button>
+      </div>
+      <div id="commentList" class="list"></div>
+      <button type="button" id="btnRunAllComments" class="btn primary block">⚡ Chạy đã chọn</button>
+    </section>
+
+    <!-- RADAR -->
+    <section id="tab-radar" class="tab-panel">
+      <div class="card">
+        <label class="check-row">
+          <input type="checkbox" id="radarActive" /> Bật Radar Lead
+        </label>
+        <label>Từ khóa (dùng - để loại)</label>
+        <textarea id="radarKeywords" rows="3" placeholder="cần tìm, gợi ý, -miễn phí"></textarea>
+        <label>Chu kỳ quét</label>
+        <select id="radarInterval">
+          <option value="5">5 phút</option>
+          <option value="15" selected>15 phút</option>
+          <option value="30">30 phút</option>
+          <option value="60">60 phút</option>
+        </select>
+        <label class="check-row"><input type="checkbox" id="radarPush" checked /> Push desktop</label>
+        <div class="row">
+          <button type="button" id="btnRadarScan" class="btn outline">Quét ngay</button>
+          <button type="button" id="btnRadarSave" class="btn primary">Lưu</button>
+        </div>
+      </div>
+      <div id="leadList" class="list"></div>
+    </section>
+
+    <!-- ACTIVITY -->
+    <section id="tab-activity" class="tab-panel">
+      <div class="toggle-row">
+        <button type="button" data-sub="upcoming" class="toggle active">Sắp tới</button>
+        <button type="button" data-sub="history" class="toggle">Lịch sử</button>
+      </div>
+      <div id="activityUpcoming" class="list"></div>
+      <div id="activityHistory" class="list hidden"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="tab-settings" class="tab-panel">
+      <div class="card">
+        <label>URL website (mặc định tidien.xyz)</label>
+        <input type="url" id="tidienBaseUrl" placeholder="https://tidien.xyz" />
+        <p class="hint">Lưu URL chính thức — extension gọi <code>{url}/api/group-posts/...</code> và <code>{url}/v1/...</code></p>
+        <label>Email tidien</label>
+        <input type="email" id="tidienEmail" />
+        <label>Password</label>
+        <input type="password" id="tidienPassword" />
+        <button type="button" id="btnTidienLogin" class="btn primary">Đăng nhập tidien</button>
+        <label>tidien API Key</label>
+        <input type="password" id="tidienApiKey" />
+        <label>9Router API Key</label>
+        <input type="password" id="routerApiKey" />
+        <label>Drive Service Account JSON</label>
+        <textarea id="driveJson" rows="3"></textarea>
+        <label>Drive Folder ID</label>
+        <input type="text" id="driveFolderId" />
+        <label>Max groups/lần</label>
+        <input type="number" id="maxGroups" min="1" max="50" value="10" />
+        <label>Ngôn ngữ FB</label>
+        <select id="fbLang">
+          <option value="vi">Tiếng Việt</option>
+          <option value="en">English</option>
+        </select>
+        <button type="button" id="btnSaveSettings" class="btn primary block">💾 Lưu cài đặt</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <button type="button" id="btnSchedule" class="btn outline">Lên lịch</button>
+    <button type="button" id="btnPostNow" class="btn primary">Đăng ngay →</button>
+  </footer>
+
+  <script src="lib/xlsx.full.min.js"></script>
+  <script src="modules/storage.js"></script>
+  <script src="modules/spintax.js"></script>
+  <script src="modules/excel.js"></script>
+  <script src="modules/imageGen.js"></script>
+  <script src="modules/googleDrive.js"></script>
+  <script src="modules/scheduler.js"></script>
+  <script src="modules/tidienAuth.js"></script>
+  <script src="modules/tidienSync.js"></script>
+  <script src="modules/leadRadar.js"></script>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
