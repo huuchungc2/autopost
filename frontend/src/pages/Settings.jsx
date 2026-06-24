@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Upload } from 'lucide-react';
 import api from '../services/api';
 import { formatDateTime } from '../utils/date';
 import useNotifications from '../hooks/useNotifications';
@@ -240,6 +241,7 @@ export default function Settings() {
         google_drive_folder_id: response.data.media_storage.folder_id || '',
         google_drive_service_account_json: '',
       }));
+      setDriveJsonFilename('');
       showToast('Đã lưu cấu hình Google Drive', 'success');
       invalidateMediaStorageCache();
     } catch (err) {
@@ -485,39 +487,39 @@ export default function Settings() {
 
               <label style={{ display: 'block', marginTop: 12 }}>
                 Service Account JSON
+                <div className="skill-file-upload" style={{ marginTop: 8, marginBottom: 10 }}>
+                  <label className="skill-file-label">
+                    <input
+                      type="file"
+                      accept="application/json,.json"
+                      onChange={handleDriveJsonFile}
+                      disabled={!canEditMediaStorage}
+                    />
+                    <Upload size={28} strokeWidth={1.5} />
+                    <span>Chọn file JSON từ máy (Browse)</span>
+                    <small>Service Account key tải từ Google Cloud — tự điền vào ô bên dưới</small>
+                  </label>
+                  {driveJsonFilename && (
+                    <div className="form-success">
+                      Đã nạp: <code>{driveJsonFilename}</code>
+                    </div>
+                  )}
+                </div>
                 <textarea
                   rows={5}
                   placeholder={driveStatus.has_stored_credentials || driveStatus.credentials_source === 'env'
-                    ? 'Để trống nếu giữ JSON hiện tại — dán JSON mới để thay'
-                    : 'Dán toàn bộ JSON service account từ Google Cloud'}
+                    ? 'Để trống nếu giữ JSON hiện tại — chọn file hoặc dán JSON mới để thay'
+                    : 'Chọn file JSON ở trên hoặc dán toàn bộ JSON service account'}
                   value={mediaForm.google_drive_service_account_json}
                   onChange={(e) => handleMediaChange('google_drive_service_account_json', e.target.value)}
                 />
               </label>
 
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="file"
-                    accept="application/json,.json"
-                    onChange={handleDriveJsonFile}
-                    disabled={!canEditMediaStorage}
-                    style={{ maxWidth: 260 }}
-                  />
-                  <span className="field-hint">Chọn file JSON (tự điền vào ô trên)</span>
-                </label>
-                {driveJsonFilename && (
-                  <span className="field-hint">
-                    File: <code>{driveJsonFilename}</code>
-                  </span>
-                )}
-              </div>
-
               <p className="field-hint" style={{ marginTop: 8 }}>
                 1) Tạo Service Account trên Google Cloud → tải JSON.
                 2) Tạo folder Drive → Share với <code>client_email</code> trong JSON (quyền Editor).
                 3) Copy Folder ID từ URL (<code>drive.google.com/.../folders/<strong>ID_Ở_ĐÂY</strong></code>).
-                4) Dán JSON + Folder ID gốc → <strong>Kiểm tra kết nối</strong> → Lưu.
+                4) Chọn file JSON + Folder ID gốc → <strong>Kiểm tra kết nối</strong> → Lưu.
                 {' '}Mỗi fanpage có thể gán folder riêng tại <strong>Fanpage → Sửa</strong> (ảnh vào subfolder, không lộn xộn).
               </p>
 

@@ -40,6 +40,7 @@
 - `facebookPublishService.js`: import `isComposioAutoFallbackEnabled` from correct module
 - Settings: Google Drive test trước khi lưu; validate Folder ID (không nhận email)
 - Settings: thêm nút upload file JSON (Service Account) để auto-fill textarea
+- Settings: UI Browse file JSON Drive (khung chọn file rõ, giống Skills)
 - Settings: Composio UI (field thiếu, nhãn nút rõ); fanpage preview token; chặn ghi đè token rỗng
 - Composio: chỉ đọc từ database — bỏ fallback/seed từ `.env`
 - Đồng bộ Composio: fix `token_status` truncated (`unknown` → `valid` trên cột legacy)
