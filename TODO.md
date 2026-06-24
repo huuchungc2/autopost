@@ -17,6 +17,7 @@
 - [x] `MAX_IMAGES_MB` 5GB, UI Drive trong Cài đặt
 - [x] Ảnh `gdrive://` — proxy khi đăng FB
 - [x] Folder Drive riêng từng fanpage — PageForm + migration `023`
+- [x] Settings: upload file Service Account JSON (auto-fill)
 
 ## Done in v0.2.0
 
@@ -48,11 +49,12 @@ PRD: [`GroupFlow/fb-group-poster-PRD.md`](GroupFlow/fb-group-poster-PRD.md)
 - [x] Backend: `POST /api/group-posts/sync` + migration 024
 
 ### Phase 2 — Comment chéo *(core)*
-- [x] Login tidien extension, tab Comment, AI generate + DOM comment
+- [x] Login tidien extension, tab Comment, AI generate + comment nền GraphQL (`fbCommentBg.js`), fallback DOM
 - [x] Backend: `GET pending-comments` + `PATCH commented`
 
 ### Phase 3
 - [x] Lên lịch + retry miss lịch, Google Drive, Activity log
+- [x] Lịch xuất ảnh riêng + quét đêm queue (giống fanpage)
 
 ### Phase 4 — Radar Lead
 - [x] Tab Radar, `leadRadar.js`
@@ -66,9 +68,15 @@ PRD: [`GroupFlow/fb-group-poster-PRD.md`](GroupFlow/fb-group-poster-PRD.md)
 - [x] Dashboard GroupFlow widget + mobile nav Group
 - [x] Shared draft team (admin import), sửa draft, re-pull
 - [x] `group_name` trên bài đã đăng + extension sync
+- [x] Chế độ Nhanh (GraphQL nền SW, không tab FB) + Cổ điển (DOM), cấp độ bảo mật, tránh ban đêm
+- [x] Chuyển Cá nhân / Fanpage (profile switcher header)
+- [x] Nhóm theo từng bài + tab Nhóm + bộ custom + auto-sync FB
+- [x] AI provider text/image trong Cài đặt extension (giống fanpage) + API proxy `/ai/*`
+- [x] Tab Tạo bài: Nhập tay mặc định, chọn nhóm inline trên card bài
 
 ## Remaining (optional polish)
 
+- [ ] IndexedDB media queue (tránh base64 lớn trong `chrome.storage`, như GPP)
 - [ ] E2E tests (Playwright)
 - [ ] Swagger/OpenAPI docs
 - [ ] content_templates CRUD

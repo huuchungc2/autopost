@@ -44,6 +44,7 @@ export default function Settings() {
   const [mediaForm, setMediaForm] = useState(null);
   const [mediaSaving, setMediaSaving] = useState(false);
   const [mediaTesting, setMediaTesting] = useState(false);
+  const [driveJsonFilename, setDriveJsonFilename] = useState('');
   const [composioForm, setComposioForm] = useState(null);
   const [composioSaving, setComposioSaving] = useState(false);
   const [composioLinking, setComposioLinking] = useState(false);
@@ -190,6 +191,26 @@ export default function Settings() {
 
   const handleMediaChange = (field, value) => {
     setMediaForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleDriveJsonFile = async (event) => {
+    const file = event.target?.files?.[0];
+    // allow re-selecting the same file
+    event.target.value = '';
+    if (!file) return;
+    if (!file.name?.toLowerCase().endsWith('.json')) {
+      showToast('Chỉ nhận file .json (Service Account key)', 'error');
+      return;
+    }
+    try {
+      const text = await file.text();
+      JSON.parse(text);
+      setDriveJsonFilename(file.name);
+      handleMediaChange('google_drive_service_account_json', text.trim());
+      showToast(`Đã nạp JSON từ file: ${file.name}`, 'success');
+    } catch (err) {
+      showToast(err?.message || 'Không đọc/parse được file JSON', 'error');
+    }
   };
 
   const saveMediaStorage = async () => {
@@ -473,6 +494,24 @@ export default function Settings() {
                   onChange={(e) => handleMediaChange('google_drive_service_account_json', e.target.value)}
                 />
               </label>
+
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    onChange={handleDriveJsonFile}
+                    disabled={!canEditMediaStorage}
+                    style={{ maxWidth: 260 }}
+                  />
+                  <span className="field-hint">Chọn file JSON (tự điền vào ô trên)</span>
+                </label>
+                {driveJsonFilename && (
+                  <span className="field-hint">
+                    File: <code>{driveJsonFilename}</code>
+                  </span>
+                )}
+              </div>
 
               <p className="field-hint" style={{ marginTop: 8 }}>
                 1) Tạo Service Account trên Google Cloud → tải JSON.
