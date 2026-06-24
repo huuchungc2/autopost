@@ -8,6 +8,9 @@ import {
 
 let driveClient = null;
 
+/** Service account + folder shared cần scope drive (drive.file không đọc được folder đã share). */
+const DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive'];
+
 export function resetDriveClient() {
   driveClient = null;
 }
@@ -31,7 +34,7 @@ function getDrive() {
   if (!driveClient) {
     const auth = new google.auth.GoogleAuth({
       credentials: getCredentials(),
-      scopes: ['https://www.googleapis.com/auth/drive.file'],
+      scopes: DRIVE_SCOPES,
     });
     driveClient = google.drive({ version: 'v3', auth });
   }
@@ -52,6 +55,7 @@ export async function uploadBufferToDrive(buffer, filename, mimeType, folderIdOv
     },
     media: { mimeType, body: stream },
     fields: 'id',
+    supportsAllDrives: true,
   });
 
   const fileId = created.data.id;
@@ -71,7 +75,7 @@ export async function uploadBufferToDrive(buffer, filename, mimeType, folderIdOv
 export async function downloadDriveFileStream(fileId) {
   const drive = getDrive();
   const response = await drive.files.get(
-    { fileId, alt: 'media' },
+    { fileId, alt: 'media', supportsAllDrives: true },
     { responseType: 'stream' }
   );
   return response.data;
@@ -102,13 +106,29 @@ export async function testDriveConnection(overrides = {}) {
 
   const auth = new google.auth.GoogleAuth({
     credentials,
-    scopes: ['https://www.googleapis.com/auth/drive.file'],
+    scopes: DRIVE_SCOPES,
   });
   const drive = google.drive({ version: 'v3', auth });
-  const folder = await drive.files.get({
-    fileId: folderId,
-    fields: 'id,name,mimeType',
-  });
+  let folder;
+  try {
+    folder = await drive.files.get({
+      fileId: folderId,
+      fields: 'id,name,mimeType',
+      supportsAllDrives: true,
+    });
+  } catch (error) {
+    const msg = String(error?.message || '');
+    if (msg.includes('File not found') || error?.code === 404) {
+      const hint = new Error(
+        'Folder không truy cập được — kiểm tra Folder ID (copy từ URL, phân biệt hoa/thường) '
+        + 'và Share folder với client_email trong JSON (quyền Editor). '
+        + 'Nếu folder nằm trong Shared drive, thêm service account vào ổ dùng chung.'
+      );
+      hint.status = 400;
+      throw hint;
+    }
+    throw error;
+  }
   return {
     folder_id: folder.data.id,
     folder_name: folder.data.name,

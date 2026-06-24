@@ -54,4 +54,5 @@ Migration: `023_fb_pages_drive_folder.sql`
 ## Lưu ý
 
 - **Không** dùng OAuth popup cho Service Account — JSON chỉ lấy từ Google Cloud Console.
+- API scope: `https://www.googleapis.com/auth/drive` (scope `drive.file` **không** đọc được folder đã share với service account → dễ báo File not found dù đã Share).
 - Provider test (`/providers/:id/test-image`) dùng folder global (không gắn fanpage).
