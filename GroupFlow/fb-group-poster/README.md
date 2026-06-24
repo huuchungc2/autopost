@@ -4,16 +4,23 @@ Chrome Extension trong `GroupFlow/fb-group-poster/`.
 
 ## Cài extension (dev)
 
-1. Mở Chrome → `chrome://extensions`
-2. Bật **Developer mode**
-3. **Load unpacked** → chọn folder `GroupFlow/fb-group-poster`
-4. Mở Facebook (đăng nhập) + bấm icon GroupFlow → Side Panel
+1. Chạy `node build-sw-bundle.js` (nếu sửa module SW) rồi `.\validate.ps1`
+2. **Xóa** mọi file tham chiếu GPP (`_ref-*`, `*.zip`, `2.3.2_0/`) — Chrome **từ chối load** nếu có tên `_...`
+3. Mở Chrome → `chrome://extensions`
+4. Bật **Developer mode**
+5. **Load unpacked** → chọn **đúng** folder `GroupFlow/fb-group-poster` (không chọn `ref-group-posting`)
+6. **Reload** → version **1.0.10**
+7. **Bấm icon** → cửa sổ popup GroupFlow
+
+**Service worker “Không hoạt động”** = SW đang ngủ (MV3 bình thường). Popup vẫn mở được.
+
+**Nút Lỗi đỏ** → thường do `_ref-group-posting/` bị copy nhầm vào folder extension, hoặc lỗi CSP cũ (đã bỏ Google Fonts v1.0.6). Bấm **Xóa tất cả** trên trang Lỗi sau khi Reload.
 
 ## Cấu hình
 
 1. **Cài đặt** → URL website (`https://tidien.xyz` production; `http://localhost:3001` khi dev local)
-2. Đăng nhập tidien (email/password) hoặc dán **tidien API key**
-3. **9Router API key** — generate ảnh / comment AI
+2. Đăng nhập tidien (email/password) hoặc dán **tidien API key** (Settings website → GroupFlow Extension)
+3. Chọn **Text provider** + **Image provider** — giống fanpage (tạo tại Providers trên web). **9Router API key** chỉ dự phòng khi chưa chọn provider.
 4. (Tuỳ chọn) Google Drive Service Account JSON + Folder ID
 
 ## Backend API (AutoPost)
@@ -26,6 +33,9 @@ Chrome Extension trong `GroupFlow/fb-group-poster/`.
 | GET | `/api/group-posts/pending-comments?page=&limit=` |
 | PATCH | `/api/group-posts/:id/commented` |
 | PUT | `/api/group-posts/fb-profile` |
+| GET | `/api/group-posts/ai-providers` |
+| POST | `/api/group-posts/ai/image` |
+| POST | `/api/group-posts/ai/text` |
 
 Migration: `024`–`026` (tự chạy khi restart backend)
 
@@ -38,11 +48,13 @@ Migration: `024`–`026` (tự chạy khi restart backend)
 ## Tính năng
 
 - Phase 1: Đăng bài Excel/nhập tay, generate ảnh, sync metadata
-- Phase 2: Comment chéo + login tidien
+- Phase 2: Comment chéo (GraphQL nền + lịch batch) + login tidien
 - Phase 3: Lên lịch, Drive, activity log
 - Phase 4: Radar Lead (quét từ khóa trong group)
 
 PRD chi tiết: [`fb-group-poster-PRD.md`](../fb-group-poster-PRD.md)
+
+Tham chiếu Group Posting Pro (dev only, **không** để trong folder extension — Chrome chặn tên `_*`): [`../ref-group-posting/`](../ref-group-posting/)
 
 ## Lưu ý
 

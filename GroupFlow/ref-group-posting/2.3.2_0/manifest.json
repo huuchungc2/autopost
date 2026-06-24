@@ -1,0 +1,44 @@
+{
+   "action": {
+      "default_icon": {
+         "128": "icon16.png",
+         "16": "icon16.png",
+         "48": "icon16.png"
+      }
+   },
+   "background": {
+      "service_worker": "background.js"
+   },
+   "content_scripts": [ {
+      "js": [ "i18n.js", "content.js" ],
+      "matches": [ "\u003Call_urls>" ]
+   } ],
+   "content_security_policy": {
+      "extension_pages": "script-src 'self'; object-src 'self';"
+   },
+   "declarative_net_request": {
+      "rule_resources": [ {
+         "enabled": true,
+         "id": "ruleset_1",
+         "path": "networkrule.json"
+      } ]
+   },
+   "default_locale": "en",
+   "description": "__MSG_appDescription__",
+   "host_permissions": [ "\u003Call_urls>" ],
+   "icons": {
+      "128": "icon16.png",
+      "16": "icon16.png",
+      "48": "icon16.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3I04YrcO0lSKQRFJBEbFyuKNcDFRTD9vxK32vV3fLolup6pBSUT8btuCOH4AVAs6Jo2BDw9gXd3a4sfVu9zUhor+QUKFBORYRz9PpVBRzXUudZUs7a+EFVgY9BWckQqeoa5HOKQ36pOuSu3qKKNhOTbyXLOBSNrJkFyWjNiYNn3Va2ym5oeaM03inyh3M4QhGbxQzVAEXQFCcj0jZD1NoT0in6WxcVjhzLsEUWo6KIfCS7iIY/7J4SafhvrmS5U5BuupKbG4xb0pQRpFgG3TwE5xxqO+BtX+pV6mczeBHBeO3W2HULf0S0jR6MhdQy1x/dXavAiYNPjgt7UMoY3DzQIDAQAB",
+   "manifest_version": 3,
+   "name": "__MSG_appName__",
+   "permissions": [ "activeTab", "storage", "unlimitedStorage", "scripting", "windows", "cookies", "declarativeNetRequest", "declarativeNetRequestWithHostAccess", "tabs", "alarms", "notifications" ],
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "2.3.2",
+   "web_accessible_resources": [ {
+      "matches": [ "http://*/*", "https://*/*" ],
+      "resources": [ "i18n.js", "popup.html", "popup.js", "worker.js", "worker.html", "js/quill.js", "js/jsemoji-button-3.0.3.min", "bootstrap.bundle.min.js", "assets/icons/*", "restricted.html", "restricted.js", "update.html" ]
+   } ]
+}

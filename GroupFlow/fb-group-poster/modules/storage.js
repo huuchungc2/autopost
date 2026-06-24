@@ -10,15 +10,20 @@ GF.storage = {
   async getSettings() {
     const d = await this.get([
       'tidienBaseUrl', 'tidienToken', 'tidienApiKey', 'tidienUser',
+      'textProviderId', 'imageProviderId',
       'routerApiKey', 'driveJson', 'driveFolderId',
-      'maxGroups', 'securityLevel', 'avoidNight', 'fbLang', 'retryMissed',
-      'fbUser', 'extractedGroups', 'selectedGroupIds',
+      'maxGroups', 'securityLevel', 'avoidNight', 'fbLang', 'retryMissed', 'postMode',
+      'fbUser', 'extractedGroups', 'selectedGroupIds', 'fbProfiles', 'activeActorId',
+      'groupImageScheduleEnabled', 'groupImageScheduleStart', 'groupImageScheduleEnd',
+      'groupImageScheduleInterval',
     ]);
     return {
       tidienBaseUrl: d.tidienBaseUrl || 'https://tidien.xyz',
       tidienToken: d.tidienToken || '',
       tidienApiKey: d.tidienApiKey || '',
       tidienUser: d.tidienUser || null,
+      textProviderId: d.textProviderId ? Number(d.textProviderId) : null,
+      imageProviderId: d.imageProviderId ? Number(d.imageProviderId) : null,
       routerApiKey: d.routerApiKey || '',
       driveJson: d.driveJson || '',
       driveFolderId: d.driveFolderId || '',
@@ -27,9 +32,16 @@ GF.storage = {
       avoidNight: d.avoidNight !== false,
       fbLang: d.fbLang || 'vi',
       retryMissed: d.retryMissed !== false,
+      postMode: d.postMode === 'classic' ? 'classic' : 'fast',
       fbUser: d.fbUser || null,
+      fbProfiles: d.fbProfiles || null,
+      activeActorId: d.activeActorId || d.fbUser?.id || null,
       extractedGroups: d.extractedGroups || [],
       selectedGroupIds: d.selectedGroupIds || [],
+      groupImageScheduleEnabled: d.groupImageScheduleEnabled === true,
+      groupImageScheduleStart: d.groupImageScheduleStart ?? 1,
+      groupImageScheduleEnd: d.groupImageScheduleEnd ?? 5,
+      groupImageScheduleInterval: d.groupImageScheduleInterval ?? 10,
     };
   },
   async saveSettings(patch) {

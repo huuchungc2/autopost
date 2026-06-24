@@ -1,0 +1,3194 @@
+{
+   "aboutTitle": {
+      "message": "About"
+   },
+   "actBtn": {
+      "message": "Activate License"
+   },
+   "actContinueFree": {
+      "message": "Continue with Free Trial (Close this window)"
+   },
+   "actInfo": {
+      "message": "Enter your license key below. You can find this in the email we sent after your purchase."
+   },
+   "actNoKey": {
+      "message": "Don't have a license key?"
+   },
+   "actPh": {
+      "message": "XXXX-XXXX-XXXX-XXXX"
+   },
+   "actPrice": {
+      "message": "License keys start from €9.9 / month."
+   },
+   "actSubtitle": {
+      "message": "Enter your license key to get started"
+   },
+   "actTitle": {
+      "message": "Activate Your License"
+   },
+   "actUpgradeLink": {
+      "message": "Upgrade now"
+   },
+   "aiBtnGenerate": {
+      "message": "Generate Post"
+   },
+   "aiLblAudience": {
+      "message": "Target Audience"
+   },
+   "aiLblCTA": {
+      "message": "Call to Action"
+   },
+   "aiLblGoal": {
+      "message": "Main Goal / Topic"
+   },
+   "aiLblKeywords": {
+      "message": "Key Points / Keywords"
+   },
+   "aiLblOptions": {
+      "message": "Additional Options"
+   },
+   "aiLblTone": {
+      "message": "Desired Tone"
+   },
+   "aiModalSubtitle": {
+      "message": "Provide details below to help the AI create the best post for you."
+   },
+   "aiModalTitle": {
+      "message": "GroupPostingAI Post Generator"
+   },
+   "aiOptEmojis": {
+      "message": "Add Emojis"
+   },
+   "aiOptEmojisDesc": {
+      "message": "Automatically include relevant emojis."
+   },
+   "aiOptHashtags": {
+      "message": "Add Hashtags"
+   },
+   "aiOptHashtagsDesc": {
+      "message": "Include relevant #hashtags at the end."
+   },
+   "aiOptSpintax": {
+      "message": "Use Spintax"
+   },
+   "aiOptSpintaxDesc": {
+      "message": "Generate text variations like {A|B}."
+   },
+   "aiPhAudience": {
+      "message": "e.g., 'Entrepreneurs'"
+   },
+   "aiPhCTA": {
+      "message": "e.g., 'Visit our website'"
+   },
+   "aiPhGoal": {
+      "message": "REQUIRED: Explain the core purpose..."
+   },
+   "aiPhKeywords": {
+      "message": "List important points..."
+   },
+   "aiToneCasual": {
+      "message": "Casual & Conversational"
+   },
+   "aiToneExcited": {
+      "message": "Excited & Enthusiastic"
+   },
+   "aiToneFriendly": {
+      "message": "Friendly & Engaging"
+   },
+   "aiToneFunny": {
+      "message": "Funny & Witty"
+   },
+   "aiToneInfo": {
+      "message": "Informative & Educational"
+   },
+   "aiToneInspire": {
+      "message": "Inspirational & Motivational"
+   },
+   "aiToneProf": {
+      "message": "Professional"
+   },
+   "aiToneSales": {
+      "message": "Persuasive & Sales-Oriented"
+   },
+   "aiUseSpintax": {
+      "message": "Use Spintax Variations"
+   },
+   "appDescription": {
+      "message": "Safely auto-post and schedule content to multiple Facebook™ groups. Boost engagement with AI variations and smart delays."
+   },
+   "appName": {
+      "message": "Group Posting PRO: Group Scheduler | Auto Publisher | Radar for Facebook™"
+   },
+   "ardActiveSafe": {
+      "message": "Engine Active & Safe"
+   },
+   "ardLiveActivity": {
+      "message": "Live Activity"
+   },
+   "ardSafeNotice": {
+      "message": "You can safely minimize this window or browse other tabs. Automation will continue."
+   },
+   "backupErrMsg": {
+      "message": "An error occurred: $ERR$",
+      "placeholders": {
+         "err": {
+            "content": "$1"
+         }
+      }
+   },
+   "backupErrTitle": {
+      "message": "Backup Error"
+   },
+   "backupMsg": {
+      "message": "Your Post Templates and Group Collections have been saved to a file."
+   },
+   "backupTitle": {
+      "message": "Backup Successful"
+   },
+   "badgeBestValue": {
+      "message": "BEST VALUE"
+   },
+   "badgeDataDriven": {
+      "message": "Data-Driven"
+   },
+   "badgeFree": {
+      "message": "Free:"
+   },
+   "badgePaused": {
+      "message": "Paused"
+   },
+   "badgeProcessing": {
+      "message": "Processing"
+   },
+   "badgeRunning": {
+      "message": "Running"
+   },
+   "badgeScheduled": {
+      "message": "Scheduled"
+   },
+   "badgeWaiting": {
+      "message": "Waiting"
+   },
+   "bannerFeedbackDesc": {
+      "message": "Share your feedback—it only takes a minute."
+   },
+   "bannerFeedbackTitle": {
+      "message": "Help shape the future?"
+   },
+   "bannerPaused": {
+      "message": "Scheduled posts are paused."
+   },
+   "benAI": {
+      "message": "AI Content Generation"
+   },
+   "benCampaigns": {
+      "message": "Campaign Workflows"
+   },
+   "benCancel": {
+      "message": "Cancel Anytime"
+   },
+   "benRadar": {
+      "message": "Lead Radar"
+   },
+   "benSchedule": {
+      "message": "Scheduled Posting"
+   },
+   "benSpintax": {
+      "message": "Smart Spintax"
+   },
+   "benSupport": {
+      "message": "Priority Support"
+   },
+   "benUnlimited": {
+      "message": "Unlimited Posts"
+   },
+   "blockLoop": {
+      "message": "Loop"
+   },
+   "blockPost": {
+      "message": "Post"
+   },
+   "blockStop": {
+      "message": "Stop"
+   },
+   "blockTrigger": {
+      "message": "Trigger"
+   },
+   "blockWait": {
+      "message": "Wait"
+   },
+   "btnActivate": {
+      "message": "Activate license"
+   },
+   "btnActivateKey": {
+      "message": "Activate License Key"
+   },
+   "btnAdd": {
+      "message": "Add"
+   },
+   "btnAddLink": {
+      "message": "Add a new link"
+   },
+   "btnAddProd": {
+      "message": "Add new product template"
+   },
+   "btnAddSpintax": {
+      "message": "Add spintax"
+   },
+   "btnAdvSelector": {
+      "message": "Advanced selector"
+   },
+   "btnAiWizard": {
+      "message": "AI Wizard"
+   },
+   "btnAutoJoin": {
+      "message": "Auto join groups"
+   },
+   "btnAutoVars": {
+      "message": "Auto-Variations"
+   },
+   "btnBack": {
+      "message": "Back"
+   },
+   "btnBackup": {
+      "message": "Backup All Data"
+   },
+   "btnCancel": {
+      "message": "Cancel"
+   },
+   "btnCancelEdit": {
+      "message": "Cancel Edit"
+   },
+   "btnChoose": {
+      "message": "Choose"
+   },
+   "btnClearAll": {
+      "message": "Clear All"
+   },
+   "btnClose": {
+      "message": "Close"
+   },
+   "btnConfig": {
+      "message": "Configuration & Constraints"
+   },
+   "btnCreateColl": {
+      "message": "Create new collection"
+   },
+   "btnCreateFirstTemp": {
+      "message": "Create First Template"
+   },
+   "btnCreateNew": {
+      "message": "Create New"
+   },
+   "btnCreateTag": {
+      "message": "Create New Tag"
+   },
+   "btnCreateTemplate": {
+      "message": "Create new post template"
+   },
+   "btnDefault": {
+      "message": "Default"
+   },
+   "btnDelete": {
+      "message": "Delete"
+   },
+   "btnDone": {
+      "message": "Done"
+   },
+   "btnEnhance": {
+      "message": "AI Improvements"
+   },
+   "btnExport": {
+      "message": "Export"
+   },
+   "btnExtract": {
+      "message": "Extract from FB"
+   },
+   "btnExtractFb": {
+      "message": "Extract from Facebook"
+   },
+   "btnFeatureReq": {
+      "message": "Feature request"
+   },
+   "btnFillTemplate": {
+      "message": "Fill from template"
+   },
+   "btnForceReset": {
+      "message": "Force Reset Engine"
+   },
+   "btnGenCamp": {
+      "message": "Generate Campaign"
+   },
+   "btnGenerateAI": {
+      "message": "AI Generation"
+   },
+   "btnGo": {
+      "message": "Go"
+   },
+   "btnGoBack": {
+      "message": "Go Back & Edit"
+   },
+   "btnGoToFb": {
+      "message": "Go to Facebook"
+   },
+   "btnHealth": {
+      "message": "Health"
+   },
+   "btnImportColl": {
+      "message": "Import from other collections"
+   },
+   "btnLaunch": {
+      "message": "Launch"
+   },
+   "btnLetsGo": {
+      "message": "Let's Go!"
+   },
+   "btnLoadCloud": {
+      "message": "Load from Cloud"
+   },
+   "btnLoadMore": {
+      "message": "Load More"
+   },
+   "btnManageCat": {
+      "message": "Manage Categories"
+   },
+   "btnManageTags": {
+      "message": "Manage Tags"
+   },
+   "btnManualScan": {
+      "message": "Manual Scan"
+   },
+   "btnMasterTools": {
+      "message": "Master Tools"
+   },
+   "btnNameAZ": {
+      "message": "Name (A-Z)"
+   },
+   "btnNameZA": {
+      "message": "Name (Z-A)"
+   },
+   "btnNext": {
+      "message": "Next"
+   },
+   "btnNoThanks": {
+      "message": "No Thanks"
+   },
+   "btnPostNow": {
+      "message": "Post Now"
+   },
+   "btnPreFill": {
+      "message": "Pre-fill"
+   },
+   "btnPreparing": {
+      "message": "Preparing..."
+   },
+   "btnRemoveFromTag": {
+      "message": "Remove from Tag"
+   },
+   "btnRemoveKey": {
+      "message": "Remove Validation Key"
+   },
+   "btnReschedule": {
+      "message": "Reschedule"
+   },
+   "btnRestore": {
+      "message": "Restore from Backup"
+   },
+   "btnResume": {
+      "message": "Resume"
+   },
+   "btnRetry": {
+      "message": "Retry Failed Posts"
+   },
+   "btnSave": {
+      "message": "Save"
+   },
+   "btnSaveCloud": {
+      "message": "Save to Cloud"
+   },
+   "btnSavePersona": {
+      "message": "Save Persona"
+   },
+   "btnSaveSettings": {
+      "message": "Save Settings"
+   },
+   "btnSchedule": {
+      "message": "Schedule"
+   },
+   "btnScheduleLater": {
+      "message": "Schedule for Later"
+   },
+   "btnSegmentNiche": {
+      "message": "Segment by Niche"
+   },
+   "btnShowAll": {
+      "message": "Show All Posts"
+   },
+   "btnSortFilter": {
+      "message": "Sort & Filter"
+   },
+   "btnSplit": {
+      "message": "Split"
+   },
+   "btnStartTour": {
+      "message": "Start Tour"
+   },
+   "btnStop": {
+      "message": "Stop Posting"
+   },
+   "btnSure": {
+      "message": "Sure"
+   },
+   "btnToneHelpful": {
+      "message": "Helpful"
+   },
+   "btnToneProf": {
+      "message": "Professional"
+   },
+   "btnTonePromo": {
+      "message": "Promotional"
+   },
+   "btnUnlock": {
+      "message": "Upgrade to Unlock"
+   },
+   "btnUpgrade": {
+      "message": "Upgrade"
+   },
+   "btnUpgradeReq": {
+      "message": "Upgrade Required"
+   },
+   "btnView": {
+      "message": "View"
+   },
+   "btnWrapSpintax": {
+      "message": "Wrap in spintax"
+   },
+   "builderLoopCount": {
+      "message": "Loop $COUNT$x to Step $STEP$",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         },
+         "step": {
+            "content": "$2"
+         }
+      }
+   },
+   "builderLoopForever": {
+      "message": "Loop Forever to Step $STEP$",
+      "placeholders": {
+         "step": {
+            "content": "$1"
+         }
+      }
+   },
+   "builderNoWait": {
+      "message": "No wait"
+   },
+   "builderPostInherit": {
+      "message": " (Inherits Step $STEP$)",
+      "placeholders": {
+         "step": {
+            "content": "$1"
+         }
+      }
+   },
+   "builderPostSummary": {
+      "message": "$POSTS$ Post(s), $GROUPS$ Group(s)",
+      "placeholders": {
+         "groups": {
+            "content": "$2"
+         },
+         "posts": {
+            "content": "$1"
+         }
+      }
+   },
+   "builderPostSummaryInherit": {
+      "message": "$POSTS$ Post(s), Inherited Groups",
+      "placeholders": {
+         "posts": {
+            "content": "$1"
+         }
+      }
+   },
+   "builderStepOption": {
+      "message": "Step $NUM$",
+      "placeholders": {
+         "num": {
+            "content": "$1"
+         }
+      }
+   },
+   "builderWaitSummary": {
+      "message": "Wait $DURATION$",
+      "placeholders": {
+         "duration": {
+            "content": "$1"
+         }
+      }
+   },
+   "campActionPause": {
+      "message": "Pause"
+   },
+   "campActionRestart": {
+      "message": "Restarting"
+   },
+   "campActionResume": {
+      "message": "Resume"
+   },
+   "campActionUpgrade": {
+      "message": "Upgrade to Activate"
+   },
+   "campAuto": {
+      "message": "Auto-Campaign"
+   },
+   "campBlockBatch": {
+      "message": "Post Batch"
+   },
+   "campBlockDelay": {
+      "message": "Wait Delay"
+   },
+   "campBlockLoop": {
+      "message": "Loop"
+   },
+   "campBlockStop": {
+      "message": "Stop"
+   },
+   "campBlockTrigger": {
+      "message": "Trigger"
+   },
+   "campDeleteMsg": {
+      "message": "Are you sure? This will permanently remove this campaign and its history."
+   },
+   "campDeleteTitle": {
+      "message": "Delete Strategy"
+   },
+   "campDescLoopCount": {
+      "message": "Repeat $COUNT$ times",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "campDescLoopForever": {
+      "message": "Repeat Forever"
+   },
+   "campDescPost": {
+      "message": "$POSTS$ Template(s) &rarr; $GROUPS$ Group(s)",
+      "placeholders": {
+         "groups": {
+            "content": "$2"
+         },
+         "posts": {
+            "content": "$1"
+         }
+      }
+   },
+   "campDescStop": {
+      "message": "End Campaign"
+   },
+   "campDescWait": {
+      "message": "Pause for $DURATION$",
+      "placeholders": {
+         "duration": {
+            "content": "$1"
+         }
+      }
+   },
+   "campRestartMsg": {
+      "message": "Campaign was finished, so it has been restarted from Step 1."
+   },
+   "campStatusActive": {
+      "message": "Active"
+   },
+   "campStatusCompleted": {
+      "message": "Completed"
+   },
+   "campStatusEnded": {
+      "message": "Ended"
+   },
+   "campStatusPaused": {
+      "message": "Paused"
+   },
+   "campStatusProcessing": {
+      "message": "Processing..."
+   },
+   "campStatusRunning": {
+      "message": "Running..."
+   },
+   "campStatusWaiting": {
+      "message": "Waiting"
+   },
+   "campStep": {
+      "message": "Campaign Step"
+   },
+   "campStepDone": {
+      "message": "Done"
+   },
+   "campStepManual": {
+      "message": "Manual Start"
+   },
+   "campStepPending": {
+      "message": "Pending"
+   },
+   "campStepProcessing": {
+      "message": "Processing..."
+   },
+   "campStepScheduled": {
+      "message": "Scheduled"
+   },
+   "campStepSent": {
+      "message": "Sent"
+   },
+   "campTimeStarting": {
+      "message": "Starting..."
+   },
+   "campTimeUntil": {
+      "message": "Until $DATE$",
+      "placeholders": {
+         "date": {
+            "content": "$1"
+         }
+      }
+   },
+   "campWizChip1": {
+      "message": "💰 Affiliate Deal"
+   },
+   "campWizChip2": {
+      "message": "🏠 Real Estate"
+   },
+   "campWizChip3": {
+      "message": "🍔 Local Biz"
+   },
+   "campWizPrompt1": {
+      "message": "Affiliate Marketing: Promote a software deal ending in 48 hours. Aggressive frequency."
+   },
+   "campWizPrompt2": {
+      "message": "Real Estate: Showcase a new property. Teaser -> Features -> Open House."
+   },
+   "campWizPrompt3": {
+      "message": "Small Biz: Launch a new menu item. Build hunger and offer a discount."
+   },
+   "canvasEmpty": {
+      "message": "Drag the \u003Cstrong>Trigger\u003C/strong> block here to start"
+   },
+   "cardGroupsTip": {
+      "message": "Smart Group Management"
+   },
+   "catAdd": {
+      "message": "Add New Category"
+   },
+   "catConfirmDel": {
+      "message": "Are you sure you want to delete the category \"$NAME$\"?",
+      "placeholders": {
+         "name": {
+            "content": "$1"
+         }
+      }
+   },
+   "catErrEmpty": {
+      "message": "Category name cannot be empty."
+   },
+   "catErrLimit": {
+      "message": "You have reached the maximum limit of categories."
+   },
+   "catLimit": {
+      "message": "Maximum categories reached"
+   },
+   "catManage": {
+      "message": "Manage Categories"
+   },
+   "catPhName": {
+      "message": "Category Name"
+   },
+   "colBlue": {
+      "message": "Blue"
+   },
+   "colDefault": {
+      "message": "Default (Black)"
+   },
+   "colGroup": {
+      "message": "Target Group"
+   },
+   "colGroupName": {
+      "message": "Group Name"
+   },
+   "colOrange": {
+      "message": "Orange"
+   },
+   "colPink": {
+      "message": "Pink"
+   },
+   "colPurple": {
+      "message": "Purple"
+   },
+   "colRed": {
+      "message": "Red"
+   },
+   "colStatus": {
+      "message": "Status"
+   },
+   "colTags": {
+      "message": "Tags"
+   },
+   "colTeal": {
+      "message": "Teal"
+   },
+   "colTemplate": {
+      "message": "Post Template"
+   },
+   "countChars": {
+      "message": "$COUNT$ character",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "countCharsPlural": {
+      "message": "$COUNT$ characters",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "countItems": {
+      "message": "$COUNT$ item",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "countItemsPlural": {
+      "message": "$COUNT$ items",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "countLinkSingular": {
+      "message": "$COUNT$ link",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "countLinks": {
+      "message": "$COUNT$ links",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "countSelected": {
+      "message": "$COUNT$ selected",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "descAiAutoVars": {
+      "message": "Automatically rewrite your post in 3 distinct tones to bypass Facebook spam filters."
+   },
+   "descAiInstructions": {
+      "message": "The ultimate override. Give the AI specific rules for your brand."
+   },
+   "descAnonPost": {
+      "message": "Aborts if group doesn't allow it. Supported only in classic mode."
+   },
+   "descAnonShort": {
+      "message": "If allowed"
+   },
+   "descBackup": {
+      "message": "Saves templates and group collections (no media)."
+   },
+   "descBilledMonthly": {
+      "message": "Billed monthly"
+   },
+   "descBilledQuarterly": {
+      "message": "Billed every 3 mo"
+   },
+   "descBilledYearly": {
+      "message": "Billed yearly"
+   },
+   "descClassic": {
+      "message": "Visual automation. Good for video."
+   },
+   "descCloudSync": {
+      "message": "Securely backup your templates, groups, and campaigns to your account. (Media files are excluded to save space)."
+   },
+   "descCompress": {
+      "message": "Optimize size (recommended)"
+   },
+   "descDesktopAlerts": {
+      "message": "Get a native OS notification."
+   },
+   "descDragDrop": {
+      "message": "Drag & drop files here or click the plus button"
+   },
+   "descEmptyCamp": {
+      "message": "Create your first automated strategy to get started."
+   },
+   "descEmptySched": {
+      "message": "You haven't scheduled any posts yet."
+   },
+   "descEnableContext": {
+      "message": "The AI will adopt this identity and adapt to the context (helpful vs salesy)."
+   },
+   "descFormats": {
+      "message": "Supported formats: Images, MP4, WebM videos"
+   },
+   "descGenAiVar": {
+      "message": "Create variations with different tones automatically. Post's purpose will be preserved."
+   },
+   "descImport": {
+      "message": "Extract your Facebook groups."
+   },
+   "descInPageAlerts": {
+      "message": "Show a popup on your screen when browsing."
+   },
+   "descMediaPools": {
+      "message": "Pick random media to prevent spam filters"
+   },
+   "descNightMode": {
+      "message": "Don't post 10PM - 7AM"
+   },
+   "descPost": {
+      "message": "Run a Quick or Scheduled post."
+   },
+   "descPro": {
+      "message": "Unlock unlimited power."
+   },
+   "descSafeDelay": {
+      "message": "Wait full time even if post fails."
+   },
+   "descSecLevel": {
+      "message": "Balances speed and safety."
+   },
+   "descSkipNet": {
+      "message": "Enable this only if your posts get stuck on 'Connection unstable' despite having working internet."
+   },
+   "descSmartTiming": {
+      "message": "Select a date to see daily strategy insights."
+   },
+   "descSourceExist": {
+      "message": "Select your templates."
+   },
+   "descSourceGen": {
+      "message": "AI will write fresh posts."
+   },
+   "descSpeed": {
+      "message": "Facebook API. Fast & Reliable."
+   },
+   "descTargetGroups": {
+      "message": "(Max 25 - Recommended: 5-10)"
+   },
+   "descTelemetry": {
+      "message": "This helps us improve the extension. We never collect personal data or content."
+   },
+   "descTemplate": {
+      "message": "Write a reusable post."
+   },
+   "descTriggerKw": {
+      "message": "(Use \u003Cb>-word\u003C/b> to exclude. E.g., \u003Ci>need help, -free\u003C/i>)"
+   },
+   "descVars": {
+      "message": "Use {Hi|Hello} or Variations."
+   },
+   "descWaitFailShort": {
+      "message": "Wait if fail"
+   },
+   "dueNow": {
+      "message": "Due now"
+   },
+   "emptyCampaigns": {
+      "message": "No campaigns yet"
+   },
+   "emptySched": {
+      "message": "No Scheduled Posts"
+   },
+   "enhBoostDesc": {
+      "message": "Maximize engagement with strong hooks and CTAs."
+   },
+   "enhBoostTitle": {
+      "message": "Conversion Boost"
+   },
+   "enhPolishDesc": {
+      "message": "Fix errors and improve clarity without changing the tone."
+   },
+   "enhPolishTitle": {
+      "message": "Grammar & Polish"
+   },
+   "enhSpinDesc": {
+      "message": "Convert text into complex nested variations {A|B} for safety."
+   },
+   "enhSpinTitle": {
+      "message": "Spintax Architect"
+   },
+   "enhTitle": {
+      "message": "Choose Enhancement Style"
+   },
+   "errConnectMsg": {
+      "message": "Could not reach the validation server. Please check your internet."
+   },
+   "errConnectTitle": {
+      "message": "Connection Error"
+   },
+   "errStopFail": {
+      "message": "Error stopping: $MSG$",
+      "placeholders": {
+         "msg": {
+            "content": "$1"
+         }
+      }
+   },
+   "errStopUnknown": {
+      "message": "Failed to confirm stop signal."
+   },
+   "extractBtnStart": {
+      "message": "OK, Start Scraping"
+   },
+   "extractConfirmMsg": {
+      "message": "When you click OK, the extension will try to get your Facebook groups via our GPP secure engine. \u003Cb>It might take a couple of minutes.\u003C/b> If it runs into any issues, it will fall back to a manual extraction method that will open A new, visible tab will open to your Facebook groups page. The extension will then scroll down automatically to find all your groups. \u003Cbr>\u003Cbr>\u003Cb>Please do not close this new tab;\u003C/b> it will close itself when the process is finished."
+   },
+   "extractConfirmTitle": {
+      "message": "Start Group Extraction?"
+   },
+   "fbBtn": {
+      "message": "Give Feedback & Get Posts"
+   },
+   "fbReward": {
+      "message": "As a thank you, we'll add 3 more free posts!"
+   },
+   "fbSorry": {
+      "message": "We're sorry! How can we improve?"
+   },
+   "fileLargeMsg": {
+      "message": "The following files are too large for the browser extension to handle directly:\u003Cbr>\u003Cbr>\u003Cstrong>$FILES$\u003C/strong>\u003Cbr>\u003Cbr>Please compress them to under $SIZE$MB.",
+      "placeholders": {
+         "files": {
+            "content": "$1"
+         },
+         "size": {
+            "content": "$2"
+         }
+      }
+   },
+   "fileLargeTitle": {
+      "message": "Files Too Large"
+   },
+   "fileTypeMsg": {
+      "message": "The following files were skipped: \u003Cbr>\u003Cstrong>$FILES$\u003C/strong>",
+      "placeholders": {
+         "files": {
+            "content": "$1"
+         }
+      }
+   },
+   "fileTypeTitle": {
+      "message": "Unsupported File Type"
+   },
+   "freqDaily": {
+      "message": "DAILY"
+   },
+   "freqMonthly": {
+      "message": "MONTHLY"
+   },
+   "freqOnce": {
+      "message": "ONCE"
+   },
+   "freqWeekly": {
+      "message": "WEEKLY"
+   },
+   "freshCool": {
+      "message": "\u003Cstrong>Fresh/Cool (>7 days):\u003C/strong> $COUNT$ groups",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "freshCoolLabel": {
+      "message": "Fresh (>7d):"
+   },
+   "freshHot": {
+      "message": "\u003Cstrong>Hot (Last 2 days):\u003C/strong> $COUNT$ groups",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "freshHotLabel": {
+      "message": "Hot (\u003C48h):"
+   },
+   "freshOverviewTitle": {
+      "message": "Freshness Overview"
+   },
+   "freshTitle": {
+      "message": "Freshness Analysis (when posted)"
+   },
+   "freshWarm": {
+      "message": "\u003Cstrong>Warm (3-7 days):\u003C/strong> $COUNT$ groups",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "freshWarmLabel": {
+      "message": "Warm (\u003C7d):"
+   },
+   "graphLess": {
+      "message": "Less"
+   },
+   "graphMore": {
+      "message": "More"
+   },
+   "graphPostsCount": {
+      "message": "$COUNT$ posts",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "grpPhLink": {
+      "message": "Link"
+   },
+   "grpPhTitle": {
+      "message": "Title"
+   },
+   "guideTitle": {
+      "message": "Setup Guide"
+   },
+   "headerAiVar": {
+      "message": "AI Post Variations"
+   },
+   "headerComments": {
+      "message": "Comment Settings"
+   },
+   "headerCreateTemp": {
+      "message": "Create Template"
+   },
+   "headerDragBlocks": {
+      "message": "DRAG THE BUILDING BLOCKS"
+   },
+   "headerHistory": {
+      "message": "History"
+   },
+   "headerOrder": {
+      "message": "Posting Order"
+   },
+   "headerPause": {
+      "message": "Pause & Protection & Comment"
+   },
+   "headerSchedulePost": {
+      "message": "Schedule Your Post"
+   },
+   "headerScheduled": {
+      "message": "Scheduled Posts"
+   },
+   "headerSelectGroups": {
+      "message": "Select target group collections"
+   },
+   "headerSelectTemplates": {
+      "message": "Select post templates to publish"
+   },
+   "headerStrategy": {
+      "message": "Posting Strategy"
+   },
+   "healthCleanupMsg": {
+      "message": "Removed $COUNT$ dead links from your collections.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "healthCleanupTitle": {
+      "message": "Cleanup Complete"
+   },
+   "healthFoundMsg": {
+      "message": "These groups are still in your collections but fail consistently."
+   },
+   "healthFoundTitle": {
+      "message": "Found $COUNT$ Dead Groups",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "healthRemoveBtn": {
+      "message": "Remove Selected Groups"
+   },
+   "healthSuccessMsg": {
+      "message": "No active groups found with consistent failure history inside any group collections."
+   },
+   "healthSuccessTitle": {
+      "message": "All Good!"
+   },
+   "healthVerifyLink": {
+      "message": "Verify Link"
+   },
+   "helpClose": {
+      "message": "Close"
+   },
+   "helpEmailIntro": {
+      "message": "For technical issues, please write to us at:"
+   },
+   "helpModalTitle": {
+      "message": "Help & Support"
+   },
+   "helpPageIntro": {
+      "message": "Or visit our help page for guides and FAQs:"
+   },
+   "hintBgColor": {
+      "message": "For posts with max 130 characters"
+   },
+   "hintInterval": {
+      "message": "Between pauses"
+   },
+   "hintOrder": {
+      "message": "Sequential: A,A,A... then B,B,B... | Alternate: A,B,C... then A,B,C..."
+   },
+   "hintVariations": {
+      "message": "Saves as {A|B|C...}"
+   },
+   "hintWait": {
+      "message": "Randomized duration"
+   },
+   "histFilterDate": {
+      "message": "Filtering by: \u003Cstrong>$DATE$\u003C/strong>",
+      "placeholders": {
+         "date": {
+            "content": "$1"
+         }
+      }
+   },
+   "histSearch": {
+      "message": "Search history..."
+   },
+   "impBtnImport": {
+      "message": "Import Selected"
+   },
+   "impErrEmpty": {
+      "message": "Please select a group collection and at least one link."
+   },
+   "impLblAvail": {
+      "message": "Available Links"
+   },
+   "impNoLinks": {
+      "message": "No links in this collection"
+   },
+   "impPhSearch": {
+      "message": "Search links..."
+   },
+   "impSelAll": {
+      "message": "Select All"
+   },
+   "impSelAllFilt": {
+      "message": "Select All Filtered"
+   },
+   "impSelFirst": {
+      "message": "Select a group collection first"
+   },
+   "impTitle": {
+      "message": "Import from Group Collection"
+   },
+   "initLoading": {
+      "message": "Initializing Group Posting Pro..."
+   },
+   "keyRemovedMsg": {
+      "message": "Your validation key has been removed successfully."
+   },
+   "keyRemovedTitle": {
+      "message": "Validation key removed"
+   },
+   "langSystemDefault": {
+      "message": "System Default"
+   },
+   "lblAIAssistant": {
+      "message": "AI Assistant"
+   },
+   "lblActivity": {
+      "message": "LAST 30 DAYS ACTIVITY"
+   },
+   "lblAddGroupColl": {
+      "message": "Add a new group collection"
+   },
+   "lblAddMedia": {
+      "message": "Add images or videos"
+   },
+   "lblAddMediaText": {
+      "message": "Add media"
+   },
+   "lblAfterEvery": {
+      "message": "After every"
+   },
+   "lblAiAudienceOpt": {
+      "message": "Target Audience (Optional)"
+   },
+   "lblAiAutoVars": {
+      "message": "AI Auto-Variations"
+   },
+   "lblAiInstructions": {
+      "message": "Custom AI Instructions (Optional)"
+   },
+   "lblAiPrompt": {
+      "message": "What should this post be about?"
+   },
+   "lblAlreadyPurchased": {
+      "message": "Already purchased?"
+   },
+   "lblAlternate": {
+      "message": "Alternate"
+   },
+   "lblAnalysingCopy": {
+      "message": "Analyzing intent & generating copy..."
+   },
+   "lblAnonCaps": {
+      "message": "POST ANONYMOUSLY"
+   },
+   "lblAnonPost": {
+      "message": "Post Anonymously"
+   },
+   "lblAutoCommentContent": {
+      "message": "Auto-Comment Content"
+   },
+   "lblAutoLoop": {
+      "message": "Auto-Loop Forever"
+   },
+   "lblAutoMatch": {
+      "message": "Auto-match Groups"
+   },
+   "lblBackground": {
+      "message": "Background"
+   },
+   "lblBalanced": {
+      "message": "Balanced"
+   },
+   "lblBgColor": {
+      "message": "Background Color"
+   },
+   "lblCampAssets": {
+      "message": "Campaign Assets (Optional)"
+   },
+   "lblCampaigns": {
+      "message": "Automations"
+   },
+   "lblCategories": {
+      "message": "Categories"
+   },
+   "lblChooseTone": {
+      "message": "Choose a Tone"
+   },
+   "lblClickActivate": {
+      "message": "Click to activate"
+   },
+   "lblCloudSync": {
+      "message": "Cloud Sync"
+   },
+   "lblCompress": {
+      "message": "Compress images"
+   },
+   "lblCondition": {
+      "message": "Condition"
+   },
+   "lblConstructing": {
+      "message": "Constructing Strategy..."
+   },
+   "lblCount": {
+      "message": "Count"
+   },
+   "lblDays": {
+      "message": "days"
+   },
+   "lblDaysLower": {
+      "message": "Days"
+   },
+   "lblDesc": {
+      "message": "Description"
+   },
+   "lblDesktopAlerts": {
+      "message": "Desktop Push Alerts"
+   },
+   "lblDetails": {
+      "message": "Posting Details"
+   },
+   "lblDisableComm": {
+      "message": "Disable Comments"
+   },
+   "lblDoorDrop": {
+      "message": "Door Dropoff"
+   },
+   "lblDoorPickup": {
+      "message": "Door Pickup"
+   },
+   "lblDropFiles": {
+      "message": "Drop images/video"
+   },
+   "lblEmojis": {
+      "message": "Emojis"
+   },
+   "lblEmptyTemp": {
+      "message": "(Empty Template)"
+   },
+   "lblEnableComm": {
+      "message": "Enable Comments"
+   },
+   "lblEnableContext": {
+      "message": "Enable Business Context"
+   },
+   "lblEndCamp": {
+      "message": "End the campaign here."
+   },
+   "lblFast": {
+      "message": "Fast"
+   },
+   "lblFbStandards": {
+      "message": "Read Facebook™ Community Standards"
+   },
+   "lblFilterCat": {
+      "message": "Filter by Category"
+   },
+   "lblFiltered": {
+      "message": "Filtered: $CAT$",
+      "placeholders": {
+         "cat": {
+            "content": "$1"
+         }
+      }
+   },
+   "lblFirstComm": {
+      "message": "Add First Comment"
+   },
+   "lblFixedTimes": {
+      "message": "Fixed Times"
+   },
+   "lblFlowCtrl": {
+      "message": "Flow Control"
+   },
+   "lblForever": {
+      "message": "Forever"
+   },
+   "lblGen": {
+      "message": "Generate"
+   },
+   "lblGenAiVar": {
+      "message": "Generate AI Variations"
+   },
+   "lblGoToStep": {
+      "message": "Go to Step"
+   },
+   "lblHrs": {
+      "message": "hrs"
+   },
+   "lblInPageAlerts": {
+      "message": "In-Page Alerts"
+   },
+   "lblInterval": {
+      "message": "Interval"
+   },
+   "lblIssues": {
+      "message": "Issues"
+   },
+   "lblJoinCount": {
+      "message": "How many groups to join?"
+   },
+   "lblLicenseKey": {
+      "message": "License key:"
+   },
+   "lblLoadTemp": {
+      "message": "Loading templates..."
+   },
+   "lblMedia": {
+      "message": "Media (Images & Videos)"
+   },
+   "lblMediaPools": {
+      "message": "Media Spintax (Pools)"
+   },
+   "lblMinMembers": {
+      "message": "Minimum members:"
+   },
+   "lblMins": {
+      "message": "mins"
+   },
+   "lblMonthly": {
+      "message": "Monthly"
+   },
+   "lblNightMode": {
+      "message": "Avoid night posting"
+   },
+   "lblNightModeCaps": {
+      "message": "AVOID NIGHT POSTING"
+   },
+   "lblNoSavedTemp": {
+      "message": "No saved post templates found."
+   },
+   "lblNotConfigured": {
+      "message": "Not configured"
+   },
+   "lblNotSignedIn": {
+      "message": "Not Signed In"
+   },
+   "lblNumVar": {
+      "message": "Number of Variations:"
+   },
+   "lblOrFresh": {
+      "message": "OR WRITE A FRESH POST"
+   },
+   "lblPerPost": {
+      "message": "per post"
+   },
+   "lblPickupOpts": {
+      "message": "Pickup Options"
+   },
+   "lblPlansStart": {
+      "message": "Plans start from"
+   },
+   "lblPostContent": {
+      "message": "Post Content"
+   },
+   "lblPostScore": {
+      "message": "Post Quality"
+   },
+   "lblPrice": {
+      "message": "Price"
+   },
+   "lblProdName": {
+      "message": "Product Title"
+   },
+   "lblPublicMeet": {
+      "message": "Public Meetup"
+   },
+   "lblQuarterly": {
+      "message": "Quarterly"
+   },
+   "lblQuickGroups": {
+      "message": "Select target group collections"
+   },
+   "lblQuickStep1": {
+      "message": "1. Where do you want to post?"
+   },
+   "lblQuickStep2": {
+      "message": "2. What do you want to say? (use presaved templates, write a fresh post or use both)"
+   },
+   "lblQuickStep3": {
+      "message": "3. Advanced Automation Settings"
+   },
+   "lblRecTimes": {
+      "message": "Recommended Times for this Day:"
+   },
+   "lblRepeat": {
+      "message": "Repeat:"
+   },
+   "lblSafe": {
+      "message": "Safe"
+   },
+   "lblSafeDelay": {
+      "message": "Safety delay on fail"
+   },
+   "lblSafeDelayCaps": {
+      "message": "SAFETY DELAY"
+   },
+   "lblSave45": {
+      "message": "Save 45%"
+   },
+   "lblSave58": {
+      "message": "Save 58%"
+   },
+   "lblSaveJoined": {
+      "message": "Save newly joined groups"
+   },
+   "lblSavedProds": {
+      "message": "Saved Products"
+   },
+   "lblScanInterval": {
+      "message": "Scan Interval"
+   },
+   "lblSearchParam": {
+      "message": "Search Parameter"
+   },
+   "lblSecLevel": {
+      "message": "Posting Security Level"
+   },
+   "lblSecLevelCaps": {
+      "message": "SECURITY LEVEL"
+   },
+   "lblSelect": {
+      "message": "Select:"
+   },
+   "lblSelectTemp": {
+      "message": "Select a Post Template:"
+   },
+   "lblSequential": {
+      "message": "Sequential"
+   },
+   "lblSkipNet": {
+      "message": "Disable Connectivity Check"
+   },
+   "lblSmartTiming": {
+      "message": "Smart Timing Advisor"
+   },
+   "lblSortBy": {
+      "message": "Sort by"
+   },
+   "lblSourceExist": {
+      "message": "Use My Templates"
+   },
+   "lblSourceGen": {
+      "message": "AI Writes Everything"
+   },
+   "lblSpintax": {
+      "message": "Spintax"
+   },
+   "lblStartImm": {
+      "message": "Start Immediately"
+   },
+   "lblStatus": {
+      "message": "Status:"
+   },
+   "lblSupportId": {
+      "message": "Support ID:"
+   },
+   "lblTargetGroups": {
+      "message": "Target Groups"
+   },
+   "lblTargetSame": {
+      "message": "Target same as:"
+   },
+   "lblTelemetry": {
+      "message": "Allow Anonymous Usage Data"
+   },
+   "lblTemplateName": {
+      "message": "Template Name"
+   },
+   "lblTimeRange": {
+      "message": "22:00 - 07:00"
+   },
+   "lblTimeSaved": {
+      "message": "Time Saved Last 30 Dats"
+   },
+   "lblToday": {
+      "message": "Today"
+   },
+   "lblTodayDate": {
+      "message": "Today"
+   },
+   "lblTriggerKw": {
+      "message": "Trigger Keywords"
+   },
+   "lblVariations": {
+      "message": "Variations"
+   },
+   "lblVariationsPrefix": {
+      "message": "Variations:"
+   },
+   "lblVarsLower": {
+      "message": "variations"
+   },
+   "lblVer": {
+      "message": "GroupPosting PRO Version: $VER$",
+      "placeholders": {
+         "ver": {
+            "content": "$1"
+         }
+      }
+   },
+   "lblWaitLabel": {
+      "message": "Wait:"
+   },
+   "lblWaitTime": {
+      "message": "Wait Time"
+   },
+   "lblYearly": {
+      "message": "Yearly"
+   },
+   "lblYourLink": {
+      "message": "Default Call-To-Action Link"
+   },
+   "lblYourProduct": {
+      "message": "Core Offer / Product"
+   },
+   "lblYourRole": {
+      "message": "Your Identity / Role"
+   },
+   "lblYourTags": {
+      "message": "Your Tags"
+   },
+   "lblYourTone": {
+      "message": "Your Default Tone"
+   },
+   "licIssueMsg": {
+      "message": "Your license key is invalid or has expired. Please check your key or purchase a new one."
+   },
+   "licIssueTitle": {
+      "message": "License Issue"
+   },
+   "loadingMsg": {
+      "message": "Preparing to post..."
+   },
+   "loadingNotify": {
+      "message": "Posting has started! You can browse other tabs - we'll continue in the background."
+   },
+   "lockAiEnhance": {
+      "message": "AI Text Enhancement is a \u003Cb>Pro Feature\u003C/b>.\u003Cbr>\u003Cbr>Instantly rewrite posts for conversion, grammar, or spintax.\u003Cbr>Upgrade to unlock."
+   },
+   "lockAiGen": {
+      "message": "AI Post Generation is a \u003Cb>Pro Feature\u003C/b>.\u003Cbr>\u003Cbr>Generate unlimited high-converting posts in seconds.\u003Cbr>Upgrade to unlock."
+   },
+   "lockAutoJoin": {
+      "message": "Auto-Joining Groups is a \u003Cb>Pro Feature\u003C/b>.\u003Cbr>Free users must join groups manually.\u003Cbr>\u003Cbr>Upgrade to automate your audience growth!"
+   },
+   "lockCampArch": {
+      "message": "The AI Campaign Architect is a \u003Cb>Pro Feature\u003C/b>.\u003Cbr>\u003Cbr>It analyzes your goal and builds entire multi-step campaigns automatically.\u003Cbr>Upgrade to unlock this power."
+   },
+   "lockCampResume": {
+      "message": "You have no free posts remaining. Please upgrade or activate a license to run campaigns."
+   },
+   "lockSchedule": {
+      "message": "Scheduling is a \u003Cb>Pro Feature\u003C/b>.\u003Cbr>Free users can only use 'Post Now'.\u003Cbr>\u003Cbr>Upgrade to unlock the Scheduler."
+   },
+   "lockScheduleSave": {
+      "message": "Scheduling posts for the future is a \u003Cb>Pro Feature\u003C/b>.\u003Cbr>Free users can only use 'Post Now'.\u003Cbr>\u003Cbr>Upgrade to unlock the Scheduler, Auto-Campaigns, and more!"
+   },
+   "menuAbout": {
+      "message": "About"
+   },
+   "menuAiProfile": {
+      "message": "AI Profile"
+   },
+   "menuHelp": {
+      "message": "Help"
+   },
+   "missedActionDesc": {
+      "message": "These one-time posts were not sent. Please choose an action for each."
+   },
+   "missedActionHeader": {
+      "message": "Action Required: Missed Posts"
+   },
+   "missedWasDue": {
+      "message": "Was due: $DATE$",
+      "placeholders": {
+         "date": {
+            "content": "$1"
+         }
+      }
+   },
+   "modalActionQueued": {
+      "message": "Action Queued"
+   },
+   "modalAiLock": {
+      "message": "AI Variations are a Pro feature. Please disable them or upgrade."
+   },
+   "modalAiPersonaDesc": {
+      "message": "Give the AI context so it writes exactly like you."
+   },
+   "modalAiPersonaTitle": {
+      "message": "AI Business Persona"
+   },
+   "modalCategoryTitle": {
+      "message": "Manage Categories"
+   },
+   "modalConfirmDel": {
+      "message": "Confirm Deletion"
+   },
+   "modalConfirmDelBody": {
+      "message": "Are you sure you want to delete this scheduled post? This action cannot be undone."
+   },
+   "modalConfirmPost": {
+      "message": "Confirm Posting Details"
+   },
+   "modalDailyLimitBody": {
+      "message": "You have used your \u003Cb>$COUNT$ free posts\u003C/b> for today.",
+      "placeholders": {
+         "count": {
+            "content": "$1",
+            "example": "3"
+         }
+      }
+   },
+   "modalDailyLimitTitle": {
+      "message": "Daily Limit Reached"
+   },
+   "modalDeleted": {
+      "message": "The scheduled post has been deleted."
+   },
+   "modalFbLoginReqBody": {
+      "message": "Group Posting Pro requires an active Facebook session to work. \u003Cbr>\u003Cbr>Please log in to Facebook in another tab and then click Refresh."
+   },
+   "modalFbLoginReqTitle": {
+      "message": "Facebook Login Required"
+   },
+   "modalHelp": {
+      "message": "Help & Support"
+   },
+   "modalImportSelect": {
+      "message": "Import Selected"
+   },
+   "modalImportTitle": {
+      "message": "Import from Group Collection"
+   },
+   "modalInputRequired": {
+      "message": "Input Required"
+   },
+   "modalLicReq": {
+      "message": "License Required"
+   },
+   "modalLicReqBody": {
+      "message": "Your license is invalid or expired. You cannot run scheduled tasks.\u003Cbr>\u003Cbr>Please activate to continue."
+   },
+   "modalLimitBody": {
+      "message": "You selected \u003Cb>$TOTAL$ groups\u003C/b>, but the Free Tier is limited to \u003Cb>$LIMIT$ groups per run\u003C/b>.\u003Cbr>Please select a collection accordingly or upgrade to Pro for unlimited posting.",
+      "placeholders": {
+         "actual": {
+            "content": "$3"
+         },
+         "limit": {
+            "content": "$2"
+         },
+         "total": {
+            "content": "$1"
+         }
+      }
+   },
+   "modalLimitTitle": {
+      "message": "Free Tier Limit Applied"
+   },
+   "modalNoContent": {
+      "message": "Please create content to schedule."
+   },
+   "modalNoGroups": {
+      "message": "Please select at least one group."
+   },
+   "modalProDesc": {
+      "message": "Remove daily limits, unlock AI, and scale."
+   },
+   "modalProFeature": {
+      "message": "Pro Feature"
+   },
+   "modalProTitle": {
+      "message": "Unlock Unlimited Power"
+   },
+   "modalQueuedImmediate": {
+      "message": "The post has been queued to run immediately."
+   },
+   "modalRunNowBody": {
+      "message": "This will queue \u003Cstrong>\"$TITLE$\"\u003C/strong> to start immediately.\u003Cbr>\u003Cbr>The schedule will \u003Cstrong>not\u003C/strong> be deleted and will continue to run at its future times.",
+      "placeholders": {
+         "title": {
+            "content": "$1"
+         }
+      }
+   },
+   "modalRunNowTitle": {
+      "message": "Run Post Now?"
+   },
+   "modalSplitTitle": {
+      "message": "Split Group Collection"
+   },
+   "modalSuccessQueue": {
+      "message": "The post has been queued and will start momentarily."
+   },
+   "modalTargetConfirm": {
+      "message": "Confirm Selection"
+   },
+   "modalTargetTitle": {
+      "message": "Advanced Group Selection"
+   },
+   "modeClassic": {
+      "message": "Classic Mode"
+   },
+   "modeSpeed": {
+      "message": "Speed Mode"
+   },
+   "msgPostingCompleted": {
+      "message": "Posting Completed!"
+   },
+   "msgPostingStopped": {
+      "message": "Posting Stopped by User"
+   },
+   "msgSendingStop": {
+      "message": "Sending stop signal..."
+   },
+   "msgStopping": {
+      "message": "Stopping..."
+   },
+   "navActivity": {
+      "message": "Activity"
+   },
+   "navAllGroups": {
+      "message": "All Groups"
+   },
+   "navCampaigns": {
+      "message": "Automations"
+   },
+   "navCompose": {
+      "message": "Create Post"
+   },
+   "navHistory": {
+      "message": "History"
+   },
+   "navMonitor": {
+      "message": "Lead Radar"
+   },
+   "navTemplates": {
+      "message": "Assets"
+   },
+   "navUpcoming": {
+      "message": "Upcoming"
+   },
+   "nextAction": {
+      "message": "Next Action"
+   },
+   "noHistory": {
+      "message": "No history found."
+   },
+   "noMatch": {
+      "message": "No logs match your filters."
+   },
+   "notifHeader": {
+      "message": "Notifications"
+   },
+   "notifMissedRecur": {
+      "message": "The recurring post \u003Cstrong>\"$TITLE$\"\u003C/strong> was missed on $DATE$. It has been automatically rescheduled.",
+      "placeholders": {
+         "date": {
+            "content": "$2"
+         },
+         "title": {
+            "content": "$1"
+         }
+      }
+   },
+   "optAllActivity": {
+      "message": "All Activity"
+   },
+   "optAllKeywords": {
+      "message": "All Keywords"
+   },
+   "optAllLeads": {
+      "message": "All Leads"
+   },
+   "optCommentsOnly": {
+      "message": "Comments Only"
+   },
+   "optPostsOnly": {
+      "message": "Posts Only"
+   },
+   "optRead": {
+      "message": "Read"
+   },
+   "optScan15": {
+      "message": "Every 15 Minutes (Balanced)"
+   },
+   "optScan30": {
+      "message": "Every 30 Minutes (Relaxed)"
+   },
+   "optScan5": {
+      "message": "Every 5 Minutes (Aggressive)"
+   },
+   "optScan60": {
+      "message": "Every 60 Minutes (Safe)"
+   },
+   "optStarred": {
+      "message": "⭐ Starred"
+   },
+   "optUnread": {
+      "message": "Unread Only"
+   },
+   "overlayAutoClose": {
+      "message": "The tab will close automatically."
+   },
+   "overlayCloseBtn": {
+      "message": "Close This Notification"
+   },
+   "overlayDesc": {
+      "message": "Please keep this browser window open. The automation will continue in the background and the tab will close automatically."
+   },
+   "overlayDlVideo": {
+      "message": "Downloading video from storage (large file)..."
+   },
+   "overlayDupRetry": {
+      "message": "Duplicate content detected. Automatically modifying and retrying..."
+   },
+   "overlayEnd": {
+      "message": "Reached end of list or no more joinable groups. Finishing."
+   },
+   "overlayFinalize": {
+      "message": "Finalizing post"
+   },
+   "overlayFinished": {
+      "message": "Finished. Joined $COUNT$ groups.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "overlayHumanPause": {
+      "message": "Pausing for a moment to appear more human... (Level: $LEVEL$)",
+      "placeholders": {
+         "level": {
+            "content": "$1"
+         }
+      }
+   },
+   "overlayInit": {
+      "message": "Initializing process..."
+   },
+   "overlayInsertImg": {
+      "message": "Inserting images"
+   },
+   "overlayInsertText": {
+      "message": "Inserting text"
+   },
+   "overlayJoined": {
+      "message": "($CURRENT$/$TOTAL$) Joined \"$GROUP$\". \u003Cbr>\u003Cb>Reminder:\u003C/b> Joining too many groups quickly can flag your account.",
+      "placeholders": {
+         "current": {
+            "content": "$1"
+         },
+         "group": {
+            "content": "$3"
+         },
+         "total": {
+            "content": "$2"
+         }
+      }
+   },
+   "overlayLongPause": {
+      "message": "Taking a longer break for safety ($SEC$s)...",
+      "placeholders": {
+         "sec": {
+            "content": "$1"
+         }
+      }
+   },
+   "overlayLonger": {
+      "message": "Taking longer than usual... ensuring browser priority."
+   },
+   "overlayNewContent": {
+      "message": "New content detected, scrolling again..."
+   },
+   "overlayNoNew": {
+      "message": "No new joinable groups found. Attempt $ATTEMPT$/5...",
+      "placeholders": {
+         "attempt": {
+            "content": "$1"
+         }
+      }
+   },
+   "overlayOpenModal": {
+      "message": "Opening modal"
+   },
+   "overlayPause": {
+      "message": "Found \"$GROUP$\". Pausing for $SEC$s...",
+      "placeholders": {
+         "group": {
+            "content": "$1"
+         },
+         "sec": {
+            "content": "$2"
+         }
+      }
+   },
+   "overlayPendingVerify": {
+      "message": "Facebook says 'Pending', verifying if that's true..."
+   },
+   "overlayPostData": {
+      "message": "Post data retrieved"
+   },
+   "overlayPreText": {
+      "message": "Ensuring page readiness"
+   },
+   "overlayProcessing": {
+      "message": "Processing data..."
+   },
+   "overlaySaved": {
+      "message": "Saved $COUNT$ groups to collection \"$NAME$\".",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         },
+         "name": {
+            "content": "$2"
+         }
+      }
+   },
+   "overlaySaving": {
+      "message": "Saving joined groups to a new collection..."
+   },
+   "overlayScan": {
+      "message": "Scanning page for new groups..."
+   },
+   "overlayScrapeEmpty": {
+      "message": "Scraping finished, but no valid groups were extracted."
+   },
+   "overlayScrapeNoItems": {
+      "message": "Scraping finished, but no group items were found. Ensure English(US) language."
+   },
+   "overlayScrapeSuccess": {
+      "message": "SUCCESS! $COUNT$ groups were saved to a new collection named \"$NAME$\".\u003Cbr>\u003Cbr>This tab will close automatically.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         },
+         "name": {
+            "content": "$2"
+         }
+      }
+   },
+   "overlayScrolling": {
+      "message": "Scrolling to the bottom of the page..."
+   },
+   "overlaySessionComplete": {
+      "message": "Session complete. Joined $COUNT$ groups.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "overlaySetColor": {
+      "message": "Setting background color"
+   },
+   "overlaySlowLoad": {
+      "message": "Content is loading slowly, increasing delay to $MS$ ms.",
+      "placeholders": {
+         "ms": {
+            "content": "$1"
+         }
+      }
+   },
+   "overlayTitle": {
+      "message": "GroupPosting is Working"
+   },
+   "overlayUnresponsive": {
+      "message": "Button unresponsive. Trying final recovery..."
+   },
+   "overlayUploading": {
+      "message": "Media is uploading. This may take several minutes..."
+   },
+   "overlayVerify": {
+      "message": "Verifying post status..."
+   },
+   "overlayWaitLoad": {
+      "message": "Scrolling & waiting for new content to load..."
+   },
+   "panelSpintaxGuide": {
+      "message": "Spintax Guide:"
+   },
+   "phAssign": {
+      "message": "Assign..."
+   },
+   "phCollName": {
+      "message": "Name of the group collection"
+   },
+   "phDescribeGoal": {
+      "message": "Describe your goal..."
+   },
+   "phFirstComm": {
+      "message": "Enter your comment text here. SPINTAXT IS SUPPORTED AND RECOMMENDED"
+   },
+   "phQuickGroups": {
+      "message": "Click to select target group collections for posting to"
+   },
+   "phSaveGroupAs": {
+      "message": "Enter group name to save as"
+   },
+   "phSearchGroups": {
+      "message": "Search Groups"
+   },
+   "phSearchHist": {
+      "message": "Search history..."
+   },
+   "phSearchParam": {
+      "message": "Enter search keyword (e.g. marketing)"
+   },
+   "phSearchTemp": {
+      "message": "Search templates..."
+   },
+   "phSelectGroups": {
+      "message": "Select one or more group collections..."
+   },
+   "phSelectSavedTemplates": {
+      "message": "Select saved templates to post..."
+   },
+   "phSelectTemplates": {
+      "message": "Select one or more post templates..."
+   },
+   "phTemplateName": {
+      "message": "Enter a name for this template"
+   },
+   "postingCompleted": {
+      "message": "Posting completed!"
+   },
+   "prevClose": {
+      "message": "Close Preview"
+   },
+   "prevDisclaimer": {
+      "message": "This is a preview. Actual appearance may vary."
+   },
+   "prevNextVar": {
+      "message": "Next Var"
+   },
+   "prevReSpin": {
+      "message": "Re-spin Text"
+   },
+   "prevTitle": {
+      "message": "Post Preview"
+   },
+   "prevVar": {
+      "message": "Var"
+   },
+   "qualBonusEmoji": {
+      "message": "Emoji bonus applied"
+   },
+   "qualBonusLength": {
+      "message": "Perfect length"
+   },
+   "qualBonusSpintax": {
+      "message": "Spintax bonus applied"
+   },
+   "qualCatEngage": {
+      "message": "Engagement"
+   },
+   "qualCatFormat": {
+      "message": "Formatting"
+   },
+   "qualCatLength": {
+      "message": "Content Length"
+   },
+   "qualCatMedia": {
+      "message": "Media"
+   },
+   "qualCatPolicy": {
+      "message": "Policy Compliance"
+   },
+   "qualFormatBasic": {
+      "message": "Basic"
+   },
+   "qualFormatEx": {
+      "message": "Excellent"
+   },
+   "qualFormatGood": {
+      "message": "Good"
+   },
+   "qualFormatMod": {
+      "message": "Moderate"
+   },
+   "qualLevelBad": {
+      "message": "Needs Work"
+   },
+   "qualLevelGreat": {
+      "message": "Great"
+   },
+   "qualLevelOk": {
+      "message": "Good"
+   },
+   "qualLevelPerfect": {
+      "message": "Perfect"
+   },
+   "qualSentNeg": {
+      "message": "Negative"
+   },
+   "qualSentNeutral": {
+      "message": "Neutral"
+   },
+   "qualSentPos": {
+      "message": "Positive"
+   },
+   "qualSentSomewhat": {
+      "message": "Somewhat Positive"
+   },
+   "qualSentVeryPos": {
+      "message": "Very Positive"
+   },
+   "qualStatFormat": {
+      "message": "Formatting"
+   },
+   "qualStatSent": {
+      "message": "Sentiment"
+   },
+   "qualStatWords": {
+      "message": "Word Count"
+   },
+   "qualTitle": {
+      "message": "Post Quality Score"
+   },
+   "qualViewTips": {
+      "message": "View analysis details and suggestions"
+   },
+   "qualWarnPhone": {
+      "message": "Phone number detected ($COUNT$)",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "qualWarnProf": {
+      "message": "Profanity detected ($COUNT$)",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "quickScheduleButton": {
+      "message": "Update Schedule"
+   },
+   "quillPhQuick": {
+      "message": "Write your post here..."
+   },
+   "quillPhTemplate": {
+      "message": "Start writing your post here...\n\nMulti-level spintax is supported.\nUse {option1|option2} to create a spintax."
+   },
+   "radarBtnCopy": {
+      "message": "Copy Link"
+   },
+   "radarBtnDraftReply": {
+      "message": "AI Draft Reply"
+   },
+   "radarBtnUnlock": {
+      "message": "Unlock Pro Now"
+   },
+   "radarBtnView": {
+      "message": "View Post"
+   },
+   "radarBtnViewReply": {
+      "message": "View Reply"
+   },
+   "radarPremiumDesc": {
+      "message": "Upgrade to Pro to read the full context, reveal the group, and fire off an AI reply to close the deal."
+   },
+   "radarPremiumLead": {
+      "message": "Premium Lead"
+   },
+   "radarSelectLead": {
+      "message": "Select a lead to view details"
+   },
+   "rateBadReward": {
+      "message": "Your feedback directly helps us prioritize new features and fixes."
+   },
+   "rateBadText": {
+      "message": "We're sorry GroupPosting Pro didn't meet your expectations yet. Could you spare a moment to tell us how we can improve?"
+   },
+   "rateBadTitle": {
+      "message": "Thanks for your honesty!"
+   },
+   "rateBtnFeedback": {
+      "message": "Give Feedback & Get Posts"
+   },
+   "rateBtnLater": {
+      "message": "Maybe Later"
+   },
+   "rateBtnNo": {
+      "message": "No Thanks"
+   },
+   "rateBtnReview": {
+      "message": "Rate on Store & Get Posts"
+   },
+   "rateBtnSubmit": {
+      "message": "Submit Rating"
+   },
+   "rateErr": {
+      "message": "Please select a rating."
+   },
+   "rateGoodReward": {
+      "message": "Your review helps other group admins find this tool!!"
+   },
+   "rateGoodText": {
+      "message": "Would you mind leaving a quick review on the Chrome Store? It helps us direct more users to GroupPosting Pro!"
+   },
+   "rateGoodTitle": {
+      "message": "Awesome! Glad you like it!"
+   },
+   "rateText": {
+      "message": "How has your experience been with GroupPosting Pro? Your quick rating helps us improve!"
+   },
+   "rateTitle": {
+      "message": "How are we doing?"
+   },
+   "readyMsg": {
+      "message": "Sending $TEMPLATES$ template(s) to $GROUPS$ group(s).",
+      "placeholders": {
+         "groups": {
+            "content": "$2"
+         },
+         "templates": {
+            "content": "$1"
+         }
+      }
+   },
+   "readyMsgAlternate": {
+      "message": "Sending 1 post to each of $GROUPS$ group(s) (cycling through $TEMPLATES$ templates).",
+      "placeholders": {
+         "groups": {
+            "content": "$1"
+         },
+         "templates": {
+            "content": "$2"
+         }
+      }
+   },
+   "readyMsgSequential": {
+      "message": "Sending $TEMPLATES$ template(s) to each of $GROUPS$ group(s).",
+      "placeholders": {
+         "groups": {
+            "content": "$2"
+         },
+         "templates": {
+            "content": "$1"
+         }
+      }
+   },
+   "readyTitle": {
+      "message": "Ready to Launch"
+   },
+   "restoreErrJson": {
+      "message": "Please select a valid JSON backup file."
+   },
+   "restoreErrMsg": {
+      "message": "The file could not be read. It may be corrupted or in the wrong format. Error: $ERR$",
+      "placeholders": {
+         "err": {
+            "content": "$1"
+         }
+      }
+   },
+   "restoreErrTitle": {
+      "message": "Restore Error"
+   },
+   "restoreMsg": {
+      "message": "This will add $TAGS$ post templates and $GROUPS$ group collections to your existing data. Are you sure you want to continue?",
+      "placeholders": {
+         "groups": {
+            "content": "$2"
+         },
+         "tags": {
+            "content": "$1"
+         }
+      }
+   },
+   "restoreSuccessMsg": {
+      "message": "Successfully added $TAGS$ new templates and $GROUPS$ new collections.",
+      "placeholders": {
+         "groups": {
+            "content": "$2"
+         },
+         "tags": {
+            "content": "$1"
+         }
+      }
+   },
+   "restoreSuccessTitle": {
+      "message": "Restore Successful"
+   },
+   "restoreTitle": {
+      "message": "Confirm Restore"
+   },
+   "retryMsg": {
+      "message": "Would you like to try sending the $COUNT$ failed or skipped post(s) again?",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "retryTitle": {
+      "message": "Some posts didn't make it."
+   },
+   "revAwesome": {
+      "message": "Awesome!"
+   },
+   "revBtn": {
+      "message": "Rate on Store & Get Posts"
+   },
+   "revText": {
+      "message": "Would you mind leaving a quick review?"
+   },
+   "saveCollection": {
+      "message": "Save Group Collection"
+   },
+   "savePercent": {
+      "message": "Save $PERCENT$%",
+      "placeholders": {
+         "percent": {
+            "content": "$1"
+         }
+      }
+   },
+   "schedDate": {
+      "message": "Date"
+   },
+   "schedDaysMonth": {
+      "message": "Select Days of Month"
+   },
+   "schedDaysWeek": {
+      "message": "Select Days of Week"
+   },
+   "schedErrPast": {
+      "message": "Scheduled time cannot be in the past."
+   },
+   "schedFreq": {
+      "message": "Posting Frequency"
+   },
+   "schedSave": {
+      "message": "Save Schedule"
+   },
+   "schedTime": {
+      "message": "Time"
+   },
+   "secBackup": {
+      "message": "Backup & Restore"
+   },
+   "secDescBalanced": {
+      "message": "Balances speed and safety with moderate, random delays. Recommended for most users."
+   },
+   "secDescFast": {
+      "message": "Prioritizes speed with minimal delays. Best for established accounts."
+   },
+   "secDescSafe": {
+      "message": "Prioritizes account safety with longer delays, focused tab and more human-like behavior. Slowest but safest."
+   },
+   "securePayment": {
+      "message": "Secure payment via LemonSqueezy."
+   },
+   "spOrPaste": {
+      "message": "OR PASTE NEW URLS"
+   },
+   "spSearchDbPh": {
+      "message": "Type to search your database..."
+   },
+   "spSearchExisting": {
+      "message": "1. Search Existing Groups"
+   },
+   "spSmartPaste": {
+      "message": "2. Smart Paste URLs"
+   },
+   "spinAdd": {
+      "message": "Add Another Variation"
+   },
+   "spinAiBtn": {
+      "message": "Auto-Fill with AI"
+   },
+   "spinApply": {
+      "message": "Add Spintax to text"
+   },
+   "spinErr": {
+      "message": "Please add at least one variation."
+   },
+   "spinInstr": {
+      "message": "Add and preview variations for your text. (Use {option1|option2} format)."
+   },
+   "spinPreview": {
+      "message": "Live Preview of the variations"
+   },
+   "spinShuffle": {
+      "message": "Shuffle"
+   },
+   "spinTitle": {
+      "message": "Create Spintax Variations"
+   },
+   "splitBtn": {
+      "message": "Split Collection"
+   },
+   "splitErrMin": {
+      "message": "You need at least 2 links to split."
+   },
+   "splitErrValid": {
+      "message": "Please enter a valid number of pieces."
+   },
+   "splitFeedbackExact": {
+      "message": "Creates \u003Cstrong>$PIECES$\u003C/strong> collections with \u003Cstrong>$LINKS$\u003C/strong> links each.",
+      "placeholders": {
+         "links": {
+            "content": "$2"
+         },
+         "pieces": {
+            "content": "$1"
+         }
+      }
+   },
+   "splitFeedbackMixed": {
+      "message": "Creates \u003Cstrong>$PIECES$\u003C/strong> collections. $BIG$ will have $L1$ links, $SMALL$ will have $L2$.",
+      "placeholders": {
+         "big": {
+            "content": "$2"
+         },
+         "l1": {
+            "content": "$3"
+         },
+         "l2": {
+            "content": "$5"
+         },
+         "pieces": {
+            "content": "$1"
+         },
+         "small": {
+            "content": "$4"
+         }
+      }
+   },
+   "splitInfo": {
+      "message": "This collection has \u003Cstrong>$COUNT$\u003C/strong> links.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "splitLblPieces": {
+      "message": "How many smaller collections do you want?"
+   },
+   "splitSuccess": {
+      "message": "Collection split into $COUNT$ parts.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "splitTitle": {
+      "message": "Split Group Collection"
+   },
+   "spotCampDesc": {
+      "message": "Chain posts, set delays, and loop indefinitely."
+   },
+   "spotCampTitle": {
+      "message": "Campaign Automation"
+   },
+   "spotRadarDesc": {
+      "message": "Monitor scans Facebook groups in the background every 5-10 minutes. Catch hot leads the moment they ask for recommendations or help!"
+   },
+   "spotRadarStep1": {
+      "message": "Set \u003Cstrong>Keywords\u003C/strong>"
+   },
+   "spotRadarStep2": {
+      "message": "Target \u003Cstrong>Groups\u003C/strong>"
+   },
+   "spotRadarStep3": {
+      "message": "Get \u003Cstrong>Notified\u003C/strong>"
+   },
+   "spotRadarTitle": {
+      "message": "Automated Group Monitoring - Lead Radar"
+   },
+   "spotStepExtract": {
+      "message": "\u003Cstrong>Extract\u003C/strong>"
+   },
+   "spotStepLoop": {
+      "message": "Set \u003Cstrong>Loop\u003C/strong>"
+   },
+   "spotStepPost": {
+      "message": "Add \u003Cstrong>Post\u003C/strong> block"
+   },
+   "spotStepSplit": {
+      "message": "\u003Cstrong>Split\u003C/strong> Lists"
+   },
+   "spotStepWait": {
+      "message": "Add \u003Cstrong>Wait\u003C/strong> block"
+   },
+   "statFailedSkipped": {
+      "message": "Failed/Skipped"
+   },
+   "statSuccessful": {
+      "message": "Successful"
+   },
+   "statTotal": {
+      "message": "Total"
+   },
+   "statusFailed": {
+      "message": "Failed"
+   },
+   "statusPending": {
+      "message": "Pending"
+   },
+   "statusSkipped": {
+      "message": "Skipped"
+   },
+   "statusSuccess": {
+      "message": "Success"
+   },
+   "stepImport": {
+      "message": "Import Groups"
+   },
+   "stepPost": {
+      "message": "Send a Post"
+   },
+   "stepPro": {
+      "message": "Activate Pro"
+   },
+   "stepTemplate": {
+      "message": "Create Template"
+   },
+   "stepVars": {
+      "message": "Add Variations"
+   },
+   "streakBest": {
+      "message": "Best Streak"
+   },
+   "streakCurrent": {
+      "message": "Current Streak"
+   },
+   "streakKeepAlive": {
+      "message": "Keep the fire alive! 🔥"
+   },
+   "streakRecord": {
+      "message": "All-time record 🏆"
+   },
+   "stuckReset": {
+      "message": "Posting stuck? - only in case of issues."
+   },
+   "sumContent": {
+      "message": "Content"
+   },
+   "sumDuration": {
+      "message": "Est. Duration"
+   },
+   "sumGroups": {
+      "message": "$ACTUAL$ Groups",
+      "placeholders": {
+         "actual": {
+            "content": "$1"
+         }
+      }
+   },
+   "sumOverview": {
+      "message": "Run Overview"
+   },
+   "sumTruncated": {
+      "message": "(of $TOTAL$)",
+      "placeholders": {
+         "total": {
+            "content": "$1"
+         }
+      }
+   },
+   "sumVariations": {
+      "message": "$COUNT$ Variation(s)",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "sumVolume": {
+      "message": "Volume"
+   },
+   "tabAdv": {
+      "message": "Advanced Posting"
+   },
+   "tabGroupColls": {
+      "message": "Group Collection"
+   },
+   "tabPostTemps": {
+      "message": "Post Templates"
+   },
+   "tabQuick": {
+      "message": "Simple Post"
+   },
+   "tabUpcoming": {
+      "message": "Upcoming"
+   },
+   "tagCompat": {
+      "message": "Max Compatibility"
+   },
+   "tagRec": {
+      "message": "Recommended"
+   },
+   "targeterBtnExclude": {
+      "message": "Exclude this group"
+   },
+   "targeterDedup": {
+      "message": " ($COUNT$ duplicate(s) removed)",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "targeterDescFresh": {
+      "message": "Select groups you haven't posted to recently first (Fresh > Warm > Hot)."
+   },
+   "targeterInputPostTo": {
+      "message": "Post to"
+   },
+   "targeterInputRandom": {
+      "message": "random groups"
+   },
+   "targeterLblAll": {
+      "message": "Will post to \u003Cstrong>all $COUNT$\u003C/strong> of them.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "targeterLblRandom": {
+      "message": "Will post to \u003Cstrong>$COUNT$\u003C/strong> of them randomly.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "targeterModeAll": {
+      "message": "Post to All Selected"
+   },
+   "targeterModeRandom": {
+      "message": "Random Subset"
+   },
+   "targeterNoColls": {
+      "message": "No group collections found. Please create one on the \"Groups\" page first."
+   },
+   "targeterPhSearch": {
+      "message": "Search across all your groups..."
+   },
+   "targeterStep1": {
+      "message": "1. Select Group Collections"
+   },
+   "targeterStep2": {
+      "message": "2. (Optional) Add Specific Groups"
+   },
+   "targeterStep3": {
+      "message": "3. Configure Posting Strategy"
+   },
+   "targeterSummaryInit": {
+      "message": "Select collections or groups to see options."
+   },
+   "targeterSummaryMain": {
+      "message": "You have selected \u003Cstrong>$COUNT$\u003C/strong> unique target groups.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "targeterToggleFresh": {
+      "message": "Prioritize Fresh Groups"
+   },
+   "timeInDays": {
+      "message": "in $COUNT$ day(s)",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "timeInHours": {
+      "message": "in $HOURS$ hr $MINS$ min",
+      "placeholders": {
+         "hours": {
+            "content": "$1"
+         },
+         "mins": {
+            "content": "$2"
+         }
+      }
+   },
+   "timeInMins": {
+      "message": "in $MINS$ min",
+      "placeholders": {
+         "mins": {
+            "content": "$1"
+         }
+      }
+   },
+   "timeSoon": {
+      "message": "in \u003C 1 min"
+   },
+   "timelineTitle": {
+      "message": "Today's Schedule"
+   },
+   "tipFmtBold": {
+      "message": "Try using bold text to emphasize points."
+   },
+   "tipFmtEx": {
+      "message": "Excellent formatting! Easy to read."
+   },
+   "tipFmtHead": {
+      "message": "Consider adding headings to structure content."
+   },
+   "tipFmtList": {
+      "message": "Bullet points make information easier to scan."
+   },
+   "tipGroupsDesc": {
+      "message": "Organize groups by niche to target the right audience every time."
+   },
+   "tipLenGood": {
+      "message": "Great job! Your post has a good length."
+   },
+   "tipLenPerfect": {
+      "message": "Perfect! Your post has an ideal length for high engagement."
+   },
+   "tipLenShort": {
+      "message": "Your post is on the shorter side. Adding more details could help."
+   },
+   "tipLenStart": {
+      "message": "Start writing your post to see recommendations."
+   },
+   "tipMediaAdd": {
+      "message": "Adding images or videos can significantly increase engagement."
+   },
+   "tipMediaGood": {
+      "message": "Great job! Including media helps boost engagement."
+   },
+   "tipMediaPerfect": {
+      "message": "Perfect! Multiple media items significantly increase engagement."
+   },
+   "tipPolPhone": {
+      "message": "Phone numbers detected. This might trigger platform restrictions."
+   },
+   "tipPolProf": {
+      "message": "Potentially problematic language detected. Consider revising."
+   },
+   "tipSegment": {
+      "message": "\u003Cstrong>Segment\u003C/strong> by Niche"
+   },
+   "tipSentEx": {
+      "message": "Excellent! Very positive tone likely to boost engagement."
+   },
+   "tipSentGood": {
+      "message": "Great job! Positive tone detected."
+   },
+   "tipSentImprove": {
+      "message": "Consider adding more positive language."
+   },
+   "tipStepAI": {
+      "message": "\u003Cstrong>AI\u003C/strong> Rewrite"
+   },
+   "tipStepExtract": {
+      "message": "\u003Cstrong>Extract\u003C/strong>"
+   },
+   "tipStepSeg": {
+      "message": "\u003Cstrong>Segment\u003C/strong> by Niche"
+   },
+   "tipStepSpin": {
+      "message": "Use \u003Cstrong>Spintax\u003C/strong>"
+   },
+   "tipStepSplit": {
+      "message": "\u003Cstrong>Split\u003C/strong> Lists"
+   },
+   "tipStepVar": {
+      "message": "Create \u003Cstrong>Variations\u003C/strong>"
+   },
+   "tipTemplates": {
+      "message": "Power Up Your Templates"
+   },
+   "tipTemplatesDesc": {
+      "message": "Templates save time and keep your messaging consistent."
+   },
+   "toolSegmentDesc": {
+      "message": "Extract groups matching specific keywords from your entire database."
+   },
+   "toolSegmentTitle": {
+      "message": "Segment by Niche"
+   },
+   "toolSplitMasterDesc": {
+      "message": "Break your entire database into smaller, safer batches."
+   },
+   "toolSplitMasterTitle": {
+      "message": "Split Master List"
+   },
+   "tour1Text": {
+      "message": "The safest, most powerful way to automate your Facebook group outreach."
+   },
+   "tour1Title": {
+      "message": "Welcome to GroupPosting Pro!"
+   },
+   "tour2Text": {
+      "message": "Start here. Create reusable Post Templates and organize your target groups into Collections."
+   },
+   "tour2Title": {
+      "message": "1. Create Templates"
+   },
+   "tour3Text": {
+      "message": "Use Simple Post for quick blasts, or the Advanced Scheduler to plan posts ahead."
+   },
+   "tour3Title": {
+      "message": "2. Compose & Schedule"
+   },
+   "tour4Text": {
+      "message": "Build powerful workflows. Chain multiple posts, set specific delays, and loop your strategy."
+   },
+   "tour4Title": {
+      "message": "3. Automated Campaigns"
+   },
+   "tour5Text": {
+      "message": "View logs of every run. See what succeeded or failed, and retry with one click."
+   },
+   "tour5Title": {
+      "message": "4. Track History"
+   },
+   "tour6Text": {
+      "message": "We've set up a few sample templates for you. Click below to start!"
+   },
+   "tour6Title": {
+      "message": "You're Ready!"
+   },
+   "tsEmptyDesc": {
+      "message": "Create a reusable post template with Spintax and media to save time."
+   },
+   "tsEmptyTitle": {
+      "message": "No Templates Yet"
+   },
+   "tsSelectToPreview": {
+      "message": "Select a template to preview."
+   },
+   "typeComment": {
+      "message": "Comment"
+   },
+   "typeManual": {
+      "message": "Manual"
+   },
+   "typeRetry": {
+      "message": "Retry"
+   },
+   "typeScheduled": {
+      "message": "Scheduled"
+   },
+   "unitMin": {
+      "message": "min"
+   },
+   "unitPosts": {
+      "message": "posts"
+   },
+   "upAiReplyText": {
+      "message": "AI Magic Replies are a Pro feature.\u003Cbr>\u003Cbr>Let the AI instantly draft a personalized, highly-converting reply to this lead based on your exact business profile."
+   },
+   "upAiReplyTitle": {
+      "message": "Close deals in seconds. ⚡"
+   },
+   "upAiText": {
+      "message": "AI Generation is a Pro feature.\u003Cbr>\u003Cbr>Facebook blocks identical posts. Let our AI automatically rewrite your posts in 3 different variations to keep your account 100% safe."
+   },
+   "upAiTitle": {
+      "message": "Bypass the spam filters. 🛡️"
+   },
+   "upCampText": {
+      "message": "Campaigns are a Pro feature.\u003Cbr>\u003Cbr>Chain posts together, set intelligent delays, and loop workflows forever. Set it up once and generate leads automatically for months."
+   },
+   "upCampTitle": {
+      "message": "Build your automated empire. ⚙️"
+   },
+   "upCloudText": {
+      "message": "Cloud Sync is a Pro feature.\u003Cbr>\u003Cbr>Keep your templates, campaigns, and group lists securely backed up to the cloud and synced instantly across all your devices."
+   },
+   "upCloudTitle": {
+      "message": "Never lose your work again. ☁️"
+   },
+   "upColorText": {
+      "message": "Colored Backgrounds are a Pro feature.\u003Cbr>\u003Cbr>Text posts with colored backgrounds get up to 3x more visibility on Facebook. Upgrade to Pro to unlock all aesthetic tools and grab attention."
+   },
+   "upColorTitle": {
+      "message": "Stand out in the feed. 🎨"
+   },
+   "upDefaultText": {
+      "message": "Upgrade to Pro to remove limits and unlock the full suite of automation tools."
+   },
+   "upDefaultTitle": {
+      "message": "Unlock Pro Power"
+   },
+   "upExportText": {
+      "message": "CSV Exporting is a Pro feature.\u003Cbr>\u003Cbr>Export your hot leads instantly, import them into your favorite CRM, and close deals faster. Don't leave your leads trapped in Facebook."
+   },
+   "upExportTitle": {
+      "message": "Own your data. 📊"
+   },
+   "upJoinText": {
+      "message": "Auto-Joining is a Pro feature.\u003Cbr>\u003Cbr>Searching and joining groups manually takes hours. Let the engine automatically find and join highly-targeted groups for you in the background."
+   },
+   "upJoinTitle": {
+      "message": "Grow your audience on autopilot. 🚀"
+   },
+   "upLimitText": {
+      "message": "Posting to $COUNT$ groups manually would take you about \u003Cspan class=\"upsell-highlight\">$HOURS$ hours\u003C/span>.\u003Cbr>\u003Cbr>The Free Tier is limited to 7 groups per run. Upgrade to Pro to post to all $COUNT$ groups automatically while you sleep.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         },
+         "hours": {
+            "content": "$2"
+         }
+      }
+   },
+   "upLimitTitle": {
+      "message": "Whoa! You selected $COUNT$ groups. 🤯",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "upRadarText": {
+      "message": "Lead Radar is a Pro feature.\u003Cbr>\u003Cbr>Let the engine scan your groups 24/7. Get instant push notifications the second someone asks for recommendations or help in your niche."
+   },
+   "upRadarTitle": {
+      "message": "Stop chasing clients. 🧲"
+   },
+   "upSchedText": {
+      "message": "Scheduling is a Pro feature. \u003Cbr>\u003Cbr>Stop waking up early to post. Schedule an entire month of content in 5 minutes and let the engine post for you while you are away from your desk."
+   },
+   "upSchedTitle": {
+      "message": "Reclaim your mornings. ☕"
+   },
+   "upSynText": {
+      "message": "AI Auto-Synonyms are a Pro feature.\u003Cbr>\u003Cbr>Manually thinking of synonyms takes forever. Let the AI generate perfect, context-aware variations instantly so you can post safely."
+   },
+   "upSynTitle": {
+      "message": "Perfect Spintax in 1 second. 🧬"
+   },
+   "upWizText": {
+      "message": "The Campaign Wizard is a Pro feature.\u003Cbr>\u003Cbr>Tell the AI your goal. It will build an entire multi-day campaign, write the copy, and select the best groups automatically."
+   },
+   "upWizTitle": {
+      "message": "Your personal marketing agency. 🧠"
+   },
+   "updateCollection": {
+      "message": "Update Group Collection"
+   },
+   "upsellCancel": {
+      "message": "Cancel anytime."
+   },
+   "upsellPerMo": {
+      "message": "/mo"
+   },
+   "upsellStartsFrom": {
+      "message": "starts from"
+   },
+   "upsellSubtitle": {
+      "message": "Group Posting Pro"
+   },
+   "valNeutral": {
+      "message": "Neutral"
+   },
+   "valNo": {
+      "message": "No"
+   },
+   "valYes": {
+      "message": "Yes"
+   },
+   "vipBtnClaim": {
+      "message": "Claim My 3-Day Free Trial"
+   },
+   "vipDesc": {
+      "message": "As a thank you for using Group Posting Pro, we want to give you full VIP access to try out our premium tools."
+   },
+   "vipFeature1": {
+      "message": "Unlimited Posting & Scheduling"
+   },
+   "vipFeature2": {
+      "message": "AI Generation & Auto-Variations"
+   },
+   "vipFeature3": {
+      "message": "Lead Radar (Push Notifications)"
+   },
+   "vipForDays": {
+      "message": "for 3 days"
+   },
+   "vipIncludes": {
+      "message": "Your 3-Day VIP Pass includes:"
+   },
+   "vipPrice": {
+      "message": "Then the standard €24/mo. Cancel anytime."
+   },
+   "vipSelected": {
+      "message": "You've been selected."
+   },
+   "vipSurprise": {
+      "message": "SURPRISE UNLOCK 🎉"
+   },
+   "warnDesktopAlerts": {
+      "message": "Requires Chrome notifications enabled in OS settings."
+   },
+   "warnFbLimit": {
+      "message": "Facebook limits joins! Max 25 per day recommended."
+   },
+   "warnHighVolMsg": {
+      "message": "Publishing to a large number of groups at once can increase the risk of Facebook flagging your account. Consider posting to smaller batches or enabling 'Prioritize Fresh Groups' for better safety. Ensure you are using Spintax or AI Variations to keep content unique."
+   },
+   "warnHighVolTitle": {
+      "message": "High Volume Warning"
+   },
+   "warnOnline": {
+      "message": "Your browser must be open for posts to send."
+   },
+   "warnQuick": {
+      "message": "Simple Post uses improved Speed mode."
+   },
+   "welcomeProMsg": {
+      "message": "License activated successfully! All features are now unlocked."
+   },
+   "welcomeProTitle": {
+      "message": "Welcome to Pro"
+   },
+   "wizAnalyzing": {
+      "message": "Analyzing goal against $COUNT$ groups...",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "wizBtnAnalyzing": {
+      "message": "Analyzing..."
+   },
+   "wizBuildError": {
+      "message": "Builder Error"
+   },
+   "wizBuildMsg": {
+      "message": "The AI generated a strategy, but we couldn't place it on the canvas. Error: $ERR$",
+      "placeholders": {
+         "err": {
+            "content": "$1"
+         }
+      }
+   },
+   "wizEmptyMsg": {
+      "message": "The AI returned an empty strategy. Please try adding more detail to your goal."
+   },
+   "wizEmptyTitle": {
+      "message": "Invalid Result"
+   },
+   "wizEnterGoal": {
+      "message": "Please describe your campaign goal (e.g., 'Promote my webinar next Friday')."
+   },
+   "wizError": {
+      "message": "Connection failed. Please reload the extension and try again."
+   },
+   "wizFailedMsg": {
+      "message": "The AI could not generate a strategy. Please try again or use a simpler prompt."
+   },
+   "wizFailedTitle": {
+      "message": "AI Generation Failed"
+   },
+   "wizInputReq": {
+      "message": "Input Required"
+   },
+   "wizNoTemplate": {
+      "message": "Please select at least one template to use."
+   },
+   "wizSuccessMsg": {
+      "message": "AI successfully created \u003Cb>$COUNT$ steps\u003C/b> based on your goal.\u003Cbr>\u003Cbr>Review the setup and click \u003Cb>Save\u003C/b> to launch!",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "wizSuccessTitle": {
+      "message": "Strategy Ready"
+   }
+}

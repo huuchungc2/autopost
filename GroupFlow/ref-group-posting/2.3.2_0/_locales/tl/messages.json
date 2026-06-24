@@ -1,0 +1,1530 @@
+{
+  "appName": {
+    "message": "Group Posting PRO: Group Scheduler | Auto Publisher | Radar para sa FB™"
+  },
+  "appDescription": {
+    "message": "Safely auto-post and schedule content to multiple Facebook™ groups. Boost engagement with AI variations and smart delays."
+  },
+  "initLoading": { "message": "Sinisimulan ang Group Posting Pro..." },
+
+  "loadingMsg": { "message": "Naghahanda na mag-post..." },
+  "loadingNotify": {
+    "message": "Nagsimula na ang posting! Pwede kang mag-browse sa ibang tabs - tuloy kami sa background."
+  },
+  "btnStop": { "message": "I-stop ang Posting" },
+  "stuckReset": { "message": "Na-stuck ang post? - gamitin lang pag may error." },
+
+  "postingCompleted": { "message": "Tapos na ang posting!" },
+  "saveCollection": { "message": "I-save ang Collection" },
+  "updateCollection": { "message": "I-update ang Collection" },
+  "tabUpcoming": { "message": "Upcoming" },
+  "aboutTitle": { "message": "About" },
+  "lblLicenseKey": { "message": "License key:" },
+  "lblStatus": { "message": "Status:" },
+  "lblSupportId": { "message": "Support ID:" },
+  "lblTelemetry": { "message": "Payagan ang Anonymous Usage Data" },
+  "descTelemetry": {
+    "message": "Nakakatulong ito na pagandahin ang app. Hindi kami kumukuha ng personal data."
+  },
+  "secBackup": { "message": "Backup at Restore" },
+  "btnBackup": { "message": "I-backup Lahat ng Data" },
+  "btnRestore": { "message": "I-restore mula Backup" },
+  "descBackup": {
+    "message": "Sina-save ang templates at group collections (walang media)."
+  },
+  "btnRemoveKey": { "message": "I-remove ang Validation Key" },
+  "btnBack": { "message": "Bumalik" },
+  "btnFeatureReq": { "message": "Mag-request ng Feature" },
+
+  "badgeFree": { "message": "Libre:" },
+  "btnUpgrade": { "message": "Mag-Upgrade" },
+  "btnActivate": { "message": "I-activate ang lisensya" },
+  "menuAbout": { "message": "About" },
+  "menuHelp": { "message": "Tulong" },
+
+  "modalProTitle": { "message": "I-unlock ang Unlimited Power" },
+  "modalProDesc": { "message": "Alisin ang daily limits, i-unlock ang AI, at mag-scale." },
+  "benUnlimited": { "message": "Unlimited Posts" },
+  "benCampaigns": { "message": "Campaign Workflows" },
+  "benAI": { "message": "AI Content Generation" },
+  "benSpintax": { "message": "Smart Spintax" },
+  "benSupport": { "message": "Priority Support" },
+  "benCancel": { "message": "Kanselahin Kahit Kailan" },
+  "lblMonthly": { "message": "Buwanan" },
+  "lblYearly": { "message": "Taunan" },
+  "lblQuarterly": { "message": "Quarterly" },
+  "descBilledMonthly": { "message": "Billed monthly" },
+  "descBilledYearly": { "message": "Billed yearly" },
+  "descBilledQuarterly": { "message": "Billed every 3 months" },
+  "badgeBestValue": { "message": "BEST VALUE" },
+  "btnChoose": { "message": "Piliin" },
+  "lblAlreadyPurchased": { "message": "Bumili na dati?" },
+  "btnActivateKey": { "message": "I-activate ang License Key" },
+
+  "guideTitle": { "message": "Setup Guide" },
+  "stepImport": { "message": "Mag-import ng Groups" },
+  "descImport": { "message": "I-extract ang iyong Facebook groups." },
+  "btnGo": { "message": "Go" },
+  "stepTemplate": { "message": "Gumawa ng Template" },
+  "descTemplate": { "message": "Gumawa ng reusable post." },
+  "stepVars": { "message": "Magdagdag ng Variations" },
+  "descVars": { "message": "Gumamit ng {Hi|Hello} o AI." },
+  "stepPost": { "message": "Mag-send ng Post" },
+  "descPost": { "message": "I-run ang Quick o Scheduled post." },
+  "stepPro": { "message": "I-activate ang Pro" },
+  "descPro": { "message": "I-unlock ang unlimited power." },
+  "btnView": { "message": "Tingnan" },
+
+  "bannerFeedbackTitle": { "message": "Tulungan kaming mas pagandahin to?" },
+  "bannerFeedbackDesc": {
+    "message": "I-share ang feedback mo—isang minuto lang to."
+  },
+  "btnSure": { "message": "Sure" },
+  "bannerPaused": { "message": "Naka-pause ang scheduled posts." },
+  "btnResume": { "message": "I-resume" },
+
+  "navTemplates": { "message": "Assets" },
+  "navCompose": { "message": "Gumawa ng Post" },
+  "navCampaigns": { "message": "Automations" },
+  "navUpcoming": { "message": "Upcoming" },
+  "navHistory": { "message": "History" },
+
+  "tabQuick": { "message": "Simpleng Post" },
+  "tabAdv": { "message": "Advanced Posting" },
+  "tabPostTemps": { "message": "Post Templates" },
+  "tabGroupColls": { "message": "Group Collections" },
+
+  "btnCancel": { "message": "I-cancel" },
+  "btnSave": { "message": "I-save" },
+  "lblPostScore": { "message": "Post Quality" },
+  "lblTemplateName": { "message": "Pangalan ng Template" },
+  "phTemplateName": { "message": "Maglagay ng pangalan para sa template" },
+  "lblCategories": { "message": "Categories" },
+  "phAssign": { "message": "I-assign..." },
+  "lblVariations": { "message": "Variations" },
+  "hintVariations": { "message": "Sina-save bilang {A|B|C...}" },
+  "lblPostContent": { "message": "Content ng Post" },
+  "btnAddSpintax": { "message": "Mag-add ng Spintax" },
+  "panelSpintaxGuide": { "message": "Spintax Guide:" },
+  "lblAIAssistant": { "message": "AI Assistant" },
+  "btnEnhance": { "message": "AI Improvements" },
+  "btnGenerateAI": { "message": "Gawin gamit ang AI" },
+  "lblMedia": { "message": "Media (Images & Videos)" },
+  "lblAddMedia": { "message": "Mag-add ng images o videos" },
+  "descDragDrop": {
+    "message": "I-drag & drop ang files dito o i-click ang plus button"
+  },
+  "descFormats": { "message": "Supported formats: Images, MP4, WebM" },
+  "lblBgColor": { "message": "Background Color" },
+  "hintBgColor": { "message": "Para sa posts na may max 130 characters" },
+
+  "lblProdName": { "message": "Title ng Produkto" },
+  "lblPrice": { "message": "Presyo" },
+  "lblCondition": { "message": "Kondisyon" },
+  "lblDesc": { "message": "Description" },
+  "lblPickupOpts": { "message": "Pickup Options" },
+  "lblPublicMeet": { "message": "Public Meetup" },
+  "lblDoorPickup": { "message": "Door Pickup" },
+  "lblDoorDrop": { "message": "Door Dropoff" },
+
+  "lblAddGroupColl": { "message": "Mag-add ng bagong group collection" },
+  "phCollName": { "message": "Pangalan ng collection" },
+  "phSearchGroups": { "message": "Maghanap ng Groups" },
+  "btnAddLink": { "message": "Mag-add ng bagong link" },
+  "btnSplit": { "message": "Hatiin" },
+  "btnCreateColl": { "message": "Gumawa ng bagong collection" },
+  "btnExtract": { "message": "I-extract sa FB" },
+  "btnAutoJoin": { "message": "Auto join sa groups" },
+  "cardGroupsTip": { "message": "Smart Group Management" },
+  "spotStepExtract": { "message": "<strong>I-extract</strong>" },
+  "spotStepSplit": { "message": "<strong>Hatiin</strong> ang Lists" },
+  "tipSegment": { "message": "<strong>I-segment</strong> per Niche" },
+  "lblSearchParam": { "message": "Hahanapin na Keyword" },
+  "phSearchParam": { "message": "Maglagay ng keyword (hal. marketing)" },
+  "lblJoinCount": { "message": "Ilang groups ang sasalihan?" },
+  "lblMinMembers": { "message": "Minimum na members:" },
+  "lblSaveJoined": { "message": "I-save ang mga bagong nasalihan" },
+  "warnFbLimit": {
+    "message": "Naglilimit ng joins si FB! Max 25 per day recommended."
+  },
+
+  "lblCampaigns": { "message": "Automations" },
+  "btnAiWizard": { "message": "AI Wizard" },
+  "btnCreateNew": { "message": "Gumawa ng Bago" },
+  "emptyCampaigns": { "message": "Wala pang campaigns" },
+  "descEmptyCamp": {
+    "message": "Gawin ang iyong unang automated strategy para magsimula."
+  },
+  "spotCampTitle": { "message": "Campaign Automation" },
+  "spotCampDesc": {
+    "message": "Pag-ugnayin ang posts, mag-set ng delays, at i-loop."
+  },
+  "btnLaunch": { "message": "I-launch" },
+  "headerDragBlocks": { "message": "I-DRAG ANG MGA BLOCKS DITO" },
+  "blockTrigger": { "message": "Trigger" },
+  "blockPost": { "message": "Post" },
+  "blockWait": { "message": "Wait" },
+  "blockLoop": { "message": "Loop" },
+  "blockStop": { "message": "Stop" },
+
+  "btnCreateTemplate": { "message": "Gumawa ng bagong template" },
+  "btnSortFilter": { "message": "Sort at Filter" },
+  "lblSortBy": { "message": "I-sort by" },
+  "btnDefault": { "message": "Default" },
+  "btnNameAZ": { "message": "Pangalan (A-Z)" },
+  "btnNameZA": { "message": "Pangalan (Z-A)" },
+  "lblFilterCat": { "message": "I-filter by Category" },
+  "btnManageCat": { "message": "I-manage ang Categories" },
+  "tipTemplates": { "message": "Pabilisin ang iyong Templates" },
+
+  "lblSavedProds": { "message": "Saved Products" },
+  "btnAddProd": { "message": "Mag-add ng product template" },
+
+  "headerSelectTemplates": { "message": "Pumili ng templates na ipa-publish" },
+  "phSelectTemplates": { "message": "Pumili ng isa o higit pang templates..." },
+  "headerSelectGroups": { "message": "Pumili ng target group collections" },
+  "phSelectGroups": { "message": "Pumili ng isa o higit pang collections..." },
+  "btnAdvSelector": { "message": "Advanced selector" },
+  "headerOrder": { "message": "Posting Order" },
+  "lblSequential": { "message": "Sequential" },
+  "lblAlternate": { "message": "Alternate" },
+  "hintOrder": {
+    "message": "Sequential: A,A... tapos B,B... | Alternate: A,B,C... tapos A,B,C..."
+  },
+  "headerAiVar": { "message": "AI Post Variations" },
+  "lblGenAiVar": { "message": "Mag-generate ng AI Variations" },
+  "descGenAiVar": {
+    "message": "Gumawa ng variations na may iba't-ibang tones automatically. Same parin ang message."
+  },
+  "typeComment": { "message": "Comment" },
+  "lblNumVar": { "message": "Bilang ng Variations:" },
+  "headerPause": { "message": "Pauses, Protection at Comment" },
+  "lblInterval": { "message": "Interval" },
+  "unitPosts": { "message": "posts" },
+  "hintInterval": { "message": "Sa pagitan ng pauses" },
+  "lblWaitTime": { "message": "Wait Time" },
+  "unitMin": { "message": "mins" },
+  "hintWait": { "message": "Random na tagal" },
+  "lblSafeDelay": { "message": "Safety delay pag nag-fail" },
+  "descSafeDelay": { "message": "Iintayin parin ang oras kahit mag-fail ang post." },
+  "lblNightMode": { "message": "Umiwas mag-post sa gabi" },
+  "descNightMode": { "message": "Wag mag-post ng 10PM - 7AM" },
+  "lblCompress": { "message": "I-compress ang images" },
+  "descCompress": { "message": "I-optimize ang size (recommended)" },
+  "lblSecLevel": { "message": "Posting Security Level" },
+  "lblFast": { "message": "Mabilis" },
+  "lblBalanced": { "message": "Sakto Lang" },
+  "lblSafe": { "message": "Ligtas" },
+  "descSecLevel": { "message": "Binabalanse ang bilis at safety." },
+  "headerStrategy": { "message": "Posting Strategy" },
+  "modeSpeed": { "message": "Speed Mode" },
+  "tagRec": { "message": "Recommended" },
+  "descSpeed": { "message": "Facebook API. Mabilis at Maasahan." },
+  "modeClassic": { "message": "Classic Mode" },
+  "tagCompat": { "message": "Max Compatibility" },
+  "descClassic": { "message": "Visual automation. Maganda sa video." },
+  "headerComments": { "message": "Comment Settings" },
+  "lblEnableComm": { "message": "I-enable ang Comments" },
+  "lblDisableComm": { "message": "I-disable ang Comments" },
+  "lblFirstComm": { "message": "Mag-add ng Unang Comment" },
+  "phFirstComm": { "message": "I-type ang comment mo dito. MAGANDA KUNG MAY SPINTAX" },
+  "btnCancelEdit": { "message": "I-cancel ang Edit" },
+  "btnSchedule": { "message": "I-schedule" },
+  "btnPostNow": { "message": "I-post Ngayon" },
+  "spinAiBtn": { "message": "Auto-Fill gamit ang AI" },
+  "lblQuickGroups": { "message": "Pumili ng target group collections" },
+  "phQuickGroups": { "message": "I-click para pumili ng target groups na pagpopost-an" },
+  "btnPreFill": { "message": "Pre-fill" },
+  "btnScheduleLater": { "message": "I-schedule Para Mamaya" },
+  "warnQuick": {
+    "message": "Gumagamit ng Speed mode ang Simpleng Post."
+  },
+
+  "headerScheduled": { "message": "Scheduled Posts" },
+  "btnShowAll": { "message": "I-show Lahat ng Posts" },
+  "emptySched": { "message": "Walang Scheduled Posts" },
+  "descEmptySched": { "message": "Wala ka pang na-schedule na posts." },
+  "lblToday": { "message": "Ngayong Araw" },
+  "warnOnline": { "message": "Dapat bukas ang browser mo para ma-send ang posts." },
+
+  "headerHistory": { "message": "History" },
+  "lblActivity": { "message": "LAST 30 DAYS ACTIVITY" },
+  "phSearchHist": { "message": "Mag-search sa history..." },
+  "lblIssues": { "message": "Issues" },
+  "btnHealth": { "message": "Health" },
+  "lblDetails": { "message": "Posting Details" },
+  "btnLoadMore": { "message": "I-load ang Iba Pa" },
+
+  "modalHelp": { "message": "Tulong & Support" },
+  "modalImportTitle": { "message": "Mag-import mula sa Collection" },
+  "modalImportSelect": { "message": "I-import ang mga Pinili" },
+  "modalSplitTitle": { "message": "Hatiin ang Group Collection" },
+  "modalCategoryTitle": { "message": "I-manage ang Categories" },
+  "btnAdd": { "message": "Mag-add" },
+  "btnDone": { "message": "Done" },
+  "modalTargetTitle": { "message": "Advanced Group Selection" },
+  "modalTargetConfirm": { "message": "I-confirm ang Selection" },
+
+  "overlayTitle": { "message": "Nagtatrabaho pa ang GroupPosting" },
+  "overlayDesc": {
+    "message": "Paki-iwanang bukas itong window. Magpapatuloy sa background ang automation at kusang magsasara ang tab."
+  },
+  "overlayInit": { "message": "Sinisimulan na ang proseso..." },
+  "overlayCloseBtn": { "message": "I-close Itong Notification" },
+
+  "overlayScan": { "message": "Ini-iscan ang page para sa mga bagong groups..." },
+  "overlayPause": {
+    "message": "Nahanap ang \"$GROUP$\". Nag-papause ng $SEC$s...",
+    "placeholders": { "group": { "content": "$1" }, "sec": { "content": "$2" } }
+  },
+  "overlayLongPause": {
+    "message": "Kumukuha ng mas matagal na break para iwas ban ($SEC$s)...",
+    "placeholders": { "sec": { "content": "$1" } }
+  },
+  "overlayJoined": {
+    "message": "($CURRENT$/$TOTAL$) Naka-join na sa \"$GROUP$\". <br><b>Reminder:</b> Masyadong mabilis mag-join pwede ma-flag account mo.",
+    "placeholders": {
+      "current": { "content": "$1" },
+      "total": { "content": "$2" },
+      "group": { "content": "$3" }
+    }
+  },
+  "overlayNoNew": {
+    "message": "Walang mahanap na pwedeng salihan. Attempt $ATTEMPT$/5...",
+    "placeholders": { "attempt": { "content": "$1" } }
+  },
+  "overlayEnd": {
+    "message": "Nasa dulo na ng listahan. Tatapusin na ang process."
+  },
+  "overlaySaving": { "message": "Sina-save ang mga nasalihang groups sa bagong collection..." },
+  "overlaySaved": {
+    "message": "Na-save ang $COUNT$ groups sa collection na \"$NAME$\".",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "name": { "content": "$2" }
+    }
+  },
+  "overlaySessionComplete": {
+    "message": "Tapos na ang session. Naka-join sa $COUNT$ groups.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "overlayFinished": {
+    "message": "Tapos na. Naka-join sa $COUNT$ groups.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "overlayAutoClose": { "message": "Kusang magsasara ang tab na ito." },
+
+  "overlayScrolling": { "message": "Nag-iscroll sa baba ng page..." },
+  "overlayWaitLoad": {
+    "message": "Nag-iscroll at nag-aantay mag-load ang bagong content..."
+  },
+  "overlayNewContent": {
+    "message": "May na-detect na bagong content, mag-iiscroll ulit..."
+  },
+  "overlaySlowLoad": {
+    "message": "Mabagal mag-load, dinadagdagan ang delay sa $MS$ ms.",
+    "placeholders": { "ms": { "content": "$1" } }
+  },
+  "overlayProcessing": { "message": "Pino-process ang data..." },
+  "overlayScrapeSuccess": {
+    "message": "SUCCESS! $COUNT$ groups ang na-save sa bagong collection na \"$NAME$\".<br><br>Kusang magsasara itong tab.",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "name": { "content": "$2" }
+    }
+  },
+  "overlayScrapeEmpty": {
+    "message": "Tapos na mag-scrape, pero walang nahanap na valid groups."
+  },
+  "overlayScrapeNoItems": {
+    "message": "Tapos na mag-scrape, walang nahanap na groups. Siguraduhing naka-English(US) ang language mo."
+  },
+
+  "overlayPreText": { "message": "Sinisiguradong ready na ang page" },
+  "overlayPostData": { "message": "Nakuha na ang post data" },
+  "overlayOpenModal": { "message": "Binubuksan ang modal" },
+  "overlayInsertImg": { "message": "Nag-iinsert ng images" },
+  "overlayInsertText": { "message": "Nag-iinsert ng text" },
+  "overlaySetColor": { "message": "Sini-set ang background color" },
+  "overlayFinalize": { "message": "Fina-finalize ang post" },
+  "overlayUnresponsive": {
+    "message": "Di nagre-respond ang button. Susubukan ulit..."
+  },
+  "overlayVerify": { "message": "Bini-verify ang post status..." },
+  "overlayLonger": {
+    "message": "Medyo matagal kesa sa inaasahan... isinisiguro ang browser priority."
+  },
+  "overlayUploading": {
+    "message": "Ina-upload pa ang media. Baka abutin ito ng ilang minuto..."
+  },
+  "overlayDupRetry": {
+    "message": "Na-detect na duplicate content. Kusa nating babaguhin at ita-try ulit..."
+  },
+  "overlayPendingVerify": {
+    "message": "Sabi ni Facebook 'Pending' daw, iche-check natin kung totoo..."
+  },
+  "overlayHumanPause": {
+    "message": "Nagpapause saglit para magmukhang tao... (Level: $LEVEL$)",
+    "placeholders": { "level": { "content": "$1" } }
+  },
+  "overlayDlVideo": {
+    "message": "Dina-download ang video galing sa storage (malaking file)..."
+  },
+
+  "modalDailyLimitTitle": { "message": "Naabot na ang Daily Limit" },
+  "modalDailyLimitBody": {
+    "message": "Nagamit mo na ang iyong <b>$COUNT$ free posts</b> para sa araw na ito.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "msgStopping": { "message": "Sino-stop na..." },
+  "msgSendingStop": { "message": "Nagsesend ng stop signal..." },
+  "errStopFail": {
+    "message": "Error pag-stop: $MSG$",
+    "placeholders": { "msg": { "content": "$1" } }
+  },
+  "errStopUnknown": { "message": "Hindi ma-confirm ang stop signal." },
+
+  "modalProFeature": { "message": "Pro Feature" },
+  "modalAiLock": {
+    "message": "Pang-Pro lang ang AI Variations. Paki-disable o mag-upgrade."
+  },
+  "modalInputRequired": { "message": "Kailangan ng Input" },
+  "modalNoContent": { "message": "Gumawa muna ng content na isu-schedule." },
+  "modalNoGroups": { "message": "Pumili ng kahit isang group man lang." },
+
+  "modalLimitTitle": { "message": "Umiiral ang Free Tier Limit" },
+  "modalLimitBody": {
+    "message": "Pumili ka ng <b>$TOTAL$ groups</b>, pero ang Free Tier ay hanggang <b>$LIMIT$ groups lang kada run</b>.<br>Bawasan mo muna or mag-upgrade sa Pro para maka-post ng unlimited.",
+    "placeholders": {
+      "total": { "content": "$1" },
+      "limit": { "content": "$2" },
+      "actual": { "content": "$3" }
+    }
+  },
+
+  "modalConfirmPost": { "message": "I-confirm ang Posting Details" },
+  "btnGoBack": { "message": "Bumalik & Mag-Edit" },
+
+  "sumOverview": { "message": "Run Overview" },
+  "sumVolume": { "message": "Dami" },
+  "sumGroups": {
+    "message": "$ACTUAL$ Groups",
+    "placeholders": { "actual": { "content": "$1" } }
+  },
+  "sumTruncated": {
+    "message": "(out of $TOTAL$)",
+    "placeholders": { "total": { "content": "$1" } }
+  },
+  "sumContent": { "message": "Content" },
+  "sumVariations": {
+    "message": "$COUNT$ Variation(s)",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "sumDuration": { "message": "Est. Duration" },
+
+  "readyTitle": { "message": "Ready to Launch" },
+  "readyMsg": {
+    "message": "Magsesend ng $TEMPLATES$ template(s) sa $GROUPS$ group(s).",
+    "placeholders": {
+      "templates": { "content": "$1" },
+      "groups": { "content": "$2" }
+    }
+  },
+  "statusPending": { "message": "Naka-pending" },
+  "statusSuccess": { "message": "Success" },
+  "statusFailed": { "message": "Failed" },
+  "statusSkipped": { "message": "Na-skip" },
+  "countSelected": {
+    "message": "$COUNT$ ang pinili",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "countChars": {
+    "message": "$COUNT$ character",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "countCharsPlural": {
+    "message": "$COUNT$ characters",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "countItems": {
+    "message": "$COUNT$ item",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "countItemsPlural": {
+    "message": "$COUNT$ items",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "countLinks": {
+    "message": "$COUNT$ links",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "countLinkSingular": {
+    "message": "$COUNT$ link",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "graphLess": { "message": "Konti" },
+  "graphMore": { "message": "Madami" },
+  "graphPostsCount": {
+    "message": "$COUNT$ posts",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+
+  "typeManual": { "message": "Manual" },
+  "typeScheduled": { "message": "Scheduled" },
+  "typeRetry": { "message": "Retry" },
+
+  "statTotal": { "message": "Total" },
+  "statSuccessful": { "message": "Successful" },
+  "statFailedSkipped": { "message": "Failed/Na-skip" },
+
+  "colTemplate": { "message": "Post Template" },
+  "colGroup": { "message": "Target Group" },
+  "colStatus": { "message": "Status" },
+
+  "retryTitle": { "message": "May mga posts na hindi pumasok." },
+  "retryMsg": {
+    "message": "Gusto mo bang subukang i-send ulit yung $COUNT$ na nag-fail o na-skip?",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "btnRetry": { "message": "I-retry ang Failed Posts" },
+  "btnPreparing": { "message": "Naghahanda..." },
+  "noHistory": { "message": "Walang nahanap na history." },
+  "noMatch": { "message": "Walang logs na nag-match sa filters mo." },
+  "notifHeader": { "message": "Notifications" },
+  "notifMissedRecur": {
+    "message": "Ang recurring post na <strong>\"$TITLE$\"</strong> ay na-miss noong $DATE$. Kusang ni-reschedule na 'to.",
+    "placeholders": {
+      "title": { "content": "$1" },
+      "date": { "content": "$2" }
+    }
+  },
+  "missedActionHeader": { "message": "Action Required: Missed Posts" },
+  "missedActionDesc": {
+    "message": "Hindi na-send itong mga one-time posts. Mamili ng action para sa bawat isa."
+  },
+  "missedWasDue": {
+    "message": "Schedule sana: $DATE$",
+    "placeholders": { "date": { "content": "$1" } }
+  },
+  "btnReschedule": { "message": "I-reschedule" },
+  "btnDelete": { "message": "I-delete" },
+
+  "campStep": { "message": "Campaign Step" },
+  "campAuto": { "message": "Auto-Campaign" },
+  "badgeWaiting": { "message": "Waiting" },
+  "badgeRunning": { "message": "Tumatakbo" },
+  "badgePaused": { "message": "Naka-pause" },
+  "badgeScheduled": { "message": "Scheduled" },
+  "badgeProcessing": { "message": "Pino-process" },
+
+  "freqOnce": { "message": "MINSAN LANG" },
+  "freqDaily": { "message": "ARAW-ARAW" },
+  "freqWeekly": { "message": "LINGGU-LINGGO" },
+  "freqMonthly": { "message": "BUWAN-BUWAN" },
+
+  "nextAction": { "message": "Next Action" },
+  "dueNow": { "message": "Due na ngayon" },
+  "timeInDays": {
+    "message": "in $COUNT$ day(s)",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "timeInHours": {
+    "message": "in $HOURS$ hr $MINS$ min",
+    "placeholders": {
+      "hours": { "content": "$1" },
+      "mins": { "content": "$2" }
+    }
+  },
+  "timeInMins": {
+    "message": "in $MINS$ min",
+    "placeholders": { "mins": { "content": "$1" } }
+  },
+  "timeSoon": { "message": "in < 1 min" },
+
+  "modalRunNowTitle": { "message": "I-run na ba ang Post Ngayon?" },
+  "modalRunNowBody": {
+    "message": "Ike-queue nito ang <strong>\"$TITLE$\"</strong> para mag-start agad.<br><br>Ang schedule ay <strong>hindi</strong> made-delete at tatakbo pa rin sa nakatakdang oras.",
+    "placeholders": { "title": { "content": "$1" } }
+  },
+  "modalSuccessQueue": {
+    "message": "Naka-queue na ang post at magsa-start na mamaya-maya."
+  },
+  "modalActionQueued": { "message": "Action Naka-Queue" },
+  "modalQueuedImmediate": {
+    "message": "Ang post ay naka-queue na para i-run immediately."
+  },
+
+  "modalConfirmDel": { "message": "I-confirm ang Delete" },
+  "modalConfirmDelBody": {
+    "message": "Sure ka bang gusto mong i-delete tong scheduled post? Hindi na to maibabalik."
+  },
+  "modalDeleted": { "message": "Na-delete na ang scheduled post." },
+
+  "modalLicReq": { "message": "Kailangan ng License" },
+  "modalLicReqBody": {
+    "message": "Invalid o expired na ang iyong license. Hindi ka pwedeng mag-run ng scheduled tasks.<br><br>Paki-activate para magtuloy."
+  },
+
+  "lblTodayDate": { "message": "Ngayon" },
+  "campStatusActive": { "message": "Active" },
+  "campStatusPaused": { "message": "Naka-pause" },
+  "campStatusCompleted": { "message": "Completed" },
+  "campStatusRunning": { "message": "Tumatakbo..." },
+  "campStatusProcessing": { "message": "Pino-process..." },
+  "campStatusWaiting": { "message": "Waiting" },
+  "campStatusEnded": { "message": "Tapos Na" },
+
+  "campActionResume": { "message": "I-resume" },
+  "campActionPause": { "message": "I-pause" },
+  "campActionUpgrade": { "message": "Mag-Upgrade para Ma-activate" },
+  "campActionRestart": { "message": "Nire-restart" },
+  "campRestartMsg": {
+    "message": "Tapos na sana ang campaign, kaya inumpisahan ulit mula sa Step 1."
+  },
+
+  "campDeleteTitle": { "message": "I-delete ang Strategy" },
+  "campDeleteMsg": {
+    "message": "Sigurado ka ba? Tuluyan nitong tatanggalin ang campaign na ito at ang history niya."
+  },
+
+  "campStepManual": { "message": "Manual Start" },
+  "campStepScheduled": { "message": "Scheduled" },
+  "campStepDone": { "message": "Done" },
+  "campStepPending": { "message": "Pending" },
+  "campStepSent": { "message": "Na-send na" },
+  "campStepProcessing": { "message": "Pino-process..." },
+
+  "campBlockBatch": { "message": "Post Batch" },
+  "campBlockDelay": { "message": "Wait Delay" },
+  "campBlockLoop": { "message": "Loop" },
+  "campBlockStop": { "message": "Stop" },
+  "campBlockTrigger": { "message": "Trigger" },
+
+  "campDescPost": {
+    "message": "$POSTS$ Template(s) &rarr; $GROUPS$ Group(s)",
+    "placeholders": {
+      "posts": { "content": "$1" },
+      "groups": { "content": "$2" }
+    }
+  },
+  "campDescWait": {
+    "message": "Mag-pause nang $DURATION$",
+    "placeholders": { "duration": { "content": "$1" } }
+  },
+  "campDescLoopForever": { "message": "Ulitin Forever" },
+  "campDescLoopCount": {
+    "message": "Ulitin nang $COUNT$ beses",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "campDescStop": { "message": "Tapusin ang Campaign" },
+
+  "campTimeUntil": {
+    "message": "Hanggang $DATE$",
+    "placeholders": { "date": { "content": "$1" } }
+  },
+  "campTimeStarting": { "message": "Nagsisimula na..." },
+
+  "wizInputReq": { "message": "Input Required" },
+  "wizNoTemplate": { "message": "Pumili ng kahit isang template na gagamitin." },
+  "wizEnterGoal": {
+    "message": "I-describe mo yung goal mo (hal., 'I-promote ang webinar ko this Friday')."
+  },
+  "wizAnalyzing": {
+    "message": "Ina-analyze ang goal sa $COUNT$ groups...",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "wizError": {
+    "message": "Failed ang connection. I-reload lang ang extension at i-try ulit."
+  },
+  "wizFailedTitle": { "message": "Palpak ang AI Generation" },
+  "wizFailedMsg": {
+    "message": "Hindi kinaya ng AI gumawa ng strategy. I-try ulit o gumamit ng mas simpleng prompt."
+  },
+  "wizEmptyTitle": { "message": "Invalid ang Result" },
+  "wizEmptyMsg": {
+    "message": "Walang ibinigay na strategy ang AI. Dagdagan mo ng detalye ang goal mo."
+  },
+  "wizBuildError": { "message": "Builder Error" },
+  "wizBuildMsg": {
+    "message": "Nagawa ng AI ang strategy, pero di namin mailagay sa canvas. Error: $ERR$",
+    "placeholders": { "err": { "content": "$1" } }
+  },
+  "wizSuccessTitle": { "message": "Ready na ang Strategy" },
+  "wizSuccessMsg": {
+    "message": "Gumawa ang AI ng <b>$COUNT$ steps</b> base sa goal mo.<br><br>I-review ang setup at i-click ang <b>Save</b> para simulan!",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "wizBtnAnalyzing": { "message": "Ina-analyze..." },
+  "targeterStep1": { "message": "1. Pumili ng Group Collections" },
+  "targeterStep2": { "message": "2. (Opsiyonal) Mag-add ng Specific Groups" },
+  "targeterStep3": { "message": "3. I-setup ang Posting Strategy" },
+  "targeterPhSearch": { "message": "Maghanap sa lahat ng groups mo..." },
+  "targeterNoColls": {
+    "message": "Walang nakitang group collections. Gumawa muna sa \"Groups\" page."
+  },
+  "targeterSummaryInit": {
+    "message": "Pumili ng collections o groups para makita ang options."
+  },
+  "targeterSummaryMain": {
+    "message": "Nakapili ka ng <strong>$COUNT$</strong> unique target groups.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "targeterDedup": {
+    "message": " ($COUNT$ duplicate(s) ang tinanggal)",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "targeterModeAll": { "message": "I-post sa Lahat ng Napili" },
+  "targeterModeRandom": { "message": "Random na Subset" },
+  "targeterLblRandom": {
+    "message": "Magpo-post nang random sa <strong>$COUNT$</strong> sa kanila.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "targeterLblAll": {
+    "message": "Magpo-post sa <strong>lahat ng $COUNT$</strong> na iyon.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "targeterInputPostTo": { "message": "I-post sa" },
+  "targeterInputRandom": { "message": "random groups" },
+  "targeterToggleFresh": { "message": "Unahin ang Fresh Groups" },
+  "targeterDescFresh": {
+    "message": "Pipiliin muna yung mga groups na hindi mo pa napa-postan kamakailan (Fresh > Warm > Hot)."
+  },
+
+  "spinTitle": { "message": "Gumawa ng Spintax Variations" },
+  "spinInstr": {
+    "message": "Mag-add at i-preview ang variations ng text mo. (Gamitin ang {option1|option2} format)."
+  },
+  "spinAdd": { "message": "Mag-add ng Iba Pang Variation" },
+  "spinPreview": { "message": "Live Preview" },
+  "spinShuffle": { "message": "I-shuffle" },
+  "spinApply": { "message": "I-add ang Spintax sa text" },
+  "spinErr": { "message": "Maglagay ng kahit isang variation lang." },
+
+  "prevTitle": { "message": "Post Preview" },
+  "prevDisclaimer": {
+    "message": "Preview lang po ito. Pwedeng mag-iba ang itsura sa mismong Facebook."
+  },
+  "prevClose": { "message": "I-close ang Preview" },
+  "prevVar": { "message": "Var" },
+  "prevNextVar": { "message": "Next Var" },
+  "prevReSpin": { "message": "I-spin Ulit ang Text" },
+
+  "schedFreq": { "message": "Posting Frequency" },
+  "schedDate": { "message": "Petsa" },
+  "schedTime": { "message": "Oras" },
+  "schedDaysWeek": { "message": "Pumili ng Araw sa Linggo" },
+  "schedDaysMonth": { "message": "Pumili ng Araw sa Buwan" },
+  "schedSave": { "message": "I-save ang Schedule" },
+  "quickScheduleButton": { "message": "I-update ang Schedule" },
+  "schedErrPast": { "message": "Bawal i-schedule sa nakaraan yung oras." },
+
+  "catManage": { "message": "I-manage ang Categories" },
+  "catAdd": { "message": "Mag-add ng Bagong Category" },
+  "catLimit": { "message": "Naabot na ang maximum categories" },
+  "catErrEmpty": { "message": "Hindi pwedeng walang laman ang pangalan ng category." },
+  "catErrLimit": {
+    "message": "Naabot mo na ang maximum limit ng categories."
+  },
+  "catConfirmDel": {
+    "message": "Sure ka ba na gusto mong i-delete itong category na \"$NAME$\"?",
+    "placeholders": { "name": { "content": "$1" } }
+  },
+  "aiModalTitle": { "message": "GroupPosting AI Post Generator" },
+  "aiModalSubtitle": {
+    "message": "I-provide ang details sa ibaba para matulungan ang AI na gumawa ng the best post para sayo."
+  },
+
+  "aiLblGoal": { "message": "Main Goal / Topic" },
+  "aiPhGoal": { "message": "REQUIRED: Ipaliwanag ang pinaka-purpose..." },
+
+  "aiLblTone": { "message": "Gusto Mong Tone" },
+  "aiToneProf": { "message": "Professional" },
+  "aiToneFriendly": { "message": "Friendly at Nakaka-engage" },
+  "aiToneCasual": { "message": "Casual at Pang-usapan" },
+  "aiToneFunny": { "message": "Nakakatawa at Witty" },
+  "aiToneExcited": { "message": "Excited at Enthusiastic" },
+  "aiToneInfo": { "message": "Informative at Nakakatulong" },
+  "aiToneSales": { "message": "Persuasive at Pang-benta" },
+  "aiToneInspire": { "message": "Nakaka-inspire at Nakaka-motivate" },
+
+  "aiLblAudience": { "message": "Target Audience" },
+  "aiPhAudience": { "message": "hal., 'Mga Negosyante'" },
+  "aiLblKeywords": { "message": "Key Points / Keywords" },
+  "aiPhKeywords": { "message": "I-list ang importanteng points..." },
+  "aiLblCTA": { "message": "Call to Action" },
+  "aiPhCTA": { "message": "hal., 'Bisitahin ang website namin'" },
+  "aiLblOptions": { "message": "Iba Pang Options" },
+  "aiOptEmojis": { "message": "Lagyag ng Emojis" },
+  "aiOptSpintax": { "message": "Gumamit ng Spintax" },
+  "aiOptHashtags": { "message": "Lagyan ng Hashtags" },
+  "aiOptEmojisDesc": { "message": "Kusang maglalagay ng mga swak na emojis." },
+  "aiOptSpintaxDesc": { "message": "Gagawa ng text variations tulad ng {A|B}." },
+  "aiOptHashtagsDesc": { "message": "Maglalagay ng relevant #hashtags sa dulo." },
+
+  "aiBtnGenerate": { "message": "I-generate ang Post" },
+
+  "enhTitle": { "message": "Pumili ng Enhancement Style" },
+  "enhBoostTitle": { "message": "Pampa-Boost ng Conversion" },
+  "enhBoostDesc": {
+    "message": "I-maximize ang engagement gamit ang malakas na hooks at CTAs."
+  },
+  "enhSpinTitle": { "message": "Spintax Architect" },
+  "enhSpinDesc": {
+    "message": "I-convert ang text sa complex nested variations {A|B} para ligtas."
+  },
+  "enhPolishTitle": { "message": "Grammar & Polish" },
+  "enhPolishDesc": {
+    "message": "Ayusin ang errors at palinawin ang mensahe nang hindi nag-iiba ang tono."
+  },
+  "qualTitle": { "message": "Post Quality Score" },
+  "qualLevelBad": { "message": "Kailangan Pang Ayusin" },
+  "qualLevelOk": { "message": "Pwede Na" },
+  "qualLevelGreat": { "message": "Astig" },
+  "qualLevelPerfect": { "message": "Perfect" },
+  "qualViewTips": { "message": "Tingnan ang analysis details at suggestions" },
+
+  "qualCatLength": { "message": "Haba ng Content" },
+  "qualCatEngage": { "message": "Engagement" },
+  "qualCatMedia": { "message": "Media" },
+  "qualCatFormat": { "message": "Formatting" },
+  "qualCatPolicy": { "message": "Policy Compliance" },
+
+  "qualStatWords": { "message": "Word Count" },
+  "qualStatSent": { "message": "Sentiment" },
+  "qualStatFormat": { "message": "Formatting" },
+
+  "qualSentNeutral": { "message": "Neutral" },
+  "qualSentPos": { "message": "Positive" },
+  "qualSentVeryPos": { "message": "Sobrang Positive" },
+  "qualSentSomewhat": { "message": "Medyo Positive" },
+  "qualSentNeg": { "message": "Negative" },
+
+  "qualFormatBasic": { "message": "Basic" },
+  "qualFormatGood": { "message": "Good" },
+  "qualFormatEx": { "message": "Excellent" },
+  "qualFormatMod": { "message": "Katamtaman" },
+
+  "qualWarnProf": {
+    "message": "May na-detect na bad words ($COUNT$)",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "qualWarnPhone": {
+    "message": "May na-detect na phone number ($COUNT$)",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "qualBonusSpintax": { "message": "In-apply ang Spintax bonus" },
+  "qualBonusEmoji": { "message": "In-apply ang Emoji bonus" },
+  "qualBonusLength": { "message": "Perfect ang haba" },
+
+  "tipLenPerfect": {
+    "message": "Perfect! Sakto lang ang haba ng post mo para sa mataas na engagement."
+  },
+  "tipLenGood": { "message": "Good job! Maayos ang haba ng post mo." },
+  "tipLenShort": {
+    "message": "Medyo maikli yung post mo. Makakatulong kung dadagdagan ng details."
+  },
+  "tipLenStart": {
+    "message": "Simulan mag-type para makita ang recommendations."
+  },
+
+  "tipSentEx": {
+    "message": "Excellent! Malaki ang chance na mag-boost ang engagement dahil sobrang positive ng tone."
+  },
+  "tipSentGood": { "message": "Good job! Positive ang tone ng message mo." },
+  "tipSentImprove": { "message": "Subukang gumamit ng mas positive na words." },
+
+  "tipMediaPerfect": {
+    "message": "Perfect! Ang pagkakaroon ng maraming media items ay nagpapataas talaga ng engagement."
+  },
+  "tipMediaGood": {
+    "message": "Great job! Nakakatulong sa engagement kapag may media."
+  },
+  "tipMediaAdd": {
+    "message": "Ang paglalagay ng images o videos ay nakakapagpataas ng engagement ng malala."
+  },
+
+  "tipFmtEx": { "message": "Excellent formatting! Madaling basahin." },
+  "tipFmtHead": { "message": "Pwedeng magdagdag ng headings para mas ma-structure yung content." },
+  "tipFmtList": { "message": "Mas madaling i-scan ang impormasyon kapag may bullet points." },
+  "tipFmtBold": { "message": "I-try gamitin ang bold text para i-emphasize ang mga points." },
+
+  "tipPolProf": {
+    "message": "May nakitang salita na pwedeng magka-problema. I-check mo ulit."
+  },
+  "tipPolPhone": {
+    "message": "May na-detect na phone numbers. Pwede 'tong mag-trigger ng platform restrictions."
+  },
+
+  "impTitle": { "message": "Mag-import mula sa Group Collection" },
+  "impPhSearch": { "message": "Mag-search ng links..." },
+  "impLblAvail": { "message": "Available na Links" },
+  "impSelFirst": { "message": "Pumili muna ng group collection" },
+  "impNoLinks": { "message": "Walang links sa collection na 'to" },
+  "impSelAll": { "message": "I-select Lahat" },
+  "impSelAllFilt": { "message": "I-select ang Filtered" },
+  "impBtnImport": { "message": "I-import ang mga Pinili" },
+  "impErrEmpty": {
+    "message": "Pumili muna ng group collection at kahit isang link."
+  },
+
+  "splitTitle": { "message": "Hatiin ang Group Collection" },
+  "splitInfo": {
+    "message": "Itong collection ay may <strong>$COUNT$</strong> links.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "splitLblPieces": { "message": "Sa ilang mas maliliit na collections mo gustong hatiin 'to?" },
+  "splitErrMin": { "message": "Kailangan mo ng at least 2 links para mahati." },
+  "splitErrValid": { "message": "Maglagay ng valid number ng hahatiin." },
+  "splitFeedbackExact": {
+    "message": "Gagawa ito ng <strong>$PIECES$</strong> collections na may tig-<strong>$LINKS$</strong> links.",
+    "placeholders": {
+      "pieces": { "content": "$1" },
+      "links": { "content": "$2" }
+    }
+  },
+  "splitFeedbackMixed": {
+    "message": "Gagawa ito ng <strong>$PIECES$</strong> collections. $BIG$ dito ay magkakaroon ng $L1$ links, at ang $SMALL$ ay magkakaroon ng $L2$.",
+    "placeholders": {
+      "pieces": { "content": "$1" },
+      "big": { "content": "$2" },
+      "l1": { "content": "$3" },
+      "small": { "content": "$4" },
+      "l2": { "content": "$5" }
+    }
+  },
+  "splitBtn": { "message": "Hatiin ang Collection" },
+  "splitSuccess": {
+    "message": "Nahati na ang collection sa $COUNT$ na parts.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "builderWaitSummary": {
+    "message": "Mag-wait ng $DURATION$",
+    "placeholders": { "duration": { "content": "$1" } }
+  },
+  "builderNoWait": { "message": "Walang wait" },
+  "builderLoopForever": {
+    "message": "I-loop Forever pabalik sa Step $STEP$",
+    "placeholders": { "step": { "content": "$1" } }
+  },
+  "builderLoopCount": {
+    "message": "I-loop nang $COUNT$x pabalik sa Step $STEP$",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "step": { "content": "$2" }
+    }
+  },
+  "builderPostInherit": {
+    "message": " (Minana ang Step $STEP$)",
+    "placeholders": { "step": { "content": "$1" } }
+  },
+  "builderPostSummary": {
+    "message": "$POSTS$ Post(s), $GROUPS$ Group(s)",
+    "placeholders": {
+      "posts": { "content": "$1" },
+      "groups": { "content": "$2" }
+    }
+  },
+  "builderPostSummaryInherit": {
+    "message": "$POSTS$ Post(s), Inherited Groups",
+    "placeholders": { "posts": { "content": "$1" } }
+  },
+  "builderStepOption": {
+    "message": "Step $NUM$",
+    "placeholders": { "num": { "content": "$1" } }
+  },
+  "healthSuccessTitle": { "message": "All Good!" },
+  "healthSuccessMsg": {
+    "message": "Walang nakitang active groups na laging nagfe-fail sa loob ng mga collections mo."
+  },
+  "healthFoundTitle": {
+    "message": "May Nahanap na $COUNT$ Dead Groups",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "healthFoundMsg": {
+    "message": "Nasa collections mo pa rin ang mga groups na 'to pero laging nag-e-error."
+  },
+  "healthRemoveBtn": { "message": "I-remove ang Selected Groups" },
+  "healthVerifyLink": { "message": "I-verify ang Link" },
+  "healthCleanupTitle": { "message": "Tapos na Maglinis" },
+  "healthCleanupMsg": {
+    "message": "Nang-alis ng $COUNT$ dead links mula sa collections mo.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+
+  "grpPhTitle": { "message": "Title" },
+  "grpPhLink": { "message": "Link" },
+  "btnImportColl": { "message": "Mag-import galing sa ibang collections" },
+  "catPhName": { "message": "Pangalan ng Category" },
+
+  "lblSpintax": { "message": "Spintax" },
+  "lblEmojis": { "message": "Emojis" },
+  "valYes": { "message": "Oo" },
+  "valNo": { "message": "Hindi" },
+  "valNeutral": { "message": "Neutral" },
+  "secDescFast": {
+    "message": "Priyoridad ang bilis na may konting delay lang. Best para sa luma o matitibay na accounts."
+  },
+  "secDescBalanced": {
+    "message": "Balanse ang bilis at safety na may random na delays. Nirerekomenda para sa nakararami."
+  },
+  "secDescSafe": {
+    "message": "Priyoridad ang account safety na may mas mahahabang delays, para mas magmukhang tao. Pinakamabagal pero pinaka-safe."
+  },
+
+  "lblFiltered": {
+    "message": "Naka-filter: $CAT$",
+    "placeholders": { "cat": { "content": "$1" } }
+  },
+
+  "keyRemovedTitle": { "message": "Na-remove na ang validation key" },
+  "keyRemovedMsg": {
+    "message": "Matagumpay nang na-remove ang validation key mo."
+  },
+
+  "actTitle": { "message": "I-activate ang iyong Lisensya" },
+  "actSubtitle": { "message": "Ilagay ang license key mo para makapagsimula" },
+  "actInfo": {
+    "message": "Ilagay ang license key mo sa ibaba. Makikita mo 'to sa email na pinadala namin nung bumili ka."
+  },
+  "actPh": { "message": "XXXX-XXXX-XXXX-XXXX" },
+  "actBtn": { "message": "I-activate ang Lisensya" },
+  "actNoKey": { "message": "Wala ka bang license key?" },
+  "actPrice": { "message": "Nagsisimula sa €9.9 / buwan ang license keys." },
+  "actUpgradeLink": { "message": "Mag-upgrade ngayon" },
+  "actContinueFree": {
+    "message": "Ipagpatuloy sa Free Trial (I-close tong window)"
+  },
+  "securePayment": { "message": "Ligtas ang pagbabayad via LemonSqueezy." },
+  "helpModalTitle": { "message": "Tulong & Support" },
+  "helpEmailIntro": {
+    "message": "Para sa technical issues, sumulat lang samin sa:"
+  },
+  "helpPageIntro": { "message": "O pumunta sa help page namin para sa guides at FAQs:" },
+  "helpClose": { "message": "I-close" },
+
+  "campWizChip1": { "message": "💰 Affiliate Deal" },
+  "campWizChip2": { "message": "🏠 Real Estate" },
+  "campWizChip3": { "message": "🍔 Local Biz" },
+  "campWizPrompt1": {
+    "message": "Affiliate Marketing: I-promote ang software deal na matatapos sa 48 hours. Aggressive na frequency."
+  },
+  "campWizPrompt2": {
+    "message": "Real Estate: Ipakita ang bagong property. Teaser -> Features -> Open House."
+  },
+  "campWizPrompt3": {
+    "message": "Small Biz: Mag-launch ng bagong menu item. Magpagutom ng tao at mag-offer ng discount."
+  },
+
+  "histSearch": { "message": "Mag-search sa history..." },
+  "histFilterDate": {
+    "message": "Naka-filter by: <strong>$DATE$</strong>",
+    "placeholders": { "date": { "content": "$1" } }
+  },
+
+  "backupTitle": { "message": "Backup Successful" },
+  "backupMsg": {
+    "message": "Ang iyong Post Templates at Group Collections ay na-save na sa file."
+  },
+  "backupErrTitle": { "message": "Backup Error" },
+  "backupErrMsg": {
+    "message": "Nagkaproblema: $ERR$",
+    "placeholders": { "err": { "content": "$1" } }
+  },
+
+  "restoreTitle": { "message": "I-confirm ang Restore" },
+  "restoreMsg": {
+    "message": "Magdadagdag ito ng $TAGS$ post templates at $GROUPS$ group collections sa dati mong data. Sigurado ka bang gusto mong ituloy?",
+    "placeholders": {
+      "tags": { "content": "$1" },
+      "groups": { "content": "$2" }
+    }
+  },
+  "restoreSuccessTitle": { "message": "Restore Successful" },
+  "restoreSuccessMsg": {
+    "message": "Matagumpay na nakapag-add ng $TAGS$ bagong templates at $GROUPS$ bagong collections.",
+    "placeholders": {
+      "tags": { "content": "$1" },
+      "groups": { "content": "$2" }
+    }
+  },
+  "restoreErrTitle": { "message": "Restore Error" },
+  "restoreErrMsg": {
+    "message": "Di mabasa yung file. Baka corrupted ito o mali ang format. Error: $ERR$",
+    "placeholders": { "err": { "content": "$1" } }
+  },
+  "restoreErrJson": { "message": "Paki-pili ang tamang JSON backup file." },
+  "spotStepPost": { "message": "Mag-add ng <strong>Post</strong> block" },
+  "spotStepWait": { "message": "Mag-add ng <strong>Wait</strong> block" },
+  "spotStepLoop": { "message": "Mag-set ng <strong>Loop</strong>" },
+
+  "tipTemplatesDesc": {
+    "message": "Ang Templates ay nakakatipid sa oras at para maging tuloy-tuloy lang ang pag-post mo."
+  },
+  "tipStepSpin": { "message": "Gamitin ang <strong>Spintax</strong>" },
+  "tipStepVar": { "message": "Gumawa ng <strong>Variations</strong>" },
+  "tipStepAI": { "message": "I-rewrite gamit ang <strong>AI</strong>" },
+
+  "tipGroupsDesc": {
+    "message": "I-organize ang groups ayon sa niche para ma-target ang tamang audience lagi."
+  },
+  "tipStepExtract": { "message": "<strong>I-extract</strong>" },
+  "tipStepSplit": { "message": "<strong>Hatiin</strong> ang Lists" },
+  "tipStepSeg": { "message": "<strong>I-segment</strong> per Niche" },
+  "lockCampArch": {
+    "message": "Ang AI Campaign Architect ay isang <b>Pro Feature</b>.<br><br>Ina-analyze nito ang goal mo at bubuo ng multi-step campaigns ng kusa.<br>Mag-upgrade para ma-unlock itong power."
+  },
+  "lockSchedule": {
+    "message": "Pang-Pro Feature ang pag-iischedule.<br>Hanggang 'Post Now' lang ang pwedeng gawin ng free users.<br><br>Mag-upgrade para ma-unlock ang Scheduler."
+  },
+  "lockScheduleSave": {
+    "message": "Pang-Pro Feature ang pag-iischedule ng posts in the future.<br>Hanggang 'Post Now' lang ang pwedeng gawin ng free users.<br><br>Mag-upgrade para ma-unlock ang Scheduler, Auto-Campaigns, at marami pang iba!"
+  },
+  "lockAutoJoin": {
+    "message": "Pang-Pro Feature ang Auto-Joining ng Groups.<br>Mano-manong maga-add sa groups ang free users.<br><br>Mag-upgrade para ma-automate ang paglago ng audience mo!"
+  },
+  "lockAiGen": {
+    "message": "Pang-Pro Feature ang AI Post Generation.<br><br>Gagawa ito ng unlimited high-converting posts in seconds.<br>Mag-upgrade para ma-unlock."
+  },
+  "lockAiEnhance": {
+    "message": "Pang-Pro Feature ang AI Text Enhancement.<br><br>Instant na ire-rewrite nito ang posts for conversion, grammar, or spintax.<br>Mag-upgrade para ma-unlock."
+  },
+  "lockCampResume": {
+    "message": "Ubos na ang free posts mo. Paki-upgrade o activate ang license mo para makapag-run ng campaigns."
+  },
+
+  "btnUnlock": { "message": "Mag-Upgrade para Ma-Unlock" },
+  "btnUpgradeReq": { "message": "Kailangan mag-Upgrade" },
+  "rateTitle": { "message": "Kumusta na ang serbisyo namin?" },
+  "rateText": {
+    "message": "Kumusta ang experience mo sa GroupPosting Pro? Sobrang nakakatulong ang quick rating mo para mag-improve kami!"
+  },
+  "rateBtnSubmit": { "message": "I-submit ang Rating" },
+  "rateBtnLater": { "message": "Baka Mamaya Na Lang" },
+  "rateErr": { "message": "Pumili ka muna ng rating." },
+
+  "rateBadTitle": { "message": "Salamat sa honesty mo!" },
+  "rateBadText": {
+    "message": "Sorry dahil hindi na-meet ng GroupPosting Pro ang expectations mo. Pwede ka bang mag-share samin kung pano pa kami pwedeng mag-improve?"
+  },
+  "rateBadReward": {
+    "message": "Ang feedback mo ang basehan namin para unahing ayusin at bigyan ng bagong features."
+  },
+
+  "rateBtnFeedback": { "message": "Mag-Feedback para sa Libreng Posts" },
+  "rateBtnNo": { "message": "Wag Na Lang" },
+
+  "rateGoodTitle": { "message": "Ayos! Buti naman nagustuhan mo!" },
+  "rateGoodText": {
+    "message": "Pwede ka bang mag-iwan ng quick review sa Chrome Store? Para makatulong samin maka-reach ng mas madaming users ng GroupPosting Pro!"
+  },
+  "rateGoodReward": {
+    "message": "Malaking tulong ang review mo para mahanap din ng ibang group admins itong tool!!"
+  },
+  "rateBtnReview": { "message": "I-rate sa Store para sa Libreng Posts" },
+
+  "fileLargeTitle": { "message": "Sobrang Laki ng Files" },
+  "fileLargeMsg": {
+    "message": "Itong files na to ay sobrang laki para ma-handle direkta ng browser extension:<br><br><strong>$FILES$</strong><br><br>Paki-compress para maging below $SIZE$MB.",
+    "placeholders": {
+      "files": { "content": "$1" },
+      "size": { "content": "$2" }
+    }
+  },
+  "fileTypeTitle": { "message": "Hindi Supported ang File Type" },
+  "fileTypeMsg": {
+    "message": "Ini-skip ang mga sumusunod na files: <br><strong>$FILES$</strong>",
+    "placeholders": { "files": { "content": "$1" } }
+  },
+
+  "errConnectTitle": { "message": "Connection Error" },
+  "errConnectMsg": {
+    "message": "Hindi maka-connect sa validation server. Paki-check ang internet mo."
+  },
+
+  "licIssueTitle": { "message": "License Issue" },
+  "licIssueMsg": {
+    "message": "Invalid o expired na ang license key mo. Paki-check ang key o kaya bumili ng bago."
+  },
+
+  "welcomeProTitle": { "message": "Welcome sa Pro" },
+  "welcomeProMsg": {
+    "message": "Na-activate na ang license successfully! Naka-unlock na lahat ng features."
+  },
+  "freshTitle": { "message": "Freshness Analysis (nung pino-post)" },
+  "freshHot": {
+    "message": "<strong>Hot (Last 2 days):</strong> $COUNT$ groups",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "freshWarm": {
+    "message": "<strong>Warm (3-7 days):</strong> $COUNT$ groups",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "freshCool": {
+    "message": "<strong>Fresh/Cool (>7 days):</strong> $COUNT$ groups",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+
+  "extractConfirmTitle": { "message": "Simulan ang Group Extraction?" },
+  "extractConfirmMsg": {
+    "message": "Kapag nag-click ka ng OK, kukunin ng extension ang Facebook groups mo gamit ang GPP secure engine natin. <b>Aabutin ito ng ilang minuto.</b> Kapag may naging problema, magfo-fallback ito sa manual extraction at magbubukas ng bagong visible tab sa Facebook groups page mo. Mag-iiscroll na ng kusa pababa ang extension para hanapin lahat ng groups mo. <br><br><b>Wag mo i-close itong bagong tab;</b> magko-close to ng kusa pagtapos ng process."
+  },
+  "extractBtnStart": { "message": "OK, Simulan Mag-Scrape" },
+  "lblTimeSaved": { "message": "Time Saved Last 30 Days" },
+  "quillPhTemplate": {
+    "message": "Magsimulang i-type ang post mo rito...\n\nSupported din ang Multi-level spintax.\nGumamit ng {option1|option2} para mag-create ng spintax."
+  },
+  "quillPhQuick": { "message": "Isulat ang post mo rito..." },
+  "lblAnonPost": {
+    "message": "Mag-post nang Anonymous"
+  },
+  "descAnonPost": {
+    "message": "Maa-abort kapag bawal sa group na yun. Pang-classic mode lang 'to available."
+  },
+  "lblSkipNet": {
+    "message": "I-disable ang Connectivity Check"
+  },
+  "descSkipNet": {
+    "message": "I-enable lang to kapag na-stuck yung posts mo sa 'Connection unstable' kahit na may okay ka namang internet."
+  },
+  "tour1Title": { "message": "Welcome sa GroupPosting Pro!" },
+  "tour1Text": {
+    "message": "Ang pinaka-safe at powerful na way para i-automate yung pag-reachout mo sa Facebook groups."
+  },
+  "btnStartTour": { "message": "Umpisahan ang Tour" },
+
+  "tour2Title": { "message": "1. Gumawa ng Templates" },
+  "tour2Text": {
+    "message": "Start tayo dito. Gumawa ng reusable na Post Templates at ayusin ang target groups mo into Collections."
+  },
+
+  "tour3Title": { "message": "2. Mag-Compose at Mag-Schedule" },
+  "tour3Text": {
+    "message": "Use Simple Post para magpa-blast mabilisan, o ang Advanced Scheduler para mag-plano ng posts bukas o in the future."
+  },
+
+  "tour4Title": { "message": "3. Automated Campaigns" },
+  "tour4Text": {
+    "message": "Bumuo ng malulupit na workflows. I-chain ang madaming posts, i-set ang tamang delays, at i-loop ang strategy mo."
+  },
+
+  "tour5Title": { "message": "4. I-track ang History" },
+  "tour5Text": {
+    "message": "Tingnan ang logs every time na magra-run ka. Tingnan kung ano ang pumasa o nag-fail, at i-retry in just one click."
+  },
+
+  "tour6Title": { "message": "Ready Ka Na!" },
+  "tour6Text": {
+    "message": "May inihanda na kaming ilang sample templates para sa'yo. I-click sa ibaba para magsimula!"
+  },
+  "btnLetsGo": { "message": "Let's Go!" },
+  "savePercent": {
+    "message": "Maka-Save ng $PERCENT$%",
+    "placeholders": { "percent": { "content": "$1" } }
+  },
+  "phSaveGroupAs": { "message": "Maglagay ng group name para i-save bilang" },
+  "lblVer": {
+    "message": "GroupPosting PRO Version: $VER$",
+    "placeholders": { "ver": { "content": "$1" } }
+  },
+
+  "colDefault": { "message": "Default (Black)" },
+  "colRed": { "message": "Red" },
+  "colOrange": { "message": "Orange" },
+  "colPurple": { "message": "Purple" },
+  "colTeal": { "message": "Teal" },
+  "colPink": { "message": "Pink" },
+  "colBlue": { "message": "Blue" },
+
+  "lblSourceGen": { "message": "AI Writes Everything" },
+  "lblSourceExist": { "message": "Gagamit ng My Templates" },
+  "descSourceGen": { "message": "Magsusulat ang AI ng fresh posts." },
+  "descSourceExist": { "message": "I-select ang templates mo." },
+  "lblAutoMatch": { "message": "Auto-match Groups" },
+  "lblAutoLoop": { "message": "I-Auto-Loop Forever" },
+  "lblStartImm": { "message": "Magsimula Agad-agad" },
+  "lblCampAssets": { "message": "Campaign Assets (Opsiyonal)" },
+  "lblDropFiles": { "message": "I-drop ang images/video rito" },
+  "lblConstructing": { "message": "Bumubuo ng Strategy..." },
+  "lblAnalysingCopy": { "message": "Ina-analyze ang intent at gumagawa ng copy..." },
+  "btnGenCamp": { "message": "I-generate ang Campaign" },
+
+  "canvasEmpty": {
+    "message": "I-drag ang <strong>Trigger</strong> block rito para mag-umpisa"
+  },
+  "btnConfig": { "message": "Configuration & Constraints" },
+  "lblNotConfigured": { "message": "Di pa Naka-configure" },
+  "lblTargetSame": { "message": "Ita-target kaparehas ng:" },
+  "lblFlowCtrl": { "message": "Flow Control" },
+  "lblAfterEvery": { "message": "Pagkatapos ng bawat" },
+  "lblWaitLabel": { "message": "Wait:" },
+  "lblRepeat": { "message": "Repeat:" },
+  "lblGoToStep": { "message": "Pumunta sa Step" },
+  "lblCount": { "message": "Count" },
+  "lblEndCamp": { "message": "Dito mag-eend ang campaign." },
+  "lblFixedTimes": { "message": "Fixed na Beses" },
+  "lblForever": { "message": "Forever" },
+  "lblDays": { "message": "days" },
+  "lblHrs": { "message": "hrs" },
+  "lblMins": { "message": "mins" },
+  "lblGen": { "message": "Mag-generate" },
+  "lblVarsLower": { "message": "variations" },
+
+  "fbSorry": { "message": "Pasensya na! Pano po ba namin mapapaganda 'to?" },
+  "fbReward": { "message": "Bilang thank you, bibigyan ka namin ng 3 pang free posts!" },
+  "fbBtn": { "message": "Magbigay ng Feedback at Kunin ang Posts" },
+  "revAwesome": { "message": "Ayos!" },
+  "revText": { "message": "Pwede ka po bang mag-iwan ng quick review para samin?" },
+  "revBtn": { "message": "I-rate sa Store at Kunin ang Posts" },
+  "btnNoThanks": { "message": "Wag Na Lang" },
+
+  "lblSelectTemp": { "message": "Pumili ng Post Template:" },
+  "phSearchTemp": { "message": "Mag-search ng templates..." },
+  "lblLoadTemp": { "message": "Nilolo-load ang templates..." },
+  "lblNoSavedTemp": { "message": "Walang nakitang naka-save na post templates." },
+  "lblEmptyTemp": { "message": "(Walang Laman)" },
+
+  "lblSecLevelCaps": { "message": "SECURITY LEVEL" },
+  "lblNightModeCaps": { "message": "UMIWAS SA GABING POSTING" },
+  "lblTimeRange": { "message": "22:00 - 07:00" },
+  "lblSafeDelayCaps": { "message": "SAFETY DELAY" },
+  "descWaitFailShort": { "message": "Maghintay pag nag-fail" },
+  "lblAnonCaps": { "message": "MAG-POST NANG ANONYMOUS" },
+  "descAnonShort": { "message": "Kung allowed" },
+
+  "phDescribeGoal": { "message": "I-describe mo yung goal mo..." },
+
+  "lblPlansStart": { "message": "Nag-uumpisa ang plans sa" },
+  "btnNext": { "message": "Next" },
+  "readyMsgSequential": {
+    "message": "Nagsesend ng $TEMPLATES$ template(s) sa bawat isa sa $GROUPS$ group(s).",
+    "placeholders": {
+      "templates": { "content": "$1" },
+      "groups": { "content": "$2" }
+    }
+  },
+  "readyMsgAlternate": {
+    "message": "Nagsesend ng 1 post sa bawat isa ng $GROUPS$ group(s) (iikot lang sa $TEMPLATES$ templates).",
+    "placeholders": {
+      "groups": { "content": "$1" },
+      "templates": { "content": "$2" }
+    }
+  },
+  "aiUseSpintax": { "message": "Gumamit ng Spintax Variations" },
+  "lblNotSignedIn": {
+    "message": "Hindi Naka-Sign In"
+  },
+  "warnHighVolTitle": { "message": "High Volume Warning" },
+  "warnHighVolMsg": {
+    "message": "Pag nag-publish ka sa sobrang daming groups ng isahan, pwedeng ma-flag ang account mo ni Facebook. Subukang ipost by smaller batches or i-enable yung 'Unahin ang Fresh Groups' para safe. Siguraduhing gumagamit ka ng Spintax or AI Variations para unique ang laman mo."
+  },
+  "btnWrapSpintax": { "message": "I-wrap sa spintax" },
+  "ardActiveSafe": { "message": "Active & Safe ang Engine" },
+  "ardSafeNotice": { "message": "Safe mong i-minimize ang window na'to or mag-browse ng iba. Tuloy lang ang automation." },
+  "ardLiveActivity": { "message": "Live Activity" },
+  "btnForceReset": { "message": "I-Force Reset ang Engine" },
+
+  "langSystemDefault": { "message": "System Default" },
+  "lblCloudSync": { "message": "Cloud Sync" },
+  "descCloudSync": { "message": "I-backup lahat ng templates, groups, at campaigns nang ligtas sa account mo. (Walang kasamang media files para bawas storage)." },
+  "btnSaveCloud": { "message": "I-save sa Cloud" },
+  "btnLoadCloud": { "message": "I-load galing Cloud" },
+  "lblFbStandards": { "message": "Basahin ang Facebook™ Community Standards" },
+
+  "menuAiProfile": { "message": "AI Profile" },
+  "navMonitor": { "message": "Lead Radar" },
+  "navActivity": { "message": "Activity" },
+
+  "upsellSubtitle": { "message": "Group Posting Pro" },
+  "upsellStartsFrom": { "message": "starts from" },
+  "upsellPerMo": { "message": "/mo" },
+  "upsellCancel": { "message": "Pwedeng i-cancel kahit kailan." },
+  "vipSurprise": { "message": "SURPRISE UNLOCK 🎉" },
+  "vipSelected": { "message": "Napili ka namin." },
+  "vipDesc": { "message": "Bilang thank you sa pag-gamit ng Group Posting Pro, binibigyan ka namin ng full VIP access para ma-try mo premium tools namin." },
+  "vipIncludes": { "message": "Kasama sa 3-Day VIP Pass mo ay:" },
+  "vipFeature1": { "message": "Unlimited na Posting at Scheduling" },
+  "vipFeature2": { "message": "AI Generation & Auto-Variations" },
+  "vipFeature3": { "message": "Lead Radar (Push Notifications)" },
+  "vipForDays": { "message": "para sa 3 araw" },
+  "vipPrice": { "message": "Tapos balik na sa standard €24/mo. Cancel anytime." },
+  "vipBtnClaim": { "message": "I-claim na ang Aking 3-Day Free Trial" },
+  "benRadar": { "message": "Lead Radar" },
+  "benSchedule": { "message": "Scheduled Posting" },
+  "lblSave58": { "message": "Maka-Save ng 58%" },
+  "lblSave45": { "message": "Maka-Save ng 45%" },
+
+  "headerCreateTemp": { "message": "Gumawa ng Template" },
+  "lblVariationsPrefix": { "message": "Variations:" },
+  "btnAutoVars": { "message": "Auto-Variations" },
+  "lblBackground": { "message": "Background" },
+  "lblAddMediaText": { "message": "Mag-add ng media" },
+  "lblMediaPools": { "message": "Media Spintax (Pools)" },
+  "descMediaPools": { "message": "Pipili ng random na media para umiwas sa spam filters" },
+  "lblSelect": { "message": "Pumili:" },
+  "lblPerPost": { "message": "bawat post" },
+
+  "lblQuickStep1": { "message": "1. Saan mo gustong i-post 'to?" },
+  "lblQuickStep2": { "message": "2. Ano bang sasabihin mo? (gumamit ng presaved templates, bagong post o pareho)" },
+  "lblOrFresh": { "message": "O KAYA SUMULAT NG FRESH NA POST" },
+  "btnFillTemplate": { "message": "Mag-fill galing template" },
+  "lblAiAutoVars": { "message": "AI Auto-Variations" },
+  "descAiAutoVars": { "message": "Kusang ire-rewrite ang post mo sa 3 iba't-ibang tono para maiwasan ang Facebook spam filters." },
+  "lblQuickStep3": { "message": "3. Advanced Automation Settings" },
+  "lblAutoCommentContent": { "message": "Auto-Comment Content" },
+
+  "btnExtractFb": { "message": "I-extract galing Facebook" },
+  "navAllGroups": { "message": "Lahat ng Groups" },
+  "lblYourTags": { "message": "Yung Tags mo" },
+  "btnCreateTag": { "message": "Gumawa ng Bagong Tag" },
+  "btnManageTags": { "message": "I-manage ang Tags" },
+  "btnRemoveFromTag": { "message": "I-remove sa Tag" },
+  "colGroupName": { "message": "Group Name" },
+  "colTags": { "message": "Tags" },
+  "btnSegmentNiche": { "message": "I-segment per Niche" },
+
+  "lblClickActivate": { "message": "I-click para i-activate" },
+  "lblTriggerKw": { "message": "Trigger na Keywords" },
+  "descTriggerKw": { "message": "(Gumamit ng <b>-word</b> pang-exclude. Hal., <i>need help, -free</i>)" },
+  "lblTargetGroups": { "message": "Target na Groups" },
+  "descTargetGroups": { "message": "(Max 25 - Recommended: 5-10)" },
+  "lblScanInterval": { "message": "Scan Interval" },
+  "optScan5": { "message": "Every 5 Minutes (Aggressive)" },
+  "optScan15": { "message": "Every 15 Minutes (Balanced)" },
+  "optScan30": { "message": "Every 30 Minutes (Relaxed)" },
+  "optScan60": { "message": "Every 60 Minutes (Safe)" },
+  "lblInPageAlerts": { "message": "In-Page na Alerts" },
+  "descInPageAlerts": { "message": "Magsyo-show ng popup sa screen mo habang nagba-browse." },
+  "lblDesktopAlerts": { "message": "Desktop Push Alerts" },
+  "descDesktopAlerts": { "message": "Makakatanggap ka ng native OS notification." },
+  "warnDesktopAlerts": { "message": "Kailangang naka-enable yung Chrome notifications sa OS settings mo." },
+  "btnManualScan": { "message": "Manual Scan" },
+  "btnSaveSettings": { "message": "I-save ang Settings" },
+  "btnExport": { "message": "I-export" },
+  "btnClearAll": { "message": "I-clear Lahat" },
+  "optAllLeads": { "message": "Lahat ng Leads" },
+  "optUnread": { "message": "Unread Lamang" },
+  "optStarred": { "message": "⭐ Naka-star" },
+  "optRead": { "message": "Read na" },
+  "optAllKeywords": { "message": "Lahat ng Keywords" },
+  "spotRadarTitle": { "message": "Automated Group Monitoring - Lead Radar" },
+  "spotRadarDesc": { "message": "Si Monitor ang sascan sa Facebook groups mo sa background every 5-10 mins. Hulihin mo yung hot leads sa mismong oras na naghahanap sila ng recommendations!" },
+  "spotRadarStep1": { "message": "I-set ang <strong>Keywords</strong>" },
+  "spotRadarStep2": { "message": "I-target ang <strong>Groups</strong>" },
+  "spotRadarStep3": { "message": "Makakuha ng <strong>Notifications</strong>" },
+
+  "optAllActivity": { "message": "Lahat ng Activity" },
+  "optPostsOnly": { "message": "Posts Lamang" },
+  "optCommentsOnly": { "message": "Comments Lamang" },
+  "headerSchedulePost": { "message": "I-schedule Mo Na" },
+  "lblSmartTiming": { "message": "Smart Timing Advisor" },
+  "badgeDataDriven": { "message": "Data-Driven" },
+  "descSmartTiming": { "message": "Pumili ng petsa para makita ang daily strategy insights." },
+  "lblRecTimes": { "message": "Recommended na Oras Ngayon:" },
+  "timelineTitle": { "message": "Schedule Para Ngayon" },
+
+  "lblAiPrompt": { "message": "Tungkol saan dapat itong post?" },
+  "lblChooseTone": { "message": "Pumili ng Tone" },
+  "btnToneHelpful": { "message": "Nakakatulong" },
+  "btnToneProf": { "message": "Pormal/Professional" },
+  "btnTonePromo": { "message": "Pang-promote" },
+  "lblAiAudienceOpt": { "message": "Target Audience (Opsiyonal)" },
+
+  "modalAiPersonaTitle": { "message": "AI Business Persona" },
+  "modalAiPersonaDesc": { "message": "I-feed mo ng context ang AI para kopyang-kopya ang style mo magsulat." },
+  "lblEnableContext": { "message": "I-enable ang Business Context" },
+  "descEnableContext": { "message": "Aakuin ng AI ang identity na'to tapos a-adapt niya ang context (kung nakakatulong ba or nagse-sales talk)." },
+  "lblYourRole": { "message": "Yung Identity mo / Role" },
+  "lblYourTone": { "message": "Yung Default na Tone mo" },
+  "lblYourProduct": { "message": "Core na Offer / Produkto" },
+  "lblYourLink": { "message": "Default na Call-To-Action Link" },
+  "lblAiInstructions": { "message": "Custom na AI Instructions (Opsiyonal)" },
+  "descAiInstructions": { "message": "Itong the ultimate override. Bigyan ng specific na rules ang AI para sa brand mo." },
+  "btnSavePersona": { "message": "I-save ang Persona" },
+  "msgPostingStopped": { "message": "Pina-stop ng User yung Posting" },
+  "msgPostingCompleted": { "message": "Tapos na ang Posting!" },
+  "modalFbLoginReqTitle": { "message": "Facebook Login Required" },
+  "modalFbLoginReqBody": { "message": "Kailangan mong mag-login sa Facebook para gumana ang Group Posting Pro. <br><br>Paki-login ka muna sa Facebook sa ibang tab tapos saka mo i-click ang Refresh." },
+  "btnGoToFb": { "message": "Pumunta sa Facebook" },
+  "btnClose": { "message": "I-close" },
+
+  "tsEmptyTitle": { "message": "Wala Pang Templates Ngayon" },
+  "tsEmptyDesc": { "message": "Bumuo ng post template na may Spintax at media para madali mag-reuse, at tipid oras din." },
+  "btnCreateFirstTemp": { "message": "Gawin ang Una Mong Template" },
+  "tsSelectToPreview": { "message": "Pumili ng template para makita ang preview." },
+
+  "btnMasterTools": { "message": "Mga Master Tools" },
+  "toolSplitMasterTitle": { "message": "Hatiin ang Master List" },
+  "toolSplitMasterDesc": { "message": "Pirapirasuhin mo na yung sobrang daming database into safe and smaller batches." },
+  "toolSegmentTitle": { "message": "I-segment per Niche" },
+  "toolSegmentDesc": { "message": "Hakutin lahat ng groups base sa binigay mong keywords galing sa mismong buong database mo." },
+
+  "freshOverviewTitle": { "message": "Freshness Overview" },
+  "freshHotLabel": { "message": "Hot (<48h):" },
+  "freshWarmLabel": { "message": "Warm (<7d):" },
+  "freshCoolLabel": { "message": "Fresh (>7d):" },
+
+  "spSearchExisting": { "message": "1. I-search sa Mga Groups Ngayon" },
+  "spSearchDbPh": { "message": "Type mo rito kung hahanap ka sa database..." },
+  "spOrPaste": { "message": "O KAYA MAG-PASTE NG MGA BAGONG URL" },
+  "spSmartPaste": { "message": "2. I-Smart Paste URLs" },
+
+  "upLimitTitle": { 
+    "message": "Naks! Nakapili ka ng $COUNT$ groups. 🤯",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "upLimitText": { 
+    "message": "Pag mano-manong mo kasing gagawin to aabutin ng <span class=\"upsell-highlight\">$HOURS$ oras</span> yung panay pagpo-post sa $COUNT$ groups.<br><br>Pero kase 7 lang yung allowed max groups pag free user ka lang. Eh di mag-Upgrade ka na lang pala into Pro para lahat ng $COUNT$ groups mo eh kusa ng ipo-post kahit habang natutulog ka nalang.",
+    "placeholders": { 
+      "count": { "content": "$1" },
+      "hours": { "content": "$2" }
+    }
+  },
+  "upSchedTitle": { "message": "I-reclaim mo ang mga umaga mo. ☕" },
+  "upSchedText": { "message": "Pang Pro feature ang Scheduling na yan ah. <br><br>Gusto mong gumising nalang ng walang iniisip na i-popost? Ang laking ginhawa noh. Kase pwedeng mong i-set ang isang buwang content schedule within 5 mins, saka mo i-iwan dun ang systema at magagawa mo rin ang iba mo pang task for the day." },
+  "upColorTitle": { "message": "Bumida nang wagas sa feed. 🎨" },
+  "upColorText": { "message": "O, isa pang Pro feature yung Colored Backgrounds ah.<br><br>Sabe kase sa data, almost up to 3x higit na dumadami ang audience pag lalagyan mo ng Colored Background. Pwes ano pang inaantay mo mag-Upgrade kana in Pro para ma-achieve ang unlimited views mula sa Colored Background na 'to." },
+  "upCampTitle": { "message": "I-buo ang automated na imperyo mo. ⚙️" },
+  "upCampText": { "message": "Kaya nga Pro Feature eh, so you mean Campaigns.<br><br>Kada posts nagchechain together, delay is setup wisely and loop workflows automatically, i mean forever!. Pag set mo, magagawa mo yun hanggang mapagod sya, yes ng ilang bwan pa!." },
+  "upRadarTitle": { "message": "Itigil na ang kakacover sa clients, nakakapagod na! 🧲" },
+  "upRadarText": { "message": "Ang dami ngang leads, pano mo ihohook up kung hindi ka PRO?<br><br>Let mo nalang ang engine ang sumcan every now and then (24/7 pa to ah). Push notificaiton muna sabay receive pag naramdamang nagpapapansin ulit sa groups yung prospect for recommendations or pag huminge lang bigla ng help sa niche mo!" },
+  "upExportTitle": { "message": "Pwedeng mag-angkin ng data dito. 📊" },
+  "upExportText": { "message": "Yung CSV Export is considered Pro Feature.<br><br>Hahayaan mo nalang sa FB yung hot leads mo? Para mas mabilis mo silang makwento sa CRM na prefer mo, i-export mo sila tas di ka mahuhuli ng kung sino." },
+  "upAiTitle": { "message": "Lagpasan mo ang spam filters nila. 🛡️" },
+  "upAiText": { "message": "AI Generation? Pro yan.<br><br>Pina-block ng Facebook yung pagpo-post mo ng pare-parehong mensahe paulit-ulit? Ang hirap nun eh, magpaka-safe ka na and allow our AI na palitan by 3 unique variations 'tong post mo. 100% guarantee na okay ang account mo." },
+  "upAiReplyTitle": { "message": "I-close mo agad yung deals, in an instant. ⚡" },
+  "upAiReplyText": { "message": "Para saan ba yung AI Magic Replies kung wala ka namang PRO?<br><br>In short: Binibigyan namin ng pagkakataon yung AI para sagutin specifically, ng bonggang-bongga ang target mo, basing exactly as what your profile is set to." },
+  "upSynTitle": { "message": "Perfect spintax with minimal delay!. 🧬" },
+  "upSynText": { "message": "Isa ding Pro feature itong AI Auto-Synonyms.<br><br>Ang hirap mag-isip manually ng iba’t ibang synonym? Papel na nga lang ang i-edit naten. I-allow ang AI to do variations naturally as safely." },
+  "upWizTitle": { "message": "Your own marketing firm. 🧠" },
+  "upWizText": { "message": "The Campaign Wizard is practically a Pro Tool ah.<br><br>Pwes sabihin mo na kase yung goal mo sa AI. Tutulungan ka nya mamili, magdesisyon anong groups o kaya bubuo ng workflow automatically para may pang-campaigns kana nang matagal na di mo pinoproblema." },
+  "upJoinTitle": { "message": "Buldok sa dami ang pwedeng humawak. 🚀" },
+  "upJoinText": { "message": "Hala. Auto-Joining pang-Pro na feature pala to.<br><br>So kung nagta-try kana kumausap sa random FB groups manual lang tas abutin kana ng tanghali. Ay isusuko muna ba? Mag auto na let mo na ang system gumawa, you target tapos yun na yun!" },
+  "upCloudTitle": { "message": "Walang work na mawawala dito. ☁️" },
+  "upCloudText": { "message": "Cloud Sync ay isang pang PRO lamang eh.<br><br>Pwede mong i-upload mga drafts mo sa cloud. I-secure sa account tapos available yan sa the rest ng PC/Gadgets mo the exact minute na nakaupload sya." },
+  "upDefaultTitle": { "message": "I-Unlock na ang Power ni Pro" },
+  "upDefaultText": { "message": "Mag-Upgrade into Pro kung gusto mo talagang tanggalin na tong lahat ng limitasyon para maging mas smooth pa lalo." },
+
+  "targeterBtnExclude": { "message": "I-exclude itong group na to" },
+  
+  "radarSelectLead": { "message": "Select muna ng lead para malaman ang details" },
+  "radarBtnCopy": { "message": "I-copy ang Link" },
+  "radarBtnView": { "message": "I-view ang Post" },
+  "radarBtnViewReply": { "message": "I-view ang Sagot" },
+  "radarBtnDraftReply": { "message": "I-Draft sa AI ang Reply" },
+  "radarPremiumLead": { "message": "Premium na Lead" },
+  "radarPremiumDesc": { "message": "Need mag-Upgrade if ever reading the full context ah, alamin ang group at bawi na para makapag-fire ng reply nang bongga at ma-close niyo to!" },
+  "radarBtnUnlock": { "message": "I-Unlock ang Pro Ngayon" },
+
+  "streakCurrent": { "message": "Current Streak" },
+  "streakBest": { "message": "Best na Streak" },
+  "lblDaysLower": { "message": "Araw" },
+  "streakKeepAlive": { "message": "Ituloy-tuloy mo lang 'to! 🔥" },
+  "streakRecord": { "message": "All-time record 🏆" },
+  "phSelectSavedTemplates": { "message": "Pumili ng naka-save na templates na ipo-post..." }
+
+}

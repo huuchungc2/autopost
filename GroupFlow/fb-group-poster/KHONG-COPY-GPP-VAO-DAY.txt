@@ -1,0 +1,11 @@
+KHÔNG đặt file tham chiếu Group Posting Pro vào folder này.
+
+Chrome từ chối extension nếu có:
+  _ref-group-posting/
+  _metadata/
+  *.zip
+  2.3.2_0/
+
+Tham chiếu GPP (dev only): D:\project\AutoPost\GroupFlow\ref-group-posting\
+
+Trước khi Load unpacked, chạy:  .\validate.ps1

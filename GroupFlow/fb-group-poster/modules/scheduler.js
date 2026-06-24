@@ -2,9 +2,15 @@ window.GF = window.GF || {};
 
 GF.scheduler = {
   DELAYS: {
-    fast: { betweenGroups: [60, 120], betweenPosts: 180 },
-    balanced: { betweenGroups: [180, 300], betweenPosts: 420 },
-    safe: { betweenGroups: [420, 600], betweenPosts: 900 },
+    fast: { betweenGroups: [60, 120], betweenPosts: 180, betweenComments: [90, 180] },
+    balanced: { betweenGroups: [180, 300], betweenPosts: 420, betweenComments: [180, 300] },
+    safe: { betweenGroups: [420, 600], betweenPosts: 900, betweenComments: [300, 600] },
+  },
+
+  async getDelays(level) {
+    const d = await GF.storage.get(['securityLevel']);
+    const key = level || d.securityLevel || 'balanced';
+    return this.DELAYS[key] || this.DELAYS.balanced;
   },
 
   randBetween([min, max]) {

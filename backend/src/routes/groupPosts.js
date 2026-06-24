@@ -20,6 +20,11 @@ import {
   repullGroupPostDraft,
   deleteGroupPostDraft,
 } from '../services/groupPostService.js';
+import {
+  extensionGenerateImage,
+  extensionGenerateText,
+  listExtensionAiProviders,
+} from '../services/groupPostAiService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 const router = express.Router();
@@ -86,6 +91,34 @@ router.put('/fb-profile', authenticateExtension, asyncHandler(async (req, res) =
   const { fb_user_id, fb_user_name } = req.body;
   const profile = await updateExtensionFbProfile(req.user.id, { fb_user_id, fb_user_name });
   res.json(profile);
+}));
+
+/** Extension: danh sách AI provider user được dùng (giống fanpage) */
+router.get('/ai-providers', authenticateExtension, asyncHandler(async (req, res) => {
+  const providers = await listExtensionAiProviders(req.user);
+  res.json(providers);
+}));
+
+/** Extension: xuất ảnh qua image provider đã chọn */
+router.post('/ai/image', authenticateExtension, asyncHandler(async (req, res) => {
+  const prompt = String(req.body.prompt || '').trim();
+  if (!prompt) return res.status(400).json({ error: 'Thiếu prompt' });
+  const providerId = req.body.provider_id || req.body.image_provider_id;
+  const result = await extensionGenerateImage(req.user, prompt, providerId);
+  res.json(result);
+}));
+
+/** Extension: viết lại / comment qua text provider đã chọn */
+router.post('/ai/text', authenticateExtension, asyncHandler(async (req, res) => {
+  const text = String(req.body.text || '').trim();
+  if (!text) return res.status(400).json({ error: 'Thiếu text' });
+  const out = await extensionGenerateText(req.user, {
+    task: req.body.task || 'rewrite',
+    text,
+    mode: req.body.mode,
+    provider_id: req.body.provider_id || req.body.text_provider_id,
+  });
+  res.json({ text: out });
 }));
 
 /** Website: danh sách bài group đã đăng */

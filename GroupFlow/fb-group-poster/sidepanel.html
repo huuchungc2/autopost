@@ -5,98 +5,280 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GroupFlow</title>
   <link rel="stylesheet" href="sidepanel.css" />
+  <link rel="stylesheet" href="lib/quill.snow.css" />
 </head>
 <body>
   <header class="header">
-    <div class="logo">🤖 GroupFlow</div>
-    <div class="fb-user" id="fbUserLabel">— <span class="dot" id="fbDot"></span></div>
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">G</span>
+      <div class="brand-text">
+        <span class="brand-name">GroupFlow</span>
+        <span class="brand-tag">FB Group Poster</span>
+      </div>
+    </div>
+    <div class="profile-picker" id="profilePicker">
+      <button type="button" class="profile-trigger" id="profileTrigger" title="Chọn tài khoản đăng">
+        <span class="profile-avatar" id="profileAvatar">?</span>
+        <span class="profile-trigger-text">
+          <span class="profile-name" id="fbUserName">Chưa kết nối FB</span>
+          <span class="profile-type" id="fbUserType"></span>
+        </span>
+        <span class="profile-chevron" aria-hidden="true">▾</span>
+      </button>
+      <div class="profile-menu hidden" id="profileMenu">
+        <div class="profile-menu-head">
+          <span>Đăng với tư cách</span>
+          <button type="button" id="btnRefreshProfiles" class="btn ghost sm">Làm mới</button>
+        </div>
+        <div id="profileList" class="profile-list"></div>
+      </div>
+    </div>
   </header>
 
-  <nav class="tabs" id="tabBar">
-    <button data-tab="create" class="active">📝 Tạo Bài</button>
-    <button data-tab="comment">💬 Comment <span class="badge" id="commentBadge"></span></button>
-    <button data-tab="radar">📡 Radar <span class="badge" id="radarBadge"></span></button>
-    <button data-tab="activity">📋 Log</button>
-    <button data-tab="settings">⚙️</button>
+  <nav class="tabs" id="tabBar" role="tablist">
+    <button type="button" data-tab="create" class="active" role="tab">
+      <span class="tab-icon" aria-hidden="true">✎</span>
+      <span class="tab-label">Tạo bài</span>
+    </button>
+    <button type="button" data-tab="groups" role="tab">
+      <span class="tab-icon" aria-hidden="true">◎</span>
+      <span class="tab-label">Nhóm</span>
+      <span class="badge" id="groupsTabBadge"></span>
+    </button>
+    <button type="button" data-tab="comment" role="tab">
+      <span class="tab-icon" aria-hidden="true">◉</span>
+      <span class="tab-label">Comment</span>
+      <span class="badge" id="commentBadge"></span>
+    </button>
+    <button type="button" data-tab="radar" role="tab">
+      <span class="tab-icon" aria-hidden="true">◎</span>
+      <span class="tab-label">Radar</span>
+      <span class="badge" id="radarBadge"></span>
+    </button>
+    <button type="button" data-tab="activity" role="tab">
+      <span class="tab-icon" aria-hidden="true">▤</span>
+      <span class="tab-label">Log</span>
+    </button>
+    <button type="button" data-tab="help" role="tab" title="Hướng dẫn">
+      <span class="tab-icon" aria-hidden="true">?</span>
+      <span class="tab-label">Hướng dẫn</span>
+    </button>
+    <button type="button" data-tab="settings" class="tab-settings" role="tab" title="Cài đặt">
+      <span class="tab-icon" aria-hidden="true">⚙</span>
+    </button>
   </nav>
 
   <main class="content">
     <!-- TẠO BÀI -->
     <section id="tab-create" class="tab-panel active">
       <div class="card">
-        <div class="toggle-row">
-          <button type="button" id="srcExcel" class="toggle active">📂 Excel</button>
-          <button type="button" id="srcManual" class="toggle">✏️ Nhập tay</button>
+        <div class="segmented" role="group">
+          <button type="button" id="srcManual" class="segmented-btn active">Nhập tay</button>
+          <button type="button" id="srcExcel" class="segmented-btn">Excel</button>
         </div>
-        <div id="excelPanel">
-          <input type="file" id="excelFile" accept=".csv,.xlsx,.xls" />
-          <p class="hint">Cột: noi_dung | prompt_anh | ngay_dang | gio_dang</p>
+        <div id="excelPanel" class="hidden">
+          <label class="file-drop" for="excelFile">
+            <span class="file-drop-icon">↑</span>
+            <span class="file-drop-title">Chọn file Excel / CSV</span>
+            <span class="file-drop-hint">noi_dung · prompt_anh · ngay_dang · gio_dang</span>
+          </label>
+          <input type="file" id="excelFile" accept=".csv,.xlsx,.xls" class="sr-only" />
         </div>
-        <div id="manualPanel" class="hidden">
-          <textarea id="manualText" rows="5" placeholder="Nội dung bài..."></textarea>
+        <div id="manualPanel">
+          <div class="composer-toolbar">
+            <div class="variation-tabs" role="tablist">
+              <button type="button" class="variation-tab active" data-var="A">A</button>
+              <button type="button" class="variation-tab" data-var="B">B</button>
+              <button type="button" class="variation-tab" data-var="C">C</button>
+              <button type="button" class="variation-tab" data-var="D">D</button>
+            </div>
+            <div class="composer-tools">
+              <span id="composerQuality" class="quality-badge">--/100</span>
+              <button type="button" id="btnComposerSpintax" class="btn ghost sm" title="Chèn spintax">&#123;spin&#125;</button>
+              <button type="button" id="btnComposerWrapSpintax" class="btn ghost sm" title="Bọc đoạn chọn">Bọc</button>
+              <button type="button" id="btnComposerEmoji" class="btn ghost sm" title="Emoji">😊</button>
+              <select id="aiRewriteMode" class="composer-select" title="AI viết lại">
+                <option value="">AI…</option>
+                <option value="persuasive">Hấp dẫn</option>
+                <option value="grammar">Sửa lỗi</option>
+                <option value="spintax">Tạo spintax</option>
+              </select>
+              <button type="button" id="btnAiRewrite" class="btn ghost sm accent">AI</button>
+            </div>
+          </div>
+          <div id="composerEditors" class="composer-editors"></div>
+          <label class="field-label">Nền bài FB <span class="field-hint">(chế độ Nhanh)</span></label>
+          <div class="bg-color-row">
+            <button type="button" class="bg-dot active" data-bg-color="#18191A" title="Không nền" style="background:#fff;border:1px solid #cbd5e1">×</button>
+            <button type="button" class="bg-dot" data-bg-color="#e2013b" style="background:#e2013b"></button>
+            <button type="button" class="bg-dot" data-bg-color="#dc7a5a" style="background:#dc7a5a"></button>
+            <button type="button" class="bg-dot" data-bg-color="#c600ff" style="background:#c600ff"></button>
+            <button type="button" class="bg-dot" data-bg-color="#0073ff" style="background:#0073ff"></button>
+            <button type="button" class="bg-dot" data-bg-color="#8395d1" style="background:#8395d1"></button>
+            <button type="button" class="bg-dot" data-bg-color="#33234b" style="background:#33234b"></button>
+            <button type="button" class="bg-dot" data-bg-color="#5d6374" style="background:#5d6374"></button>
+          </div>
+          <label class="field-label">Campaign <span class="field-hint">(tuỳ chọn)</span></label>
+          <input type="text" id="manualCampaign" placeholder="Tên chiến dịch — gom bài lên lịch dàn" />
+          <label class="field-label">First comment <span class="field-hint">(sau khi đăng)</span></label>
+          <textarea id="manualFirstComment" rows="2" placeholder="Comment đầu tiên — hỗ trợ {spintax|biến thể}"></textarea>
+          <label class="switch-row">
+            <input type="checkbox" id="manualFirstCommentOn" />
+            <span>Bật first comment tự động</span>
+          </label>
+          <label class="field-label">Ảnh / video <span class="field-hint">(tuỳ chọn)</span></label>
+          <label class="file-drop file-drop-sm" for="manualMedia">
+            <span class="file-drop-icon">🖼</span>
+            <span class="file-drop-title" id="manualMediaLabel">Chọn ảnh hoặc video</span>
+            <span class="file-drop-hint">Ảnh ≤8MB · Video ≤15MB (video dùng Chế độ Cổ điển)</span>
+          </label>
+          <input type="file" id="manualMedia" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm" class="sr-only" />
+          <div id="manualMediaPreview" class="media-preview hidden"></div>
+          <label class="field-label">Prompt tạo ảnh AI <span class="field-hint">(nếu chưa có file)</span></label>
+          <input type="text" id="manualPrompt" placeholder="Mô tả ảnh cho 9Router…" />
           <div class="row">
             <input type="date" id="manualDate" />
             <input type="time" id="manualTime" />
           </div>
-          <button type="button" id="btnAddManual" class="btn outline">+ Thêm vào danh sách</button>
+          <label class="switch-row">
+            <input type="checkbox" id="manualAutoImage" checked />
+            <span>Tự xuất ảnh AI khi đăng (nếu chưa có file)</span>
+          </label>
+          <label class="field-label">Lịch xuất ảnh <span class="field-hint">(tuỳ chọn — trước giờ đăng)</span></label>
+          <div class="row">
+            <input type="date" id="manualImageDate" />
+            <input type="time" id="manualImageTime" />
+          </div>
+          <label class="field-label">Nhóm đăng <span class="field-hint">(tuỳ chọn — tối đa theo cài đặt)</span></label>
+          <div id="manualGroupPicker" class="inline-group-list scroll-sm"></div>
+          <button type="button" id="btnAddManual" class="btn ghost block">+ Thêm vào danh sách</button>
         </div>
       </div>
 
       <div class="card">
         <div class="card-head">
-          <strong>Danh sách bài</strong>
-          <div>
-            <button type="button" id="btnPullWeb" class="btn outline sm">⬇ Tải từ website</button>
-            <button type="button" id="btnGenAll" class="btn outline sm">⚡ Generate tất cả</button>
+          <div class="card-title">
+            <span class="card-title-text">Danh sách bài</span>
+            <span class="chip" id="postCount">0</span>
+          </div>
+          <div class="card-actions">
+            <button type="button" id="btnPullWeb" class="btn ghost sm">Tải web</button>
+            <button type="button" id="btnGenAll" class="btn ghost sm accent">Generate</button>
           </div>
         </div>
         <div id="postList" class="list"></div>
       </div>
 
-      <div class="card">
-        <div class="card-head">
-          <strong>Chọn nhóm</strong>
-          <button type="button" id="btnExtract" class="btn outline sm">↻ Extract</button>
-        </div>
-        <input type="search" id="groupSearch" placeholder="Tìm group..." />
-        <label class="check-row"><input type="checkbox" id="selectAllGroups" /> Extracted Groups (<span id="groupCount">0</span>)</label>
-        <div id="groupList" class="list scroll"></div>
-      </div>
-
-      <div id="progressBox" class="card hidden">
+      <div id="progressBox" class="card progress-card hidden">
         <div class="progress-bar"><div id="progressFill"></div></div>
         <div id="progressLog" class="log"></div>
       </div>
     </section>
 
+    <!-- NHÓM -->
+    <section id="tab-groups" class="tab-panel">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <span class="card-title-text">Gán nhóm cho bài</span>
+            <span class="chip" id="assignPostCount">0</span>
+          </div>
+        </div>
+        <p class="hint">Tick nhiều bài → tìm/chọn nhóm FB hoặc bộ custom → <strong>Gán</strong></p>
+        <label class="select-all">
+          <input type="checkbox" id="selectAllAssignPosts" />
+          <span>Chọn tất cả bài</span>
+        </label>
+        <div id="assignPostList" class="list scroll-sm"></div>
+        <div class="assign-actions">
+          <button type="button" id="btnApplyGroups" class="btn primary sm">Gán nhóm đã chọn</button>
+          <button type="button" id="btnClearPostGroups" class="btn ghost sm">Xóa nhóm khỏi bài</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <span class="card-title-text">Thư viện nhóm</span>
+            <span class="chip" id="groupCount">0</span>
+          </div>
+          <button type="button" id="btnRefreshGroups" class="btn ghost sm accent">↻ Làm mới</button>
+        </div>
+        <p class="hint" id="groupsSyncStatus">Tự lấy nhóm qua session Chrome — GraphQL nền, không mở Facebook</p>
+        <div class="segmented groups-sub-nav" role="group">
+          <button type="button" data-groups-sub="fb" class="segmented-btn active">Tất cả nhóm FB</button>
+          <button type="button" data-groups-sub="custom" class="segmented-btn">Bộ custom</button>
+        </div>
+
+        <div id="groupsSubFb">
+          <div class="search-wrap">
+            <span class="search-icon" aria-hidden="true">⌕</span>
+            <input type="search" id="groupSearch" placeholder="Gõ tên tìm nhóm…" />
+          </div>
+          <p class="hint assign-picker-hint" id="assignPickerHint">Đang chọn: <span id="assignPickerCount">0</span> nhóm</p>
+          <label class="select-all">
+            <input type="checkbox" id="selectAllPickerGroups" />
+            <span>Chọn tất cả (kết quả tìm)</span>
+          </label>
+          <div id="groupLibraryList" class="list scroll"></div>
+        </div>
+
+        <div id="groupsSubCustom" class="hidden">
+          <div class="custom-set-form row">
+            <input type="text" id="customSetName" placeholder="Tên bộ custom (vd. Marketing VN)" />
+            <button type="button" id="btnCreateCustomSet" class="btn ghost sm">+ Tạo từ nhóm đang chọn</button>
+          </div>
+          <p class="hint">Bộ custom = tập nhóm FB đã lưu — tick nhóm ở tab「Tất cả nhóm FB」rồi tạo bộ</p>
+          <div id="customSetList" class="list"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- COMMENT -->
     <section id="tab-comment" class="tab-panel">
-      <div class="card-head">
-        <strong>Comment chéo</strong>
-        <button type="button" id="btnRefreshComments" class="btn outline sm">↻ Làm mới</button>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <span class="card-title-text">Comment chéo</span>
+          </div>
+          <button type="button" id="btnRefreshComments" class="btn ghost sm">Làm mới</button>
+        </div>
+        <p class="hint">Giãn cách ngẫu nhiên giữa mỗi comment theo mức <strong>Settings → Giãn cách</strong>.</p>
+        <label class="field-label">Bắt đầu lịch</label>
+        <input type="datetime-local" id="commentScheduleStart" />
+        <div id="commentList" class="list"></div>
+        <div class="row" style="margin-top: 12px">
+          <button type="button" id="btnRunAllComments" class="btn primary">Chạy đã chọn</button>
+          <button type="button" id="btnScheduleComments" class="btn outline">Lên lịch đã chọn</button>
+        </div>
       </div>
-      <div id="commentList" class="list"></div>
-      <button type="button" id="btnRunAllComments" class="btn primary block">⚡ Chạy đã chọn</button>
     </section>
 
     <!-- RADAR -->
     <section id="tab-radar" class="tab-panel">
       <div class="card">
-        <label class="check-row">
-          <input type="checkbox" id="radarActive" /> Bật Radar Lead
+        <div class="card-title" style="margin-bottom: 12px">
+          <span class="card-title-text">Radar Lead</span>
+        </div>
+        <label class="switch-row">
+          <input type="checkbox" id="radarActive" />
+          <span>Bật quét tự động</span>
         </label>
-        <label>Từ khóa (dùng - để loại)</label>
+        <label class="field-label">Từ khóa <span class="field-hint">(dùng - để loại)</span></label>
         <textarea id="radarKeywords" rows="3" placeholder="cần tìm, gợi ý, -miễn phí"></textarea>
-        <label>Chu kỳ quét</label>
+        <label class="field-label">Chu kỳ quét</label>
         <select id="radarInterval">
           <option value="5">5 phút</option>
           <option value="15" selected>15 phút</option>
           <option value="30">30 phút</option>
           <option value="60">60 phút</option>
         </select>
-        <label class="check-row"><input type="checkbox" id="radarPush" checked /> Push desktop</label>
+        <label class="switch-row">
+          <input type="checkbox" id="radarPush" checked />
+          <span>Thông báo desktop</span>
+        </label>
         <div class="row">
-          <button type="button" id="btnRadarScan" class="btn outline">Quét ngay</button>
+          <button type="button" id="btnRadarScan" class="btn ghost">Quét ngay</button>
           <button type="button" id="btnRadarSave" class="btn primary">Lưu</button>
         </div>
       </div>
@@ -105,53 +287,191 @@
 
     <!-- ACTIVITY -->
     <section id="tab-activity" class="tab-panel">
-      <div class="toggle-row">
-        <button type="button" data-sub="upcoming" class="toggle active">Sắp tới</button>
-        <button type="button" data-sub="history" class="toggle">Lịch sử</button>
+      <div class="segmented" style="margin-bottom: 12px">
+        <button type="button" data-sub="upcoming" class="segmented-btn active">Sắp tới</button>
+        <button type="button" data-sub="history" class="segmented-btn">Lịch sử</button>
       </div>
       <div id="activityUpcoming" class="list"></div>
       <div id="activityHistory" class="list hidden"></div>
     </section>
 
+    <!-- HELP -->
+    <section id="tab-help" class="tab-panel">
+      <div class="card">
+        <div class="card-title" style="margin-bottom: 12px">
+          <span class="card-title-text">Hướng dẫn sử dụng</span>
+        </div>
+        <p class="hint">
+          Mục tiêu: tạo bài → chọn nhóm → (xuất ảnh nếu cần) → lên lịch/đăng ngay → sync về website.
+        </p>
+      </div>
+
+      <div class="card">
+        <p class="section-eyebrow">1) Cài đặt lần đầu (5 phút)</p>
+        <ol class="help-steps">
+          <li><strong>Load unpacked</strong> thư mục <code>GroupFlow/fb-group-poster</code> (không chọn <code>ref-group-posting</code>).</li>
+          <li>Mở tab <strong>Cài đặt</strong> → URL website (vd. <code>https://tidien.xyz</code>).</li>
+          <li>Đăng nhập tidien bằng <strong>Email/Password</strong> (khuyên dùng) hoặc dán <strong>tidien API key</strong>.</li>
+          <li>Chọn <strong>Text Provider</strong> (viết lại/comment) và <strong>Image Provider</strong> (xuất ảnh).</li>
+          <li>(Tuỳ chọn) cấu hình Google Drive nếu muốn upload media lên Drive.</li>
+        </ol>
+        <p class="hint">
+          Nếu chưa có provider: tạo trên website tại trang <strong>Providers</strong> (giống cấu hình fanpage).
+        </p>
+      </div>
+
+      <div class="card">
+        <p class="section-eyebrow">2) Quy trình đăng bài</p>
+        <div class="help-grid">
+          <div class="help-block">
+            <div class="help-block-title">A. Tạo bài</div>
+            <ul class="help-bullets">
+              <li>Tab <strong>Tạo bài</strong> → <strong>Nhập tay</strong> hoặc <strong>Excel</strong>.</li>
+              <li>Nhập nội dung (A–D) + prompt ảnh (nếu cần).</li>
+              <li>Chọn nhóm ngay trên form (nhập tay) hoặc trên từng card bài (<strong>Chọn nhóm</strong>).</li>
+            </ul>
+          </div>
+          <div class="help-block">
+            <div class="help-block-title">B. Chuẩn bị media</div>
+            <ul class="help-bullets">
+              <li>Đính kèm ảnh/video thủ công, hoặc bấm <strong>Generate</strong> để xuất ảnh AI.</li>
+              <li>Bật <strong>Tự xuất ảnh khi đăng</strong> nếu muốn để tới giờ đăng mới xuất ảnh.</li>
+            </ul>
+          </div>
+          <div class="help-block">
+            <div class="help-block-title">C. Đăng ngay / Lên lịch</div>
+            <ul class="help-bullets">
+              <li>Tick bài cần chạy → bấm <strong>Đăng ngay</strong> hoặc <strong>Lên lịch</strong>.</li>
+              <li>Nút <strong>Dàn</strong>: lên lịch nhiều bài theo khoảng cách phút (campaign).</li>
+              <li>Tab <strong>Log</strong>: xem lịch sử; tab <strong>Activity</strong>: quản lý job sắp chạy.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="section-eyebrow">3) Comment chéo team</p>
+        <ul class="help-bullets">
+          <li>Tab <strong>Comment</strong> → bấm <strong>Làm mới</strong> để tải danh sách cần comment.</li>
+          <li>Bấm <strong>AI</strong> để generate comment (dùng Text Provider) → <strong>Chạy đã chọn</strong> hoặc <strong>Lên lịch</strong>.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <p class="section-eyebrow">4) Lỗi thường gặp</p>
+        <ul class="help-bullets">
+          <li><strong>Nút “Lỗi” đỏ / không load</strong>: kiểm tra không copy nhầm thư mục <code>_ref-*</code> hoặc <code>2.3.2_0</code> vào folder extension → Reload.</li>
+          <li><strong>Không thấy nhóm</strong>: đăng nhập Facebook trong Chrome → vào tab <strong>Nhóm</strong> → <strong>↻ Làm mới</strong>.</li>
+          <li><strong>Generate/AI báo thiếu key</strong>: vào <strong>Cài đặt</strong> → đăng nhập tidien → chọn provider; 9Router key chỉ là dự phòng.</li>
+          <li><strong>Video không đăng</strong>: chuyển <strong>Chế độ Cổ điển</strong> (Settings) vì video cần DOM.</li>
+        </ul>
+      </div>
+    </section>
+
     <!-- SETTINGS -->
     <section id="tab-settings" class="tab-panel">
       <div class="card">
-        <label>URL website (mặc định tidien.xyz)</label>
+        <p class="section-eyebrow">Kết nối</p>
+        <label class="field-label">URL website</label>
         <input type="url" id="tidienBaseUrl" placeholder="https://tidien.xyz" />
-        <p class="hint">Lưu URL chính thức — extension gọi <code>{url}/api/group-posts/...</code> và <code>{url}/v1/...</code></p>
-        <label>Email tidien</label>
+        <p class="hint">API: <code>{url}/api/group-posts/...</code></p>
+        <label class="field-label">Email</label>
         <input type="email" id="tidienEmail" />
-        <label>Password</label>
+        <label class="field-label">Password</label>
         <input type="password" id="tidienPassword" />
-        <button type="button" id="btnTidienLogin" class="btn primary">Đăng nhập tidien</button>
-        <label>tidien API Key</label>
+        <button type="button" id="btnTidienLogin" class="btn primary block">Đăng nhập</button>
+
+        <p class="section-eyebrow">AI Provider</p>
+        <p class="hint">Giống fanpage trên website — chọn provider viết bài và xuất ảnh. Cần đăng nhập tidien; tạo provider tại <strong>Providers</strong> trên web.</p>
+        <label class="field-label">Text Provider — viết bài / comment / AI rewrite</label>
+        <select id="textProviderId">
+          <option value="">— Chưa chọn —</option>
+        </select>
+        <p class="hint" id="textProviderHint"></p>
+        <label class="field-label">Image Provider — xuất ảnh AI</label>
+        <select id="imageProviderId">
+          <option value="">— Chưa chọn —</option>
+        </select>
+        <p class="hint" id="imageProviderHint"></p>
+        <button type="button" id="btnReloadProviders" class="btn ghost sm">↻ Tải lại providers</button>
+
+        <p class="section-eyebrow">API &amp; Drive (dự phòng)</p>
+        <label class="field-label">tidien API Key</label>
         <input type="password" id="tidienApiKey" />
-        <label>9Router API Key</label>
+        <label class="field-label">9Router API Key <span class="field-hint">(chỉ khi chưa chọn provider)</span></label>
         <input type="password" id="routerApiKey" />
-        <label>Drive Service Account JSON</label>
+        <label class="field-label">Drive Service Account JSON</label>
         <textarea id="driveJson" rows="3"></textarea>
-        <label>Drive Folder ID</label>
+        <label class="field-label">Drive Folder ID</label>
         <input type="text" id="driveFolderId" />
-        <label>Max groups/lần</label>
+        <label class="field-label">Max groups / lần</label>
         <input type="number" id="maxGroups" min="1" max="50" value="10" />
-        <label>Ngôn ngữ FB</label>
+
+        <p class="section-eyebrow">Chiến lược đăng bài</p>
+        <p class="hint">Nhanh = GraphQL session FB. Cổ điển = DOM (video / fallback).</p>
+        <div class="strategy-row" role="radiogroup" aria-label="Chế độ đăng bài">
+          <label class="strategy-card">
+            <input type="radio" name="postMode" value="fast" class="sr-only" checked />
+            <span class="strategy-title">Chế độ Nhanh</span>
+            <span class="strategy-badge">Khuyên dùng</span>
+            <span class="strategy-desc">API nội bộ FB — text + ảnh</span>
+          </label>
+          <label class="strategy-card">
+            <input type="radio" name="postMode" value="classic" class="sr-only" />
+            <span class="strategy-title">Chế độ Cổ điển</span>
+            <span class="strategy-badge muted">Tương thích</span>
+            <span class="strategy-desc">Tự động hóa DOM — tốt cho video</span>
+          </label>
+        </div>
+
+        <p class="section-eyebrow">Giãn cách đăng &amp; comment</p>
+        <p class="hint" id="securityHint">Chờ ngẫu nhiên giữa group / bài / comment khi chạy hàng loạt.</p>
+        <div class="segmented" role="radiogroup" aria-label="Giãn cách đăng">
+          <label class="segmented-btn"><input type="radio" name="securityLevel" value="fast" class="sr-only" />Nhanh</label>
+          <label class="segmented-btn"><input type="radio" name="securityLevel" value="balanced" class="sr-only" checked />Cân bằng</label>
+          <label class="segmented-btn"><input type="radio" name="securityLevel" value="safe" class="sr-only" />An toàn</label>
+        </div>
+        <label class="switch-row" style="margin-top: 12px">
+          <input type="checkbox" id="avoidNight" checked />
+          <span>Tránh đăng ban đêm (22:00–07:00)</span>
+        </label>
+        <label class="field-label">Ngôn ngữ FB</label>
         <select id="fbLang">
           <option value="vi">Tiếng Việt</option>
           <option value="en">English</option>
         </select>
-        <button type="button" id="btnSaveSettings" class="btn primary block">💾 Lưu cài đặt</button>
+
+        <p class="section-eyebrow">Lịch xuất ảnh (queue)</p>
+        <p class="hint">Giống website fanpage — quét queue mỗi phút, xuất ảnh bài chưa có media trong khung giờ.</p>
+        <label class="switch-row">
+          <input type="checkbox" id="groupImageScheduleEnabled" />
+          <span>Bật lịch xuất ảnh ban đêm</span>
+        </label>
+        <div class="row">
+          <label>Giờ bắt đầu<input type="number" id="groupImageScheduleStart" min="0" max="23" value="1" /></label>
+          <label>Giờ kết thúc<input type="number" id="groupImageScheduleEnd" min="1" max="24" value="5" /></label>
+          <label>Mỗi (phút)<input type="number" id="groupImageScheduleInterval" min="5" max="60" value="10" /></label>
+        </div>
+
+        <button type="button" id="btnSaveSettings" class="btn primary block">Lưu cài đặt</button>
       </div>
     </section>
   </main>
 
   <footer class="footer">
-    <button type="button" id="btnSchedule" class="btn outline">Lên lịch</button>
-    <button type="button" id="btnPostNow" class="btn primary">Đăng ngay →</button>
+    <button type="button" id="btnScheduleCampaign" class="btn ghost sm" title="Lên lịch dàn các bài đã chọn">Dàn</button>
+    <button type="button" id="btnSchedule" class="btn ghost">Lên lịch</button>
+    <button type="button" id="btnPostNow" class="btn primary cta">Đăng ngay</button>
   </footer>
+
+  <script src="lib/quill.js"></script>
+  <script src="lib/emoji-button.min.js"></script>
 
   <script src="lib/xlsx.full.min.js"></script>
   <script src="modules/storage.js"></script>
+  <script src="modules/aiApi.js"></script>
   <script src="modules/spintax.js"></script>
+  <script src="modules/composer.js"></script>
   <script src="modules/excel.js"></script>
   <script src="modules/imageGen.js"></script>
   <script src="modules/googleDrive.js"></script>
@@ -159,6 +479,8 @@
   <script src="modules/tidienAuth.js"></script>
   <script src="modules/tidienSync.js"></script>
   <script src="modules/leadRadar.js"></script>
+  <script src="modules/groupSets.js"></script>
+  <script src="modules/postMedia.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>

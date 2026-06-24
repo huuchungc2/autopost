@@ -1,0 +1,340 @@
+
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Group Posting Pro - The AI Business Update</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --text-main: #334155;
+        --text-dark: #0f172a;
+        --text-muted: #64748b;
+        --bg-color: #ffffff;
+        --accent: #f8fafc;
+        --accent-border: #e2e8f0;
+        --brand: #4f46e5;
+        --brand-light: #e0e7ff;
+        --success: #10b981;
+      }
+
+      body {
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        font-family: "Inter", -apple-system, sans-serif;
+        line-height: 1.7;
+        margin: 0;
+        padding: 60px 20px;
+        display: flex;
+        justify-content: center;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .letter-container {
+        max-width: 650px;
+        width: 100%;
+      }
+
+      .header {
+        margin-bottom: 40px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .header img {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      }
+
+      .header-meta {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .header-meta span.app-name {
+        font-weight: 700;
+        color: var(--text-dark);
+        font-size: 16px;
+      }
+
+      .header-meta span.date {
+        color: var(--brand);
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      h1 {
+        font-family: "Playfair Display", serif;
+        font-size: 36px;
+        font-weight: 600;
+        color: var(--text-dark);
+        margin: 0 0 20px 0;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+      }
+
+      p {
+        margin: 0 0 20px 0;
+        font-size: 16px;
+      }
+
+      /* Feature Highlights */
+      .feature-card {
+        background-color: var(--accent);
+        border: 1px solid var(--accent-border);
+        border-radius: 12px;
+        padding: 24px;
+        margin: 30px 0;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .feature-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+      }
+
+      .feature-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background-color: var(--brand-light);
+        color: var(--brand);
+        border-radius: 8px;
+        font-size: 16px;
+        margin-bottom: 12px;
+      }
+
+      .feature-title {
+        font-weight: 600;
+        color: var(--text-dark);
+        font-size: 18px;
+        margin: 0 0 8px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .new-badge {
+        font-size: 10px;
+        background: linear-gradient(135deg, #6366f1, #a855f7);
+        color: white;
+        padding: 2px 8px;
+        border-radius: 99px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .feature-desc {
+        margin: 0;
+        font-size: 15px;
+        color: #475569;
+      }
+
+      .feature-desc strong {
+        color: var(--text-dark);
+      }
+
+      /* Compact Under the Hood List */
+      .tech-list {
+        margin: 0;
+        padding-left: 20px;
+        font-size: 15px;
+      }
+      
+      .tech-list li {
+        margin-bottom: 10px;
+      }
+
+      /* FAQ Section */
+      .faq-section {
+        margin-top: 50px;
+        border-top: 2px dashed var(--accent-border);
+        padding-top: 40px;
+      }
+
+      .faq-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-dark);
+        margin-bottom: 24px;
+      }
+
+      .faq-item {
+        margin-bottom: 24px;
+      }
+
+      .faq-q {
+        font-weight: 600;
+        color: var(--text-dark);
+        font-size: 16px;
+        margin: 0 0 6px 0;
+        display: flex;
+        gap: 8px;
+      }
+
+      .faq-q::before {
+        content: "Q:";
+        color: var(--brand);
+      }
+
+      .faq-a {
+        margin: 0;
+        font-size: 15px;
+        color: #475569;
+        padding-left: 26px;
+      }
+
+      /* Signature */
+      .signature-block {
+        margin-top: 60px;
+        padding-bottom: 40px;
+      }
+
+      .signature-svg {
+        height: 50px;
+        margin-bottom: 12px;
+        display: block;
+        opacity: 0.85;
+      }
+
+      .signature-name {
+        font-weight: 600;
+        color: var(--text-dark);
+        font-size: 16px;
+      }
+
+      .signature-team {
+        color: var(--text-muted);
+        font-size: 14px;
+        margin-top: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="letter-container">
+      <div class="header">
+        <!-- Replace with your actual logo path -->
+        <img src="assets/icons/logo.png" alt="Logo" onerror="this.style.display = 'none'" />
+        <div class="header-meta">
+          <span class="app-name">Group Posting Pro</span>
+          <span class="date">Update v2.1.8 is live</span>
+        </div>
+      </div>
+
+      <h1>The AI Business Update</h1>
+
+      <p>Hi everyone,</p>
+
+      <p>
+        Over the past few weeks, we've been quietly rebuilding Group Posting Pro into much more than just a poster. Today, we are transforming it into a fully-fledged <strong>Social CRM and AI Assistant</strong>. 
+      </p>
+
+      <p>
+        We've overhauled the AI engine, completely redesigned the interface, and patched the underlying architecture to make the extension faster and virtually crash-proof. Here are the major highlights:
+      </p>
+
+      <!-- BIG HIGHLIGHT 1 -->
+      <div class="feature-card">
+        <div class="feature-icon">💼</div>
+        <h3 class="feature-title">The AI Business Persona <span class="new-badge">New</span></h3>
+        <p class="feature-desc">
+          Stop sounding like a generic bot. In the new settings hub, you can now teach the AI your exact <strong>Role, Niche, Core Offer, and Tone</strong>. Once enabled, the AI silently reads this profile before generating any content, allowing it to pitch your actual products like an expert consultant and perfectly adapt to the context of the conversation.
+        </p>
+      </div>
+
+      <!-- BIG HIGHLIGHT 2 -->
+      <div class="feature-card">
+        <div class="feature-icon">🎯</div>
+        <h3 class="feature-title">Lead Radar 2.0 & Magic Replies <span class="new-badge">New</span></h3>
+        <p class="feature-desc">
+          The Lead Radar now supports up to <strong>25 groups</strong> simultaneously, strictly filters out spam using <strong>negative keywords</strong> (like <code>-free</code>), and pushes Native OS Desktop Notifications when Chrome is minimized.<br><br>
+          <strong>The Magic Reply:</strong> Found a hot lead in your interactive Inbox? Click "Draft Reply". The AI reads their post, checks your Business Persona, and writes a highly personalized reply. Review it in our pixel-perfect Facebook UI clone, and hit Send to <strong>auto-comment in the background instantly</strong>. The lead gets a green ✅ Replied badge so you never double-comment.
+        </p>
+      </div>
+
+      <!-- BIG HIGHLIGHT 3 -->
+      <div class="feature-card">
+        <div class="feature-icon">🌪️</div>
+        <h3 class="feature-title">1-Click "Pre-Flight" AI Variations</h3>
+        <p class="feature-desc">
+          We removed the confusing number inputs. Now, just check the <strong>✨ Auto-Generate AI Variations</strong> box before you post. When you hit send, the engine pauses, secretly generates 3 completely unique, Spintax-heavy variations of your text, and seamlessly alternates between them as it posts to your groups. Ultimate anti-ban protection with zero extra work.
+        </p>
+      </div>
+
+      <!-- BIG HIGHLIGHT 4 -->
+      <div class="feature-card">
+        <div class="feature-icon">✍️</div>
+        <h3 class="feature-title">Smart Spintax & Tab Auto-Fill</h3>
+        <p class="feature-desc">
+          <strong>Auto-Synonyms:</strong> Highlight a word in the editor, click the glowing purple AI button, and it will instantly read your sentence and suggest 3-4 contextually perfect synonyms.<br><br>
+          <strong>Tab Auto-Fill:</strong> Wrote a great post in Tab A? Click over to Tab B and hit "Auto-Fill". The AI perfectly clones your formatting, emojis, and links into 3 brand new variations for Tabs B, C, and D.
+        </p>
+      </div>
+
+      <h3>Quality of Life Improvements</h3>
+      <ul class="tech-list" style="margin-bottom: 40px;">
+        <li><strong>"Remember My Settings":</strong> The extension now permanently saves your Wait times, Night Mode, Security Level, and Comment settings. Set it once and forget it.</li>
+        <li><strong>Smart History Labels:</strong> If you select multiple collections, the History tab now cleanly groups them (e.g., <em>"US Realtors +1 [ 35 ]"</em>) instead of causing massive text overflows.</li>
+      </ul>
+
+      <h3>Under the Hood (Engine Fixes)</h3>
+      <ul class="tech-list">
+        <li><strong>Out of Memory Crash Fix:</strong> We completely rebuilt the boot sequence. The extension now safely "weighs" your data before loading it, completely preventing browser crashes caused by legacy media files.</li>
+        <li><strong>Self-Healing Campaigns:</strong> Added a watchdog to detect if a campaign step was orphaned (e.g., your PC went to sleep) and safely pause it instead of permanently freezing.</li>
+        <li><strong>JIT (Just-In-Time) Rendering:</strong> Removed initial load lag. The extension now opens in milliseconds, loading your templates and groups only the exact second you click on the tab.</li>
+        <li><strong>The "0 Minute" Bug:</strong> Fixed a glitch where setting a wait time to 0 would forcefully revert to 2 or 5 minutes. You can now blast posts instantly if you choose to.</li>
+      </ul>
+
+
+      <!-- FAQ SECTION -->
+      <div class="faq-section">
+        <div class="faq-title">Frequently Asked Questions</div>
+
+        <div class="faq-item">
+          <p class="faq-q">Do I need to keep a new tab open for Magic Replies to work?</p>
+          <p class="faq-a">No! Once you review the AI's drafted reply and click "Send", the extension securely handles the auto-commenting in the background. You can stay right in the extension window.</p>
+        </div>
+
+        <div class="faq-item">
+          <p class="faq-q">How does the new AI Business Profile work?</p>
+          <p class="faq-a">Think of it as a master set of instructions for the AI. Instead of typing "I am a real estate agent selling homes in Miami" every time you generate a post, you save it once in the Business Persona settings. The AI will automatically apply that context to everything it writes for you.</p>
+        </div>
+
+        <div class="faq-item">
+          <p class="faq-q">What happened to the AI variation number input?</p>
+          <p class="faq-a">We simplified it to protect your account. Checking the "Auto-Generate AI Variations" box now automatically creates exactly 3 highly-optimized variations behind the scenes. This is the sweet spot for avoiding Facebook spam filters without overwhelming the API.</p>
+        </div>
+
+        <div class="faq-item">
+          <p class="faq-q">Is my data safe with these new updates?</p>
+          <p class="faq-a">Absolutely. Alongside performance boosts, we implemented a native <code>escapeHTML</code> sanitizer across the entire app, meaning malicious group names or weird characters can no longer break your extension UI. Your data remains stored locally and securely.</p>
+        </div>
+      </div>
+
+      <div class="signature-block">
+        <!-- Abstract signature SVG -->
+        <svg class="signature-svg" viewBox="0 0 250 80" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 20 70 C 25 20, 35 20, 40 20 C 45 40, 50 60, 55 70 M 30 55 C 40 55, 50 65, 65 55 C 70 70, 75 50, 80 65 C 85 75, 90 45, 95 65 C 100 75, 110 40, 115 65" fill="none" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M 140 20 L 140 70 M 140 25 C 160 20, 165 40, 150 45 C 170 45, 170 70, 140 70 C 155 70, 165 50, 175 65 C 185 75, 190 50, 200 65 C 210 75, 215 55, 220 65" fill="none" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+
+        <div class="signature-name">András Bodó</div>
+        <div class="signature-team">
+          & the growing Group Posting Pro Team<br />
+          <span style="font-size: 13px; color: #94a3b8; font-weight: 400">(Helena Garcia, Emi L., David, and Sarah)</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

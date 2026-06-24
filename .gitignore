@@ -6,3 +6,6 @@ dist/
 uploads/
 /public/images/
 /public/videos/
+
+# Local Google Drive service account keys (DO NOT COMMIT)
+google drive/

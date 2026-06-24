@@ -1,0 +1,3194 @@
+{
+   "aboutTitle": {
+      "message": "O nas"
+   },
+   "actBtn": {
+      "message": "Aktywuj Licencję"
+   },
+   "actContinueFree": {
+      "message": "Kontynuuj Darmowy Okres (Zamknij okno)"
+   },
+   "actInfo": {
+      "message": "Wpisz poniżej swój klucz licencyjny. Znajdziesz go w wiadomości e-mail wysłanej po zakupie."
+   },
+   "actNoKey": {
+      "message": "Nie masz klucza licencji?"
+   },
+   "actPh": {
+      "message": "XXXX-XXXX-XXXX-XXXX"
+   },
+   "actPrice": {
+      "message": "Klucze licencyjne zaczynają się od €9.9 / miesiąc."
+   },
+   "actSubtitle": {
+      "message": "Wpisz swój klucz licencyjny, aby zacząć"
+   },
+   "actTitle": {
+      "message": "Aktywuj Swoją Licencję"
+   },
+   "actUpgradeLink": {
+      "message": "Ulepsz teraz"
+   },
+   "aiBtnGenerate": {
+      "message": "Generuj Post"
+   },
+   "aiLblAudience": {
+      "message": "Grupa Docelowa"
+   },
+   "aiLblCTA": {
+      "message": "Wezwanie do Akcji (CTA)"
+   },
+   "aiLblGoal": {
+      "message": "Główny Cel / Temat"
+   },
+   "aiLblKeywords": {
+      "message": "Kluczowe Punkty / Słowa"
+   },
+   "aiLblOptions": {
+      "message": "Dodatkowe Opcje"
+   },
+   "aiLblTone": {
+      "message": "Pożądany Ton"
+   },
+   "aiModalSubtitle": {
+      "message": "Podaj szczegóły poniżej, aby AI stworzyło dla Ciebie najlepszy post."
+   },
+   "aiModalTitle": {
+      "message": "Generator Postów AI GroupPosting"
+   },
+   "aiOptEmojis": {
+      "message": "Dodaj Emojis"
+   },
+   "aiOptEmojisDesc": {
+      "message": "Automatycznie dołącz trafne emojis."
+   },
+   "aiOptHashtags": {
+      "message": "Dodaj Hashtagi"
+   },
+   "aiOptHashtagsDesc": {
+      "message": "Dodaj trafne #hashtagi na końcu."
+   },
+   "aiOptSpintax": {
+      "message": "Użyj Spintax"
+   },
+   "aiOptSpintaxDesc": {
+      "message": "Generuj wersje tekstu typu {A|B}."
+   },
+   "aiPhAudience": {
+      "message": "np., 'Przedsiębiorcy'"
+   },
+   "aiPhCTA": {
+      "message": "np., 'Odwiedź naszą stronę'"
+   },
+   "aiPhGoal": {
+      "message": "WYMAGANE: Wyjaśnij główny cel..."
+   },
+   "aiPhKeywords": {
+      "message": "Wypisz ważne punkty..."
+   },
+   "aiToneCasual": {
+      "message": "Swobodny i Konwersacyjny"
+   },
+   "aiToneExcited": {
+      "message": "Podekscytowany i Entuzjastyczny"
+   },
+   "aiToneFriendly": {
+      "message": "Przyjazny i Angażujący"
+   },
+   "aiToneFunny": {
+      "message": "Zabawny i Błyskotliwy"
+   },
+   "aiToneInfo": {
+      "message": "Informacyjny i Edukacyjny"
+   },
+   "aiToneInspire": {
+      "message": "Inspirujący i Motywujący"
+   },
+   "aiToneProf": {
+      "message": "Profesjonalny"
+   },
+   "aiToneSales": {
+      "message": "Przekonujący i Sprzedażowy"
+   },
+   "aiUseSpintax": {
+      "message": "Użyj Wersji Spintax"
+   },
+   "appDescription": {
+      "message": "Safely auto-post and schedule content to multiple Facebook™ groups. Boost engagement with AI variations and smart delays."
+   },
+   "appName": {
+      "message": "Group Posting PRO: Planer Grup | Auto Publikacje | Radar na FB™"
+   },
+   "ardActiveSafe": {
+      "message": "Silnik Aktywny i Bezpieczny"
+   },
+   "ardLiveActivity": {
+      "message": "Aktywność na Żywo"
+   },
+   "ardSafeNotice": {
+      "message": "Możesz zminimalizować to okno lub przeglądać inne karty. Automatyzacja trwa."
+   },
+   "backupErrMsg": {
+      "message": "Wystąpił błąd: $ERR$",
+      "placeholders": {
+         "err": {
+            "content": "$1"
+         }
+      }
+   },
+   "backupErrTitle": {
+      "message": "Błąd Zapisywania"
+   },
+   "backupMsg": {
+      "message": "Twoje Szablony Postów i Kolekcje Grup zostały zapisane do pliku."
+   },
+   "backupTitle": {
+      "message": "Zapisano Pomyślnie"
+   },
+   "badgeBestValue": {
+      "message": "NAJLEPSZA OFERTA"
+   },
+   "badgeDataDriven": {
+      "message": "Wskaźniki oparte na danych"
+   },
+   "badgeFree": {
+      "message": "Darmowe:"
+   },
+   "badgePaused": {
+      "message": "Pauza"
+   },
+   "badgeProcessing": {
+      "message": "Przetwarzanie"
+   },
+   "badgeRunning": {
+      "message": "Działa"
+   },
+   "badgeScheduled": {
+      "message": "Zaplanowany"
+   },
+   "badgeWaiting": {
+      "message": "Czekam"
+   },
+   "bannerFeedbackDesc": {
+      "message": "Podziel się opinią — to zajmie tylko minutę."
+   },
+   "bannerFeedbackTitle": {
+      "message": "Pomożesz nam się rozwijać?"
+   },
+   "bannerPaused": {
+      "message": "Zaplanowane posty są wstrzymane."
+   },
+   "benAI": {
+      "message": "Generowanie Treści AI"
+   },
+   "benCampaigns": {
+      "message": "Automatyzacja Kampanii"
+   },
+   "benCancel": {
+      "message": "Anuluj w Dowolnej Chwili"
+   },
+   "benRadar": {
+      "message": "Radar Leadów"
+   },
+   "benSchedule": {
+      "message": "Planowanie Postów"
+   },
+   "benSpintax": {
+      "message": "Inteligentny Spintax"
+   },
+   "benSupport": {
+      "message": "Priorytetowe Wsparcie"
+   },
+   "benUnlimited": {
+      "message": "Nielimitowane Posty"
+   },
+   "blockLoop": {
+      "message": "Pętla"
+   },
+   "blockPost": {
+      "message": "Post"
+   },
+   "blockStop": {
+      "message": "Stop"
+   },
+   "blockTrigger": {
+      "message": "Wyzwalacz"
+   },
+   "blockWait": {
+      "message": "Czekaj"
+   },
+   "btnActivate": {
+      "message": "Aktywuj licencję"
+   },
+   "btnActivateKey": {
+      "message": "Aktywuj Klucz Licencyjny"
+   },
+   "btnAdd": {
+      "message": "Dodaj"
+   },
+   "btnAddLink": {
+      "message": "Dodaj nowy link"
+   },
+   "btnAddProd": {
+      "message": "Dodaj szablon produktu"
+   },
+   "btnAddSpintax": {
+      "message": "Dodaj spintax"
+   },
+   "btnAdvSelector": {
+      "message": "Wybór Zaawansowany"
+   },
+   "btnAiWizard": {
+      "message": "Kreator AI"
+   },
+   "btnAutoJoin": {
+      "message": "Auto-dołączanie"
+   },
+   "btnAutoVars": {
+      "message": "Auto-Wersje AI"
+   },
+   "btnBack": {
+      "message": "Wstecz"
+   },
+   "btnBackup": {
+      "message": "Wykonaj Kopię Danych"
+   },
+   "btnCancel": {
+      "message": "Anuluj"
+   },
+   "btnCancelEdit": {
+      "message": "Anuluj Edycję"
+   },
+   "btnChoose": {
+      "message": "Wybierz"
+   },
+   "btnClearAll": {
+      "message": "Wyczyść Wszystko"
+   },
+   "btnClose": {
+      "message": "Zamknij okno"
+   },
+   "btnConfig": {
+      "message": "Konfiguracja i Restrykcje"
+   },
+   "btnCreateColl": {
+      "message": "Utwórz kolekcję"
+   },
+   "btnCreateFirstTemp": {
+      "message": "Utwórz Mój Pierwszy Szablon"
+   },
+   "btnCreateNew": {
+      "message": "Utwórz Nową"
+   },
+   "btnCreateTag": {
+      "message": "Utwórz Nowy Tagi"
+   },
+   "btnCreateTemplate": {
+      "message": "Utwórz nowy szablon"
+   },
+   "btnDefault": {
+      "message": "Domyślnie"
+   },
+   "btnDelete": {
+      "message": "Usuń"
+   },
+   "btnDone": {
+      "message": "Gotowe"
+   },
+   "btnEnhance": {
+      "message": "Poprawki AI"
+   },
+   "btnExport": {
+      "message": "Eksportuj"
+   },
+   "btnExtract": {
+      "message": "Pobierz z FB"
+   },
+   "btnExtractFb": {
+      "message": "Pobierz z FB"
+   },
+   "btnFeatureReq": {
+      "message": "Poproś o Funkcję"
+   },
+   "btnFillTemplate": {
+      "message": "Wypełnij z szablonu"
+   },
+   "btnForceReset": {
+      "message": "Wymuś Restart Silnika"
+   },
+   "btnGenCamp": {
+      "message": "Generuj Kampanię"
+   },
+   "btnGenerateAI": {
+      "message": "Generowanie AI"
+   },
+   "btnGo": {
+      "message": "Idź"
+   },
+   "btnGoBack": {
+      "message": "Wróć i Edytuj"
+   },
+   "btnGoToFb": {
+      "message": "Wejdź na FB"
+   },
+   "btnHealth": {
+      "message": "Kondycja"
+   },
+   "btnImportColl": {
+      "message": "Importuj z innej kolekcji"
+   },
+   "btnLaunch": {
+      "message": "Uruchom"
+   },
+   "btnLetsGo": {
+      "message": "Lecimy!"
+   },
+   "btnLoadCloud": {
+      "message": "Pobierz z Chmury"
+   },
+   "btnLoadMore": {
+      "message": "Załaduj Więcej"
+   },
+   "btnManageCat": {
+      "message": "Zarządzaj Kategoriami"
+   },
+   "btnManageTags": {
+      "message": "Zarządzaj Etykietami"
+   },
+   "btnManualScan": {
+      "message": "Wymuś Skanowanie"
+   },
+   "btnMasterTools": {
+      "message": "Główne Narzędzia Edycji"
+   },
+   "btnNameAZ": {
+      "message": "Nazwa (A-Z)"
+   },
+   "btnNameZA": {
+      "message": "Nazwa (Z-A)"
+   },
+   "btnNext": {
+      "message": "Dalej"
+   },
+   "btnNoThanks": {
+      "message": "Nie, dziękuję"
+   },
+   "btnPostNow": {
+      "message": "Publikuj Teraz"
+   },
+   "btnPreFill": {
+      "message": "Wypełnij"
+   },
+   "btnPreparing": {
+      "message": "Przygotowywanie..."
+   },
+   "btnRemoveFromTag": {
+      "message": "Usuń z Etykiety"
+   },
+   "btnRemoveKey": {
+      "message": "Usuń Klucz Weryfikacyjny"
+   },
+   "btnReschedule": {
+      "message": "Zmień Datę"
+   },
+   "btnRestore": {
+      "message": "Przywróć z Kopii"
+   },
+   "btnResume": {
+      "message": "Wznów"
+   },
+   "btnRetry": {
+      "message": "Ponów Nieudane Posty"
+   },
+   "btnSave": {
+      "message": "Zapisz"
+   },
+   "btnSaveCloud": {
+      "message": "Zapisz w Chmurze"
+   },
+   "btnSavePersona": {
+      "message": "Zapisz Moją Personę"
+   },
+   "btnSaveSettings": {
+      "message": "Zapisz Ustawienia"
+   },
+   "btnSchedule": {
+      "message": "Zaplanuj"
+   },
+   "btnScheduleLater": {
+      "message": "Zaplanuj na Później"
+   },
+   "btnSegmentNiche": {
+      "message": "Segmentuj wg Niszy"
+   },
+   "btnShowAll": {
+      "message": "Pokaż Wszystkie"
+   },
+   "btnSortFilter": {
+      "message": "Sortuj i Filtruj"
+   },
+   "btnSplit": {
+      "message": "Podziel"
+   },
+   "btnStartTour": {
+      "message": "Zacznij Trasę"
+   },
+   "btnStop": {
+      "message": "Zatrzymaj Publikację"
+   },
+   "btnSure": {
+      "message": "Pewnie"
+   },
+   "btnToneHelpful": {
+      "message": "Pomocny"
+   },
+   "btnToneProf": {
+      "message": "Profesjonalny"
+   },
+   "btnTonePromo": {
+      "message": "Reklamowy"
+   },
+   "btnUnlock": {
+      "message": "Kup Pro, by Odblokować"
+   },
+   "btnUpgrade": {
+      "message": "Kup Pro"
+   },
+   "btnUpgradeReq": {
+      "message": "Wymagane Ulepszenie"
+   },
+   "btnView": {
+      "message": "Zobacz"
+   },
+   "btnWrapSpintax": {
+      "message": "Otocz spintaxem"
+   },
+   "builderLoopCount": {
+      "message": "Pętla $COUNT$x do Kroku $STEP$",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         },
+         "step": {
+            "content": "$2"
+         }
+      }
+   },
+   "builderLoopForever": {
+      "message": "Pętla w Nieskończoność do Kroku $STEP$",
+      "placeholders": {
+         "step": {
+            "content": "$1"
+         }
+      }
+   },
+   "builderNoWait": {
+      "message": "Brak czekania"
+   },
+   "builderPostInherit": {
+      "message": " (Dziedziczy z $STEP$)",
+      "placeholders": {
+         "step": {
+            "content": "$1"
+         }
+      }
+   },
+   "builderPostSummary": {
+      "message": "$POSTS$ Post/y, $GROUPS$ Grupa/y",
+      "placeholders": {
+         "groups": {
+            "content": "$2"
+         },
+         "posts": {
+            "content": "$1"
+         }
+      }
+   },
+   "builderPostSummaryInherit": {
+      "message": "$POSTS$ Post/y, Dziedziczone Grupy",
+      "placeholders": {
+         "posts": {
+            "content": "$1"
+         }
+      }
+   },
+   "builderStepOption": {
+      "message": "Krok $NUM$",
+      "placeholders": {
+         "num": {
+            "content": "$1"
+         }
+      }
+   },
+   "builderWaitSummary": {
+      "message": "Czekaj $DURATION$",
+      "placeholders": {
+         "duration": {
+            "content": "$1"
+         }
+      }
+   },
+   "campActionPause": {
+      "message": "Wstrzymaj"
+   },
+   "campActionRestart": {
+      "message": "Restartuję"
+   },
+   "campActionResume": {
+      "message": "Wznów"
+   },
+   "campActionUpgrade": {
+      "message": "Kup Pro, by Aktywować"
+   },
+   "campAuto": {
+      "message": "Auto-Kampania"
+   },
+   "campBlockBatch": {
+      "message": "Paczka Postów"
+   },
+   "campBlockDelay": {
+      "message": "Przerwa"
+   },
+   "campBlockLoop": {
+      "message": "Pętla"
+   },
+   "campBlockStop": {
+      "message": "Stop"
+   },
+   "campBlockTrigger": {
+      "message": "Wyzwalacz"
+   },
+   "campDeleteMsg": {
+      "message": "Jesteś pewien? To trwale usunie tę kampanię i jej historię."
+   },
+   "campDeleteTitle": {
+      "message": "Usuń Strategię"
+   },
+   "campDescLoopCount": {
+      "message": "Powtarzaj $COUNT$ razy",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "campDescLoopForever": {
+      "message": "Powtarzaj w Nieskończoność"
+   },
+   "campDescPost": {
+      "message": "$POSTS$ Szablon/y &rarr; $GROUPS$ Grupa/y",
+      "placeholders": {
+         "groups": {
+            "content": "$2"
+         },
+         "posts": {
+            "content": "$1"
+         }
+      }
+   },
+   "campDescStop": {
+      "message": "Zakończ Kampanię"
+   },
+   "campDescWait": {
+      "message": "Pauza na $DURATION$",
+      "placeholders": {
+         "duration": {
+            "content": "$1"
+         }
+      }
+   },
+   "campRestartMsg": {
+      "message": "Kampania była zakończona, więc została zrestartowana od Kroku 1."
+   },
+   "campStatusActive": {
+      "message": "Aktywna"
+   },
+   "campStatusCompleted": {
+      "message": "Ukończona"
+   },
+   "campStatusEnded": {
+      "message": "Zakończona"
+   },
+   "campStatusPaused": {
+      "message": "Zatrzymana"
+   },
+   "campStatusProcessing": {
+      "message": "Przetwarzanie..."
+   },
+   "campStatusRunning": {
+      "message": "Działa..."
+   },
+   "campStatusWaiting": {
+      "message": "Czekam"
+   },
+   "campStep": {
+      "message": "Krok Kampanii"
+   },
+   "campStepDone": {
+      "message": "Wykonany"
+   },
+   "campStepManual": {
+      "message": "Ręczny Start"
+   },
+   "campStepPending": {
+      "message": "Oczekuje"
+   },
+   "campStepProcessing": {
+      "message": "Przetwarzanie..."
+   },
+   "campStepScheduled": {
+      "message": "Zaplanowany"
+   },
+   "campStepSent": {
+      "message": "Wysłany"
+   },
+   "campTimeStarting": {
+      "message": "Startuję..."
+   },
+   "campTimeUntil": {
+      "message": "Do $DATE$",
+      "placeholders": {
+         "date": {
+            "content": "$1"
+         }
+      }
+   },
+   "campWizChip1": {
+      "message": "💰 Oferta Afiliacyjna"
+   },
+   "campWizChip2": {
+      "message": "🏠 Nieruchomości"
+   },
+   "campWizChip3": {
+      "message": "🍔 Lokalny Biznes"
+   },
+   "campWizPrompt1": {
+      "message": "Afiliacja: Promuj narzędzie, promocja kończy się za 48h. Agressywna częstotliwość."
+   },
+   "campWizPrompt2": {
+      "message": "Nieruchomości: Pokaż nową ofertę. Zwiastun -> Cechy -> Dni otwarte."
+   },
+   "campWizPrompt3": {
+      "message": "Lokalny Biznes: Nowe menu. Zrób smaka i daj rabat."
+   },
+   "canvasEmpty": {
+      "message": "Przeciągnij tutaj blok \u003Cstrong>Wyzwalacza\u003C/strong> na start"
+   },
+   "cardGroupsTip": {
+      "message": "Inteligentne Zarządzanie Grupami"
+   },
+   "catAdd": {
+      "message": "Dodaj Nową Kategorię"
+   },
+   "catConfirmDel": {
+      "message": "Czy na pewno chcesz usunąć kategorię \"$NAME$\"?",
+      "placeholders": {
+         "name": {
+            "content": "$1"
+         }
+      }
+   },
+   "catErrEmpty": {
+      "message": "Nazwa kategorii nie może być pusta."
+   },
+   "catErrLimit": {
+      "message": "Osiągnąłeś maksymalny limit kategorii."
+   },
+   "catLimit": {
+      "message": "Osiągnięto limit kategorii"
+   },
+   "catManage": {
+      "message": "Zarządzaj Kategoriami"
+   },
+   "catPhName": {
+      "message": "Nazwa Kategorii"
+   },
+   "colBlue": {
+      "message": "Niebieski"
+   },
+   "colDefault": {
+      "message": "Domyślny (Czarny)"
+   },
+   "colGroup": {
+      "message": "Grupa Docelowa"
+   },
+   "colGroupName": {
+      "message": "Nazwa Grupy"
+   },
+   "colOrange": {
+      "message": "Pomarańczowy"
+   },
+   "colPink": {
+      "message": "Różowy"
+   },
+   "colPurple": {
+      "message": "Fioletowy"
+   },
+   "colRed": {
+      "message": "Czerwony"
+   },
+   "colStatus": {
+      "message": "Status"
+   },
+   "colTags": {
+      "message": "Etykiety"
+   },
+   "colTeal": {
+      "message": "Turkusowy"
+   },
+   "colTemplate": {
+      "message": "Szablon Posta"
+   },
+   "countChars": {
+      "message": "$COUNT$ znak",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "countCharsPlural": {
+      "message": "$COUNT$ znaków",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "countItems": {
+      "message": "$COUNT$ element",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "countItemsPlural": {
+      "message": "$COUNT$ elementy/ów",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "countLinkSingular": {
+      "message": "$COUNT$ link",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "countLinks": {
+      "message": "$COUNT$ linków",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "countSelected": {
+      "message": "$COUNT$ zaznaczonych",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "descAiAutoVars": {
+      "message": "Automatycznie przygotuje 3 oddzielne wersje posta, aby pominąć wkurzające filtry spamu."
+   },
+   "descAiInstructions": {
+      "message": "Nadpisanie najwyższego poziomu. Nakazuj wprost, czego AI NIE może używać i co musi zawierać."
+   },
+   "descAnonPost": {
+      "message": "Anuluje, jeśli grupa na to nie pozwala. Tylko w Trybie Klasycznym."
+   },
+   "descAnonShort": {
+      "message": "Jeśli to możliwe"
+   },
+   "descBackup": {
+      "message": "Zapisuje szablony i kolekcje grup (bez multimediów)."
+   },
+   "descBilledMonthly": {
+      "message": "Rozliczane co miesiąc"
+   },
+   "descBilledQuarterly": {
+      "message": "Rozliczane co 3 miesiące"
+   },
+   "descBilledYearly": {
+      "message": "Rozliczane co rok"
+   },
+   "descClassic": {
+      "message": "Automatyzacja wizualna. Dobra dla wideo."
+   },
+   "descCloudSync": {
+      "message": "Zapisuj szablony, grupy i kampanie na koncie. (Zdjęcia i wideo nie są objęte backupem)."
+   },
+   "descCompress": {
+      "message": "Zmniejsza rozmiar (zalecane)"
+   },
+   "descDesktopAlerts": {
+      "message": "Dostaniesz natywne powiadomienie systemu."
+   },
+   "descDragDrop": {
+      "message": "Przeciągnij i upuść pliki lub kliknij plus"
+   },
+   "descEmptyCamp": {
+      "message": "Utwórz swoją pierwszą automatyczną strategię."
+   },
+   "descEmptySched": {
+      "message": "Jeszcze nie zaplanowałeś żadnych postów."
+   },
+   "descEnableContext": {
+      "message": "AI zacznie naśladować Twoją profesję i zaadoptuje swój ton w zależności od sytuacji (pomagający i doradzający kontra stricte sprzedażowy)."
+   },
+   "descFormats": {
+      "message": "Formaty: Zdjęcia, wideo MP4, WebM"
+   },
+   "descGenAiVar": {
+      "message": "Twórz wersje w różnych tonach. Cel posta zostanie zachowany."
+   },
+   "descImport": {
+      "message": "Pobierz swoje grupy z Facebooka."
+   },
+   "descInPageAlerts": {
+      "message": "Pokaż wyskakujące okienko u dołu Twojego ekranu."
+   },
+   "descMediaPools": {
+      "message": "Wybiera losowe pliki mediów, omijając filtry spamowe"
+   },
+   "descNightMode": {
+      "message": "Nie publikuj od 22:00 do 07:00"
+   },
+   "descPost": {
+      "message": "Uruchom szybki lub zaplanowany post."
+   },
+   "descPro": {
+      "message": "Odblokuj nieograniczoną moc."
+   },
+   "descSafeDelay": {
+      "message": "Czekaj pełen czas, nawet jeśli post się nie uda."
+   },
+   "descSecLevel": {
+      "message": "Balans między szybkością a bezpieczeństwem."
+   },
+   "descSkipNet": {
+      "message": "Włącz tylko, gdy Twoje posty zacinają się z powodem 'Brak połączenia', choć masz internet."
+   },
+   "descSmartTiming": {
+      "message": "Wybierz datę, żeby dostać dzienne powiadomienia strategiczne."
+   },
+   "descSourceExist": {
+      "message": "Wybierz swoje własne szablony."
+   },
+   "descSourceGen": {
+      "message": "AI napisze dla Ciebie nowe posty."
+   },
+   "descSpeed": {
+      "message": "API Facebooka. Szybki i Niezawodny."
+   },
+   "descTargetGroups": {
+      "message": "(Max 25 - Polecane: 5-10)"
+   },
+   "descTelemetry": {
+      "message": "To pomaga nam ulepszać rozszerzenie. Nigdy nie zbieramy danych osobowych."
+   },
+   "descTemplate": {
+      "message": "Napisz post do wielokrotnego użytku."
+   },
+   "descTriggerKw": {
+      "message": "(Użyj \u003Cb>-słowo\u003C/b> żeby wykluczyć. Np. \u003Ci>szukam kogoś, -za darmo\u003C/i>)"
+   },
+   "descVars": {
+      "message": "Użyj {Cześć|Hej} lub Wersji AI."
+   },
+   "descWaitFailShort": {
+      "message": "Zaczekaj, gdy błąd"
+   },
+   "dueNow": {
+      "message": "Teraz"
+   },
+   "emptyCampaigns": {
+      "message": "Brak kampanii"
+   },
+   "emptySched": {
+      "message": "Brak Zaplanowanych Postów"
+   },
+   "enhBoostDesc": {
+      "message": "Maksymalizuj zaangażowanie dzięki mocnym haczykom i CTA."
+   },
+   "enhBoostTitle": {
+      "message": "Wzrost Konwersji"
+   },
+   "enhPolishDesc": {
+      "message": "Napraw błędy i popraw jasność bez zmiany tonu."
+   },
+   "enhPolishTitle": {
+      "message": "Gramatyka i Szlify"
+   },
+   "enhSpinDesc": {
+      "message": "Zamień tekst w skomplikowane wersje {A|B} dla bezpieczeństwa."
+   },
+   "enhSpinTitle": {
+      "message": "Architekt Spintax"
+   },
+   "enhTitle": {
+      "message": "Wybierz Styl Ulepszenia"
+   },
+   "errConnectMsg": {
+      "message": "Nie mogliśmy połączyć się z serwerem. Sprawdź swoje połączenie."
+   },
+   "errConnectTitle": {
+      "message": "Błąd Połączenia"
+   },
+   "errStopFail": {
+      "message": "Błąd podczas zatrzymywania: $MSG$",
+      "placeholders": {
+         "msg": {
+            "content": "$1"
+         }
+      }
+   },
+   "errStopUnknown": {
+      "message": "Nie udało się potwierdzić sygnału stopu."
+   },
+   "extractBtnStart": {
+      "message": "OK, Rozpocznij Skanowanie"
+   },
+   "extractConfirmMsg": {
+      "message": "Gdy klikniesz OK, rozszerzenie spróbuje pobrać grupy przez bezpieczny silnik GPP. \u003Cb>Może to zająć parę minut.\u003C/b> Jeśli będą problemy, otworzy nową, widoczną kartę z Twoimi grupami. \u003Cbr>\u003Cbr>\u003Cb>Proszę, nie zamykaj nowej karty;\u003C/b> sama się zamknie, gdy proces się zakończy."
+   },
+   "extractConfirmTitle": {
+      "message": "Rozpocząć Pobieranie Grup?"
+   },
+   "fbBtn": {
+      "message": "Daj Opinię i Zgarnij Posty"
+   },
+   "fbReward": {
+      "message": "W podzięce dodamy Ci 3 darmowe posty!"
+   },
+   "fbSorry": {
+      "message": "Przepraszamy! Jak możemy to naprawić?"
+   },
+   "fileLargeMsg": {
+      "message": "Następujące pliki są zbyt duże do obsługi:\u003Cbr>\u003Cbr>\u003Cstrong>$FILES$\u003C/strong>\u003Cbr>\u003Cbr>Proszę, skompresuj je poniżej $SIZE$MB.",
+      "placeholders": {
+         "files": {
+            "content": "$1"
+         },
+         "size": {
+            "content": "$2"
+         }
+      }
+   },
+   "fileLargeTitle": {
+      "message": "Zbyt Duże Pliki"
+   },
+   "fileTypeMsg": {
+      "message": "Następujące pliki zostały pominięte: \u003Cbr>\u003Cstrong>$FILES$\u003C/strong>",
+      "placeholders": {
+         "files": {
+            "content": "$1"
+         }
+      }
+   },
+   "fileTypeTitle": {
+      "message": "Nieobsługiwany Typ Pliku"
+   },
+   "freqDaily": {
+      "message": "CODZIENNIE"
+   },
+   "freqMonthly": {
+      "message": "CO MIESIĄC"
+   },
+   "freqOnce": {
+      "message": "JEDEN RAZ"
+   },
+   "freqWeekly": {
+      "message": "CO TYDZIEŃ"
+   },
+   "freshCool": {
+      "message": "\u003Cstrong>Świeże (>7 dni):\u003C/strong> $COUNT$ grup",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "freshCoolLabel": {
+      "message": "Świeże (>7dni):"
+   },
+   "freshHot": {
+      "message": "\u003Cstrong>Gorące (Ostatnie 2 dni):\u003C/strong> $COUNT$ grup",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "freshHotLabel": {
+      "message": "Gorące (\u003C48h):"
+   },
+   "freshOverviewTitle": {
+      "message": "Przegląd Świeżości Publikacji"
+   },
+   "freshTitle": {
+      "message": "Analiza Świeżości (przy poście)"
+   },
+   "freshWarm": {
+      "message": "\u003Cstrong>Ciepłe (3-7 dni):\u003C/strong> $COUNT$ grup",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "freshWarmLabel": {
+      "message": "Ciepłe (\u003C7dni):"
+   },
+   "graphLess": {
+      "message": "Mniej"
+   },
+   "graphMore": {
+      "message": "Więcej"
+   },
+   "graphPostsCount": {
+      "message": "$COUNT$ postów",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "grpPhLink": {
+      "message": "Link"
+   },
+   "grpPhTitle": {
+      "message": "Tytuł"
+   },
+   "guideTitle": {
+      "message": "Poradnik Startowy"
+   },
+   "headerAiVar": {
+      "message": "Wersje AI Posta"
+   },
+   "headerComments": {
+      "message": "Ustawienia Komentarzy"
+   },
+   "headerCreateTemp": {
+      "message": "Utwórz Szablon"
+   },
+   "headerDragBlocks": {
+      "message": "PRZECIĄGNIJ BLOKI"
+   },
+   "headerHistory": {
+      "message": "Historia"
+   },
+   "headerOrder": {
+      "message": "Kolejność Publikacji"
+   },
+   "headerPause": {
+      "message": "Przerwy, Ochrona i Komentarze"
+   },
+   "headerSchedulePost": {
+      "message": "Zaplanuj Twój Post"
+   },
+   "headerScheduled": {
+      "message": "Zaplanowane Posty"
+   },
+   "headerSelectGroups": {
+      "message": "Wybierz docelowe kolekcje grup"
+   },
+   "headerSelectTemplates": {
+      "message": "Wybierz szablony do publikacji"
+   },
+   "headerStrategy": {
+      "message": "Strategia Publikacji"
+   },
+   "healthCleanupMsg": {
+      "message": "Usunięto $COUNT$ martwych linków z Twoich kolekcji.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "healthCleanupTitle": {
+      "message": "Czyszczenie Zakończone"
+   },
+   "healthFoundMsg": {
+      "message": "Te grupy są nadal w Twoich kolekcjach, ale stale powodują błędy."
+   },
+   "healthFoundTitle": {
+      "message": "Znaleziono $COUNT$ Martwych Grup",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "healthRemoveBtn": {
+      "message": "Usuń Wybrane Grupy"
+   },
+   "healthSuccessMsg": {
+      "message": "W Twoich kolekcjach nie znaleziono aktywnych grup z częstymi błędami."
+   },
+   "healthSuccessTitle": {
+      "message": "Wszystko Super!"
+   },
+   "healthVerifyLink": {
+      "message": "Sprawdź Link"
+   },
+   "helpClose": {
+      "message": "Zamknij"
+   },
+   "helpEmailIntro": {
+      "message": "W sprawach technicznych napisz do nas na:"
+   },
+   "helpModalTitle": {
+      "message": "Pomoc i Wsparcie"
+   },
+   "helpPageIntro": {
+      "message": "Lub odwiedź naszą stronę pomocy:"
+   },
+   "hintBgColor": {
+      "message": "Dla postów z maks. 130 znakami"
+   },
+   "hintInterval": {
+      "message": "Pomiędzy przerwami"
+   },
+   "hintOrder": {
+      "message": "Sekwencyjna: A,A... potem B,B... | Naprzemienna: A,B,C... potem A,B,C..."
+   },
+   "hintVariations": {
+      "message": "Zapisuje jako {A|B|C...}"
+   },
+   "hintWait": {
+      "message": "Losowy czas trwania"
+   },
+   "histFilterDate": {
+      "message": "Filtrujesz po dacie: \u003Cstrong>$DATE$\u003C/strong>",
+      "placeholders": {
+         "date": {
+            "content": "$1"
+         }
+      }
+   },
+   "histSearch": {
+      "message": "Szukaj w historii..."
+   },
+   "impBtnImport": {
+      "message": "Importuj Zaznaczone"
+   },
+   "impErrEmpty": {
+      "message": "Wybierz kolekcję grup i przynajmniej jeden link."
+   },
+   "impLblAvail": {
+      "message": "Dostępne Linki"
+   },
+   "impNoLinks": {
+      "message": "Brak linków w tej kolekcji"
+   },
+   "impPhSearch": {
+      "message": "Szukaj linków..."
+   },
+   "impSelAll": {
+      "message": "Zaznacz Wszystko"
+   },
+   "impSelAllFilt": {
+      "message": "Zaznacz Odfiltrowane"
+   },
+   "impSelFirst": {
+      "message": "Najpierw wybierz kolekcję grup"
+   },
+   "impTitle": {
+      "message": "Importuj z Kolekcji Grup"
+   },
+   "initLoading": {
+      "message": "Inicjowanie Group Posting Pro..."
+   },
+   "keyRemovedMsg": {
+      "message": "Twój klucz weryfikacyjny został pomyślnie usunięty."
+   },
+   "keyRemovedTitle": {
+      "message": "Klucz licencji usunięty"
+   },
+   "langSystemDefault": {
+      "message": "Język Systemowy"
+   },
+   "lblAIAssistant": {
+      "message": "Asystent AI"
+   },
+   "lblActivity": {
+      "message": "AKTYWNOŚĆ Z OSTATNICH 30 DNI"
+   },
+   "lblAddGroupColl": {
+      "message": "Dodaj nową kolekcję grup"
+   },
+   "lblAddMedia": {
+      "message": "Dodaj zdjęcia lub wideo"
+   },
+   "lblAddMediaText": {
+      "message": "Dodaj Media"
+   },
+   "lblAfterEvery": {
+      "message": "Co"
+   },
+   "lblAiAudienceOpt": {
+      "message": "Grupa Docelowa (Opcjonalne)"
+   },
+   "lblAiAutoVars": {
+      "message": "Auto-Wersje AI"
+   },
+   "lblAiInstructions": {
+      "message": "Własne Komendy Dla AI (Opcjonalnie)"
+   },
+   "lblAiPrompt": {
+      "message": "O czym ma być Twój post?"
+   },
+   "lblAlreadyPurchased": {
+      "message": "Już kupione?"
+   },
+   "lblAlternate": {
+      "message": "Naprzemienna"
+   },
+   "lblAnalysingCopy": {
+      "message": "Analizowanie celu i generowanie..."
+   },
+   "lblAnonCaps": {
+      "message": "PUBLIKUJ ANONIMOWO"
+   },
+   "lblAnonPost": {
+      "message": "Publikuj Anonimowo"
+   },
+   "lblAutoCommentContent": {
+      "message": "Treść Auto-Komentarza"
+   },
+   "lblAutoLoop": {
+      "message": "Zapetlaj Nieskończenie"
+   },
+   "lblAutoMatch": {
+      "message": "Automatyczne Dopasowanie"
+   },
+   "lblBackground": {
+      "message": "Tło"
+   },
+   "lblBalanced": {
+      "message": "Optymalny"
+   },
+   "lblBgColor": {
+      "message": "Kolor Tła"
+   },
+   "lblCampAssets": {
+      "message": "Materiały (Opcjonalnie)"
+   },
+   "lblCampaigns": {
+      "message": "Automatyzacje"
+   },
+   "lblCategories": {
+      "message": "Kategorie"
+   },
+   "lblChooseTone": {
+      "message": "Wybierz Tonację"
+   },
+   "lblClickActivate": {
+      "message": "Kliknij, aby aktywować"
+   },
+   "lblCloudSync": {
+      "message": "Synchronizacja Chmury"
+   },
+   "lblCompress": {
+      "message": "Kompresuj zdjęcia"
+   },
+   "lblCondition": {
+      "message": "Stan"
+   },
+   "lblConstructing": {
+      "message": "Budowanie Strategii..."
+   },
+   "lblCount": {
+      "message": "Ilość"
+   },
+   "lblDays": {
+      "message": "dni"
+   },
+   "lblDaysLower": {
+      "message": "Dni"
+   },
+   "lblDesc": {
+      "message": "Opis"
+   },
+   "lblDesktopAlerts": {
+      "message": "Alerty Systemowe (Push)"
+   },
+   "lblDetails": {
+      "message": "Szczegóły Publikacji"
+   },
+   "lblDisableComm": {
+      "message": "Wyłącz Komentarze"
+   },
+   "lblDoorDrop": {
+      "message": "Dostawa do Domu"
+   },
+   "lblDoorPickup": {
+      "message": "Odbiór Osobisty"
+   },
+   "lblDropFiles": {
+      "message": "Przeciągnij tutaj media"
+   },
+   "lblEmojis": {
+      "message": "Emojis"
+   },
+   "lblEmptyTemp": {
+      "message": "(Pusty Szablon)"
+   },
+   "lblEnableComm": {
+      "message": "Włącz Komentarze"
+   },
+   "lblEnableContext": {
+      "message": "Włącz Biznesowy Kontekst"
+   },
+   "lblEndCamp": {
+      "message": "Kampania zakończy się tutaj."
+   },
+   "lblFast": {
+      "message": "Szybki"
+   },
+   "lblFbStandards": {
+      "message": "Przeczytaj Standardy Społeczności Facebook™"
+   },
+   "lblFilterCat": {
+      "message": "Filtruj wg Kategorii"
+   },
+   "lblFiltered": {
+      "message": "Filtrowane: $CAT$",
+      "placeholders": {
+         "cat": {
+            "content": "$1"
+         }
+      }
+   },
+   "lblFirstComm": {
+      "message": "Dodaj Pierwszy Komentarz"
+   },
+   "lblFixedTimes": {
+      "message": "Stała ilość"
+   },
+   "lblFlowCtrl": {
+      "message": "Zarządzanie Przepływem"
+   },
+   "lblForever": {
+      "message": "Zawsze"
+   },
+   "lblGen": {
+      "message": "Generuj"
+   },
+   "lblGenAiVar": {
+      "message": "Generuj Wersje AI"
+   },
+   "lblGoToStep": {
+      "message": "Wróć do Kroku"
+   },
+   "lblHrs": {
+      "message": "godz"
+   },
+   "lblInPageAlerts": {
+      "message": "Alerty Ekranowe"
+   },
+   "lblInterval": {
+      "message": "Interwał"
+   },
+   "lblIssues": {
+      "message": "Błędy"
+   },
+   "lblJoinCount": {
+      "message": "Do ilu grup dołączyć?"
+   },
+   "lblLicenseKey": {
+      "message": "Klucz licencji:"
+   },
+   "lblLoadTemp": {
+      "message": "Ładowanie szablonów..."
+   },
+   "lblMedia": {
+      "message": "Media (Zdjęcia i Wideo)"
+   },
+   "lblMediaPools": {
+      "message": "Spintax Mediów (Bazy)"
+   },
+   "lblMinMembers": {
+      "message": "Minimum członków:"
+   },
+   "lblMins": {
+      "message": "min"
+   },
+   "lblMonthly": {
+      "message": "Miesięcznie"
+   },
+   "lblNightMode": {
+      "message": "Unikaj postów w nocy"
+   },
+   "lblNightModeCaps": {
+      "message": "UNIKAJ POSTÓW W NOCY"
+   },
+   "lblNoSavedTemp": {
+      "message": "Nie znaleziono zapisanych szablonów."
+   },
+   "lblNotConfigured": {
+      "message": "Brak ustawień"
+   },
+   "lblNotSignedIn": {
+      "message": "Nie Jesteś Zalogowany"
+   },
+   "lblNumVar": {
+      "message": "Liczba Wersji:"
+   },
+   "lblOrFresh": {
+      "message": "ALBO NAPISZ ZUPEŁNIE NOWY POST"
+   },
+   "lblPerPost": {
+      "message": "na post"
+   },
+   "lblPickupOpts": {
+      "message": "Opcje Odbioru"
+   },
+   "lblPlansStart": {
+      "message": "Ceny zaczynają się od"
+   },
+   "lblPostContent": {
+      "message": "Treść Posta"
+   },
+   "lblPostScore": {
+      "message": "Jakość Posta"
+   },
+   "lblPrice": {
+      "message": "Cena"
+   },
+   "lblProdName": {
+      "message": "Nazwa Produktu"
+   },
+   "lblPublicMeet": {
+      "message": "Miejsce Publiczne"
+   },
+   "lblQuarterly": {
+      "message": "Kwartalnie"
+   },
+   "lblQuickGroups": {
+      "message": "Wybierz docelowe kolekcje grup"
+   },
+   "lblQuickStep1": {
+      "message": "1. Gdzie chcesz to opublikować?"
+   },
+   "lblQuickStep2": {
+      "message": "2. Co chcesz powiedzieć? (użyj szablonów, napisz nowy lub zmiksuj)"
+   },
+   "lblQuickStep3": {
+      "message": "3. Zaawansowane Opcje Automatyzacji"
+   },
+   "lblRecTimes": {
+      "message": "Zalecane Czasy Dla Tego Dnia:"
+   },
+   "lblRepeat": {
+      "message": "Powtarzaj:"
+   },
+   "lblSafe": {
+      "message": "Bezpieczny"
+   },
+   "lblSafeDelay": {
+      "message": "Przerwa bezp. po błędzie"
+   },
+   "lblSafeDelayCaps": {
+      "message": "BEZPIECZNA PAUZA"
+   },
+   "lblSave45": {
+      "message": "Zaoszczędź 45%"
+   },
+   "lblSave58": {
+      "message": "Zaoszczędź 58%"
+   },
+   "lblSaveJoined": {
+      "message": "Zapisz nowe grupy"
+   },
+   "lblSavedProds": {
+      "message": "Zapisane Produkty"
+   },
+   "lblScanInterval": {
+      "message": "Czas Skanowania"
+   },
+   "lblSearchParam": {
+      "message": "Szukana Fraza"
+   },
+   "lblSecLevel": {
+      "message": "Poziom Bezpieczeństwa"
+   },
+   "lblSecLevelCaps": {
+      "message": "POZIOM BEZPIECZEŃSTWA"
+   },
+   "lblSelect": {
+      "message": "Wybierz:"
+   },
+   "lblSelectTemp": {
+      "message": "Wybierz Szablon Posta:"
+   },
+   "lblSequential": {
+      "message": "Sekwencyjna"
+   },
+   "lblSkipNet": {
+      "message": "Wyłącz Test Połączenia"
+   },
+   "lblSmartTiming": {
+      "message": "Doradca Od Czasów (AI)"
+   },
+   "lblSortBy": {
+      "message": "Sortuj wg"
+   },
+   "lblSourceExist": {
+      "message": "Użyj Moich Szablonów"
+   },
+   "lblSourceGen": {
+      "message": "AI Pisze Wszystko"
+   },
+   "lblSpintax": {
+      "message": "Spintax"
+   },
+   "lblStartImm": {
+      "message": "Zacznij Od Razu"
+   },
+   "lblStatus": {
+      "message": "Status:"
+   },
+   "lblSupportId": {
+      "message": "ID Wsparcia:"
+   },
+   "lblTargetGroups": {
+      "message": "Docelowe Grupy"
+   },
+   "lblTargetSame": {
+      "message": "Grupy te same co w:"
+   },
+   "lblTelemetry": {
+      "message": "Zezwól na Anonimowe Dane Użytkowania"
+   },
+   "lblTemplateName": {
+      "message": "Nazwa Szablonu"
+   },
+   "lblTimeRange": {
+      "message": "22:00 - 07:00"
+   },
+   "lblTimeSaved": {
+      "message": "Zaoszędzony Czas (Ost. 30 Dni)"
+   },
+   "lblToday": {
+      "message": "Dzisiaj"
+   },
+   "lblTodayDate": {
+      "message": "Dzisiaj"
+   },
+   "lblTriggerKw": {
+      "message": "Słowa Kluczowe"
+   },
+   "lblVariations": {
+      "message": "Wariacje"
+   },
+   "lblVariationsPrefix": {
+      "message": "Wersje:"
+   },
+   "lblVarsLower": {
+      "message": "wersje/i"
+   },
+   "lblVer": {
+      "message": "GroupPosting PRO Wersja: $VER$",
+      "placeholders": {
+         "ver": {
+            "content": "$1"
+         }
+      }
+   },
+   "lblWaitLabel": {
+      "message": "Czekaj:"
+   },
+   "lblWaitTime": {
+      "message": "Czas Czekania"
+   },
+   "lblYearly": {
+      "message": "Rocznie"
+   },
+   "lblYourLink": {
+      "message": "Twój Domyślny Link Akcji (CTA)"
+   },
+   "lblYourProduct": {
+      "message": "Twój Oferowany Produkt/Usługa"
+   },
+   "lblYourRole": {
+      "message": "Twoja Identyfikacja / Rola"
+   },
+   "lblYourTags": {
+      "message": "Twoje Etykiety"
+   },
+   "lblYourTone": {
+      "message": "Twój Domyślny Ton"
+   },
+   "licIssueMsg": {
+      "message": "Klucz licencyjny jest nieważny lub wygasł. Sprawdź swój klucz lub kup nowy."
+   },
+   "licIssueTitle": {
+      "message": "Problem z Licencją"
+   },
+   "loadingMsg": {
+      "message": "Przygotowywanie posta..."
+   },
+   "loadingNotify": {
+      "message": "Publikowanie rozpoczęte! Możesz przeglądać inne karty - my działamy w tle."
+   },
+   "lockAiEnhance": {
+      "message": "Ulepszanie Tekstu AI to \u003Cb>Funkcja Pro\u003C/b>.\u003Cbr>\u003Cbr>Natychmiast przepisuj posty dla konwersji, poprawności i spintaxu.\u003Cbr>Kup Pro, by włączyć."
+   },
+   "lockAiGen": {
+      "message": "Generowanie przez AI to \u003Cb>Funkcja Pro\u003C/b>.\u003Cbr>\u003Cbr>Generuj świetne posty bez limitu w kilka sekund.\u003Cbr>Kup Pro, by włączyć."
+   },
+   "lockAutoJoin": {
+      "message": "Auto-dołączanie do grup to \u003Cb>Funkcja Pro\u003C/b>.\u003Cbr>Darmowi użytkownicy dodają ręcznie.\u003Cbr>\u003Cbr>Kup Pro, by włączyć!"
+   },
+   "lockCampArch": {
+      "message": "Kreator Kampanii AI to \u003Cb>Funkcja Pro\u003C/b>.\u003Cbr>\u003Cbr>Analizuje Twój cel i buduje zaawansowane kampanie z wielu kroków automatycznie.\u003Cbr>Kup Pro, by odblokować."
+   },
+   "lockCampResume": {
+      "message": "Nie masz już darmowych postów. Proszę, przejdź na Pro lub aktywuj licencję, by używać kampanii."
+   },
+   "lockSchedule": {
+      "message": "Planowanie to \u003Cb>Funkcja Pro\u003C/b>.\u003Cbr>Darmowi użytkownicy mają tylko opcję 'Publikuj Teraz'.\u003Cbr>\u003Cbr>Kup Pro, by odblokować."
+   },
+   "lockScheduleSave": {
+      "message": "Planowanie postów na przyszłość to \u003Cb>Funkcja Pro\u003C/b>.\u003Cbr>Kup Pro, by odblokować Harmonogram, Auto-Kampanie i wiele więcej!"
+   },
+   "menuAbout": {
+      "message": "O nas"
+   },
+   "menuAiProfile": {
+      "message": "Profil AI"
+   },
+   "menuHelp": {
+      "message": "Pomoc"
+   },
+   "missedActionDesc": {
+      "message": "Te jednorazowe posty nie zostały wysłane. Wybierz akcję dla każdego."
+   },
+   "missedActionHeader": {
+      "message": "Wymagana Akcja: Pominięte Posty"
+   },
+   "missedWasDue": {
+      "message": "Był zaplanowany na: $DATE$",
+      "placeholders": {
+         "date": {
+            "content": "$1"
+         }
+      }
+   },
+   "modalActionQueued": {
+      "message": "Akcja Dodana"
+   },
+   "modalAiLock": {
+      "message": "Wersje AI to funkcja Pro. Wyłącz je lub przejdź na wyższy plan."
+   },
+   "modalAiPersonaDesc": {
+      "message": "Daj AI więcej kontekstu, żeby mówiła w 100% z Twoim wizerunkiem."
+   },
+   "modalAiPersonaTitle": {
+      "message": "Businessowa Persona AI"
+   },
+   "modalCategoryTitle": {
+      "message": "Zarządzaj Kategoriami"
+   },
+   "modalConfirmDel": {
+      "message": "Potwierdź Usunięcie"
+   },
+   "modalConfirmDelBody": {
+      "message": "Czy na pewno chcesz usunąć ten zaplanowany post? Tej akcji nie można cofnąć."
+   },
+   "modalConfirmPost": {
+      "message": "Potwierdź Szczegóły"
+   },
+   "modalDailyLimitBody": {
+      "message": "Wykorzystałeś dziś swoje \u003Cb>$COUNT$ darmowych postów\u003C/b>.",
+      "placeholders": {
+         "count": {
+            "content": "$1",
+            "example": "3"
+         }
+      }
+   },
+   "modalDailyLimitTitle": {
+      "message": "Osiągnięto Limit Dzienny"
+   },
+   "modalDeleted": {
+      "message": "Zaplanowany post został usunięty."
+   },
+   "modalFbLoginReqBody": {
+      "message": "Rozszerzenie potrzebuje aktywnego Facebooka. \u003Cbr>\u003Cbr>Zaloguj się na innej karcie i kliknij tutaj Ośwież."
+   },
+   "modalFbLoginReqTitle": {
+      "message": "Wymagane Logowanie na FB"
+   },
+   "modalHelp": {
+      "message": "Pomoc i Wsparcie"
+   },
+   "modalImportSelect": {
+      "message": "Importuj Zaznaczone"
+   },
+   "modalImportTitle": {
+      "message": "Importuj z Kolekcji Grup"
+   },
+   "modalInputRequired": {
+      "message": "Wymagane Dane"
+   },
+   "modalLicReq": {
+      "message": "Wymagana Licencja"
+   },
+   "modalLicReqBody": {
+      "message": "Twoja licencja jest nieważna lub wygasła. Nie możesz uruchamiać zaplanowanych zadań.\u003Cbr>\u003Cbr>Aktywuj ją, aby kontynuować."
+   },
+   "modalLimitBody": {
+      "message": "Wybrałeś \u003Cb>$TOTAL$ grup\u003C/b>, ale Plan Darmowy ogranicza do \u003Cb>$LIMIT$ grup na cykl\u003C/b>.\u003Cbr>Dostosuj wybór lub przejdź na Pro, by publikować bez limitów.",
+      "placeholders": {
+         "actual": {
+            "content": "$3"
+         },
+         "limit": {
+            "content": "$2"
+         },
+         "total": {
+            "content": "$1"
+         }
+      }
+   },
+   "modalLimitTitle": {
+      "message": "Zastosowano Limit Darmowego Planu"
+   },
+   "modalNoContent": {
+      "message": "Utwórz lub wybierz treść do zaplanowania."
+   },
+   "modalNoGroups": {
+      "message": "Wybierz przynajmniej jedną grupę."
+   },
+   "modalProDesc": {
+      "message": "Usuń dzienne limity, odblokuj AI i skaluj."
+   },
+   "modalProFeature": {
+      "message": "Funkcja Pro"
+   },
+   "modalProTitle": {
+      "message": "Odblokuj Nieograniczoną Moc"
+   },
+   "modalQueuedImmediate": {
+      "message": "Post został w kolejce do natychmiastowego wykonania."
+   },
+   "modalRunNowBody": {
+      "message": "To natychmiast doda \u003Cstrong>\"$TITLE$\"\u003C/strong> do kolejki.\u003Cbr>\u003Cbr>Harmonogram \u003Cstrong>nie\u003C/strong> zostanie usunięty i będzie działać w przyszłości.",
+      "placeholders": {
+         "title": {
+            "content": "$1"
+         }
+      }
+   },
+   "modalRunNowTitle": {
+      "message": "Uruchomić Post Teraz?"
+   },
+   "modalSplitTitle": {
+      "message": "Podziel Kolekcję Grup"
+   },
+   "modalSuccessQueue": {
+      "message": "Post został dodany do kolejki i wkrótce się rozpocznie."
+   },
+   "modalTargetConfirm": {
+      "message": "Potwierdź Wybór"
+   },
+   "modalTargetTitle": {
+      "message": "Zaawansowany Wybór Grup"
+   },
+   "modeClassic": {
+      "message": "Tryb Klasyczny"
+   },
+   "modeSpeed": {
+      "message": "Tryb Szybki"
+   },
+   "msgPostingCompleted": {
+      "message": "Publikowanie Zakończone Sukcesem!"
+   },
+   "msgPostingStopped": {
+      "message": "Publikowanie Zatrzymane Przez Ciebie"
+   },
+   "msgSendingStop": {
+      "message": "Wysyłanie sygnału zatrzymania..."
+   },
+   "msgStopping": {
+      "message": "Zatrzymywanie..."
+   },
+   "navActivity": {
+      "message": "Aktywność"
+   },
+   "navAllGroups": {
+      "message": "Wszystkie Grupy"
+   },
+   "navCampaigns": {
+      "message": "Automatyzacje"
+   },
+   "navCompose": {
+      "message": "Utwórz Post"
+   },
+   "navHistory": {
+      "message": "Historia"
+   },
+   "navMonitor": {
+      "message": "Radar Leadów"
+   },
+   "navTemplates": {
+      "message": "Zasoby"
+   },
+   "navUpcoming": {
+      "message": "Nadchodzące"
+   },
+   "nextAction": {
+      "message": "Następna Akcja"
+   },
+   "noHistory": {
+      "message": "Nie znaleziono historii."
+   },
+   "noMatch": {
+      "message": "Żadne logi nie pasują do filtrów."
+   },
+   "notifHeader": {
+      "message": "Powiadomienia"
+   },
+   "notifMissedRecur": {
+      "message": "Cykliczny post \u003Cstrong>\"$TITLE$\"\u003C/strong> został pominięty $DATE$. Został automatycznie przeprogramowany.",
+      "placeholders": {
+         "date": {
+            "content": "$2"
+         },
+         "title": {
+            "content": "$1"
+         }
+      }
+   },
+   "optAllActivity": {
+      "message": "Cała Aktywność"
+   },
+   "optAllKeywords": {
+      "message": "Każde ze słów"
+   },
+   "optAllLeads": {
+      "message": "Wszystkie Leady"
+   },
+   "optCommentsOnly": {
+      "message": "Tylko Komentarze"
+   },
+   "optPostsOnly": {
+      "message": "Tylko Posty"
+   },
+   "optRead": {
+      "message": "Przeczytane"
+   },
+   "optScan15": {
+      "message": "Co 15 Minut (Najlepiej)"
+   },
+   "optScan30": {
+      "message": "Co 30 Minut (Wolno)"
+   },
+   "optScan5": {
+      "message": "Co 5 Minut (Agressywnie)"
+   },
+   "optScan60": {
+      "message": "Co 60 Minut (Bezpiecznie)"
+   },
+   "optStarred": {
+      "message": "⭐ Z Gwiazdką"
+   },
+   "optUnread": {
+      "message": "Tylko Nieprzeczytane"
+   },
+   "overlayAutoClose": {
+      "message": "Karta zostanie zamknięta automatycznie."
+   },
+   "overlayCloseBtn": {
+      "message": "Zamknij to powiadomienie"
+   },
+   "overlayDesc": {
+      "message": "Proszę, zostaw to okno otwarte. Automatyzacja trwa w tle, a karta zamknie się sama."
+   },
+   "overlayDlVideo": {
+      "message": "Pobieranie wideo z pamięci (duży plik)..."
+   },
+   "overlayDupRetry": {
+      "message": "Wykryto duplikat. Automatyczna modyfikacja i ponowna próba..."
+   },
+   "overlayEnd": {
+      "message": "Osiągnięto koniec listy. Kończenie."
+   },
+   "overlayFinalize": {
+      "message": "Zatwierdzanie posta"
+   },
+   "overlayFinished": {
+      "message": "Zakończono. Dołączono do $COUNT$ grup.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "overlayHumanPause": {
+      "message": "Krótka pauza dla ludzkiego zachowania... (Poziom: $LEVEL$)",
+      "placeholders": {
+         "level": {
+            "content": "$1"
+         }
+      }
+   },
+   "overlayInit": {
+      "message": "Inicjowanie procesu..."
+   },
+   "overlayInsertImg": {
+      "message": "Wstawianie zdjęć"
+   },
+   "overlayInsertText": {
+      "message": "Wstawianie tekstu"
+   },
+   "overlayJoined": {
+      "message": "($CURRENT$/$TOTAL$) Dołączono do \"$GROUP$\". \u003Cbr>\u003Cb>Pamiętaj:\u003C/b> Zbyt szybkie dołączanie może zablokować konto.",
+      "placeholders": {
+         "current": {
+            "content": "$1"
+         },
+         "group": {
+            "content": "$3"
+         },
+         "total": {
+            "content": "$2"
+         }
+      }
+   },
+   "overlayLongPause": {
+      "message": "Dłuższa przerwa dla bezpieczeństwa ($SEC$ sek)...",
+      "placeholders": {
+         "sec": {
+            "content": "$1"
+         }
+      }
+   },
+   "overlayLonger": {
+      "message": "Trwa to dłużej niż zwykle... zabezpieczanie procesu."
+   },
+   "overlayNewContent": {
+      "message": "Wykryto nową treść, ponowne przewijanie..."
+   },
+   "overlayNoNew": {
+      "message": "Brak nowych grup do dołączenia. Próba $ATTEMPT$/5...",
+      "placeholders": {
+         "attempt": {
+            "content": "$1"
+         }
+      }
+   },
+   "overlayOpenModal": {
+      "message": "Otwieranie okna"
+   },
+   "overlayPause": {
+      "message": "Znaleziono \"$GROUP$\". Przerwa $SEC$ sek...",
+      "placeholders": {
+         "group": {
+            "content": "$1"
+         },
+         "sec": {
+            "content": "$2"
+         }
+      }
+   },
+   "overlayPendingVerify": {
+      "message": "Facebook twierdzi 'Oczekujący', weryfikujemy to..."
+   },
+   "overlayPostData": {
+      "message": "Pobrano dane posta"
+   },
+   "overlayPreText": {
+      "message": "Sprawdzanie gotowości strony"
+   },
+   "overlayProcessing": {
+      "message": "Przetwarzanie danych..."
+   },
+   "overlaySaved": {
+      "message": "Zapisano $COUNT$ grup do kolekcji \"$NAME$\".",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         },
+         "name": {
+            "content": "$2"
+         }
+      }
+   },
+   "overlaySaving": {
+      "message": "Zapisywanie nowych grup do kolekcji..."
+   },
+   "overlayScan": {
+      "message": "Skanowanie strony w poszukiwaniu grup..."
+   },
+   "overlayScrapeEmpty": {
+      "message": "Pobieranie zakończone, ale nie znaleziono ważnych grup."
+   },
+   "overlayScrapeNoItems": {
+      "message": "Pobieranie zakończone, brak elementów. Upewnij się, że język to English(US)."
+   },
+   "overlayScrapeSuccess": {
+      "message": "SUKCES! $COUNT$ grup zapisano w \"$NAME$\".\u003Cbr>\u003Cbr>Ta karta zamknie się sama.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         },
+         "name": {
+            "content": "$2"
+         }
+      }
+   },
+   "overlayScrolling": {
+      "message": "Przewijanie w dół strony..."
+   },
+   "overlaySessionComplete": {
+      "message": "Sesja zakończona. Dołączono do $COUNT$ grup.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "overlaySetColor": {
+      "message": "Ustawianie koloru tła"
+   },
+   "overlaySlowLoad": {
+      "message": "Treść ładuje się wolno, zwiększanie opóźnienia do $MS$ ms.",
+      "placeholders": {
+         "ms": {
+            "content": "$1"
+         }
+      }
+   },
+   "overlayTitle": {
+      "message": "GroupPosting Pracuje"
+   },
+   "overlayUnresponsive": {
+      "message": "Przycisk nie reaguje. Ostatnia próba odzyskiwania..."
+   },
+   "overlayUploading": {
+      "message": "Trwa przesyłanie mediów. Może to potrwać kilka minut..."
+   },
+   "overlayVerify": {
+      "message": "Weryfikacja statusu posta..."
+   },
+   "overlayWaitLoad": {
+      "message": "Przewijanie i czekanie na załadowanie nowej treści..."
+   },
+   "panelSpintaxGuide": {
+      "message": "Poradnik Spintax:"
+   },
+   "phAssign": {
+      "message": "Przypisz..."
+   },
+   "phCollName": {
+      "message": "Nazwa kolekcji"
+   },
+   "phDescribeGoal": {
+      "message": "Opisz swój cel..."
+   },
+   "phFirstComm": {
+      "message": "Wpisz komentarz tutaj. SPINTAX JEST ZALECANY"
+   },
+   "phQuickGroups": {
+      "message": "Kliknij, aby wybrać grupy do publikacji"
+   },
+   "phSaveGroupAs": {
+      "message": "Wpisz nazwę grupy do zapisu"
+   },
+   "phSearchGroups": {
+      "message": "Szukaj Grup"
+   },
+   "phSearchHist": {
+      "message": "Szukaj w historii..."
+   },
+   "phSearchParam": {
+      "message": "Wpisz słowo kluczowe (np. marketing)"
+   },
+   "phSearchTemp": {
+      "message": "Szukaj szablonów..."
+   },
+   "phSelectGroups": {
+      "message": "Wybierz jedną lub więcej kolekcji..."
+   },
+   "phSelectSavedTemplates": {
+      "message": "Wybierz zapisane szablony do publikacji..."
+   },
+   "phSelectTemplates": {
+      "message": "Wybierz jeden lub więcej szablonów..."
+   },
+   "phTemplateName": {
+      "message": "Wpisz nazwę dla tego szablonu"
+   },
+   "postingCompleted": {
+      "message": "Publikowanie zakończone!"
+   },
+   "prevClose": {
+      "message": "Zamknij Podgląd"
+   },
+   "prevDisclaimer": {
+      "message": "To jest podgląd. Rzeczywisty wygląd może się różnić."
+   },
+   "prevNextVar": {
+      "message": "Następna Wersja"
+   },
+   "prevReSpin": {
+      "message": "Ponownie Wymieszaj Tekst"
+   },
+   "prevTitle": {
+      "message": "Podgląd Posta"
+   },
+   "prevVar": {
+      "message": "Wersja"
+   },
+   "qualBonusEmoji": {
+      "message": "Nałożono bonus za Emojis"
+   },
+   "qualBonusLength": {
+      "message": "Idealna długość"
+   },
+   "qualBonusSpintax": {
+      "message": "Nałożono bonus za Spintax"
+   },
+   "qualCatEngage": {
+      "message": "Zaangażowanie"
+   },
+   "qualCatFormat": {
+      "message": "Formatowanie"
+   },
+   "qualCatLength": {
+      "message": "Długość Treści"
+   },
+   "qualCatMedia": {
+      "message": "Media"
+   },
+   "qualCatPolicy": {
+      "message": "Zgodność z Zasadami"
+   },
+   "qualFormatBasic": {
+      "message": "Podstawowe"
+   },
+   "qualFormatEx": {
+      "message": "Doskonałe"
+   },
+   "qualFormatGood": {
+      "message": "Dobre"
+   },
+   "qualFormatMod": {
+      "message": "Umiarkowane"
+   },
+   "qualLevelBad": {
+      "message": "Wymaga Pracy"
+   },
+   "qualLevelGreat": {
+      "message": "Świetny"
+   },
+   "qualLevelOk": {
+      "message": "Dobry"
+   },
+   "qualLevelPerfect": {
+      "message": "Idealny"
+   },
+   "qualSentNeg": {
+      "message": "Negatywny"
+   },
+   "qualSentNeutral": {
+      "message": "Neutralny"
+   },
+   "qualSentPos": {
+      "message": "Pozytywny"
+   },
+   "qualSentSomewhat": {
+      "message": "Lekko Pozytywny"
+   },
+   "qualSentVeryPos": {
+      "message": "Bardzo Pozytywny"
+   },
+   "qualStatFormat": {
+      "message": "Formatowanie"
+   },
+   "qualStatSent": {
+      "message": "Wydźwięk"
+   },
+   "qualStatWords": {
+      "message": "Liczba Słów"
+   },
+   "qualTitle": {
+      "message": "Ocena Jakości Posta"
+   },
+   "qualViewTips": {
+      "message": "Zobacz szczegóły analizy i sugestie"
+   },
+   "qualWarnPhone": {
+      "message": "Wykryto numer telefonu ($COUNT$)",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "qualWarnProf": {
+      "message": "Wykryto wulgaryzmy ($COUNT$)",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "quickScheduleButton": {
+      "message": "Zaktualizuj Harmonogram"
+   },
+   "quillPhQuick": {
+      "message": "Zacznij pisać swój post tutaj..."
+   },
+   "quillPhTemplate": {
+      "message": "Zacznij pisać swój post tutaj...\n\nWielopoziomowy spintax jest obsługiwany.\nUżyj {opcja1|opcja2}, by stworzyć spintax."
+   },
+   "radarBtnCopy": {
+      "message": "Kop. Linka"
+   },
+   "radarBtnDraftReply": {
+      "message": "Szkicnij Tego Leada z AI"
+   },
+   "radarBtnUnlock": {
+      "message": "Poddaj To Do Odblokowania z PRO"
+   },
+   "radarBtnView": {
+      "message": "Skocz Do Posta"
+   },
+   "radarBtnViewReply": {
+      "message": "Skocz Do Reakcji"
+   },
+   "radarPremiumDesc": {
+      "message": "Uderz w Plan PRO żeby zobaczyć w jakiej z tych wyodrębnionych setek ukrytych w radarze dyskusjach jest schowana dla Ciebie perełka."
+   },
+   "radarPremiumLead": {
+      "message": "Cenne Leady - Wymóg PRO"
+   },
+   "radarSelectLead": {
+      "message": "Podglądnij wprost poszczególnego Leada z boku by zerkać..."
+   },
+   "rateBadReward": {
+      "message": "Twoje zdanie pozwala nam rozwijać rozszerzenie szybciej."
+   },
+   "rateBadText": {
+      "message": "Przykro nam, że GroupPosting Pro nie spełnił Twoich oczekiwań. Poświęcisz chwilę, by nam powiedzieć, jak się poprawić?"
+   },
+   "rateBadTitle": {
+      "message": "Dzięki za szczerość!"
+   },
+   "rateBtnFeedback": {
+      "message": "Daj Opinię i Zgarnij Posty"
+   },
+   "rateBtnLater": {
+      "message": "Może Później"
+   },
+   "rateBtnNo": {
+      "message": "Nie, Dziękuję"
+   },
+   "rateBtnReview": {
+      "message": "Oceń w Sklepie i Zgarnij Posty"
+   },
+   "rateBtnSubmit": {
+      "message": "Prześlij Ocenę"
+   },
+   "rateErr": {
+      "message": "Proszę, wybierz ocenę z gwiazdkami."
+   },
+   "rateGoodReward": {
+      "message": "Twoja recenzja pomoże innym znaleźć to narzędzie!!"
+   },
+   "rateGoodText": {
+      "message": "Miałbyś ochotę zostawić szybką opinię w Chrome Store? Pomoże to nam dotrzeć do większej liczby użytkowników!"
+   },
+   "rateGoodTitle": {
+      "message": "Super! Cieszymy się!"
+   },
+   "rateText": {
+      "message": "Jak oceniasz doświadczenie z GroupPosting Pro? Twój krótki głos pomoże nam się poprawić!"
+   },
+   "rateTitle": {
+      "message": "Jak nam idzie?"
+   },
+   "readyMsg": {
+      "message": "Wysyłanie $TEMPLATES$ szablonu/ów do $GROUPS$ grupy/grup.",
+      "placeholders": {
+         "groups": {
+            "content": "$2"
+         },
+         "templates": {
+            "content": "$1"
+         }
+      }
+   },
+   "readyMsgAlternate": {
+      "message": "Wysyłanie 1 posta do $GROUPS$ grup (naprzemiennie dla $TEMPLATES$ szablonów).",
+      "placeholders": {
+         "groups": {
+            "content": "$1"
+         },
+         "templates": {
+            "content": "$2"
+         }
+      }
+   },
+   "readyMsgSequential": {
+      "message": "Wysyłanie $TEMPLATES$ szablonu/ów do każdej z $GROUPS$ grup.",
+      "placeholders": {
+         "groups": {
+            "content": "$2"
+         },
+         "templates": {
+            "content": "$1"
+         }
+      }
+   },
+   "readyTitle": {
+      "message": "Gotowe do Startu"
+   },
+   "restoreErrJson": {
+      "message": "Wybierz poprawny plik kopii JSON."
+   },
+   "restoreErrMsg": {
+      "message": "Nie można było odczytać pliku. Może być uszkodzony. Błąd: $ERR$",
+      "placeholders": {
+         "err": {
+            "content": "$1"
+         }
+      }
+   },
+   "restoreErrTitle": {
+      "message": "Błąd Przywracania"
+   },
+   "restoreMsg": {
+      "message": "To doda $TAGS$ szablonów postów i $GROUPS$ kolekcji grup do Twoich danych. Czy na pewno chcesz kontynuować?",
+      "placeholders": {
+         "groups": {
+            "content": "$2"
+         },
+         "tags": {
+            "content": "$1"
+         }
+      }
+   },
+   "restoreSuccessMsg": {
+      "message": "Pomyślnie dodano $TAGS$ nowych szablonów i $GROUPS$ nowych kolekcji.",
+      "placeholders": {
+         "groups": {
+            "content": "$2"
+         },
+         "tags": {
+            "content": "$1"
+         }
+      }
+   },
+   "restoreSuccessTitle": {
+      "message": "Pomyślnie Przywrócono"
+   },
+   "restoreTitle": {
+      "message": "Potwierdź Przywracanie"
+   },
+   "retryMsg": {
+      "message": "Czy chcesz spróbować wysłać $COUNT$ nieudanych lub pominiętych postów ponownie?",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "retryTitle": {
+      "message": "Niektóre posty nie powiodły się."
+   },
+   "revAwesome": {
+      "message": "Super!"
+   },
+   "revBtn": {
+      "message": "Oceń w Sklepie i Zgarnij Posty"
+   },
+   "revText": {
+      "message": "Miałbyś ochotę zostawić szybką opinię?"
+   },
+   "saveCollection": {
+      "message": "Zapisz Kolekcję"
+   },
+   "savePercent": {
+      "message": "Oszczędź $PERCENT$%",
+      "placeholders": {
+         "percent": {
+            "content": "$1"
+         }
+      }
+   },
+   "schedDate": {
+      "message": "Data"
+   },
+   "schedDaysMonth": {
+      "message": "Wybierz Dni Miesiąca"
+   },
+   "schedDaysWeek": {
+      "message": "Wybierz Dni Tygodnia"
+   },
+   "schedErrPast": {
+      "message": "Zaplanowany czas nie może być w przeszłości."
+   },
+   "schedFreq": {
+      "message": "Częstotliwość Publikacji"
+   },
+   "schedSave": {
+      "message": "Zapisz Harmonogram"
+   },
+   "schedTime": {
+      "message": "Godzina"
+   },
+   "secBackup": {
+      "message": "Kopia Zapasowa"
+   },
+   "secDescBalanced": {
+      "message": "Balansuje szybkość i bezpieczeństwo z losowymi przerwami. Polecane."
+   },
+   "secDescFast": {
+      "message": "Priorytet szybkości z minimalnymi przerwami. Najlepsze dla starych kont."
+   },
+   "secDescSafe": {
+      "message": "Priorytet bezpieczeństwa z długimi przerwami. Najwolniej, ale bezpiecznie."
+   },
+   "securePayment": {
+      "message": "Bezpieczna płatność przez LemonSqueezy."
+   },
+   "spOrPaste": {
+      "message": "LUB WKLEJ CAŁKOWICIE NOWE LINKI Z RĘKI"
+   },
+   "spSearchDbPh": {
+      "message": "Szukaj wg nazwy..."
+   },
+   "spSearchExisting": {
+      "message": "1. Wyszukaj W Zapisanych"
+   },
+   "spSmartPaste": {
+      "message": "2. Szybkie Inteligentne Wklejanie"
+   },
+   "spinAdd": {
+      "message": "Dodaj Kolejną Wersję"
+   },
+   "spinAiBtn": {
+      "message": "Wypełnij przez AI"
+   },
+   "spinApply": {
+      "message": "Dodaj Spintax do tekstu"
+   },
+   "spinErr": {
+      "message": "Dodaj co najmniej jedną wersję."
+   },
+   "spinInstr": {
+      "message": "Dodaj i sprawdź wersje dla swojego tekstu. (Użyj formatu {opcja1|opcja2})."
+   },
+   "spinPreview": {
+      "message": "Podgląd na Żywo"
+   },
+   "spinShuffle": {
+      "message": "Mieszaj"
+   },
+   "spinTitle": {
+      "message": "Utwórz Wersje Spintax"
+   },
+   "splitBtn": {
+      "message": "Podziel Kolekcję"
+   },
+   "splitErrMin": {
+      "message": "Potrzebujesz co najmniej 2 linków, by podzielić."
+   },
+   "splitErrValid": {
+      "message": "Wpisz poprawną liczbę części."
+   },
+   "splitFeedbackExact": {
+      "message": "Utworzy \u003Cstrong>$PIECES$\u003C/strong> kolekcji, po \u003Cstrong>$LINKS$\u003C/strong> linków w każdej.",
+      "placeholders": {
+         "links": {
+            "content": "$2"
+         },
+         "pieces": {
+            "content": "$1"
+         }
+      }
+   },
+   "splitFeedbackMixed": {
+      "message": "Utworzy \u003Cstrong>$PIECES$\u003C/strong> kolekcji. $BIG$ będzie miało $L1$ linków, a $SMALL$ będzie miało $L2$.",
+      "placeholders": {
+         "big": {
+            "content": "$2"
+         },
+         "l1": {
+            "content": "$3"
+         },
+         "l2": {
+            "content": "$5"
+         },
+         "pieces": {
+            "content": "$1"
+         },
+         "small": {
+            "content": "$4"
+         }
+      }
+   },
+   "splitInfo": {
+      "message": "Ta kolekcja ma \u003Cstrong>$COUNT$\u003C/strong> linków.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "splitLblPieces": {
+      "message": "Na ile mniejszych kolekcji chcesz ją podzielić?"
+   },
+   "splitSuccess": {
+      "message": "Kolekcja podzielona na $COUNT$ części.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "splitTitle": {
+      "message": "Podziel Kolekcję Grup"
+   },
+   "spotCampDesc": {
+      "message": "Łącz posty, ustawiaj przerwy i powtarzaj w nieskończoność."
+   },
+   "spotCampTitle": {
+      "message": "Automatyzacja Kampanii"
+   },
+   "spotRadarDesc": {
+      "message": "Nasz Radar sprawdza wskazane grupy co 5-10 minut w tle. Znajdzie gorące leady ułamek sekundy po tym, jak tylko kogoś o coś poproszą!"
+   },
+   "spotRadarStep1": {
+      "message": "Ustal \u003Cstrong>Słowa Kluczowe\u003C/strong>"
+   },
+   "spotRadarStep2": {
+      "message": "Wybierz \u003Cstrong>Grupy\u003C/strong>"
+   },
+   "spotRadarStep3": {
+      "message": "Odbieraj \u003Cstrong>Powiadomienia\u003C/strong>"
+   },
+   "spotRadarTitle": {
+      "message": "Zautomatyzowane Badanie Grup - Radar Leadów"
+   },
+   "spotStepExtract": {
+      "message": "\u003Cstrong>Pobierz\u003C/strong>"
+   },
+   "spotStepLoop": {
+      "message": "Ustaw \u003Cstrong>Pętlę\u003C/strong>"
+   },
+   "spotStepPost": {
+      "message": "Dodaj blok \u003Cstrong>Post\u003C/strong>"
+   },
+   "spotStepSplit": {
+      "message": "\u003Cstrong>Podziel\u003C/strong> Listy"
+   },
+   "spotStepWait": {
+      "message": "Dodaj blok \u003Cstrong>Czekaj\u003C/strong>"
+   },
+   "statFailedSkipped": {
+      "message": "Błędy/Pominięte"
+   },
+   "statSuccessful": {
+      "message": "Sukcesy"
+   },
+   "statTotal": {
+      "message": "Razem"
+   },
+   "statusFailed": {
+      "message": "Błąd"
+   },
+   "statusPending": {
+      "message": "Oczekujący"
+   },
+   "statusSkipped": {
+      "message": "Pominięto"
+   },
+   "statusSuccess": {
+      "message": "Sukces"
+   },
+   "stepImport": {
+      "message": "Importuj Grupy"
+   },
+   "stepPost": {
+      "message": "Wyślij Post"
+   },
+   "stepPro": {
+      "message": "Aktywuj Pro"
+   },
+   "stepTemplate": {
+      "message": "Utwórz Szablon"
+   },
+   "stepVars": {
+      "message": "Dodaj Wersje"
+   },
+   "streakBest": {
+      "message": "Najlepsza Seria"
+   },
+   "streakCurrent": {
+      "message": "Obecna Seria"
+   },
+   "streakKeepAlive": {
+      "message": "Podtrzymaj ten ogień! 🔥"
+   },
+   "streakRecord": {
+      "message": "Całkowity rekord 🏆"
+   },
+   "stuckReset": {
+      "message": "Post zablokowany? - Tylko w razie problemów."
+   },
+   "sumContent": {
+      "message": "Treść"
+   },
+   "sumDuration": {
+      "message": "Szacowany Czas"
+   },
+   "sumGroups": {
+      "message": "$ACTUAL$ Grup(y)",
+      "placeholders": {
+         "actual": {
+            "content": "$1"
+         }
+      }
+   },
+   "sumOverview": {
+      "message": "Podsumowanie Cyklu"
+   },
+   "sumTruncated": {
+      "message": "(z $TOTAL$)",
+      "placeholders": {
+         "total": {
+            "content": "$1"
+         }
+      }
+   },
+   "sumVariations": {
+      "message": "$COUNT$ Wariacja/e",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "sumVolume": {
+      "message": "Ilość"
+   },
+   "tabAdv": {
+      "message": "Zaawansowane"
+   },
+   "tabGroupColls": {
+      "message": "Kolekcje Grup"
+   },
+   "tabPostTemps": {
+      "message": "Szablony Postów"
+   },
+   "tabQuick": {
+      "message": "Prosty Post"
+   },
+   "tabUpcoming": {
+      "message": "Nadchodzące"
+   },
+   "tagCompat": {
+      "message": "Maks. Kompatybilność"
+   },
+   "tagRec": {
+      "message": "Zalecane"
+   },
+   "targeterBtnExclude": {
+      "message": "Wywal tę grupkę!"
+   },
+   "targeterDedup": {
+      "message": " (Usunięto $COUNT$ duplikat/ów)",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "targeterDescFresh": {
+      "message": "Wybiera grupy, w których dawno nie publikowałeś (Świeże > Ciepłe > Gorące)."
+   },
+   "targeterInputPostTo": {
+      "message": "Publikuj w"
+   },
+   "targeterInputRandom": {
+      "message": "losowych grupach"
+   },
+   "targeterLblAll": {
+      "message": "Opublikuje we \u003Cstrong>wszystkich $COUNT$\u003C/strong> grupach.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "targeterLblRandom": {
+      "message": "Opublikuje w \u003Cstrong>$COUNT$\u003C/strong> z nich losowo.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "targeterModeAll": {
+      "message": "Publikuj we Wszystkich"
+   },
+   "targeterModeRandom": {
+      "message": "Losowy Zbiór"
+   },
+   "targeterNoColls": {
+      "message": "Brak kolekcji grup. Najpierw utwórz jedną w zakładce 'Grupy'."
+   },
+   "targeterPhSearch": {
+      "message": "Szukaj we wszystkich swoich grupach..."
+   },
+   "targeterStep1": {
+      "message": "1. Wybierz Kolekcje Grup"
+   },
+   "targeterStep2": {
+      "message": "2. (Opcjonalnie) Dodaj Konkretne Grupy"
+   },
+   "targeterStep3": {
+      "message": "3. Skonfiguruj Strategię"
+   },
+   "targeterSummaryInit": {
+      "message": "Wybierz kolekcje lub grupy, aby zobaczyć opcje."
+   },
+   "targeterSummaryMain": {
+      "message": "Wybrałeś \u003Cstrong>$COUNT$\u003C/strong> unikalnych grup docelowych.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "targeterToggleFresh": {
+      "message": "Priorytetyzuj Świeże Grupy"
+   },
+   "timeInDays": {
+      "message": "za $COUNT$ dzień/dni",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "timeInHours": {
+      "message": "za $HOURS$ g $MINS$ min",
+      "placeholders": {
+         "hours": {
+            "content": "$1"
+         },
+         "mins": {
+            "content": "$2"
+         }
+      }
+   },
+   "timeInMins": {
+      "message": "za $MINS$ min",
+      "placeholders": {
+         "mins": {
+            "content": "$1"
+         }
+      }
+   },
+   "timeSoon": {
+      "message": "za \u003C 1 min"
+   },
+   "timelineTitle": {
+      "message": "Dzisiejszy Harmonogram"
+   },
+   "tipFmtBold": {
+      "message": "Spróbuj pogrubienia, by podkreślić ważne słowa."
+   },
+   "tipFmtEx": {
+      "message": "Doskonałe formatowanie! Łatwe w czytaniu."
+   },
+   "tipFmtHead": {
+      "message": "Rozważ nagłówki, by uporządkować treść."
+   },
+   "tipFmtList": {
+      "message": "Wypunktowania pomagają skanować treść."
+   },
+   "tipGroupsDesc": {
+      "message": "Organizuj grupy wg nisz, by celować we właściwych ludzi."
+   },
+   "tipLenGood": {
+      "message": "Dobra robota! Długość posta jest odpowiednia."
+   },
+   "tipLenPerfect": {
+      "message": "Idealnie! Twój post ma świetną długość na wysokie zasięgi."
+   },
+   "tipLenShort": {
+      "message": "Twój post jest krótki. Dodanie szczegółów może pomóc."
+   },
+   "tipLenStart": {
+      "message": "Zacznij pisać post, by zobaczyć rekomendacje."
+   },
+   "tipMediaAdd": {
+      "message": "Dodanie zdjęć lub wideo bardzo pomaga w zasięgach."
+   },
+   "tipMediaGood": {
+      "message": "Dobra robota! Dodanie mediów pomaga w zasięgach."
+   },
+   "tipMediaPerfect": {
+      "message": "Idealnie! Wiele elementów mediów znacznie podnosi zaangażowanie."
+   },
+   "tipPolPhone": {
+      "message": "Wykryto numer telefonu. Może to spowodować blokady platformy."
+   },
+   "tipPolProf": {
+      "message": "Wykryto potencjalnie problematyczny język. Rozważ poprawę."
+   },
+   "tipSegment": {
+      "message": "\u003Cstrong>Segmentuj\u003C/strong> wg Niszy"
+   },
+   "tipSentEx": {
+      "message": "Znakomicie! Pozytywny ton z pewnością podniesie zasięg."
+   },
+   "tipSentGood": {
+      "message": "Świetna robota! Wykryto pozytywny ton."
+   },
+   "tipSentImprove": {
+      "message": "Rozważ użycie bardziej pozytywnego języka."
+   },
+   "tipStepAI": {
+      "message": "Przepisz przez \u003Cstrong>AI\u003C/strong>"
+   },
+   "tipStepExtract": {
+      "message": "\u003Cstrong>Pobierz\u003C/strong>"
+   },
+   "tipStepSeg": {
+      "message": "\u003Cstrong>Segmentuj\u003C/strong> wg Niszy"
+   },
+   "tipStepSpin": {
+      "message": "Użyj \u003Cstrong>Spintaxu\u003C/strong>"
+   },
+   "tipStepSplit": {
+      "message": "\u003Cstrong>Podziel\u003C/strong> Listy"
+   },
+   "tipStepVar": {
+      "message": "Twórz \u003Cstrong>Wariacje\u003C/strong>"
+   },
+   "tipTemplates": {
+      "message": "Wzmocnij swoje szablony"
+   },
+   "tipTemplatesDesc": {
+      "message": "Szablony oszczędzają czas i utrzymują spójność Twoich wiadomości."
+   },
+   "toolSegmentDesc": {
+      "message": "Pobieraj z pełnej listy grup nazwy ze słowami, np. krypto, nieruchomości."
+   },
+   "toolSegmentTitle": {
+      "message": "Segmentuj Słowami"
+   },
+   "toolSplitMasterDesc": {
+      "message": "Przetnij gigantyczną listę dziesiątek grup do kilku pomniejszych dla podbicia bezpieczeństwa."
+   },
+   "toolSplitMasterTitle": {
+      "message": "Rozłącz Listę Grup"
+   },
+   "tour1Text": {
+      "message": "Najbezpieczniejszy i najmocniejszy sposób na automatyzację postów na grupach FB."
+   },
+   "tour1Title": {
+      "message": "Witaj w GroupPosting Pro!"
+   },
+   "tour2Text": {
+      "message": "Zacznij tutaj. Stwórz szablony postów i poukładaj grupy w Kolekcje."
+   },
+   "tour2Title": {
+      "message": "1. Stwórz Szablony"
+   },
+   "tour3Text": {
+      "message": "Użyj Prostego Posta na szybko, albo Zaawansowanego by zaplanować z góry."
+   },
+   "tour3Title": {
+      "message": "2. Twórz i Planuj"
+   },
+   "tour4Text": {
+      "message": "Buduj potężne procesy. Łącz posty, dodawaj przerwy i pętluj strategię."
+   },
+   "tour4Title": {
+      "message": "3. Zautomatyzowane Kampanie"
+   },
+   "tour5Text": {
+      "message": "Oglądaj historię wysyłek. Zobacz, co zadziałało, co nie i ponów 1 klikiem."
+   },
+   "tour5Title": {
+      "message": "4. Sprawdzaj Historię"
+   },
+   "tour6Text": {
+      "message": "Przygotowaliśmy dla Ciebie parę przykładowych szablonów. Kliknij poniżej by zacząć!"
+   },
+   "tour6Title": {
+      "message": "Gotowe!"
+   },
+   "tsEmptyDesc": {
+      "message": "Zbuduj swój pierwszy wspaniały i bezpieczny od filtrów spamerskich szablon korzystając ze spintaxów i multimediów."
+   },
+   "tsEmptyTitle": {
+      "message": "Na Razie Brak Szablonów"
+   },
+   "tsSelectToPreview": {
+      "message": "Wybierz jeden z szablonów z lewej do zerknięcia na podgląd."
+   },
+   "typeComment": {
+      "message": "Komentarz"
+   },
+   "typeManual": {
+      "message": "Ręczny"
+   },
+   "typeRetry": {
+      "message": "Ponowienie"
+   },
+   "typeScheduled": {
+      "message": "Zaplanowany"
+   },
+   "unitMin": {
+      "message": "min"
+   },
+   "unitPosts": {
+      "message": "posty"
+   },
+   "upAiReplyText": {
+      "message": "Magiczne odpowiedzi komentarzami AI pod Planem Pro.\u003Cbr>\u003Cbr>Zaufaj silnikowi AI, które wystosuje genialną perswazyjną odpowiedź bezpośrednio dopasowaną pod osobę której próbujesz cokolwiek pchnąć."
+   },
+   "upAiReplyTitle": {
+      "message": "Zamykaj dyskusje jednym strzałem w kolano. ⚡"
+   },
+   "upAiText": {
+      "message": "Automatyczne wersjonowanie od AI działa pod PRO.\u003Cbr>\u003Cbr>Zarządzający Facebooka nie lubią jednego i tego samego postu rzucanego milion razy. W zaledwie jedno kliknięcie wygeneruj 3 różniące się budową i słownictwem zdania po to by Twoje konto dalej działało i wkurzało admina bezpieczeństwa Facebook'a."
+   },
+   "upAiTitle": {
+      "message": "Bądź zwinny wobec zabezpieczeń Facebooka. 🛡️"
+   },
+   "upCampText": {
+      "message": "Kampanie sekwencyjne to opcje PRO.\u003Cbr>\u003Cbr>Scalaj oddzielnie przygotowane posty łańcuchem w wielodniowe wysyłki. Przygotuj to raz i generuj klientów organicznie z auto-pilota."
+   },
+   "upCampTitle": {
+      "message": "Zbuduj zautomatyzowane imperium. ⚙️"
+   },
+   "upCloudText": {
+      "message": "Sync. z Chmurą na Pro Planie.\u003Cbr>\u003Cbr>Narzędzie na bieżąco kopiuje ustawienia pod przypięte konto i zabezpiecza przed ewentualną śmiercią komputera czy przeglądarki na stałe. Dostęp zawsze tam gdzie go potrzebujesz z ułamkiem sekundy wczytu!"
+   },
+   "upCloudTitle": {
+      "message": "Koniec z szukaniem na dysku u babci. ☁️"
+   },
+   "upColorText": {
+      "message": "Wybór z Tłem Kolorowym jest na Planie Pro.\u003Cbr>\u003Cbr>To prosty protip: Kolor na tło sprawia że post rzuca się bardziej w oczy (od 2 do 3-krotnie więcej kliknięć) względem klasycznego ściany tekstu."
+   },
+   "upColorTitle": {
+      "message": "Bądź najbardziej widoczny. 🎨"
+   },
+   "upDefaultText": {
+      "message": "Zróbcie ulepszenie do Pro, wyzeruj restrykcje z głowy i używajcie nielimitowanego zbiornika magii autopościerającej!"
+   },
+   "upDefaultTitle": {
+      "message": "Odblokuj Supermoce Pro"
+   },
+   "upExportText": {
+      "message": "Wyrzucanie CSV jest częścią PRO.\u003Cbr>\u003Cbr>Pozwoli Ci to przerzucać odnalezione i urobione osoby (Leady) pod zewnętrzne rozwiązania - jak chociażby pod własny CRM."
+   },
+   "upExportTitle": {
+      "message": "Przejęcie pełnej konroli na Leadach. 📊"
+   },
+   "upJoinText": {
+      "message": "Autobot dla nowych członków Grup jest w PRO.\u003Cbr>\u003Cbr>Siedzenie godzinami by znajdywać po nazwie te wszystkie cudeńka grupy - i pukanie - jest katorgą. Narzędzie wyrzuci to w nicość z wplecionymi opcjami."
+   },
+   "upJoinTitle": {
+      "message": "Rosnące zasięgi na robocop-pilotażu. 🚀"
+   },
+   "upLimitText": {
+      "message": "Opisanie na sucho postów do $COUNT$ grup wyniesie gdzieś z \u003Cspan class=\"upsell-highlight\">$HOURS$ godzin/y\u003C/span>.\u003Cbr>\u003Cbr>Wersja darmowa zatrzymuje na 7 grupkach na pojedynczą akcję. Uderzaj w Pro by ustrzelić pule wielkości 15, 30 czy nielimitowanych $COUNT$ grupek w automacie z palcem w nosie podczas jedzenia pączka.",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         },
+         "hours": {
+            "content": "$2"
+         }
+      }
+   },
+   "upLimitTitle": {
+      "message": "Wow! Zaznaczyłeś $COUNT$ grup naraz. 🤯",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "upRadarText": {
+      "message": "Radar Ołowiu w Planie Pro.\u003Cbr>\u003Cbr>Pozwól naszej technologii skanować do 25 grup FB dzień po dniu byś otrzymywał monity gdy ktoś tylko zapyta czy użyje wyznaczonego przez ciebie słowa!"
+   },
+   "upRadarTitle": {
+      "message": "Przestań gonić klientów. 🧲"
+   },
+   "upSchedText": {
+      "message": "Harmonogramowanie jest na Planie Pro. \u003Cbr>\u003Cbr>Koniec ze wstawaniem z kurami by wstrzelić się w grupowe momentum. Przygotuj 5 minut konfiguracji i miej wgrany cały miesiąc spamu głowy. Narzędzie wyśle je, nawet gdy Twój komputer nie będzie ci dymił nad kolanem."
+   },
+   "upSchedTitle": {
+      "message": "Odzyskaj swoje poranki. ☕"
+   },
+   "upSynText": {
+      "message": "Zabezpieczające modyfikacje wyrazowe - tylko dla Pro.\u003Cbr>\u003Cbr>Samo myślenie nad setkami różnic to żart - a nasze AI potrafi uderzać je co oddech - a i przy tym pozwala zaoszczędzić Twoje szare komórki przed bezsensownym spintaxowym wysiłkiem w tle."
+   },
+   "upSynTitle": {
+      "message": "Doskonały synonimizator tekstowy w 1s. 🧬"
+   },
+   "upWizText": {
+      "message": "Magia Kampanijna - dla PRO.\u003Cbr>\u003Cbr>Wpisz prostym, potocznym zdaniem z głowy to, jaki wyznacznik docelowo kampania pragnie odzwierciedlać - np. 'Będziemy promować nowy kurs przez miesiąc w czwartki i piątki'. Kreator zrobi z tego cuda bez pytań i przygotuje to całe zło pod przycisk - GO!"
+   },
+   "upWizTitle": {
+      "message": "Twoja podręczna agentura z USA. 🧠"
+   },
+   "updateCollection": {
+      "message": "Aktualizuj Kolekcję"
+   },
+   "upsellCancel": {
+      "message": "Anuluj w dowolnej chwili."
+   },
+   "upsellPerMo": {
+      "message": "/mc"
+   },
+   "upsellStartsFrom": {
+      "message": "zaczyna się od"
+   },
+   "upsellSubtitle": {
+      "message": "Group Posting Pro"
+   },
+   "valNeutral": {
+      "message": "Neutralnie"
+   },
+   "valNo": {
+      "message": "Nie"
+   },
+   "valYes": {
+      "message": "Tak"
+   },
+   "vipBtnClaim": {
+      "message": "Odbieram Mój 3-dniowy Próbny Czas"
+   },
+   "vipDesc": {
+      "message": "W podziękowaniu za korzystanie z naszej wtyczki dajemy Ci pełny dostęp VIP, byś sprawdził funkcje premium."
+   },
+   "vipFeature1": {
+      "message": "Brak Limitów Postów i Planowania"
+   },
+   "vipFeature2": {
+      "message": "Generowanie Wersji i Tekstów AI"
+   },
+   "vipFeature3": {
+      "message": "Radar Leadów (Powiadomienia)"
+   },
+   "vipForDays": {
+      "message": "na 3 dni"
+   },
+   "vipIncludes": {
+      "message": "Twój 3-dniowy karnet VIP zawiera:"
+   },
+   "vipPrice": {
+      "message": "Następnie standardowe €24/mc. Anuluj kiedy chcesz."
+   },
+   "vipSelected": {
+      "message": "Wybraliśmy właśnie Ciebie."
+   },
+   "vipSurprise": {
+      "message": "NIESPODZIANKA 🎉"
+   },
+   "warnDesktopAlerts": {
+      "message": "Wymaga zgody na powiadomienia w przeglądarce i systemie."
+   },
+   "warnFbLimit": {
+      "message": "Facebook nakłada limity! Zalecane maks. 25 dziennie."
+   },
+   "warnHighVolMsg": {
+      "message": "Publikowanie na bardzo dużej liczbie grup na raz niesie ryzyko blokady. Rozważ mniejsze porcje lub włącz funkcję 'Priorytetyzuj Świeże Grupy'. Aby zapobiec duplikatom, używaj opcji Spintax lub Wersji AI."
+   },
+   "warnHighVolTitle": {
+      "message": "Ostrzeżenie o Dużej Ilości"
+   },
+   "warnOnline": {
+      "message": "Przeglądarka musi być otwarta, aby wysyłać posty."
+   },
+   "warnQuick": {
+      "message": "Prosty Post korzysta z ulepszonego Trybu Szybkiego."
+   },
+   "welcomeProMsg": {
+      "message": "Licencja aktywowana pomyślnie! Wszystkie funkcje odblokowane."
+   },
+   "welcomeProTitle": {
+      "message": "Witamy w wersji Pro"
+   },
+   "wizAnalyzing": {
+      "message": "Analiza celu dla $COUNT$ grup...",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "wizBtnAnalyzing": {
+      "message": "Analizowanie..."
+   },
+   "wizBuildError": {
+      "message": "Błąd Kreatora"
+   },
+   "wizBuildMsg": {
+      "message": "AI wygenerowało strategię, ale nie mogliśmy jej umieścić. Błąd: $ERR$",
+      "placeholders": {
+         "err": {
+            "content": "$1"
+         }
+      }
+   },
+   "wizEmptyMsg": {
+      "message": "AI zwróciło pustą strategię. Dodaj więcej szczegółów do swojego celu."
+   },
+   "wizEmptyTitle": {
+      "message": "Błędny Wynik"
+   },
+   "wizEnterGoal": {
+      "message": "Opisz cel swojej kampanii (np. 'Promocja webinaru w ten piątek')."
+   },
+   "wizError": {
+      "message": "Połączenie nie powiodło się. Odśwież rozszerzenie i spróbuj ponownie."
+   },
+   "wizFailedMsg": {
+      "message": "AI nie mogło wygenerować strategii. Spróbuj ponownie lub użyj prostszego zapytania."
+   },
+   "wizFailedTitle": {
+      "message": "Błąd Generowania AI"
+   },
+   "wizInputReq": {
+      "message": "Wymagane Dane"
+   },
+   "wizNoTemplate": {
+      "message": "Wybierz przynajmniej jeden szablon."
+   },
+   "wizSuccessMsg": {
+      "message": "AI pomyślnie stworzyło \u003Cb>$COUNT$ kroków\u003C/b> na podstawie Twojego celu.\u003Cbr>\u003Cbr>Przejrzyj ustawienia i kliknij \u003Cb>Zapisz\u003C/b>, aby uruchomić!",
+      "placeholders": {
+         "count": {
+            "content": "$1"
+         }
+      }
+   },
+   "wizSuccessTitle": {
+      "message": "Strategia Gotowa"
+   }
+}

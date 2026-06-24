@@ -1,21 +1,23 @@
 {
   "manifest_version": 3,
   "name": "GroupFlow — FB Group Auto Poster",
-  "version": "1.0.0",
+  "version": "1.0.10",
   "description": "Đăng bài FB Group, comment chéo, Radar Lead — đồng bộ tidien.xyz",
   "permissions": [
     "storage",
     "alarms",
     "downloads",
-    "sidePanel",
     "tabs",
     "activeTab",
     "scripting",
     "notifications",
-    "webRequest"
+    "cookies"
   ],
   "host_permissions": [
     "https://www.facebook.com/*",
+    "https://facebook.com/*",
+    "https://m.facebook.com/*",
+    "https://upload.facebook.com/*",
     "https://tidien.xyz/*",
     "http://localhost:3001/*",
     "https://www.googleapis.com/*"
@@ -23,17 +25,46 @@
   "background": {
     "service_worker": "background.js"
   },
-  "side_panel": {
-    "default_path": "sidepanel.html"
+  "action": {
+    "default_title": "GroupFlow",
+    "default_popup": "sidepanel.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
   "content_scripts": [
     {
-      "matches": ["https://www.facebook.com/*"],
-      "js": ["selectors.js", "content.js"],
+      "matches": [
+        "https://www.facebook.com/*",
+        "https://facebook.com/*",
+        "https://m.facebook.com/*"
+      ],
+      "js": [
+        "modules/gfShared.js",
+        "selectors.js",
+        "modules/groupParse.js",
+        "modules/fbGraphApi.js",
+        "modules/fbActor.js",
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
-  "action": {
-    "default_title": "GroupFlow"
-  }
+  "web_accessible_resources": [
+    {
+      "resources": ["modules/pageNetworkHook.js"],
+      "matches": [
+        "https://www.facebook.com/*",
+        "https://facebook.com/*",
+        "https://m.facebook.com/*"
+      ]
+    }
+  ]
 }

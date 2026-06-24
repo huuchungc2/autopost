@@ -21,10 +21,14 @@ GF.excel = {
         prompt_anh: row.prompt_anh,
         ngay_dang: row.ngay_dang,
         gio_dang: row.gio_dang,
+        groupIds: [],
         imageStatus: 'pending',
         imageBase64: null,
         imageLocal: false,
         imageDriveId: null,
+        autoGenerateImage: row.auto_generate_image !== '0' && row.auto_generate_image !== 'false',
+        anh_ngay_dang: row.anh_ngay_dang || '',
+        anh_gio_dang: row.anh_gio_dang || '',
         selected: true,
       };
     });
@@ -52,10 +56,14 @@ GF.excel = {
         prompt_anh: norm.prompt_anh,
         ngay_dang: norm.ngay_dang,
         gio_dang: norm.gio_dang,
+        groupIds: [],
         imageStatus: 'pending',
         imageBase64: null,
         imageLocal: false,
         imageDriveId: null,
+        autoGenerateImage: norm.auto_generate_image !== '0' && norm.auto_generate_image !== 'false',
+        anh_ngay_dang: norm.anh_ngay_dang || '',
+        anh_gio_dang: norm.anh_gio_dang || '',
         selected: true,
       };
     });
