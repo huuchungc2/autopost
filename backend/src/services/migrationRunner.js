@@ -376,3 +376,18 @@ export async function ensureGroupPostNameSharedDrafts() {
     await runMigrationFile('026_group_name_shared_drafts.sql', 'Migration 026 applied: group_post_draft_pulls');
   }
 }
+
+export async function ensureGroupPostClientSyncs() {
+  if (!(await tableExists('group_posts'))) return;
+  if (!(await tableExists('group_post_client_syncs'))) {
+    await runMigrationFile('027_group_post_client_syncs.sql', 'Migration 027 applied: group_post_client_syncs');
+  }
+  await ensureGroupPostSyncDeviceId();
+}
+
+export async function ensureGroupPostSyncDeviceId() {
+  if (!(await tableExists('group_post_client_syncs'))) return;
+  if (!(await columnExists('group_post_client_syncs', 'device_id'))) {
+    await runMigrationFile('028_group_sync_device_id.sql', 'Migration 028 applied: sync device_id');
+  }
+}

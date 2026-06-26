@@ -1,68 +1,64 @@
 window.GF = window.GF || {};
 
 GF.aiApi = {
-  async getAuth() {
+  async getActiveProviders() {
+    if (GF.localProviders) return GF.localProviders.getActiveProviders();
     const s = await GF.storage.getSettings();
-    const token = s.tidienApiKey || s.tidienToken;
-    if (!token) throw new Error('Chưa đăng nhập tidien — mở Cài đặt');
-    const base = (s.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
-    return { base, token, settings: s };
+    return {
+      textProviderId: s.textProviderId,
+      imageProviderId: s.imageProviderId,
+      textProvider: null,
+      imageProvider: null,
+    };
   },
 
-  async listProviders() {
-    const { base, token } = await this.getAuth();
-    const res = await fetch(`${base}/api/group-posts/ai-providers`, {
-      headers: { Authorization: `Bearer ${token}` },
+  async generatePost({ topic, textSystemPrompt, imageSystemPrompt, mediaType }) {
+    if (!GF.localAi) throw new Error('Thiếu module localAi');
+    const { textProvider } = await this.getActiveProviders();
+    if (!textProvider) throw new Error('Chọn Text provider trong Cài đặt → AI Provider');
+    return GF.localAi.generatePost({
+      topic,
+      textSystemPrompt,
+      imageSystemPrompt,
+      mediaType,
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Không tải providers');
-    return data;
   },
 
-  usesProviderProxy(settings) {
-    return Boolean(
-      (settings?.tidienApiKey || settings?.tidienToken)
-      && (settings?.imageProviderId || settings?.textProviderId),
-    );
+  usesProviderProxy() {
+    return false;
   },
 
-  async generateImage(prompt, settings) {
-    const s = settings || (await GF.storage.getSettings());
-    if (s.imageProviderId && (s.tidienApiKey || s.tidienToken)) {
-      const base = (s.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
-      const token = s.tidienApiKey || s.tidienToken;
-      const res = await fetch(`${base}/api/group-posts/ai/image`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, provider_id: s.imageProviderId }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Generate ảnh thất bại');
-      if (!data.base64) throw new Error('Không nhận được ảnh base64');
-      return { base64: data.base64, mime: data.mime || 'image/png' };
+  async generateImage(prompt) {
+    const { imageProvider } = await this.getActiveProviders();
+    if (imageProvider && GF.localAi) {
+      return GF.localAi.callImage(imageProvider, prompt);
     }
+    const s = await GF.storage.getSettings();
     if (!s.routerApiKey) {
-      throw new Error('Chọn Image provider hoặc nhập 9Router API key trong Cài đặt');
+      throw new Error('Chọn Image provider trong Cài đặt hoặc nhập 9Router API key');
     }
     return GF.imageGen.generateDirect(prompt, s.routerApiKey, s.tidienBaseUrl);
   },
 
   async generateText(task, text, settings, mode) {
     const s = settings || (await GF.storage.getSettings());
-    if (s.textProviderId && (s.tidienApiKey || s.tidienToken)) {
-      const base = (s.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
-      const token = s.tidienApiKey || s.tidienToken;
-      const res = await fetch(`${base}/api/group-posts/ai/text`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task, text, mode, provider_id: s.textProviderId }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'AI text thất bại');
-      return data.text || '';
+    const { textProvider } = await this.getActiveProviders();
+    if (textProvider && GF.localAi) {
+      const prompts = {
+        persuasive: 'Viết lại bài đăng Facebook group sau cho hấp dẫn, tự nhiên, có CTA nhẹ. Giữ tiếng Việt. Không thêm hashtag dư.',
+        grammar: 'Sửa chính tả và ngữ pháp, giữ nguyên ý và độ dài tương đương:',
+        spintax: 'Chuyển bài sau thành spintax {a|b|c} hợp lý, giữ ý chính. Chỉ trả nội dung spintax:',
+      };
+      let userPrompt;
+      if (task === 'comment') {
+        userPrompt = `Viết 1 comment ngắn tự nhiên để đẩy bài Facebook sau, không quảng cáo lộ liễu:\n${text}`;
+      } else {
+        userPrompt = `${prompts[mode] || prompts.persuasive}\n\n${text}`;
+      }
+      return GF.localAi.callText(textProvider, '', userPrompt);
     }
     if (!s.routerApiKey) {
-      throw new Error('Chọn Text provider hoặc nhập 9Router API key trong Cài đặt');
+      throw new Error('Chọn Text provider trong Cài đặt hoặc nhập 9Router API key');
     }
     if (task === 'comment') return GF.imageGen.generateCommentDirect(text, s.routerApiKey, s.tidienBaseUrl);
     return GF.imageGen.rewritePostDirect(text, s.routerApiKey, s.tidienBaseUrl, mode);

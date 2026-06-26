@@ -9,6 +9,7 @@ import {
   updateExtensionFbProfile,
   syncGroupPost,
   listPostsForComments,
+  getExtensionSyncStatus,
   recordComment,
   listPublishedGroupPosts,
   listGroupPostComments,
@@ -16,12 +17,14 @@ import {
   createGroupPostDrafts,
   listGroupPostDrafts,
   pullDraftsForExtension,
+  pullPostsForExtension,
   updateGroupPostDraft,
   repullGroupPostDraft,
   deleteGroupPostDraft,
 } from '../services/groupPostService.js';
 import {
   extensionGenerateImage,
+  extensionGeneratePost,
   extensionGenerateText,
   listExtensionAiProviders,
 } from '../services/groupPostAiService.js';
@@ -121,6 +124,20 @@ router.post('/ai/text', authenticateExtension, asyncHandler(async (req, res) => 
   res.json({ text: out });
 }));
 
+/** Extension: viết bài từ chủ đề + prompt skill local — giống POST /posts/generate (không lưu DB) */
+router.post('/ai/generate', authenticateExtension, asyncHandler(async (req, res) => {
+  const result = await extensionGeneratePost(req.user, {
+    topic: req.body.topic,
+    prompt: req.body.prompt,
+    text_system_prompt: req.body.text_system_prompt,
+    image_system_prompt: req.body.image_system_prompt,
+    text_provider_id: req.body.text_provider_id || req.body.provider_id,
+    image_provider_id: req.body.image_provider_id,
+    media_type: req.body.media_type,
+  });
+  res.json(result);
+}));
+
 /** Website: danh sách bài group đã đăng */
 router.get('/', authenticate, asyncHandler(async (req, res) => {
   const filters = {
@@ -167,9 +184,52 @@ router.get('/drafts', authenticate, asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
-/** Extension: tải draft pending về queue local */
+/** Extension: client gửi last_post_id / last_draft_id (ID lớn nhất đang giữ) */
+router.post('/sync/status', authenticateExtension, asyncHandler(async (req, res) => {
+  const result = await getExtensionSyncStatus(req.user.id, {
+    lastPostId: req.body?.last_post_id,
+    lastDraftId: req.body?.last_draft_id,
+  });
+  res.json(result);
+}));
+
+router.get('/sync/status', authenticateExtension, asyncHandler(async (req, res) => {
+  const result = await getExtensionSyncStatus(req.user.id, {
+    lastPostId: req.query?.last_post_id,
+    lastDraftId: req.query?.last_draft_id,
+  });
+  res.json(result);
+}));
+
+router.post('/posts/pull', authenticateExtension, asyncHandler(async (req, res) => {
+  const result = await pullPostsForExtension(req.user.id, {
+    limit: req.body?.limit ?? req.query?.limit,
+    afterPostId: req.body?.last_post_id ?? req.body?.after_post_id,
+  });
+  res.json(result);
+}));
+
+router.get('/posts/pull', authenticateExtension, asyncHandler(async (req, res) => {
+  const result = await pullPostsForExtension(req.user.id, {
+    limit: req.query.limit,
+    afterPostId: req.query.last_post_id ?? req.query.after_post_id,
+  });
+  res.json(result);
+}));
+
+router.post('/drafts/pull', authenticateExtension, asyncHandler(async (req, res) => {
+  const result = await pullDraftsForExtension(req.user.id, {
+    limit: req.body?.limit ?? req.query?.limit,
+    afterDraftId: req.body?.last_draft_id ?? req.body?.after_draft_id,
+  });
+  res.json(result);
+}));
+
 router.get('/drafts/pull', authenticateExtension, asyncHandler(async (req, res) => {
-  const result = await pullDraftsForExtension(req.user.id);
+  const result = await pullDraftsForExtension(req.user.id, {
+    limit: req.query.limit,
+    afterDraftId: req.query.last_draft_id ?? req.query.after_draft_id,
+  });
   res.json(result);
 }));
 
@@ -199,6 +259,8 @@ router.get('/pending-comments', authenticateExtension, asyncHandler(async (req, 
     limit: req.query.limit,
     group_id: req.query.group_id,
     posted_by: req.query.posted_by,
+    since: req.query.since,
+    needs_comment: req.query.needs_comment,
   });
   res.json(result);
 }));

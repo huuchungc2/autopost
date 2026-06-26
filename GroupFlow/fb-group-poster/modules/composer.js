@@ -41,6 +41,15 @@ GF.composer = {
     return vars[this.activeVar] || vars.A || '';
   },
 
+  setPrimaryText(text) {
+    this.init();
+    const ed = this.editors?.A;
+    if (!ed) return;
+    ed.setText(String(text || ''));
+    this.setVariation('A');
+    this.updateQualityBadge();
+  },
+
   getVariationsArray() {
     return this.VAR_KEYS.map((k) => this.getVariationTexts()[k]).filter(Boolean);
   },
@@ -107,9 +116,18 @@ GF.composer = {
 
   setBackground(hex) {
     this.backgroundColor = hex || '#18191A';
+    const norm = this.backgroundColor.toLowerCase();
     document.querySelectorAll('[data-bg-color]').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.bgColor?.toLowerCase() === this.backgroundColor.toLowerCase());
+      btn.classList.toggle('active', btn.dataset.bgColor?.toLowerCase() === norm);
     });
+    const dot = document.getElementById('manualColorDot');
+    if (dot) {
+      const isDefault = norm === '#18191a';
+      dot.classList.toggle('empty', isDefault);
+      dot.textContent = isDefault ? '×' : '';
+      dot.style.background = isDefault ? '' : this.backgroundColor;
+      dot.title = isDefault ? 'Không nền' : this.backgroundColor;
+    }
   },
 
   clearAll() {

@@ -69,10 +69,21 @@ PRD: [`GroupFlow/fb-group-poster-PRD.md`](GroupFlow/fb-group-poster-PRD.md)
 - [x] Shared draft team (admin import), sửa draft, re-pull
 - [x] `group_name` trên bài đã đăng + extension sync
 - [x] Chế độ Nhanh (GraphQL nền SW, không tab FB) + Cổ điển (DOM), cấp độ bảo mật, tránh ban đêm
+- [x] Tự đồng bộ tidien → extension (comment + draft, alarm ~10p) — v1.0.57
+- [x] Sync tidien thông minh (incremental, throttle, status check) — v1.0.58
+- [x] Sync bài theo ID per user (`group_post_client_syncs`, `/posts/pull`) — v1.0.59 (đổi v1.0.60: known_ids từ client)
+- [x] Sync client-driven `known_post_ids` — thay bằng device_id v1.0.61
+- [x] Sync `device_id` + count (scale 10k bài, không gửi list ID) — v1.0.61
 - [x] Chuyển Cá nhân / Fanpage (profile switcher header)
 - [x] Nhóm theo từng bài + tab Nhóm + bộ custom + auto-sync FB
 - [x] AI provider text/image trong Cài đặt extension (giống fanpage) + API proxy `/ai/*`
 - [x] Tab Tạo bài: Nhập tay mặc định, chọn nhóm inline trên card bài
+- [x] Tab **Provider** riêng + AI viết bài từ chủ đề
+- [x] **Skill local** import JSON — không phụ thuộc skill website
+- [x] Cấu hình lưu ảnh PNG vào folder local (Downloads/subfolder)
+- [x] Metadata nhóm (công khai/đóng/kín + duyệt đăng) + filter tab Nhóm FB (v1.0.17)
+- [x] Học duyệt đăng từ kết quả post + GraphQL About enrich (v1.0.18)
+- [x] Lọc vai trò + mời bạn bè vào nhóm (Classic) (v1.0.19)
 
 ## Remaining (optional polish)
 

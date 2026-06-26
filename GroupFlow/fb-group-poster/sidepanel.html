@@ -16,6 +16,9 @@
         <span class="brand-tag">FB Group Poster</span>
       </div>
     </div>
+    <button type="button" id="btnPopout" class="btn ghost sm" title="Thu gọn panel (bấm icon extension để mở lại)">
+      ✕ Đóng
+    </button>
     <div class="profile-picker" id="profilePicker">
       <button type="button" class="profile-trigger" id="profileTrigger" title="Chọn tài khoản đăng">
         <span class="profile-avatar" id="profileAvatar">?</span>
@@ -63,96 +66,238 @@
       <span class="tab-icon" aria-hidden="true">?</span>
       <span class="tab-label">Hướng dẫn</span>
     </button>
+    <button type="button" data-tab="skills" role="tab" title="Skill local">
+      <span class="tab-icon" aria-hidden="true">◇</span>
+      <span class="tab-label">Skill</span>
+    </button>
     <button type="button" data-tab="settings" class="tab-settings" role="tab" title="Cài đặt">
       <span class="tab-icon" aria-hidden="true">⚙</span>
+      <span class="tab-label">Cài đặt</span>
     </button>
   </nav>
 
   <main class="content">
     <!-- TẠO BÀI -->
     <section id="tab-create" class="tab-panel active">
-      <div class="card">
-        <div class="segmented" role="group">
-          <button type="button" id="srcManual" class="segmented-btn active">Nhập tay</button>
-          <button type="button" id="srcExcel" class="segmented-btn">Excel</button>
-        </div>
-        <div id="excelPanel" class="hidden">
-          <label class="file-drop" for="excelFile">
-            <span class="file-drop-icon">↑</span>
-            <span class="file-drop-title">Chọn file Excel / CSV</span>
-            <span class="file-drop-hint">noi_dung · prompt_anh · ngay_dang · gio_dang</span>
-          </label>
-          <input type="file" id="excelFile" accept=".csv,.xlsx,.xls" class="sr-only" />
-        </div>
-        <div id="manualPanel">
-          <div class="composer-toolbar">
-            <div class="variation-tabs" role="tablist">
-              <button type="button" class="variation-tab active" data-var="A">A</button>
-              <button type="button" class="variation-tab" data-var="B">B</button>
-              <button type="button" class="variation-tab" data-var="C">C</button>
-              <button type="button" class="variation-tab" data-var="D">D</button>
+      <div class="segmented create-source-tabs" role="group">
+        <button type="button" id="srcManual" class="segmented-btn active">Nhập tay</button>
+        <button type="button" id="srcAi" class="segmented-btn">AI viết</button>
+        <button type="button" id="srcExcel" class="segmented-btn">Excel</button>
+      </div>
+
+      <button type="button" class="posting-config-bar" id="btnOpenPostingSettings" title="Mở cấu hình đăng bài">
+        <span class="posting-config-label">Cấu hình đăng</span>
+        <span id="postingConfigSummary">Nhanh · Cân bằng</span>
+        <span class="posting-config-link">Chỉnh ⚙</span>
+      </button>
+
+      <div id="excelPanel" class="card hidden">
+        <label class="file-drop" for="excelFile">
+          <span class="file-drop-icon">↑</span>
+          <span class="file-drop-title">Chọn file Excel / CSV</span>
+          <span class="file-drop-hint">noi_dung · prompt_anh · ngay_dang · gio_dang</span>
+        </label>
+        <input type="file" id="excelFile" accept=".csv,.xlsx,.xls" class="sr-only" />
+      </div>
+
+      <div id="aiPanel" class="card hidden">
+        <p class="hint">Viết bài từ chủ đề — skill + provider local (tab Skill / Cài đặt).</p>
+        <label class="field-label">Chủ đề bài viết</label>
+        <input type="text" id="aiTopic" placeholder="VD: Lợi ích uống nước ấm buổi sáng" />
+        <label class="field-label">Skill viết bài</label>
+        <select id="aiTextSkill"><option value="">— Mặc định —</option></select>
+        <label class="field-label">Skill ảnh</label>
+        <select id="aiImageSkill"><option value="">— Mặc định —</option></select>
+        <label class="field-label">Loại media</label>
+        <select id="aiMediaType">
+          <option value="image">Có prompt ảnh AI</option>
+          <option value="none">Chỉ văn bản</option>
+        </select>
+        <button type="button" id="btnAiGeneratePost" class="btn primary block">✨ Viết bài bằng AI</button>
+        <p class="hint" id="aiGenerateStatus"></p>
+      </div>
+
+      <div id="manualPanel" class="create-flow">
+        <!-- Bước 1: Nhóm (giống GPP) -->
+        <section class="gf-step">
+          <h2 class="gf-step-title"><span class="gf-step-num">1</span> Bạn muốn đăng ở đâu?</h2>
+          <div class="gf-group-trigger-row">
+            <div id="manualGroupSelect" class="custom-multiselect gf-group-select-wrap">
+              <button type="button" id="manualGroupTrigger" class="gf-group-trigger" aria-haspopup="listbox" aria-expanded="false">
+                <span id="manualGroupSummary" class="gf-group-summary">Nhấp để chọn các nhóm mục tiêu cần đăng</span>
+                <span class="gf-group-trigger-meta">
+                  <span class="tag web" id="manualGroupCount">0 nhóm</span>
+                  <span class="gf-chevron" aria-hidden="true">▾</span>
+                </span>
+              </button>
+              <div id="manualGroupPicker" class="gf-group-options hidden" role="listbox" aria-label="Chọn nhóm đăng"></div>
             </div>
-            <div class="composer-tools">
-              <span id="composerQuality" class="quality-badge">--/100</span>
-              <button type="button" id="btnComposerSpintax" class="btn ghost sm" title="Chèn spintax">&#123;spin&#125;</button>
-              <button type="button" id="btnComposerWrapSpintax" class="btn ghost sm" title="Bọc đoạn chọn">Bọc</button>
-              <button type="button" id="btnComposerEmoji" class="btn ghost sm" title="Emoji">😊</button>
-              <select id="aiRewriteMode" class="composer-select" title="AI viết lại">
-                <option value="">AI…</option>
-                <option value="persuasive">Hấp dẫn</option>
-                <option value="grammar">Sửa lỗi</option>
-                <option value="spintax">Tạo spintax</option>
-              </select>
-              <button type="button" id="btnAiRewrite" class="btn ghost sm accent">AI</button>
+            <button type="button" id="btnToggleAdvanced" class="btn outline sm">Lịch &amp; campaign</button>
+          </div>
+        </section>
+
+        <!-- Bước 2: Nội dung -->
+        <section class="gf-step gf-step-compose">
+          <h2 class="gf-step-title"><span class="gf-step-num">2</span> Bạn muốn nói gì?</h2>
+          <div class="unified-composer-box">
+            <div class="composer-toolbar">
+              <div class="variation-tabs" role="tablist">
+                <button type="button" class="variation-tab active" data-var="A">A</button>
+                <button type="button" class="variation-tab" data-var="B">B</button>
+                <button type="button" class="variation-tab" data-var="C">C</button>
+                <button type="button" class="variation-tab" data-var="D">D</button>
+              </div>
+              <div class="composer-tools">
+                <span id="composerQuality" class="quality-badge">--/100</span>
+                <button type="button" id="btnComposerSpintax" class="btn ghost sm" title="Chèn spintax">&#123;spin&#125;</button>
+                <button type="button" id="btnComposerWrapSpintax" class="btn ghost sm" title="Bọc đoạn chọn">Bọc</button>
+                <button type="button" id="btnComposerEmoji" class="btn ghost sm" title="Emoji">😊</button>
+                <select id="aiRewriteMode" class="composer-select" title="AI viết lại">
+                  <option value="">AI…</option>
+                  <option value="persuasive">Hấp dẫn</option>
+                  <option value="grammar">Sửa lỗi</option>
+                  <option value="spintax">Tạo spintax</option>
+                </select>
+                <button type="button" id="btnAiRewrite" class="btn ghost sm accent">AI</button>
+              </div>
+            </div>
+            <div id="composerEditors" class="composer-editors gf-composer-main"></div>
+            <div class="composer-magic-blocks-compact">
+              <div class="magic-box bg-box" id="manualColorSelector">
+                <button type="button" id="manualColorToggleBtn" class="btn-magic-ghost w-100">
+                  <span id="manualColorDot" class="color-indicator-dot empty" title="Không nền">×</span>
+                  <span>Nền</span>
+                </button>
+                <div id="manualColorPalette" class="magic-color-palette hidden">
+                  <div class="color-dots-grid">
+                    <button type="button" class="color-dot-btn bg-dot active" data-bg-color="#18191A" title="Không nền" style="background:#fff;border:1px solid #cbd5e1">×</button>
+                    <button type="button" class="color-dot-btn bg-dot" data-bg-color="#e2013b" style="background:#e2013b"></button>
+                    <button type="button" class="color-dot-btn bg-dot" data-bg-color="#dc7a5a" style="background:#dc7a5a"></button>
+                    <button type="button" class="color-dot-btn bg-dot" data-bg-color="#c600ff" style="background:#c600ff"></button>
+                    <button type="button" class="color-dot-btn bg-dot" data-bg-color="#0073ff" style="background:#0073ff"></button>
+                    <button type="button" class="color-dot-btn bg-dot" data-bg-color="#8395d1" style="background:#8395d1"></button>
+                  </div>
+                  <p class="hint">Nền màu = bài <strong>chỉ text</strong>, chế độ <strong>Nhanh</strong> — không kèm ảnh/video.</p>
+                </div>
+              </div>
+              <button type="button" class="magic-box media-box" id="manualMediaDropzone" title="Kéo thả hoặc nhấp để thêm">
+                🖼 Media
+                <span id="manualMediaCount" class="media-count-badge hidden">0</span>
+              </button>
+              <input type="file" id="manualMedia" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm" multiple class="sr-only" />
             </div>
           </div>
-          <div id="composerEditors" class="composer-editors"></div>
-          <label class="field-label">Nền bài FB <span class="field-hint">(chế độ Nhanh)</span></label>
-          <div class="bg-color-row">
-            <button type="button" class="bg-dot active" data-bg-color="#18191A" title="Không nền" style="background:#fff;border:1px solid #cbd5e1">×</button>
-            <button type="button" class="bg-dot" data-bg-color="#e2013b" style="background:#e2013b"></button>
-            <button type="button" class="bg-dot" data-bg-color="#dc7a5a" style="background:#dc7a5a"></button>
-            <button type="button" class="bg-dot" data-bg-color="#c600ff" style="background:#c600ff"></button>
-            <button type="button" class="bg-dot" data-bg-color="#0073ff" style="background:#0073ff"></button>
-            <button type="button" class="bg-dot" data-bg-color="#8395d1" style="background:#8395d1"></button>
-            <button type="button" class="bg-dot" data-bg-color="#33234b" style="background:#33234b"></button>
-            <button type="button" class="bg-dot" data-bg-color="#5d6374" style="background:#5d6374"></button>
-          </div>
-          <label class="field-label">Campaign <span class="field-hint">(tuỳ chọn)</span></label>
-          <input type="text" id="manualCampaign" placeholder="Tên chiến dịch — gom bài lên lịch dàn" />
-          <label class="field-label">First comment <span class="field-hint">(sau khi đăng)</span></label>
-          <textarea id="manualFirstComment" rows="2" placeholder="Comment đầu tiên — hỗ trợ {spintax|biến thể}"></textarea>
+          <div id="manualMediaPreview" class="gf-media-thumbs"></div>
+          <p class="hint" id="manualMediaLabel">Ảnh ≤8MB · tối đa 10 ảnh · Video ≤15MB (1 file) · hoặc prompt AI bên dưới</p>
+          <input type="text" id="manualPrompt" class="gf-prompt-input" placeholder="Prompt ảnh AI (nếu chưa có file)…" />
           <label class="switch-row">
-            <input type="checkbox" id="manualFirstCommentOn" />
-            <span>Bật first comment tự động</span>
+            <input type="checkbox" id="manualAutoImage" checked />
+            <span>Tự xuất ảnh khi đăng</span>
           </label>
-          <label class="field-label">Ảnh / video <span class="field-hint">(tuỳ chọn)</span></label>
-          <label class="file-drop file-drop-sm" for="manualMedia">
-            <span class="file-drop-icon">🖼</span>
-            <span class="file-drop-title" id="manualMediaLabel">Chọn ảnh hoặc video</span>
-            <span class="file-drop-hint">Ảnh ≤8MB · Video ≤15MB (video dùng Chế độ Cổ điển)</span>
-          </label>
-          <input type="file" id="manualMedia" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm" class="sr-only" />
-          <div id="manualMediaPreview" class="media-preview hidden"></div>
-          <label class="field-label">Prompt tạo ảnh AI <span class="field-hint">(nếu chưa có file)</span></label>
-          <input type="text" id="manualPrompt" placeholder="Mô tả ảnh cho 9Router…" />
+        </section>
+
+        <!-- Bước 3: Cài đặt tự động hóa (GPP) — lưu theo từng bài -->
+        <section class="gf-step gf-step-automation">
+          <button type="button" id="btnTogglePostSettings" class="gf-settings-accordion" aria-expanded="false">
+            <span class="gf-settings-accordion-title"><span class="gf-step-num">3</span> Cài đặt tự động hóa nâng cao</span>
+            <span class="gf-chevron" aria-hidden="true">▾</span>
+          </button>
+          <div id="manualPostSettingsPanel" class="gf-post-settings hidden">
+            <div class="gf-settings-block">
+              <h3 class="gf-settings-subtitle">Tạm dừng, bảo vệ &amp; bình luận</h3>
+              <div class="gf-settings-row">
+                <label class="gf-input-group">
+                  <span class="field-label">Chu kỳ</span>
+                  <div class="input-with-unit">
+                    <input type="number" id="manualPauseEvery" min="1" value="1" />
+                    <span class="input-unit">bài</span>
+                  </div>
+                  <span class="field-hint">Số bài giữa các lần nghỉ</span>
+                </label>
+                <label class="gf-input-group">
+                  <span class="field-label">Thời gian chờ</span>
+                  <div class="input-with-unit">
+                    <input type="number" id="manualPauseMinutes" min="0" step="0.5" value="2" />
+                    <span class="input-unit">phút</span>
+                  </div>
+                  <span class="field-hint">Thời gian ngẫu nhiên khi nghỉ</span>
+                </label>
+              </div>
+              <div class="gf-settings-options">
+                <label class="gf-settings-option">
+                  <input type="checkbox" id="manualDelayOnFail" />
+                  <span class="gf-settings-option-text">
+                    <strong>Nghỉ an toàn nếu lỗi</strong>
+                    <small>Vẫn chờ đủ giờ kể cả khi đăng thất bại</small>
+                  </span>
+                </label>
+                <label class="gf-settings-option">
+                  <input type="checkbox" id="manualAvoidNight" checked />
+                  <span class="gf-settings-option-text">
+                    <strong>Tránh đăng ban đêm</strong>
+                    <small>Không đăng 22:00–07:00 (cảnh báo trước khi chạy)</small>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div class="gf-settings-block">
+              <h3 class="gf-settings-subtitle">Cấp độ bảo mật đăng bài</h3>
+              <p class="hint" id="manualSecurityHint">Cân bằng: ~3–5 phút/nhóm — khuyên dùng.</p>
+              <div class="gf-security-pills" role="radiogroup" aria-label="Giãn cách">
+                <label class="gf-security-pill"><input type="radio" name="manualSecurityLevel" value="fast" class="sr-only" /><span>⚡ Nhanh</span></label>
+                <label class="gf-security-pill"><input type="radio" name="manualSecurityLevel" value="balanced" class="sr-only" checked /><span>⚖ Cân bằng</span></label>
+                <label class="gf-security-pill"><input type="radio" name="manualSecurityLevel" value="safe" class="sr-only" /><span>🛡 An toàn</span></label>
+              </div>
+            </div>
+
+            <div class="gf-settings-block">
+              <h3 class="gf-settings-subtitle">Chiến lược đăng bài</h3>
+              <div class="strategy-row" role="radiogroup" aria-label="Chế độ đăng">
+                <label class="strategy-card">
+                  <input type="radio" name="manualPostMode" value="fast" class="sr-only" checked />
+                  <span class="strategy-title">Chế độ Nhanh</span>
+                  <span class="strategy-badge">Khuyên dùng</span>
+                  <span class="strategy-desc">API Facebook — nhanh &amp; ổn định</span>
+                </label>
+                <label class="strategy-card">
+                  <input type="radio" name="manualPostMode" value="classic" class="sr-only" />
+                  <span class="strategy-title">Chế độ Cổ điển</span>
+                  <span class="strategy-badge muted">Tương thích cao</span>
+                  <span class="strategy-desc">DOM trên FB — tốt cho video</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="gf-settings-block">
+              <h3 class="gf-settings-subtitle">Cài đặt bình luận</h3>
+              <label class="field-label">First comment tự động</label>
+              <textarea id="manualFirstComment" rows="2" placeholder="Comment sau khi đăng — {spintax|biến thể}"></textarea>
+              <label class="switch-row">
+                <input type="checkbox" id="manualFirstCommentOn" />
+                <span>Bật first comment sau khi đăng thành công</span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <div id="manualAdvancedPanel" class="gf-step gf-advanced hidden">
+          <p class="section-eyebrow">Lịch &amp; campaign (tuỳ chọn)</p>
+          <label class="field-label">Campaign</label>
+          <input type="text" id="manualCampaign" placeholder="Tên chiến dịch — gom bài lên lịch dàn" />
+          <label class="field-label">Lịch đăng bài</label>
           <div class="row">
             <input type="date" id="manualDate" />
             <input type="time" id="manualTime" />
           </div>
-          <label class="switch-row">
-            <input type="checkbox" id="manualAutoImage" checked />
-            <span>Tự xuất ảnh AI khi đăng (nếu chưa có file)</span>
-          </label>
-          <label class="field-label">Lịch xuất ảnh <span class="field-hint">(tuỳ chọn — trước giờ đăng)</span></label>
+          <label class="field-label">Lịch xuất ảnh <span class="field-hint">(trước giờ đăng)</span></label>
           <div class="row">
             <input type="date" id="manualImageDate" />
             <input type="time" id="manualImageTime" />
           </div>
-          <label class="field-label">Nhóm đăng <span class="field-hint">(tuỳ chọn — tối đa theo cài đặt)</span></label>
-          <div id="manualGroupPicker" class="inline-group-list scroll-sm"></div>
-          <button type="button" id="btnAddManual" class="btn ghost block">+ Thêm vào danh sách</button>
         </div>
+
+        <button type="button" id="btnAddManual" class="btn primary block gf-add-post-btn">+ Thêm vào danh sách</button>
       </div>
 
       <div class="card">
@@ -167,11 +312,6 @@
           </div>
         </div>
         <div id="postList" class="list"></div>
-      </div>
-
-      <div id="progressBox" class="card progress-card hidden">
-        <div class="progress-bar"><div id="progressFill"></div></div>
-        <div id="progressLog" class="log"></div>
       </div>
     </section>
 
@@ -204,7 +344,7 @@
           </div>
           <button type="button" id="btnRefreshGroups" class="btn ghost sm accent">↻ Làm mới</button>
         </div>
-        <p class="hint" id="groupsSyncStatus">Tự lấy nhóm qua session Chrome — GraphQL nền, không mở Facebook</p>
+        <p class="hint" id="groupsSyncStatus">Nhóm lưu cache — cập nhật GraphQL nền (1 request, không cuộn FB). ↻ = quét đủ; Ctrl+↻ = đọc đủ SW.</p>
         <div class="segmented groups-sub-nav" role="group">
           <button type="button" data-groups-sub="fb" class="segmented-btn active">Tất cả nhóm FB</button>
           <button type="button" data-groups-sub="custom" class="segmented-btn">Bộ custom</button>
@@ -213,14 +353,43 @@
         <div id="groupsSubFb">
           <div class="search-wrap">
             <span class="search-icon" aria-hidden="true">⌕</span>
-            <input type="search" id="groupSearch" placeholder="Gõ tên tìm nhóm…" />
+            <input type="search" id="groupSearch" placeholder="Gõ tên nhóm (không dấu cũng được)…" autocomplete="off" spellcheck="false" />
           </div>
+          <div class="group-filter-row">
+            <label class="group-filter-field">Quyền riêng tư
+              <select id="groupFilterPrivacy">
+                <option value="all">Tất cả</option>
+                <option value="open">Công khai</option>
+                <option value="closed">Đóng</option>
+                <option value="secret">Kín</option>
+                <option value="unknown">Chưa rõ</option>
+              </select>
+            </label>
+            <label class="group-filter-field">Đăng bài
+              <select id="groupFilterApproval">
+                <option value="all">Tất cả</option>
+                <option value="none">Không duyệt</option>
+                <option value="required">Có duyệt</option>
+                <option value="unknown">Chưa rõ</option>
+              </select>
+            </label>
+            <label class="group-filter-field">Vai trò
+              <select id="groupFilterRole">
+                <option value="all">Tất cả</option>
+                <option value="admin">Admin</option>
+                <option value="member">Member</option>
+                <option value="unknown">Chưa rõ</option>
+              </select>
+            </label>
+          </div>
+          <p class="hint" id="groupFilterSummary"></p>
           <p class="hint assign-picker-hint" id="assignPickerHint">Đang chọn: <span id="assignPickerCount">0</span> nhóm</p>
           <label class="select-all">
             <input type="checkbox" id="selectAllPickerGroups" />
             <span>Chọn tất cả (kết quả tìm)</span>
           </label>
           <div id="groupLibraryList" class="list scroll"></div>
+
         </div>
 
         <div id="groupsSubCustom" class="hidden">
@@ -243,7 +412,7 @@
           </div>
           <button type="button" id="btnRefreshComments" class="btn ghost sm">Làm mới</button>
         </div>
-        <p class="hint">Giãn cách ngẫu nhiên giữa mỗi comment theo mức <strong>Settings → Giãn cách</strong>.</p>
+        <p class="hint">Giãn cách ngẫu nhiên giữa mỗi comment theo mức <strong>Settings → Giãn cách</strong>. Danh sách <strong>tự sync</strong> từ tidien (~10 phút + khi mở panel).</p>
         <label class="field-label">Bắt đầu lịch</label>
         <input type="datetime-local" id="commentScheduleStart" />
         <div id="commentList" class="list"></div>
@@ -289,7 +458,7 @@
     <section id="tab-activity" class="tab-panel">
       <div class="segmented" style="margin-bottom: 12px">
         <button type="button" data-sub="upcoming" class="segmented-btn active">Sắp tới</button>
-        <button type="button" data-sub="history" class="segmented-btn">Lịch sử</button>
+        <button type="button" data-sub="history" class="segmented-btn">Lịch sử <span id="historyBadge" class="tab-badge hidden"></span></button>
       </div>
       <div id="activityUpcoming" class="list"></div>
       <div id="activityHistory" class="list hidden"></div>
@@ -310,10 +479,9 @@
         <p class="section-eyebrow">1) Cài đặt lần đầu (5 phút)</p>
         <ol class="help-steps">
           <li><strong>Load unpacked</strong> thư mục <code>GroupFlow/fb-group-poster</code> (không chọn <code>ref-group-posting</code>).</li>
-          <li>Mở tab <strong>Cài đặt</strong> → URL website (vd. <code>https://tidien.xyz</code>).</li>
-          <li>Đăng nhập tidien bằng <strong>Email/Password</strong> (khuyên dùng) hoặc dán <strong>tidien API key</strong>.</li>
-          <li>Chọn <strong>Text Provider</strong> (viết lại/comment) và <strong>Image Provider</strong> (xuất ảnh).</li>
-          <li>(Tuỳ chọn) cấu hình Google Drive nếu muốn upload media lên Drive.</li>
+          <li>Tab <strong>Cài đặt</strong> → khai báo <strong>AI Provider local</strong> + chọn thư mục lưu ảnh.</li>
+          <li>Tab <strong>Skill</strong> → import skill JSON (tuỳ chọn).</li>
+          <li>Đăng nhập tidien chỉ khi cần <strong>Tải web</strong> / sync.</li>
         </ol>
         <p class="hint">
           Nếu chưa có provider: tạo trên website tại trang <strong>Providers</strong> (giống cấu hình fanpage).
@@ -326,9 +494,9 @@
           <div class="help-block">
             <div class="help-block-title">A. Tạo bài</div>
             <ul class="help-bullets">
-              <li>Tab <strong>Tạo bài</strong> → <strong>Nhập tay</strong> hoặc <strong>Excel</strong>.</li>
+              <li>Tab <strong>Tạo bài</strong> → <strong>Nhập tay</strong>, <strong>AI viết</strong> hoặc <strong>Excel</strong>.</li>
               <li>Nhập nội dung (A–D) + prompt ảnh (nếu cần).</li>
-              <li>Chọn nhóm ngay trên form (nhập tay) hoặc trên từng card bài (<strong>Chọn nhóm</strong>).</li>
+              <li>Tick bài → <strong>Sửa</strong>: đổi nội dung, lịch, <strong>nhóm đăng</strong> trong cùng form; hoặc <strong>Chọn nhóm</strong> trên card khi không sửa.</li>
             </ul>
           </div>
           <div class="help-block">
@@ -342,6 +510,8 @@
             <div class="help-block-title">C. Đăng ngay / Lên lịch</div>
             <ul class="help-bullets">
               <li>Tick bài cần chạy → bấm <strong>Đăng ngay</strong> hoặc <strong>Lên lịch</strong>.</li>
+              <li>Sau đăng OK: card <strong>✓ Đã đăng</strong> → <strong>Mở bài</strong> (comment tay) hoặc <strong>▶ Bot</strong>.</li>
+              <li>Bật <strong>First comment</strong> (bước 3) để bot tự comment ngay sau đăng.</li>
               <li>Nút <strong>Dàn</strong>: lên lịch nhiều bài theo khoảng cách phút (campaign).</li>
               <li>Tab <strong>Log</strong>: xem lịch sử; tab <strong>Activity</strong>: quản lý job sắp chạy.</li>
             </ul>
@@ -364,68 +534,66 @@
           <li><strong>Không thấy nhóm</strong>: đăng nhập Facebook trong Chrome → vào tab <strong>Nhóm</strong> → <strong>↻ Làm mới</strong>.</li>
           <li><strong>Generate/AI báo thiếu key</strong>: vào <strong>Cài đặt</strong> → đăng nhập tidien → chọn provider; 9Router key chỉ là dự phòng.</li>
           <li><strong>Video không đăng</strong>: chuyển <strong>Chế độ Cổ điển</strong> (Settings) vì video cần DOM.</li>
+          <li><strong>Lỗi Nhanh / mở FB bất ngờ</strong>: mặc định Nhanh <em>không</em> mở FB; nếu lỗi xem đúng dòng đỏ trong Lịch sử (vd. thiếu session → mở facebook.com F5). Chỉ bật「Nhanh lỗi → Cổ điển」khi cần dự phòng DOM.</li>
         </ul>
+      </div>
+    </section>
+
+    <!-- SKILL LOCAL -->
+    <section id="tab-skills" class="tab-panel">
+      <div class="card">
+        <p class="section-eyebrow">Skill local — chỉ trên extension</p>
+        <p class="hint">Import JSON hoặc tạo skill tại đây. Dùng cho tab <strong>AI viết</strong> — không đồng bộ website.</p>
+        <label class="file-drop file-drop-sm" for="skillImportFile">
+          <span class="file-drop-icon">↑</span>
+          <span class="file-drop-title">Import skill JSON</span>
+          <span class="file-drop-hint">name · skill_type · system_prompt</span>
+        </label>
+        <input type="file" id="skillImportFile" accept=".json,application/json" class="sr-only" />
+        <div class="row" style="margin: 8px 0">
+          <button type="button" id="btnExportSkills" class="btn ghost sm">Xuất JSON</button>
+        </div>
+        <label class="field-label">Tạo / sửa skill</label>
+        <input type="text" id="skillFormName" placeholder="Tên skill" />
+        <select id="skillFormType">
+          <option value="text">Viết bài (text)</option>
+          <option value="image">Prompt ảnh (image)</option>
+        </select>
+        <textarea id="skillFormPrompt" rows="4" placeholder="System prompt…"></textarea>
+        <input type="hidden" id="skillFormEditId" value="" />
+        <div class="row">
+          <button type="button" id="btnSaveSkill" class="btn primary sm">Lưu skill</button>
+          <button type="button" id="btnCancelSkill" class="btn ghost sm hidden">Huỷ sửa</button>
+        </div>
+        <div id="localSkillList" class="list scroll-sm" style="margin-top:12px"></div>
       </div>
     </section>
 
     <!-- SETTINGS -->
     <section id="tab-settings" class="tab-panel">
-      <div class="card">
-        <p class="section-eyebrow">Kết nối</p>
-        <label class="field-label">URL website</label>
-        <input type="url" id="tidienBaseUrl" placeholder="https://tidien.xyz" />
-        <p class="hint">API: <code>{url}/api/group-posts/...</code></p>
-        <label class="field-label">Email</label>
-        <input type="email" id="tidienEmail" />
-        <label class="field-label">Password</label>
-        <input type="password" id="tidienPassword" />
-        <button type="button" id="btnTidienLogin" class="btn primary block">Đăng nhập</button>
+      <div class="card card-posting-strategy" id="postingStrategyCard">
+        <p class="section-eyebrow">Đăng bài — đọc phần này trước</p>
+        <p class="hint">Chọn <strong>cách đăng</strong> (Nhanh/Cổ điển) và <strong>giãn cách</strong> (Nhanh/Cân bằng/An toàn) trước khi bấm Đăng ngay.</p>
 
-        <p class="section-eyebrow">AI Provider</p>
-        <p class="hint">Giống fanpage trên website — chọn provider viết bài và xuất ảnh. Cần đăng nhập tidien; tạo provider tại <strong>Providers</strong> trên web.</p>
-        <label class="field-label">Text Provider — viết bài / comment / AI rewrite</label>
-        <select id="textProviderId">
-          <option value="">— Chưa chọn —</option>
-        </select>
-        <p class="hint" id="textProviderHint"></p>
-        <label class="field-label">Image Provider — xuất ảnh AI</label>
-        <select id="imageProviderId">
-          <option value="">— Chưa chọn —</option>
-        </select>
-        <p class="hint" id="imageProviderHint"></p>
-        <button type="button" id="btnReloadProviders" class="btn ghost sm">↻ Tải lại providers</button>
-
-        <p class="section-eyebrow">API &amp; Drive (dự phòng)</p>
-        <label class="field-label">tidien API Key</label>
-        <input type="password" id="tidienApiKey" />
-        <label class="field-label">9Router API Key <span class="field-hint">(chỉ khi chưa chọn provider)</span></label>
-        <input type="password" id="routerApiKey" />
-        <label class="field-label">Drive Service Account JSON</label>
-        <textarea id="driveJson" rows="3"></textarea>
-        <label class="field-label">Drive Folder ID</label>
-        <input type="text" id="driveFolderId" />
-        <label class="field-label">Max groups / lần</label>
-        <input type="number" id="maxGroups" min="1" max="50" value="10" />
-
-        <p class="section-eyebrow">Chiến lược đăng bài</p>
-        <p class="hint">Nhanh = GraphQL session FB. Cổ điển = DOM (video / fallback).</p>
+        <p class="field-label">Chế độ đăng</p>
+        <p class="hint">Nhanh = nền GraphQL (không mở FB). Cổ điển = tự thao tác trên tab FB (video / giống GPP).</p>
         <div class="strategy-row" role="radiogroup" aria-label="Chế độ đăng bài">
           <label class="strategy-card">
             <input type="radio" name="postMode" value="fast" class="sr-only" checked />
-            <span class="strategy-title">Chế độ Nhanh</span>
+            <span class="strategy-title">Nhanh</span>
             <span class="strategy-badge">Khuyên dùng</span>
-            <span class="strategy-desc">API nội bộ FB — text + ảnh</span>
+            <span class="strategy-desc">Text + ảnh, không cần mở FB</span>
           </label>
           <label class="strategy-card">
             <input type="radio" name="postMode" value="classic" class="sr-only" />
-            <span class="strategy-title">Chế độ Cổ điển</span>
-            <span class="strategy-badge muted">Tương thích</span>
-            <span class="strategy-desc">Tự động hóa DOM — tốt cho video</span>
+            <span class="strategy-title">Cổ điển</span>
+            <span class="strategy-badge muted">GPP</span>
+            <span class="strategy-desc">DOM trên Facebook — video</span>
           </label>
         </div>
 
-        <p class="section-eyebrow">Giãn cách đăng &amp; comment</p>
-        <p class="hint" id="securityHint">Chờ ngẫu nhiên giữa group / bài / comment khi chạy hàng loạt.</p>
+        <p class="field-label" style="margin-top:14px">Giãn cách (chống spam FB)</p>
+        <p class="hint" id="securityHint">Chờ ngẫu nhiên giữa nhóm / bài / comment khi đăng hàng loạt.</p>
         <div class="segmented" role="radiogroup" aria-label="Giãn cách đăng">
           <label class="segmented-btn"><input type="radio" name="securityLevel" value="fast" class="sr-only" />Nhanh</label>
           <label class="segmented-btn"><input type="radio" name="securityLevel" value="balanced" class="sr-only" checked />Cân bằng</label>
@@ -435,11 +603,114 @@
           <input type="checkbox" id="avoidNight" checked />
           <span>Tránh đăng ban đêm (22:00–07:00)</span>
         </label>
+        <label class="switch-row">
+          <input type="checkbox" id="classicFallbackOnFastFail" />
+          <span>Nhanh lỗi → tự thử Cổ điển (mở tab FB)</span>
+        </label>
+        <p class="hint">Mặc định <strong>tắt</strong> — giống GroupPostingPro: chỉ đăng nền, không mở Facebook. Bật nếu cần dự phòng DOM.</p>
         <label class="field-label">Ngôn ngữ FB</label>
         <select id="fbLang">
           <option value="vi">Tiếng Việt</option>
           <option value="en">English</option>
         </select>
+        <label class="field-label">Max nhóm / bài</label>
+        <input type="number" id="maxGroups" min="1" max="50" value="10" />
+      </div>
+
+      <div class="card">
+        <p class="section-eyebrow">AI Provider (local)</p>
+        <p class="hint">Khai báo API key + endpoint trên máy — gọi thẳng OpenAI/Claude/Gemini/Ideogram/9Router. Không lấy từ website.</p>
+        <label class="field-label">Text Provider đang dùng</label>
+        <select id="activeTextProviderId"><option value="">— Chưa chọn —</option></select>
+        <label class="field-label">Image Provider đang dùng</label>
+        <select id="activeImageProviderId"><option value="">— Chưa chọn —</option></select>
+        <button type="button" id="btnSaveActiveProviders" class="btn ghost sm block">Lưu lựa chọn provider</button>
+        <label class="file-drop file-drop-sm" for="providerImportFile" style="margin-top:12px">
+          <span class="file-drop-icon">↑</span>
+          <span class="file-drop-title">Import provider JSON</span>
+          <span class="file-drop-hint">name · type · api_key · model · api_endpoint</span>
+        </label>
+        <input type="file" id="providerImportFile" accept=".json,application/json" class="sr-only" />
+        <div class="row" style="margin: 8px 0">
+          <button type="button" id="btnExportProviders" class="btn ghost sm">Xuất JSON</button>
+        </div>
+        <label class="field-label">Thêm / sửa provider</label>
+        <input type="text" id="providerFormName" placeholder="Tên (vd. 9Router text)" />
+        <select id="providerFormType">
+          <option value="text">Text</option>
+          <option value="image">Image</option>
+        </select>
+        <select id="providerFormKind">
+          <option value="openai">OpenAI-compatible</option>
+          <option value="claude">Claude</option>
+          <option value="gemini">Gemini</option>
+          <option value="ideogram">Ideogram</option>
+        </select>
+        <input type="password" id="providerFormKey" placeholder="API key" />
+        <input type="text" id="providerFormModel" placeholder="Model (vd. gpt-4o-mini)" />
+        <input type="text" id="providerFormEndpoint" placeholder="API endpoint (tuỳ chọn)" />
+        <input type="hidden" id="providerFormEditId" value="" />
+        <div class="row">
+          <button type="button" id="btnSaveProvider" class="btn primary sm">Lưu provider</button>
+          <button type="button" id="btnCancelProvider" class="btn ghost sm hidden">Huỷ</button>
+        </div>
+        <div id="localProviderList" class="list scroll-sm" style="margin-top:12px"></div>
+
+        <p class="section-eyebrow">Xuất ảnh ra máy</p>
+        <p class="hint">Chọn thư mục cố định (giống chọn folder Drive) hoặc lưu vào Downloads.</p>
+        <label class="switch-row">
+          <input type="checkbox" id="imageSaveLocal" checked />
+          <span>Tự lưu ảnh PNG khi generate</span>
+        </label>
+        <label class="field-label">Chế độ lưu</label>
+        <select id="imageSaveMode">
+          <option value="downloads">Thư mục con trong Downloads</option>
+          <option value="folder">Thư mục tùy chọn trên máy</option>
+        </select>
+        <div id="imageSaveDownloadsOpts">
+          <label class="field-label">Thư mục con (Downloads)</label>
+          <input type="text" id="imageSaveSubfolder" placeholder="GroupFlow" value="GroupFlow" />
+        </div>
+        <div id="imageSaveFolderOpts" class="hidden">
+          <label class="field-label">Thư mục đã chọn</label>
+          <p class="hint" id="imageSaveDirLabel">Chưa chọn — bấm nút bên dưới</p>
+          <button type="button" id="btnPickImageFolder" class="btn ghost sm block">📁 Chọn thư mục lưu ảnh</button>
+        </div>
+        <label class="switch-row">
+          <input type="checkbox" id="imageSaveAskEachTime" />
+          <span>Hỏi vị trí mỗi lần lưu (Save As)</span>
+        </label>
+
+        <p class="section-eyebrow">Kết nối website (tuỳ chọn)</p>
+        <label class="field-label">URL website</label>
+        <input type="url" id="tidienBaseUrl" placeholder="https://tidien.xyz" />
+        <p class="hint">API: <code>{url}/api/group-posts/...</code></p>
+        <label class="field-label">Email</label>
+        <input type="email" id="tidienEmail" />
+        <label class="field-label">Password</label>
+        <input type="password" id="tidienPassword" />
+        <button type="button" id="btnTidienLogin" class="btn primary block">Đăng nhập</button>
+        <p class="hint">Đăng nhập hoặc dán <strong>API key</strong> — extension <strong>sync thông minh</strong>: chỉ bài comment mới + tối đa 5 draft/lần; không tải lại toàn bộ mỗi khi mở panel.</p>
+        <label class="switch-row">
+          <input type="checkbox" id="tidienAutoSyncEnabled" checked />
+          <span>Tự đồng bộ từ tidien (comment + draft)</span>
+        </label>
+        <label class="switch-row">
+          <input type="checkbox" id="tidienAutoPullDrafts" checked />
+          <span>Tự tải draft mới khi sync</span>
+        </label>
+        <label class="field-label">Chu kỳ sync (phút)</label>
+        <input type="number" id="tidienAutoSyncMinutes" min="5" max="120" value="10" />
+
+        <p class="section-eyebrow">API dự phòng</p>
+        <label class="field-label">tidien API Key</label>
+        <input type="password" id="tidienApiKey" />
+        <label class="field-label">9Router API Key <span class="field-hint">(chỉ khi chưa chọn provider)</span></label>
+        <input type="password" id="routerApiKey" />
+        <label class="field-label">Drive Service Account JSON</label>
+        <textarea id="driveJson" rows="3"></textarea>
+        <label class="field-label">Drive Folder ID</label>
+        <input type="text" id="driveFolderId" />
 
         <p class="section-eyebrow">Lịch xuất ảnh (queue)</p>
         <p class="hint">Giống website fanpage — quét queue mỗi phút, xuất ảnh bài chưa có media trong khung giờ.</p>
@@ -458,6 +729,37 @@
     </section>
   </main>
 
+  <!-- Overlay đăng bài — port từ GPP `.LoadingDiv` + `active-run-dashboard` -->
+  <div id="postingOverlay" class="gf-posting-overlay hidden" aria-live="polite">
+    <div class="gf-active-run">
+      <div class="gf-ard-header">
+        <div class="gf-ard-status-pill">
+          <span class="gf-ard-pulse-dot"></span>
+          <span>Engine đang chạy</span>
+        </div>
+        <button type="button" id="btnStopPosting" class="gf-ard-stop-btn">⏹ Dừng</button>
+      </div>
+      <div class="gf-ard-body">
+        <div class="gf-ard-progress-wrap">
+          <svg class="gf-ard-ring" width="100" height="100" viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="gf-ard-ring-bg" cx="50" cy="50" r="44"></circle>
+            <circle id="postingProgressRing" class="gf-ard-ring-fill" cx="50" cy="50" r="44"></circle>
+          </svg>
+          <div id="postingProgressText" class="gf-ard-progress-text">0%</div>
+        </div>
+        <h3 id="postingStatus" class="gf-ard-status">Đang chuẩn bị engine…</h3>
+        <p class="gf-ard-hint">Có thể thu nhỏ panel hoặc duyệt tab khác — automation vẫn chạy nền.</p>
+      </div>
+      <div class="gf-ard-logs">
+        <div class="gf-ard-logs-head">
+          <span>Live Activity</span>
+          <span id="postingCountText" class="gf-ard-count">0 / 0</span>
+        </div>
+        <div id="progressLog" class="gf-ard-log-list"></div>
+      </div>
+    </div>
+  </div>
+
   <footer class="footer">
     <button type="button" id="btnScheduleCampaign" class="btn ghost sm" title="Lên lịch dàn các bài đã chọn">Dàn</button>
     <button type="button" id="btnSchedule" class="btn ghost">Lên lịch</button>
@@ -469,6 +771,10 @@
 
   <script src="lib/xlsx.full.min.js"></script>
   <script src="modules/storage.js"></script>
+  <script src="modules/localSkills.js"></script>
+  <script src="modules/localProviders.js"></script>
+  <script src="modules/localAi.js"></script>
+  <script src="modules/imageFolder.js"></script>
   <script src="modules/aiApi.js"></script>
   <script src="modules/spintax.js"></script>
   <script src="modules/composer.js"></script>

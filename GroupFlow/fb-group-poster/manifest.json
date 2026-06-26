@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "GroupFlow — FB Group Auto Poster",
-  "version": "1.0.10",
-  "description": "Đăng bài FB Group, comment chéo, Radar Lead — đồng bộ tidien.xyz",
+  "version": "1.0.63",
+  "description": "Đăng bài FB Group, AI local, comment chéo, Radar — tuỳ chọn sync tidien.xyz",
   "permissions": [
     "storage",
     "alarms",
@@ -20,14 +20,25 @@
     "https://upload.facebook.com/*",
     "https://tidien.xyz/*",
     "http://localhost:3001/*",
-    "https://www.googleapis.com/*"
+    "http://localhost/*",
+    "https://www.googleapis.com/*",
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.ideogram.ai/*",
+    "https://*.ideogram.ai/*",
+    "https://openrouter.ai/*",
+    "https://*.blob.core.windows.net/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "GroupFlow",
-    "default_popup": "sidepanel.html",
+    "default_title": "GroupFlow — mở panel",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -40,6 +51,18 @@
     "128": "icons/icon128.png"
   },
   "content_scripts": [
+    {
+      "matches": [
+        "https://www.facebook.com/*",
+        "https://facebook.com/*",
+        "https://m.facebook.com/*",
+        "https://tidien.xyz/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": ["modules/gfPanelShell.js"],
+      "run_at": "document_idle"
+    },
     {
       "matches": [
         "https://www.facebook.com/*",
@@ -58,6 +81,18 @@
     }
   ],
   "web_accessible_resources": [
+    {
+      "resources": [
+        "sidepanel.html",
+        "sidepanel.css",
+        "sidepanel.js",
+        "lib/*",
+        "modules/*",
+        "icons/*",
+        "selectors.js"
+      ],
+      "matches": ["<all_urls>"]
+    },
     {
       "resources": ["modules/pageNetworkHook.js"],
       "matches": [

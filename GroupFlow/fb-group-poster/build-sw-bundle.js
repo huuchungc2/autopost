@@ -4,8 +4,11 @@ const path = require('path');
 const root = path.join(__dirname, 'modules');
 const files = [
   'gfShared.js',
+  'localProviders.js',
+  'localAi.js',
   'postMedia.js',
   'groupParse.js',
+  'groupMetaStore.js',
   'fbSessionBg.js',
   'postFormat.js',
   'fbPostBg.js',
@@ -15,7 +18,8 @@ const files = [
 
 let bundle = '/* AUTO-GENERATED — chạy: node build-sw-bundle.js */\n';
 for (const f of files) {
-  const code = fs.readFileSync(path.join(root, f), 'utf8').trim();
+  let code = fs.readFileSync(path.join(root, f), 'utf8').trim();
+  code = code.replace(/^window\.GF = window\.GF \|\| \{\};/, 'globalThis.GF = globalThis.GF || {};');
   bundle += `\n// ----- ${f} -----\n(function () {\n${code}\n})();\n`;
 }
 

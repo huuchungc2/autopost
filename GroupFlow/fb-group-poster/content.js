@@ -1,4 +1,6 @@
-const GF_CONTENT = {
+// Idempotent: file này có thể bị inject lại; tránh redeclare const.
+let GF_CONTENT = globalThis.GF_CONTENT;
+if (!GF_CONTENT) GF_CONTENT = {
   lang: 'vi',
   capturedPostId: null,
   capturedGroups: new Map(),
@@ -58,26 +60,49 @@ const GF_CONTENT = {
     return /GroupsCometJoins|GroupsCometYourGroups|groups_tab_list|joined.*groups|your_groups/i.test(String(text || ''));
   },
 
-  addCapturedGroup(id, name) {
+  addCapturedGroup(id, name, meta = {}) {
     if (!id || !/^\d{5,}$/.test(String(id))) return;
     const n = String(name || '').trim();
     if (!n || n.length < 2 || this.isGenericGroupName(n)) return;
-    const gid = String(id);
+    this.addCapturedGroupEntry({
+      id: String(id),
+      name: n,
+      href: `https://www.facebook.com/groups/${id}/`,
+      ...meta,
+    });
+  },
+
+  addCapturedGroupEntry(g) {
+    if (!g?.id || !/^\d{5,}$/.test(String(g.id))) return;
+    const n = String(g.name || '').trim();
+    if (!n || n.length < 2 || this.isGenericGroupName(n)) return;
+    const gid = String(g.id);
     const entry = {
       id: gid,
       name: n,
-      href: `https://www.facebook.com/groups/${gid}/`,
+      href: g.href || `https://www.facebook.com/groups/${gid}/`,
+      privacy: g.privacy || 'UNKNOWN',
+      post_approval: g.post_approval || 'unknown',
+      requires_approval: g.requires_approval || g.post_approval === 'required',
+      join_role: g.join_role || null,
+      meta_source: g.meta_source,
     };
     const existing = this.capturedGroups.get(gid);
-    if (!existing) {
-      this.capturedGroups.set(gid, entry);
-      return;
+    const merged = GF.groupParse?.mergeGroupEntry
+      ? GF.groupParse.mergeGroupEntry(existing, entry)
+      : { ...existing, ...entry };
+    if (existing && this.isFallbackGroupName(merged.name) && !this.isFallbackGroupName(n)) {
+      merged.name = n;
     }
-    if (this.isFallbackGroupName(existing.name) && !this.isFallbackGroupName(n)) {
-      existing.name = n;
-    } else if (!this.isFallbackGroupName(n) && n.length > existing.name.length) {
-      existing.name = n;
-    }
+    this.capturedGroups.set(gid, merged);
+  },
+
+  reportDocIdsFromHtml(html) {
+    const GP = GF.groupParse;
+    if (!GP?.findAboutDocIdsInHtml) return;
+    const docIds = GP.findAboutDocIdsInHtml(html);
+    if (!Object.keys(docIds).length) return;
+    chrome.runtime.sendMessage({ type: 'GF_SAVE_GRAPHQL_DOC_IDS', docIds }).catch(() => {});
   },
 
   findGroupNameInHtml(html, groupId) {
@@ -102,8 +127,9 @@ const GF_CONTENT = {
     if (!html || html.length < 200) return;
     const joinedOnly = opts.joinedOnly === true;
     if (joinedOnly && !this.isYourGroupsPage()) return;
+    this.reportDocIdsFromHtml(html);
     (GF.groupParse?.parseJoinedGroupsFromHtml(html, { onJoinsPage: true }) || []).forEach((g) => {
-      this.addCapturedGroup(g.id, g.name);
+      this.addCapturedGroupEntry(g);
     });
   },
 
@@ -113,9 +139,26 @@ const GF_CONTENT = {
       const joinsResponse = this.isJoinsListResponse(text);
       if (onJoins || joinsResponse) {
         (GF.groupParse?.parseJoinedGroupsFromText(text, { onJoinsPage: onJoins }) || []).forEach((g) => {
-          this.addCapturedGroup(g.id, g.name);
+          this.addCapturedGroupEntry(g);
         });
       }
+
+      if (/privacy_info|if_viewer_can_post_without_admin_approval|group_privacy/i.test(text)) {
+        const groups = GF.groupParse?.parseJoinedGroupsFromText(text, { onJoinsPage: false }) || [];
+        if (groups.length) {
+          groups.forEach((g) => this.addCapturedGroupEntry(g));
+          chrome.runtime.sendMessage({ type: 'GF_APPLY_GROUP_META', groups }).catch(() => {});
+        }
+      }
+
+      const GP = GF.groupParse;
+      if (GP?.findAboutDocIdsInHtml) {
+        const docIds = GP.findAboutDocIdsInHtml(text);
+        if (Object.keys(docIds).length) {
+          chrome.runtime.sendMessage({ type: 'GF_SAVE_GRAPHQL_DOC_IDS', docIds }).catch(() => {});
+        }
+      }
+
       const m = text.match(/"fb_api_req_friendly_name":"([^"]+)"[\s\S]{0,500}?"doc_id":"(\d+)"/);
       if (m && window.GF?.fbGraphApi) GF.fbGraphApi.rememberDocId(m[1], m[2]);
       const postM = text.match(/"legacy_story_id":"(\d+)"/) || text.match(/"post_id":"(\d+)"/);
@@ -217,17 +260,18 @@ const GF_CONTENT = {
 
     const map = new Map();
 
-    root.querySelectorAll('a[href*="/groups/"]').forEach((a) => {
-      const href = a.href || a.getAttribute('href') || '';
+    const collectHrefEl = (el) => {
+      const href = el?.href || el?.getAttribute?.('href') || el?.getAttribute?.('data-lynx-uri') || '';
+      if (!href) return;
       if (this.isExcludedGroupHref(href)) return;
       const m = href.match(/\/groups\/(\d{5,})(?:\/|$|\?)/);
       if (!m) return;
       if (joinedOnly) {
-        if (a.closest('[role="article"]')) return;
-        if (this.isInSuggestedSection(a)) return;
+        if (el.closest?.('[role="article"]')) return;
+        if (this.isInSuggestedSection(el)) return;
       }
       const id = m[1];
-      const name = this.pickNameFromLink(a, id, html);
+      const name = this.pickNameFromLink(el, id, html);
       const existing = map.get(id);
       if (!existing) {
         map.set(id, { id, name, href: `https://www.facebook.com/groups/${id}/` });
@@ -236,8 +280,50 @@ const GF_CONTENT = {
       if (this.isFallbackGroupName(existing.name) && !this.isFallbackGroupName(name)) {
         existing.name = name;
       }
+    };
+
+    // Classic anchors
+    root.querySelectorAll('a[href*="/groups/"]').forEach((a) => collectHrefEl(a));
+
+    // Some joins UIs render “Xem nhóm / View group” as button-like elements.
+    // Try to locate the nearest group link around those buttons.
+    root.querySelectorAll('[role="button"], div[role="link"], a[role="link"]').forEach((btn) => {
+      const t = String(btn?.innerText || btn?.getAttribute?.('aria-label') || '').toLowerCase();
+      if (!/(xem\s+nhóm|view\s+group)/i.test(t)) return;
+      const link = btn.closest('a[href*="/groups/"]') || btn.querySelector?.('a[href*="/groups/"]');
+      if (link) return collectHrefEl(link);
+      collectHrefEl(btn);
     });
 
+    return [...map.values()];
+  },
+
+  parseJoinsCountFromHeader() {
+    const text = document.querySelector('[role="main"]')?.innerText || document.body?.innerText || '';
+    const m = text.match(/đã tham gia\s*\((\d+)\)/i)
+      || text.match(/joined\s*\((\d+)\)/i)
+      || text.match(/(\d+)\s*(?:nhóm|groups?)/i);
+    return m ? parseInt(m[1], 10) : null;
+  },
+
+  extractGroupsFromMainHtml(html = document.documentElement.innerHTML) {
+    if (!this.isYourGroupsPage()) return [];
+    const main = document.querySelector('[role="main"]');
+    const slice = main?.innerHTML || html;
+    const map = new Map();
+    const re = /\/groups\/(\d{5,})/g;
+    let m;
+    while ((m = re.exec(slice)) !== null) {
+      const id = m[1];
+      if (this.isExcludedGroupHref(`/groups/${id}/`)) continue;
+      const name = this.findGroupNameInHtml(slice, id) || `Group ${id}`;
+      const existing = map.get(id);
+      if (!existing) {
+        map.set(id, { id, name, href: `https://www.facebook.com/groups/${id}/` });
+      } else if (this.isFallbackGroupName(existing.name) && !this.isFallbackGroupName(name)) {
+        existing.name = name;
+      }
+    }
     return [...map.values()];
   },
 
@@ -265,6 +351,9 @@ const GF_CONTENT = {
     const merged = new Map();
     this.capturedGroups.forEach((g, id) => this.upsertMergedGroup(merged, g));
     this.extractGroupsFromDom(html, { joinedOnly }).forEach((g) => this.upsertMergedGroup(merged, g));
+    if (joinedOnly && this.isYourGroupsPage()) {
+      this.extractGroupsFromMainHtml(html).forEach((g) => this.upsertMergedGroup(merged, g));
+    }
     return [...merged.values()].sort((a, b) => a.name.localeCompare(b.name, 'vi'));
   },
 
@@ -299,11 +388,85 @@ const GF_CONTENT = {
     });
   },
 
-  injectText(el, text) {
+  findCreatePostButton() {
+    const phrases = [
+      'write something', "what's on your mind", 'create a public post',
+      'bạn viết gì', 'viết gì', 'đang nghĩ', 'tạo bài', 'đăng bài', 'bài viết',
+      'bài viết công khai', 'viết bài', 'créer', 'publicación',
+    ];
+    const buttons = this.qsa('div[role="button"], span[role="button"], a[role="button"]')
+      .filter((el) => el.offsetParent);
+    for (const el of buttons) {
+      if (el.closest('[role="article"]')) continue;
+      const t = `${el.textContent || ''} ${el.getAttribute('aria-label') || ''}`.toLowerCase();
+      if (phrases.some((p) => t.includes(p))) return el.closest('[role="button"]') || el;
+    }
+    const pagelets = this.qsa('[data-pagelet="GroupInlineComposer"], [data-pagelet="FeedComposer"], [data-pagelet="InlineComposer"], [data-pagelet*="Composer"]');
+    for (const p of pagelets) {
+      const btn = [...p.querySelectorAll('div[role="button"]')].find((b) => {
+        const r = b.getBoundingClientRect();
+        return r.width > 100 && r.height > 20 && b.textContent.trim();
+      });
+      if (btn) return btn;
+    }
+    return null;
+  },
+
+  async findComposerEditor(timeout = 15000) {
+    const sel = "div[data-lexical-editor='true'], div.notranslate[contenteditable='true'], div[role='textbox'][contenteditable='true']";
+    const isVisible = (el) => {
+      const r = el.getBoundingClientRect();
+      const s = window.getComputedStyle(el);
+      return r.width > 20 && r.height > 10 && s.display !== 'none' && s.visibility !== 'hidden';
+    };
+    const end = Date.now() + timeout;
+    while (Date.now() < end) {
+      const candidates = this.qsa(sel).filter(isVisible).filter((el) => {
+        const label = (el.getAttribute('aria-label') || '').toLowerCase();
+        return !label.includes('comment') && !label.includes('bình luận') && !label.includes('search');
+      });
+      if (candidates.length) {
+        candidates.sort((a, b) => {
+          const ra = a.getBoundingClientRect();
+          const rb = b.getBoundingClientRect();
+          return (rb.width * rb.height) - (ra.width * ra.height);
+        });
+        return candidates[0];
+      }
+      await this.sleep(200);
+    }
+    throw new Error('Không tìm thấy ô soạn bài (composer)');
+  },
+
+  async injectText(el, text) {
+    const plain = String(text || '');
+    el.scrollIntoView({ block: 'center' });
     el.focus();
-    document.execCommand('selectAll', false, null);
-    document.execCommand('insertText', false, text);
-    el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    el.click();
+    await this.sleep(300);
+
+    let pasted = false;
+    try {
+      const dt = new DataTransfer();
+      dt.setData('text/plain', plain);
+      dt.setData('text/html', plain);
+      const ev = new ClipboardEvent('paste', {
+        clipboardData: dt,
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+      });
+      el.dispatchEvent(ev);
+      pasted = (el.innerText || el.textContent || '').trim().length > 0;
+    } catch { /* ignore */ }
+
+    if (!pasted) {
+      document.execCommand('selectAll', false, null);
+      document.execCommand('delete', false, null);
+      document.execCommand('insertText', false, plain);
+    }
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }));
+    await this.sleep(300);
   },
 
   extractGroups() {
@@ -343,26 +506,43 @@ const GF_CONTENT = {
       return this.mergeGroupSources({ joinedOnly: true });
     }
 
-    const scrollTargets = [
-      document.querySelector('[role="main"]'),
-      document.querySelector('[role="feed"]'),
-      document.scrollingElement,
-    ].filter(Boolean);
+    const expected = this.parseJoinsCountFromHeader();
+    let prevCount = 0;
+    let stableRounds = 0;
 
-    for (let i = 0; i < 10; i += 1) {
-      scrollTargets.forEach((el) => {
+    for (let round = 0; round < 35; round += 1) {
+      const scrollables = [
+        document.querySelector('[role="main"]'),
+        document.querySelector('[role="feed"]'),
+        document.scrollingElement,
+        document.body,
+      ].filter(Boolean);
+
+      scrollables.forEach((el) => {
         el.scrollTop = el.scrollHeight;
       });
       window.scrollTo(0, document.body.scrollHeight);
-      await this.sleep(500);
+      await this.sleep(650);
+
+      const groups = this.mergeGroupSources({ joinedOnly: true });
+      const n = groups.length;
+
+      if (expected && n >= expected) return groups;
+      if (n === prevCount) {
+        stableRounds += 1;
+        if (stableRounds >= 4 && round > 6) return groups;
+      } else {
+        stableRounds = 0;
+        prevCount = n;
+      }
     }
-    await this.sleep(600);
 
     return this.mergeGroupSources({ joinedOnly: true });
   },
 
   base64ToBlob(base64, mime = 'image/png') {
-    const bin = atob(base64);
+    const raw = String(base64).replace(/^data:[^;]+;base64,/, '');
+    const bin = atob(raw);
     const arr = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i += 1) arr[i] = bin.charCodeAt(i);
     return new Blob([arr], { type: mime });
@@ -382,13 +562,20 @@ const GF_CONTENT = {
   },
 
   async openComposer(lang) {
+    try {
+      const existing = await this.findComposerEditor(800);
+      if (existing) return existing;
+    } catch { /* mở modal */ }
+
     const triggerSel = gfPickSelector(lang, 'postTrigger');
-    const triggers = this.qsa(triggerSel.split(',').map((s) => s.trim()).join(','));
-    const trigger = triggers.find((el) => el.offsetParent !== null) || triggers[0];
-    if (trigger) trigger.click();
-    await this.sleep(800);
-    const textbox = await this.waitFor(gfPickSelector(lang, 'textbox'));
-    return textbox;
+    let trigger = this.qsa(triggerSel.split(',').map((s) => s.trim()).join(','))
+      .find((el) => el.offsetParent);
+    if (!trigger) trigger = this.findCreatePostButton();
+    if (!trigger) throw new Error('Không tìm thấy nút tạo bài — mở trang nhóm FB rồi thử lại');
+    trigger.scrollIntoView({ block: 'center' });
+    trigger.click();
+    await this.sleep(1200);
+    return this.findComposerEditor();
   },
 
   async attachMedia(fileBlob, lang, filename = 'groupflow.png') {
@@ -415,64 +602,109 @@ const GF_CONTENT = {
   },
 
   async submitPost(lang) {
-    const btn = this.qs(gfPickSelector(lang, 'postBtn'));
+    const dialog = document.querySelector('[role="dialog"]');
+    const scope = dialog || document;
+    const labels = ['đăng', 'post', 'publish', 'đăng bài', 'publier', 'publicar'];
+    let btn = [...scope.querySelectorAll('div[role="button"], button')].find((el) => {
+      if (!el.offsetParent) return false;
+      const t = (el.textContent || el.getAttribute('aria-label') || '').trim().toLowerCase();
+      if (['x', 'đóng', 'close', 'cancel', 'hủy', 'huỷ'].includes(t)) return false;
+      return labels.some((l) => t === l || t.includes(l));
+    });
+    if (!btn) btn = this.qs(gfPickSelector(lang, 'postBtn'));
     if (!btn) throw new Error('Không tìm thấy nút Đăng');
+
     this.capturedPostId = null;
     btn.click();
-    await this.sleep(4000);
+
+    for (let i = 0; i < 25; i += 1) {
+      await this.sleep(2000);
+      const errEl = [...document.querySelectorAll('[role="alert"], [role="dialog"] span, [role="dialog"] div')]
+        .find((el) => /couldn't be posted|không thể đăng|đăng thất bại|failed to post|không đăng được/i.test(el.textContent || ''));
+      if (errEl?.offsetParent) {
+        throw new Error(`Facebook từ chối: ${errEl.textContent.trim().slice(0, 120)}`);
+      }
+      if (!document.querySelector('[role="dialog"] div[contenteditable="true"]')) break;
+    }
+
     if (!this.capturedPostId) {
-      const link = this.qs('a[href*="/posts/"]');
-      const m = link?.href?.match(/posts\/(\d+)/);
+      const link = this.qs('a[href*="/posts/"], a[href*="permalink"]');
+      const m = link?.href?.match(/(\d{8,})/);
       if (m) this.capturedPostId = m[1];
+    }
+
+    if (!this.capturedPostId) {
+      const pending = [...document.querySelectorAll('[role="alert"]')]
+        .find((el) => /chờ duyệt|pending|admin duyệt/i.test(el.textContent || ''));
+      if (pending) {
+        return { postId: 'pending', status: 'pending_approval', warning: 'Đã gửi — chờ admin duyệt' };
+      }
+      throw new Error('Không xác nhận được bài đã đăng — kiểm tra nhóm trên FB');
     }
     return this.capturedPostId;
   },
 
-  async postToGroupClassic({ groupId, text, imageBase64, videoBase64, mediaMime, lang, actorId }) {
+  gfProgress(phase, snippet, group) {
+    chrome.runtime.sendMessage({
+      type: 'GF_PROGRESS',
+      data: { phase, snippet, group },
+    }).catch(() => {});
+  },
+
+  async postToGroupClassic({ groupId, text, imageBase64, images, videoBase64, mediaMime, lang, actorId }) {
+    if (!location.href.includes(`/groups/${groupId}`)) {
+      throw new Error(`Tab chưa ở nhóm ${groupId} — thử lại`);
+    }
     await this.ensureActor(actorId);
     this.hookPostIdCapture();
-    if (!location.href.includes(`/groups/${groupId}`)) {
-      location.href = `https://www.facebook.com/groups/${groupId}`;
-      await this.sleep(3500);
-    }
+    this.gfProgress('classic-composer', 'Cổ điển: mở ô soạn bài…', groupId);
     const textbox = await this.openComposer(lang);
-    this.injectText(textbox, text);
+    await this.injectText(textbox, text);
     if (videoBase64) {
       const mime = mediaMime || 'video/mp4';
       const ext = mime.includes('quicktime') ? 'mov' : mime.split('/')[1] || 'mp4';
       await this.attachMedia(this.base64ToBlob(videoBase64, mime), lang, `groupflow.${ext}`);
-    } else if (imageBase64) {
-      const mime = mediaMime || 'image/png';
-      const ext = mime.includes('jpeg') ? 'jpg' : mime.split('/')[1] || 'png';
-      await this.attachMedia(this.base64ToBlob(imageBase64, mime), lang, `groupflow.${ext}`);
+    } else {
+      const PM = globalThis.GF?.postMedia;
+      const imgList = images?.length
+        ? images
+        : (PM?.getPostImages?.({ imageBase64, mediaMime }) || (imageBase64 ? [{ base64: imageBase64, mime: mediaMime }] : []));
+      for (const img of imgList) {
+        const mime = img.mime || 'image/png';
+        const ext = mime.includes('jpeg') ? 'jpg' : mime.split('/')[1] || 'png';
+        await this.attachMedia(this.base64ToBlob(img.base64, mime), lang, `groupflow-${Date.now()}.${ext}`);
+        if (imgList.length > 1) await this.sleep(500);
+      }
     }
-    const postId = await this.submitPost(lang);
-    return { postId, groupId, mode: 'classic' };
+    this.gfProgress('classic-submit', 'Cổ điển: bấm Đăng…', groupId);
+    const submitRes = await this.submitPost(lang);
+    if (typeof submitRes === 'object') {
+      return { ...submitRes, groupId, mode: 'classic' };
+    }
+    return { postId: submitRes, groupId, mode: 'classic' };
   },
 
-  async postToGroup({ groupId, text, imageBase64, videoBase64, mediaMime, mediaType, lang, postMode, actorId }) {
+  async postToGroup({ groupId, text, imageBase64, images, videoBase64, mediaMime, mediaType, lang, postMode, actorId }) {
     const hasVideo = mediaType === 'video' || Boolean(videoBase64);
     const mode = hasVideo ? 'classic' : (postMode === 'classic' ? 'classic' : 'fast');
     if (mode === 'fast' && GF.fbGraphApi) {
       try {
-        return await GF.fbGraphApi.postToGroup({ groupId, text, imageBase64, actorId });
+        return await GF.fbGraphApi.postToGroup({ groupId, text, imageBase64, images, actorId });
       } catch (e) {
-        console.warn('[GroupFlow] Fast mode failed, fallback classic:', e.message);
-        return this.postToGroupClassic({ groupId, text, imageBase64, videoBase64, mediaMime, lang, actorId });
+        throw new Error(e.message || 'Đăng Nhanh thất bại');
       }
     }
-    return this.postToGroupClassic({ groupId, text, imageBase64, videoBase64, mediaMime, lang, actorId });
+    return this.postToGroupClassic({ groupId, text, imageBase64, images, videoBase64, mediaMime, lang, actorId });
   },
 
   async commentOnPost({ groupId, postId, text, lang }) {
     const url = `https://www.facebook.com/groups/${groupId}/posts/${postId}`;
-    if (location.href !== url) {
-      location.href = url;
-      await this.sleep(3500);
+    if (!location.href.includes(`/groups/${groupId}/posts/${postId}`)) {
+      throw new Error('Tab chưa ở đúng bài — thử lại');
     }
     const boxSel = gfPickSelector(lang, 'commentBox');
     const box = await this.waitFor(boxSel);
-    this.injectText(box, text);
+    await this.injectText(box, text);
     await this.sleep(500);
     const submit = this.qsa(gfPickSelector(lang, 'commentSubmit')).find((el) => el.offsetParent);
     if (submit) submit.click();
@@ -506,12 +738,17 @@ const GF_CONTENT = {
   },
 };
 
-if (location.hostname.includes('facebook.com') && location.pathname.includes('/groups')) {
-  GF_CONTENT.hookGroupCapture();
+if (!globalThis.GF_CONTENT) {
+  globalThis.GF_CONTENT = GF_CONTENT;
 }
 
-const GF_BRIDGE_VERSION = 5;
-globalThis.GF_CONTENT = GF_CONTENT;
+if (location.hostname.includes('facebook.com') && location.pathname.includes('/groups')) {
+  globalThis.GF_CONTENT.hookGroupCapture();
+  globalThis.GF_CONTENT.reportDocIdsFromHtml(document.documentElement.innerHTML);
+}
+
+const GF_BRIDGE_VERSION = globalThis.__gfBridgeVersion || 5;
+globalThis.__gfBridgeVersion = GF_BRIDGE_VERSION;
 
 function handleGfMessage(msg, sendResponse) {
   (async () => {
@@ -545,9 +782,18 @@ function handleGfMessage(msg, sendResponse) {
         const groups = C.extractGroups();
         return sendResponse({ groups });
       }
+      if (msg.type === 'GF_GET_JOINS_COUNT') {
+        const count = C.parseJoinsCountFromHeader?.() ?? null;
+        return sendResponse({ count });
+      }
       if (msg.type === 'GF_POST') {
         C.lang = msg.lang || 'vi';
         const result = await C.postToGroup(msg);
+        chrome.runtime.sendMessage({
+          type: 'GF_LEARN_GROUP_META',
+          groupId: msg.groupId,
+          res: result,
+        }).catch(() => {});
         return sendResponse({ ok: true, ...result });
       }
       if (msg.type === 'GF_COMMENT') {

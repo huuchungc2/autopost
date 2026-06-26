@@ -170,7 +170,7 @@ GF.fbGraphApi = {
     return String(photoId);
   },
 
-  async createGroupPost({ groupId, text, imageBase64, session }) {
+  async createGroupPost({ groupId, text, imageBase64, images, session }) {
     const friendlyCandidates = [
       'ComposerStoryCreateMutation',
       'CreateGroupStoryMutation',
@@ -189,10 +189,13 @@ GF.fbGraphApi = {
       throw new Error('Không tìm thấy doc_id composer — F5 trang group hoặc dùng Chế độ Cổ điển');
     }
 
-    let attachments = [];
-    if (imageBase64) {
-      const photoId = await this.uploadPhoto(imageBase64, session, groupId);
-      attachments = [{ photo: { id: photoId } }];
+    const imgList = images?.length
+      ? images
+      : (imageBase64 ? [{ base64: imageBase64, mime: 'image/png' }] : []);
+    const attachments = [];
+    for (const img of imgList) {
+      const photoId = await this.uploadPhoto(img.base64, session, groupId);
+      attachments.push({ photo: { id: photoId } });
     }
 
     const variables = {
@@ -232,13 +235,24 @@ GF.fbGraphApi = {
     });
 
     const postId = this.extractPostId(json, rawText);
-    if (!postId) {
-      throw new Error('Đăng GraphQL không trả post_id — thử Chế độ Cổ điển');
+    const pending = /requires_approval|pending_approval|is_pending/i.test(rawText);
+
+    if (postId) {
+      return { postId, mode: 'fast', friendlyName };
     }
-    return { postId, mode: 'fast', friendlyName };
+    if (pending) {
+      return {
+        postId: 'pending',
+        status: 'pending_approval',
+        mode: 'fast',
+        friendlyName,
+        warning: 'Đã gửi — chờ admin duyệt',
+      };
+    }
+    throw new Error('Đăng GraphQL không trả post_id — thử Chế độ Cổ điển');
   },
 
-  async postToGroup({ groupId, text, imageBase64, actorId }) {
+  async postToGroup({ groupId, text, imageBase64, images, actorId }) {
     if (actorId && GF.fbActor) {
       const current = GF.fbActor.getActiveActorId();
       if (String(current) !== String(actorId)) {
@@ -250,6 +264,6 @@ GF.fbGraphApi = {
       await GF_CONTENT.sleep(3500);
     }
     const session = this.getSession(actorId);
-    return this.createGroupPost({ groupId, text, imageBase64, session });
+    return this.createGroupPost({ groupId, text, imageBase64, images, session });
   },
 };

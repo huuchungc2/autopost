@@ -124,18 +124,24 @@ const FP = globalThis.GF.fbPostBg = {
       isFundraiser: false,
     };
     const PF = globalThis.GF?.postFormat;
-    if (PF && backgroundColor) {
+    if (PF?.isColored?.(backgroundColor)) {
       PF.applyToVariables(variables, { text, backgroundColor });
     }
     return variables;
   },
 
-  async createGroupPost({ groupId, text, imageBase64, mediaMime, session, backgroundColor }) {
+  async createGroupPost({ groupId, text, imageBase64, images, mediaMime, session, backgroundColor }) {
     const S = globalThis.GF.fbSessionBg;
-    let attachments = [];
-    if (imageBase64) {
-      const photoId = await this.uploadPhoto(imageBase64, session, groupId, mediaMime || 'image/png');
-      attachments = [{ photo: { id: photoId } }];
+    const colored = globalThis.GF?.postFormat?.isColored?.(backgroundColor);
+    const imgList = colored
+      ? []
+      : (images?.length
+        ? images
+        : (imageBase64 ? [{ base64: imageBase64, mime: mediaMime || 'image/png' }] : []));
+    const attachments = [];
+    for (const img of imgList) {
+      const photoId = await this.uploadPhoto(img.base64, session, groupId, img.mime || 'image/png');
+      attachments.push({ photo: { id: photoId } });
     }
 
     const variables = this.buildComposeVariables({ groupId, text, attachments, session, backgroundColor });
@@ -176,17 +182,17 @@ const FP = globalThis.GF.fbPostBg = {
     throw new Error('Đăng GraphQL không trả post_id');
   },
 
-  async postToGroup({ groupId, text, imageBase64, mediaMime, actorId, backgroundColor }) {
+  async postToGroup({ groupId, text, imageBase64, images, mediaMime, actorId, backgroundColor }) {
     const S = globalThis.GF.fbSessionBg;
     let session;
     try {
       session = await S.resolveSession({ actorId });
-      return await this.createGroupPost({ groupId, text, imageBase64, mediaMime, session, backgroundColor });
+      return await this.createGroupPost({ groupId, text, imageBase64, images, mediaMime, session, backgroundColor });
     } catch (e) {
       if (e.message?.includes('hết hạn') || e.message?.includes('fb_dtsg') || e.message?.includes('token')) {
         S.invalidateCache();
         session = await S.resolveSession({ force: true, actorId });
-        return await this.createGroupPost({ groupId, text, imageBase64, mediaMime, session, backgroundColor });
+        return await this.createGroupPost({ groupId, text, imageBase64, images, mediaMime, session, backgroundColor });
       }
       throw e;
     }

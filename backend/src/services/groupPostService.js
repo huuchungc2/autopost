@@ -12,6 +12,15 @@ function parsePage(value) {
   return !Number.isFinite(n) || n < 1 ? 1 : n;
 }
 
+function parseCursorId(raw) {
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+function draftEligibilitySql(alias = 'd') {
+  return `((${alias}.user_id = ? AND ${alias}.is_shared = 0) OR ${alias}.is_shared = 1)`;
+}
+
 export async function getExtensionKeyInfo(userId) {
   const rows = await query(
     `SELECT api_key, fb_user_id, fb_user_name, created_at, updated_at
@@ -138,11 +147,7 @@ export async function syncGroupPost(userId, body) {
   return { success: true, id: String(result.insertId), updated: false };
 }
 
-export async function listPostsForComments(userId, filters = {}) {
-  const page = parsePage(filters.page);
-  const limit = parseLimit(filters.limit);
-  const offset = (page - 1) * limit;
-
+function buildPostsForCommentsWhere(userId, filters = {}) {
   const conditions = [];
   const params = [];
 
@@ -154,8 +159,136 @@ export async function listPostsForComments(userId, filters = {}) {
     conditions.push('gp.fb_user_id = ?');
     params.push(filters.posted_by);
   }
+  const needsComment = filters.needs_comment === '1'
+    || filters.needs_comment === 1
+    || filters.needs_comment === true
+    || filters.needs_comment === 'true';
+  if (needsComment) {
+    conditions.push(`NOT EXISTS (
+      SELECT 1 FROM group_post_comments gpc
+      WHERE gpc.group_post_id = gp.id AND gpc.commenter_user_id = ?
+    )`);
+    params.push(userId);
+  }
+  if (filters.since) {
+    const since = new Date(filters.since);
+    if (!Number.isNaN(since.getTime())) {
+      conditions.push('gp.posted_at > ?');
+      params.push(since);
+    }
+  }
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  return {
+    where: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '',
+    params,
+  };
+}
+
+/** Extension: client gửi ID lớn nhất đang giữ — server trả còn bao nhiêu bài có id lớn hơn */
+export async function getExtensionSyncStatus(userId, {
+  lastPostId = 0,
+  lastDraftId = 0,
+} = {}) {
+  const afterPost = parseCursorId(lastPostId);
+  const afterDraft = parseCursorId(lastDraftId);
+
+  const commentRows = await query(
+    `SELECT COUNT(*) AS pending_comments, MAX(gp.posted_at) AS newest_comment_post_at
+     FROM group_posts gp
+     WHERE NOT EXISTS (
+       SELECT 1 FROM group_post_comments gpc
+       WHERE gpc.group_post_id = gp.id AND gpc.commenter_user_id = ?
+     )`,
+    [userId]
+  );
+
+  const [postMaxRow] = await query('SELECT MAX(id) AS max_id, COUNT(*) AS total FROM group_posts');
+  const serverMaxPostId = Number(postMaxRow?.max_id) || 0;
+  const totalPosts = Number(postMaxRow?.total) || 0;
+
+  const syncRows = await query(
+    'SELECT COUNT(*) AS pending_posts_sync FROM group_posts gp WHERE gp.id > ?',
+    [afterPost]
+  );
+
+  const [draftMaxRow] = await query(
+    `SELECT MAX(d.id) AS max_id FROM group_post_drafts d WHERE ${draftEligibilitySql('d')}`,
+    [userId]
+  );
+  const serverMaxDraftId = Number(draftMaxRow?.max_id) || 0;
+
+  const draftRows = await query(
+    `SELECT COUNT(*) AS pending_drafts FROM group_post_drafts d
+     WHERE d.id > ? AND ${draftEligibilitySql('d')}`,
+    [afterDraft, userId]
+  );
+
+  return {
+    last_post_id: afterPost,
+    last_draft_id: afterDraft,
+    server_max_post_id: serverMaxPostId,
+    server_max_draft_id: serverMaxDraftId,
+    total_posts: totalPosts,
+    pending_posts_sync: Number(syncRows[0]?.pending_posts_sync) || 0,
+    pending_drafts: Number(draftRows[0]?.pending_drafts) || 0,
+    up_to_date: afterPost >= serverMaxPostId,
+    pending_comments: Number(commentRows[0]?.pending_comments) || 0,
+    newest_comment_post_at: commentRows[0]?.newest_comment_post_at || null,
+  };
+}
+
+/** Extension: pull bài có id > after_post_id (cursor) */
+export async function pullPostsForExtension(userId, { limit: rawLimit, afterPostId = 0 } = {}) {
+  const afterPost = parseCursorId(afterPostId);
+  const limit = parseLimit(rawLimit, 20, 50);
+
+  const rows = await query(
+    `SELECT gp.id, gp.group_id, gp.group_name, gp.post_id, gp.noi_dung, gp.prompt_anh,
+            gp.fb_user_id AS posted_by, gp.posted_at, gp.ngay_dang, gp.gio_dang,
+            u.name AS poster_name,
+            (SELECT COUNT(*) FROM group_post_comments gpc
+             WHERE gpc.group_post_id = gp.id AND gpc.commenter_user_id = ?) AS my_comment_count
+     FROM group_posts gp
+     JOIN users u ON u.id = gp.user_id
+     WHERE gp.id > ?
+     ORDER BY gp.id ASC
+     LIMIT ?`,
+    [userId, afterPost, limit]
+  );
+
+  const remainRows = await query(
+    'SELECT COUNT(*) AS n FROM group_posts gp WHERE gp.id > ?',
+    [afterPost]
+  );
+  const pendingBefore = Number(remainRows[0]?.n) || 0;
+
+  return {
+    data: rows.map((r) => ({
+      id: String(r.id),
+      group_id: r.group_id,
+      group_name: r.group_name,
+      post_id: r.post_id,
+      noi_dung: r.noi_dung,
+      prompt_anh: r.prompt_anh,
+      posted_by: r.posted_by,
+      poster_name: r.poster_name,
+      posted_at: r.posted_at,
+      ngay_dang: r.ngay_dang,
+      gio_dang: r.gio_dang,
+      my_comment_count: Number(r.my_comment_count) || 0,
+    })),
+    synced_count: rows.length,
+    pending_remaining: Math.max(0, pendingBefore - rows.length),
+    after_post_id: afterPost,
+  };
+}
+
+export async function listPostsForComments(userId, filters = {}) {
+  const page = parsePage(filters.page);
+  const limit = parseLimit(filters.limit, 20, 50);
+  const offset = (page - 1) * limit;
+
+  const { where, params } = buildPostsForCommentsWhere(userId, filters);
 
   const countRows = await query(
     `SELECT COUNT(*) AS total FROM group_posts gp ${where}`,
@@ -463,40 +596,26 @@ export async function listGroupPostDrafts(userId, filters = {}, userRole = 'edit
   };
 }
 
-/** Extension: lấy draft pending (cá nhân + shared chưa tải) → đánh dấu pulled */
-export async function pullDraftsForExtension(userId) {
+/** Extension: pull draft có id > after_draft_id */
+export async function pullDraftsForExtension(userId, { limit: rawLimit, afterDraftId = 0 } = {}) {
+  const afterDraft = parseCursorId(afterDraftId);
+  const limit = parseLimit(rawLimit, 20, 30);
+
   const rows = await query(
     `SELECT d.id, d.is_shared, d.noi_dung, d.prompt_anh, d.ngay_dang, d.gio_dang, d.created_at
      FROM group_post_drafts d
-     LEFT JOIN group_post_draft_pulls p ON p.draft_id = d.id AND p.user_id = ?
-     WHERE (d.user_id = ? AND d.is_shared = 0 AND d.status = 'pending')
-        OR (d.is_shared = 1 AND p.user_id IS NULL)
-     ORDER BY d.is_shared ASC, d.created_at ASC`,
-    [userId, userId]
+     WHERE d.id > ? AND ${draftEligibilitySql('d')}
+     ORDER BY d.id ASC
+     LIMIT ?`,
+    [afterDraft, userId, limit]
   );
 
-  if (!rows.length) {
-    return { data: [], pulled_count: 0 };
-  }
-
-  const personalIds = rows.filter((r) => !r.is_shared).map((r) => r.id);
-  const sharedIds = rows.filter((r) => r.is_shared).map((r) => r.id);
-
-  if (personalIds.length) {
-    const ph = personalIds.map(() => '?').join(', ');
-    await query(
-      `UPDATE group_post_drafts SET status = 'pulled', pulled_at = NOW()
-       WHERE id IN (${ph}) AND user_id = ? AND is_shared = 0 AND status = 'pending'`,
-      [...personalIds, userId]
-    );
-  }
-
-  for (const draftId of sharedIds) {
-    await query(
-      `INSERT IGNORE INTO group_post_draft_pulls (draft_id, user_id) VALUES (?, ?)`,
-      [draftId, userId]
-    );
-  }
+  const remainRows = await query(
+    `SELECT COUNT(*) AS n FROM group_post_drafts d
+     WHERE d.id > ? AND ${draftEligibilitySql('d')}`,
+    [afterDraft, userId]
+  );
+  const pendingBefore = Number(remainRows[0]?.n) || 0;
 
   return {
     data: rows.map((r) => ({
@@ -509,6 +628,8 @@ export async function pullDraftsForExtension(userId) {
       is_shared: Boolean(r.is_shared),
     })),
     pulled_count: rows.length,
+    pending_remaining: Math.max(0, pendingBefore - rows.length),
+    after_draft_id: afterDraft,
   };
 }
 

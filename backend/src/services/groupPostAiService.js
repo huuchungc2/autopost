@@ -7,6 +7,11 @@ import {
 } from './providerAccessService.js';
 import { generateText } from './aiService.js';
 import { generateImage } from './imageService.js';
+import {
+  generatePostWithMedia,
+  resolveMediaMode,
+} from './contentGenerationService.js';
+import { getProviderById } from './providerService.js';
 
 const REWRITE_PROMPTS = {
   persuasive: 'Viết lại bài đăng Facebook group sau cho hấp dẫn, tự nhiên, có CTA nhẹ. Giữ tiếng Việt. Không thêm hashtag dư.',
@@ -74,4 +79,70 @@ export async function extensionGenerateText(user, { task, text, mode, provider_i
   }
   const result = await generateText(userPrompt, provider);
   return result.text || '';
+}
+
+export async function buildExtensionGenerationConfig(user, {
+  text_system_prompt: textSystemPrompt = '',
+  image_system_prompt: imageSystemPrompt = '',
+  text_provider_id: textProviderId,
+  image_provider_id: imageProviderId,
+  media_type: mediaType,
+}) {
+  const textProvider = await getProviderForAi(user, textProviderId, 'text');
+  const imageProvider = imageProviderId ? await getProviderById(imageProviderId) : null;
+  if (imageProviderId) {
+    await assertProviderAccess(user, imageProviderId);
+    if (!imageProvider?.is_active || imageProvider.type !== 'image') {
+      const err = new Error('Image provider không hợp lệ');
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  const textPrompt = String(textSystemPrompt || '').trim();
+  const imagePrompt = String(imageSystemPrompt || '').trim();
+  const imageSkills = imagePrompt ? [{ system_prompt: imagePrompt }] : [];
+
+  const resolvedMediaType = resolveMediaMode({
+    mediaType: mediaType || 'image',
+    imageSkills,
+    videoSkills: [],
+    imageProvider,
+  });
+
+  return {
+    textSystemPrompt: textPrompt,
+    imageSystemPrompt: imagePrompt,
+    videoSystemPrompt: '',
+    mediaMode: resolvedMediaType,
+    textProvider,
+    imageProvider,
+  };
+}
+
+export async function extensionGeneratePost(user, body) {
+  const topic = String(body.topic || '').trim();
+  if (!topic) {
+    const err = new Error('Thiếu chủ đề (topic)');
+    err.status = 400;
+    throw err;
+  }
+
+  const config = await buildExtensionGenerationConfig(user, body);
+  const userPrompt = body.prompt?.trim() || `Viết bài Facebook group về: ${topic}.`;
+  const generated = await generatePostWithMedia({
+    topic,
+    userPrompt,
+    config,
+    mediaMode: config.mediaMode,
+  });
+
+  return {
+    topic,
+    content: generated.content,
+    image_prompt: generated.image_prompt || '',
+    video_prompt: generated.video_prompt || '',
+    media_type: generated.media_type,
+    parse_failed: generated.parseFailed || false,
+  };
 }

@@ -20,6 +20,10 @@ GF_GLOBAL.GF.postFormat = {
     return this.PRESETS[key] || '0';
   },
 
+  isColored(hex) {
+    return this.presetId(hex) !== '0';
+  },
+
   buildComposedText(plainText) {
     const text = String(plainText || '');
     const blocks = text.split('\n');
