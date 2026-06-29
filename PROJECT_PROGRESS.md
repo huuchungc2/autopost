@@ -1,8 +1,130 @@
 # AutoPost Project Progress
 
-> Cập nhật: 2026-06-26
+> Cập nhật: 2026-06-27
 
 ## ✅ Đã hoàn thành (mới)
+
+### GroupFlow v1.0.138 — Composer countdown + tidien push rõ
+**2026-06-27** — Đăng không im lặng (countdown composer); **Đồng bộ ngay** đẩy bài đã đăng lên tidien + toast giải thích pull vs push.
+
+### GroupFlow v1.0.137 — Chuyển nhóm: chờ composer + retry
+**2026-06-27** — Nhóm 2+ trong cùng batch: chờ 6.5s, ép URL feed, prepare retry 2 lần; content retry mở composer.
+
+### GroupFlow v1.0.136 — Nhật ký engine (Log)
+**2026-06-27** — Tab Log → **Nhật ký**: lưu ~400 dòng (mở nhóm, composer, lỗi FB…); overlay Live Activity chi tiết; tự mở Nhật ký khi lỗi.
+
+### GroupFlow v1.0.135 — Fix đăng treo composer (Hybrid)
+**2026-06-27** — Bài chữ thuần + Hybrid: paste một lần thay vì gõ từng ký tự; kiểm tra ô soạn có chữ trước bấm Đăng.
+
+### GroupFlow v1.0.134 — Cài đặt: layout shell + menu con
+**2026-06-27** — Tab Cài đặt: **1 pane/mục** (Đăng bài → Ảnh → AI → Đồng bộ → Nâng cao); **Lưu cài đặt** cố định đáy panel; tab extension (Tạo bài, Nhóm, …) luôn hiện; nút ← quay Tạo bài.
+
+### GroupFlow v1.0.129 — Cài đặt UI gọn, có nav
+**2026-06-27** — Tab Cài đặt chia 5 card + thanh nav; mục Nâng cao gập. *(v1.0.134 thay sticky scroll bằng shell footer.)*
+
+### GroupFlow v1.0.128 — Cài đặt nghỉ dài (random phút)
+**2026-06-27** — Cài đặt: sau N nhóm (1 = mỗi nhóm), phút nghỉ random min–max; đăng ngay + lịch dùng chung; overlay đếm ngược.
+
+### GroupFlow v1.0.123 — Đăng từng bài + toggle xuất ảnh
+**2026-06-27** — Nút **Đăng** trên mỗi card queue; bỏ tick **Tự xuất ảnh** → đăng chữ không gọi API; lịch hẹn vẫn auto chạy.
+
+### GroupFlow v1.0.122 — Excel emoji + bulk queue
+**2026-06-27** — Import Excel đọc ô hiển thị (`cell.w`) và chuẩn hóa emoji Wingdings/PUA; danh sách bài có xóa/đổi trạng thái hàng loạt.
+
+### GroupFlow v1.0.121 — Cổ điển không treo sau paste
+**2026-06-26** — Mở dialog composer đầy đủ, nudge Lexical bật nút Đăng, re-paste khi chuyển editor; overlay báo「chờ nút Đăng」.
+
+### GroupFlow v1.0.115 — UI gọn: 1 nút Đăng, cấu hình chỉ ở Cài đặt
+**2026-06-26** — Bỏ Nâng cao/chế độ/giãn cách trên form đăng; một nút Đăng thanh dưới.
+
+### GroupFlow v1.0.114 — Lịch ở thanh queue, fix crash cập nhật
+**2026-06-26** — Ngày/giờ batch ở footer; lịch riêng chỉ khi Sửa bài; fix null `manualImageDate`.
+
+### GroupFlow v1.0.113 — Fix lên lịch đăng bài không chạy
+**2026-06-26** — Strip media khỏi alarm payload (tránh quota storage); refresh queue lúc chạy; retry miss khi mở Chrome; không đăng trùng.
+
+### GroupFlow v1.0.106 — Panel một tab, Cổ điển không double, Dừng hoạt động
+**2026-06-26** — Panel chỉ tab đã mở; gõ chữ một lần giữ emoji; nút Dừng hủy đăng.
+
+### GroupFlow v1.0.104 — Một tab FB cho cả batch đăng
+**2026-06-26** — Ghim tab; 10 bài không mở 10 tab.
+
+### GroupFlow v1.0.103 — Markdown/emoji Cổ điển + scroll composer
+**2026-06-26** — Không còn `**` trên FB; gõ chữ sau ảnh; auto-scroll nhóm.
+
+### GroupFlow v1.0.102 — Panel tự hiện lại sau đăng Cổ điển
+**2026-06-26** — FB reload tab làm mất iframe panel; session + auto GF_PANEL_OPEN.
+
+### GroupFlow v1.0.101 — Cổ điển ảnh + format + xác nhận đăng
+**2026-06-26** — Ảnh trước text; HTML paste; composer đóng không báo lỗi đỏ.
+
+### GroupFlow v1.0.100 — Fix service worker crash
+**2026-06-26** — `Identifier 'PF' has already been declared` trong `fbPostBg.buildComposeVariables` — extension không load được.
+
+### GroupFlow v1.0.99 — Luồng Nhanh→Cổ điển + session nhóm
+**2026-06-26** — `postGroupItem` gom fallback; bỏ `switchActor` DOM; cookie Page; tìm composer theo text.
+
+### GroupFlow v1.0.98 — Nhanh căn GPP (doc_id + GraphQL)
+**2026-06-26** — Lỗi cốt lõi: dùng nhầm doc_id link-preview; thiếu Comet trên mutation.
+
+### GroupFlow v1.0.97 — Tìm composer nhóm FB
+**2026-06-26** — Quét main + chờ load; redirect khỏi About/Members.
+
+### GroupFlow v1.0.96 — Gõ chữ Cổ điển giống người
+**2026-06-26** — `typeHumanLike`: delay ngẫu nhiên từng ký tự, không paste cả đoạn.
+
+### GroupFlow v1.0.95 — Cổ điển không mở Share cá nhân
+**2026-06-26** — Fix nhầm dialog「Chia sẻ」feed (Bảng feed/Bạn bè) thay vì composer nhóm.
+
+### GroupFlow v1.0.94 — Comet upload + Cổ điển DOM
+**2026-06-26** — Token `__dyn`/`__csr` cho upload Nhanh; Cổ điển không lạc sang trang cá nhân sau đổi profile.
+
+### GroupFlow v1.0.93 — Cổ điển + format queue
+**2026-06-26** — Media bridge cho DOM post; giữ delta khi sync queue; xuống dòng Cổ điển.
+
+### GroupFlow v1.0.92 — Fix upload ảnh Nhanh
+**2026-06-26** — Upload Comet khớp GPP; lỗi chi tiết thay vì chỉ「Upload ảnh thất bại」.
+
+### GroupFlow v1.0.91 — Giữ format Quill
+**2026-06-26** — Lưu `variationDeltas` (B/I, list, xuống dòng) trong queue + nháp; đăng FB vẫn dùng plain `noi_dung`.
+
+### GroupFlow v1.0.90 — Fix mất ảnh + nháp đầy đủ
+**2026-06-26** — Bug `persistAll` xóa nhầm IDB; hydrate queue khi mở panel; nháp giữ nhóm+ảnh; sync nhóm 5p.
+
+### GroupFlow v1.0.89 — Mode = form thuần, không listener
+**2026-06-26** — Bỏ toàn bộ hook `change` trên radio Nhanh/Cổ điển; lưu preference khi hành động đăng/thêm bài.
+
+### GroupFlow v1.0.88 — Fix panel trắng đổi mode
+**2026-06-26** — Chặn scroll nhảy khi bấm radio Nhanh/Cổ điển (sr-only) — hết màn xám chỉ còn nút footer.
+
+### GroupFlow v1.0.87 — Đổi mode zero render
+**2026-06-26** — Nhanh/Cổ điển: chỉ lưu `postMode` nền, bỏ sync DOM/re-render khi user bấm.
+
+### GroupFlow v1.0.86 — Đổi mode không đơ panel
+**2026-06-26** — Nhanh/Cổ điển: debounce lưu preference, giữ scroll iframe, không await storage.
+
+### GroupFlow v1.0.85 — Sync nhóm không mở FB mặc định
+**2026-06-26** — ↻ Làm mới = GraphQL nền (cookie SW). Chỉ Shift+↻ mới quét tab joins. Sửa regression: ↻ trước đó gọi deep sync tự mở facebook.com.
+
+### GroupFlow v1.0.84 — Đổi Cổ điển/Nhanh nhẹ
+**2026-06-26** — Chọn chế độ đăng chỉ cập nhật radio + lưu `postMode`; bỏ debounce/hydrate/re-render khi đổi mode.
+
+### GroupFlow v1.0.76 — Cổ điển mặc định + sửa bài giữ ảnh
+**2026-06-26** — `postMode` mặc định Cổ điển (align GPP popup). Sửa bài trong queue: snapshot media lúc mở Sửa, Lưu không reset form/ảnh; không ghi đè bằng media rỗng.
+
+### GroupFlow v1.0.71 — Popup「Bài viết ẩn danh」FB
+- Cổ điển ưu tiên ô「Bạn viết gì đi…」(công khai); tự Hủy popup ẩn danh của nhóm
+
+### GroupFlow v1.0.70 — Tab FB thường, không ẩn danh Chrome
+- `getFbTab` bỏ qua incognito; tạo tab mới trong cửa sổ thường; kiểm tra cookie + phiên DOM trước Cổ điển
+- Manifest `incognito: not_allowed`
+
+### GroupFlow v1.0.69 — Cổ điển composer + giữ ảnh khi sửa
+- Tab FB **active** khi đăng Cổ điển (composer không render trên tab nền); retry mở composer; `GF_PREPARE_CLASSIC_POST`
+- Lưu bài sau Sửa **không xóa** ảnh/video nếu user không đổi media
+
+### GroupFlow v1.0.68 — UI compose GPP
+- Bảo mật pills, 2 card chiến lược, comment chip, footer Preview/Lịch/Đăng ngay
 
 ### GroupFlow v1.0.61 — device_id sync (scale)
 - Không gửi nghìn ID; server sổ theo thiết bị + reconcile khi local trống/thiếu

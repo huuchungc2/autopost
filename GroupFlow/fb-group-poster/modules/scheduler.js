@@ -40,7 +40,11 @@ GF.scheduler = {
 
   parseScheduleDate(ngayDang, gioDang) {
     if (!ngayDang || !gioDang) return null;
-    const iso = `${ngayDang}T${gioDang}:00`;
+    const parts = String(gioDang).trim().split(':');
+    if (parts.length < 2) return null;
+    const hh = String(Number(parts[0])).padStart(2, '0');
+    const mm = String(parts[1]).slice(0, 2).padStart(2, '0');
+    const iso = `${String(ngayDang).trim()}T${hh}:${mm}:00`;
     const t = new Date(iso).getTime();
     return Number.isFinite(t) ? t : null;
   },

@@ -2,8 +2,194 @@
 
 // ----- gfShared.js -----
 (function () {
+globalThis.GF = globalThis.GF || {};
 /** Shared GF namespace — dùng trong SW bundle (IIFE) và content script. */
 globalThis.GF = globalThis.GF || {};
+const GF = globalThis.GF;
+
+GF.textFormat = {
+  escapeHtml(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  },
+
+  /** Quill delta → HTML đơn giản cho paste Cổ điển (bold/italic/xuống dòng). */
+  deltaToHtml(delta) {
+    if (!delta?.ops?.length) return '';
+    let html = '';
+    let inList = false;
+    const closeList = () => {
+      if (inList) {
+        html += '</ul>';
+        inList = false;
+      }
+    };
+    for (const op of delta.ops) {
+      if (typeof op.insert !== 'string') continue;
+      let chunk = this.escapeHtml(op.insert);
+      const attrs = op.attributes || {};
+      if (attrs.list === 'bullet') {
+        if (!inList) {
+          closeList();
+          html += '<ul>';
+          inList = true;
+        }
+        chunk = chunk.replace(/\n$/, '');
+        if (!chunk) continue;
+        chunk = `<li>${chunk}</li>`;
+      } else {
+        closeList();
+        if (attrs.bold && attrs.italic) chunk = `<strong><em>${chunk}</em></strong>`;
+        else if (attrs.bold) chunk = `<strong>${chunk}</strong>`;
+        else if (attrs.italic) chunk = `<em>${chunk}</em>`;
+        chunk = chunk.replace(/\n/g, '<br>');
+      }
+      html += chunk;
+    }
+    closeList();
+    return html
+      .replace(/<br><\/ul>/g, '</ul>')
+      .replace(/<ul><li>/g, '<ul><li>')
+      .replace(/<\/li><br>/g, '</li>');
+  },
+
+  plainFromHtml(html) {
+    const el = document.createElement('div');
+    el.innerHTML = String(html || '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>\s*<p[^>]*>/gi, '\n')
+      .replace(/<\/?p[^>]*>/gi, '');
+    return (el.textContent || '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  },
+
+  /** `**bold**`, `*italic*`, xuống dòng — cho nội dung lưu plain/markdown trong queue. */
+  markdownToHtml(text) {
+    const raw = String(text || '');
+    if (!raw.trim()) return '';
+    const lines = raw.split(/\r?\n/);
+    const out = [];
+    for (const line of lines) {
+      let s = this.escapeHtml(line);
+      s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+      // Chỉ `-` / `•` / số — giữ emoji đầu dòng (✅📦🌐) vì FB không render list HTML chuẩn
+      if (/^[-•]\s/.test(line.trim()) || /^\d+\.\s/.test(line.trim())) {
+        out.push(`<li>${s.replace(/^[-•]\s*/, '').replace(/^\d+\.\s*/, '')}</li>`);
+      } else if (s) {
+        out.push(s);
+      } else {
+        out.push('');
+      }
+    }
+    const html = [];
+    let inList = false;
+    for (const chunk of out) {
+      if (chunk.startsWith('<li>')) {
+        if (!inList) {
+          html.push('<ul>');
+          inList = true;
+        }
+        html.push(chunk);
+      } else {
+        if (inList) {
+          html.push('</ul>');
+          inList = false;
+        }
+        if (chunk) html.push(chunk);
+        else html.push('<br>');
+      }
+    }
+    if (inList) html.push('</ul>');
+    return html.join('<br>').replace(/(<br>)+<ul>/g, '<ul>').replace(/<\/ul>(<br>)+/g, '</ul>');
+  },
+
+  UNICODE_BOLD: {
+    A: '𝗔', B: '𝗕', C: '𝗖', D: '𝗗', E: '𝗘', F: '𝗙', G: '𝗚', H: '𝗛', I: '𝗜', J: '𝗝',
+    K: '𝗞', L: '𝗟', M: '𝗠', N: '𝗡', O: '𝗢', P: '𝗣', Q: '𝗤', R: '𝗥', S: '𝗦', T: '𝗧',
+    U: '𝗨', V: '𝗩', W: '𝗪', X: '𝗫', Y: '𝗬', Z: '𝗭',
+    a: '𝗮', b: '𝗯', c: '𝗰', d: '𝗱', e: '𝗲', f: '𝗳', g: '𝗴', h: '𝗵', i: '𝗶', j: '𝗷',
+    k: '𝗸', l: '𝗹', m: '𝗺', n: '𝗻', o: '𝗼', p: '𝗽', q: '𝗾', r: '𝗿', s: '𝘀', t: '𝘁',
+    u: '𝘂', v: '𝘃', w: '𝘄', x: '𝘅', y: '𝘆', z: '𝘇',
+    '0': '𝟬', '1': '𝟭', '2': '𝟮', '3': '𝟯', '4': '𝟰', '5': '𝟱', '6': '𝟲', '7': '𝟳', '8': '𝟴', '9': '𝟵',
+  },
+
+  toUnicodeBold(inner) {
+    const map = this.UNICODE_BOLD;
+    return String(inner || '').split('').map((ch) => map[ch] || ch).join('');
+  },
+
+  markdownToUnicode(text) {
+    return String(text || '')
+      .replace(/\*\*([^*]+)\*\*/g, (_, inner) => this.toUnicodeBold(inner))
+      .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '$1');
+  },
+
+  stripMarkdown(text) {
+    return String(text || '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '$1');
+  },
+
+  hasMarkdown(text) {
+    return /\*\*[^*]+\*\*|\*[^*]+\*/.test(String(text || ''));
+  },
+
+  /** Dòng cần paste: có emoji bất kỳ chỗ nào hoặc `**đậm**` — còn lại gõ. */
+  lineHasEmoji(text) {
+    return /\p{Extended_Pictographic}/u.test(String(text || ''));
+  },
+
+  needsPasteLine(line) {
+    const trimmed = String(line || '').trim();
+    if (!trimmed) return false;
+    if (this.hasMarkdown(trimmed)) return true;
+    return this.lineHasEmoji(trimmed);
+  },
+
+  /** Gom dòng liên tiếp cùng mode paste/type cho Cổ điển hybrid. */
+  splitHybridSegments(text) {
+    const lines = String(text || '').split(/\r?\n/);
+    const segments = [];
+    let buf = [];
+    let bufMode = null;
+
+    const flush = () => {
+      if (!buf.length) return;
+      const joined = buf.join('\n');
+      if (joined.trim()) segments.push({ mode: bufMode, text: joined });
+      buf = [];
+      bufMode = null;
+    };
+
+    for (const line of lines) {
+      let mode;
+      if (!String(line).trim()) {
+        mode = bufMode || 'type';
+      } else {
+        mode = this.needsPasteLine(line) ? 'paste' : 'type';
+      }
+      if (bufMode && bufMode !== mode) flush();
+      bufMode = mode;
+      buf.push(line);
+    }
+    flush();
+    return segments;
+  },
+
+  segmentPasteHtml(text) {
+    return this.markdownToHtml(text);
+  },
+
+  prepareClassicPayload({ text, htmlFromDelta }) {
+    const plain = String(text || '');
+    const html = htmlFromDelta || this.markdownToHtml(plain);
+    const unicode = this.markdownToUnicode(plain);
+    const stripped = this.stripMarkdown(plain);
+    return { plain, html, unicode, stripped, hasMd: this.hasMarkdown(plain) };
+  },
+};
 })();
 
 // ----- localProviders.js -----
@@ -332,6 +518,7 @@ globalThis.GF.localAi = {
 
 // ----- postMedia.js -----
 (function () {
+globalThis.GF = globalThis.GF || {};
 const PM = globalThis.GF.postMedia = {
   getPostImages(post) {
     if (post?.images?.length) return post.images;
@@ -414,11 +601,20 @@ const PM = globalThis.GF.postMedia = {
   },
 
   async persistPost(post) {
+    const PMS = globalThis.GF?.postMediaStore;
     const d = await chrome.storage.local.get('postQueue');
     const queue = d.postQueue || [];
     const idx = queue.findIndex((p) => p.id === post.id);
-    if (idx >= 0) queue[idx] = { ...queue[idx], ...post };
-    else queue.push(post);
+    if (PMS) {
+      if (PMS.hasPayload(post)) await PMS.save(post.id, post);
+      const lite = PMS.stripForQueue(post);
+      if (idx >= 0) queue[idx] = { ...queue[idx], ...lite };
+      else queue.push(lite);
+    } else if (idx >= 0) {
+      queue[idx] = { ...queue[idx], ...post };
+    } else {
+      queue.push(post);
+    }
     await chrome.storage.local.set({ postQueue: queue });
     return post;
   },
@@ -463,8 +659,264 @@ const PM = globalThis.GF.postMedia = {
 };
 })();
 
+// ----- postMediaStore.js -----
+(function () {
+globalThis.GF = globalThis.GF || {};
+/**
+ * Lưu media bài đăng trong IndexedDB — tránh mất ảnh khi postQueue vượt quota chrome.storage.
+ */
+globalThis.GF = globalThis.GF || {};
+
+const PMS_DB = 'groupflow-media';
+const PMS_STORE = 'byPostId';
+const PMS_VER = 1;
+
+globalThis.GF.postMediaStore = {
+  _db: null,
+  _dbPromise: null,
+
+  invalidate() {
+    this._db = null;
+    this._dbPromise = null;
+  },
+
+  isDbClosingError(err) {
+    const msg = String(err?.message || err || '');
+    return /closing|InvalidState|connection is closing|database connection/i.test(msg);
+  },
+
+  attachDbHandlers(db) {
+    db.onclose = () => {
+      this.invalidate();
+    };
+    db.onversionchange = () => {
+      try {
+        db.close();
+      } catch { /* ignore */ }
+      this.invalidate();
+    };
+  },
+
+  async db() {
+    if (this._db) {
+      try {
+        if (this._db.objectStoreNames?.contains?.(PMS_STORE)) return this._db;
+      } catch {
+        this.invalidate();
+      }
+    }
+    if (!this._dbPromise) {
+      this._dbPromise = new Promise((resolve, reject) => {
+        const req = indexedDB.open(PMS_DB, PMS_VER);
+        req.onupgradeneeded = () => {
+          if (!req.result.objectStoreNames.contains(PMS_STORE)) {
+            req.result.createObjectStore(PMS_STORE);
+          }
+        };
+        req.onsuccess = () => {
+          this._db = req.result;
+          this.attachDbHandlers(this._db);
+          resolve(this._db);
+        };
+        req.onerror = () => {
+          this.invalidate();
+          reject(req.error || new Error('IndexedDB open failed'));
+        };
+        req.onblocked = () => {
+          this.invalidate();
+          reject(new Error('IndexedDB blocked'));
+        };
+      });
+    }
+    try {
+      return await this._dbPromise;
+    } catch (e) {
+      this.invalidate();
+      throw e;
+    }
+  },
+
+  async runTx(mode, fn, retries = 2) {
+    let lastErr;
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      try {
+        const db = await this.db();
+        return await new Promise((resolve, reject) => {
+          let tx;
+          try {
+            tx = db.transaction(PMS_STORE, mode);
+          } catch (e) {
+            reject(e);
+            return;
+          }
+          const store = tx.objectStore(PMS_STORE);
+          let output;
+          tx.oncomplete = () => resolve(output);
+          tx.onerror = () => reject(tx.error || new Error('IndexedDB transaction failed'));
+          tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted'));
+          Promise.resolve(fn(store))
+            .then((val) => {
+              output = val;
+            })
+            .catch((e) => {
+              try {
+                tx.abort();
+              } catch { /* ignore */ }
+              reject(e);
+            });
+        });
+      } catch (e) {
+        lastErr = e;
+        if (attempt < retries && this.isDbClosingError(e)) {
+          this.invalidate();
+          await new Promise((r) => setTimeout(r, 60 + attempt * 80));
+          continue;
+        }
+        throw e;
+      }
+    }
+    throw lastErr || new Error('IndexedDB transaction failed');
+  },
+
+  hasPayload(post) {
+    if (!post) return false;
+    if (post.videoBase64) return true;
+    if (post.imageBase64) return true;
+    const imgs = post.images?.length ? post.images : [];
+    return imgs.some((img) => img?.base64);
+  },
+
+  pack(post) {
+    if (!this.hasPayload(post)) return null;
+    return {
+      imageBase64: post.imageBase64 || null,
+      videoBase64: post.videoBase64 || null,
+      images: post.images?.length
+        ? post.images.filter((img) => img?.base64).map((img) => ({ ...img }))
+        : null,
+      mediaType: post.mediaType || null,
+      mediaMime: post.mediaMime || null,
+      imageStatus: post.imageStatus || null,
+    };
+  },
+
+  applyPack(post, pack) {
+    if (!post || !pack) return post;
+    if (pack.videoBase64) {
+      post.videoBase64 = pack.videoBase64;
+      post.mediaType = pack.mediaType || 'video';
+      post.mediaMime = pack.mediaMime || 'video/mp4';
+      post.imageStatus = pack.imageStatus || 'ready';
+      post.imageBase64 = null;
+      post.images = null;
+      return post;
+    }
+    if (pack.images?.length) {
+      post.images = pack.images.map((img) => ({ ...img }));
+      post.imageBase64 = pack.imageBase64 || post.images[0]?.base64 || null;
+      post.mediaType = 'image';
+      post.mediaMime = pack.mediaMime || post.images[0]?.mime || 'image/png';
+      post.imageStatus = pack.imageStatus || 'ready';
+      post.videoBase64 = null;
+      return post;
+    }
+    if (pack.imageBase64) {
+      post.imageBase64 = pack.imageBase64;
+      post.mediaType = pack.mediaType || 'image';
+      post.mediaMime = pack.mediaMime || 'image/png';
+      post.imageStatus = pack.imageStatus || 'ready';
+    }
+    return post;
+  },
+
+  async save(postId, post) {
+    if (!postId) return;
+    const pack = this.pack(post);
+    if (!pack) {
+      await this.delete(postId);
+      return;
+    }
+    await this.runTx('readwrite', (store) => {
+      store.put(pack, String(postId));
+    });
+  },
+
+  async load(postId) {
+    if (!postId) return null;
+    return this.runTx('readonly', (store) => new Promise((resolve, reject) => {
+      const req = store.get(String(postId));
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error || new Error('IndexedDB read failed'));
+    }));
+  },
+
+  async delete(postId) {
+    if (!postId) return;
+    await this.runTx('readwrite', (store) => {
+      store.delete(String(postId));
+    });
+  },
+
+  stripForQueue(post) {
+    const lite = { ...post };
+    const cached = this.hasPayload(post);
+    lite.mediaCached = cached;
+    delete lite.imageBase64;
+    delete lite.videoBase64;
+    delete lite.images;
+    delete lite._gfMediaBackup;
+    if (!cached) lite.mediaCached = false;
+    return lite;
+  },
+
+  async hydratePost(post) {
+    if (!post?.id) return post;
+    if (this.hasPayload(post)) {
+      try {
+        await this.save(post.id, post);
+      } catch (e) {
+        if (!this.isDbClosingError(e)) console.warn('[GroupFlow] IDB save', e.message);
+      }
+      return post;
+    }
+    try {
+      const pack = await this.load(post.id);
+      if (pack) this.applyPack(post, pack);
+    } catch (e) {
+      if (!this.isDbClosingError(e)) console.warn('[GroupFlow] IDB load', e.message);
+    }
+    return post;
+  },
+
+  async hydratePosts(posts) {
+    const list = posts || [];
+    for (const p of list) {
+      if (p.mediaCached || p.mediaType || p.imageStatus === 'ready') {
+        await this.hydratePost(p);
+      }
+    }
+    return list;
+  },
+
+  async persistAll(posts) {
+    for (const p of posts || []) {
+      try {
+        if (this.hasPayload(p)) {
+          await this.save(p.id, p);
+        } else if (!p.mediaCached) {
+          await this.delete(p.id);
+        }
+      } catch (e) {
+        if (!this.isDbClosingError(e)) console.warn('[GroupFlow] IDB persist', p.id, e.message);
+      }
+    }
+  },
+};
+})();
+
 // ----- groupParse.js -----
 (function () {
+globalThis.GF = globalThis.GF || {};
 /**
  * Parse danh sách nhóm đã tham gia từ HTML/GraphQL FB — chạy được cả service worker lẫn content script.
  */
@@ -912,6 +1364,7 @@ const GP = globalThis.GF.groupParse = {
 
 // ----- groupMetaStore.js -----
 (function () {
+globalThis.GF = globalThis.GF || {};
 /**
  * Lưu / học metadata nhóm (privacy, duyệt bài) vào extractedGroups.
  */
@@ -990,6 +1443,7 @@ const GMS = globalThis.GF.groupMetaStore = {
 
 // ----- fbSessionBg.js -----
 (function () {
+globalThis.GF = globalThis.GF || {};
 /**
  * Session Facebook + GraphQL từ service worker (cookie Chrome, không cần tab FB).
  */
@@ -998,8 +1452,14 @@ const GRAPHQL_URL = 'https://www.facebook.com/api/graphql/';
 const S = globalThis.GF.fbSessionBg = {
   _cache: null,
   _cacheAt: 0,
+  _webSessionId: null,
   CACHE_MS: 5 * 60 * 1000,
   reqCounter: 1,
+
+  freshWebSessionId() {
+    const seg = () => Math.floor(Math.random() * (36 ** 6)).toString(36).padStart(6, '0');
+    return `${seg()}:${seg()}:${seg()}`;
+  },
 
   async hasFbLogin() {
     try {
@@ -1016,21 +1476,42 @@ const S = globalThis.GF.fbSessionBg = {
     return raw;
   },
 
-  parseGraphqlJson(text) {
+  parseAllGraphqlJson(text) {
     const cleaned = this.stripFbJsonPrefix(text);
-    const lines = cleaned.split('\n').filter(Boolean);
-    for (const line of lines) {
+    const chunks = [];
+    for (const line of cleaned.split('\n').filter(Boolean)) {
       try {
-        const json = JSON.parse(line);
-        if (json.errors?.length) {
-          throw new Error(json.errors[0]?.message || 'GraphQL lỗi');
-        }
-        return json;
-      } catch (e) {
-        if (e.message && !e.message.startsWith('Unexpected token')) throw e;
+        chunks.push(JSON.parse(line));
+      } catch {
+        /* bỏ qua dòng không phải JSON */
       }
     }
-    return JSON.parse(cleaned);
+    if (!chunks.length) {
+      try {
+        chunks.push(JSON.parse(cleaned));
+      } catch {
+        /* ignore */
+      }
+    }
+    return chunks;
+  },
+
+  pickGraphqlPayload(chunks) {
+    for (const j of chunks || []) {
+      if (j?.data?.story_create) return j;
+      if (j?.data?.createGroupPost) return j;
+    }
+    return chunks?.[0] || {};
+  },
+
+  parseGraphqlJson(text) {
+    const chunks = this.parseAllGraphqlJson(text);
+    for (const json of chunks) {
+      if (json.errors?.length) {
+        throw new Error(json.errors[0]?.message || 'GraphQL lỗi');
+      }
+    }
+    return this.pickGraphqlPayload(chunks);
   },
 
   parseSessionFromHtml(html) {
@@ -1107,7 +1588,7 @@ const S = globalThis.GF.fbSessionBg = {
     throw lastErr || new Error('Không lấy được session Facebook');
   },
 
-  async resolveSession({ force = false, actorId: preferredActorId } = {}) {
+  async resolveSession({ force = false, actorId: preferredActorId, groupId } = {}) {
     if (!force && this._cache && Date.now() - this._cacheAt < this.CACHE_MS) {
       const s = { ...this._cache };
       if (preferredActorId) s.actorId = String(preferredActorId);
@@ -1116,7 +1597,25 @@ const S = globalThis.GF.fbSessionBg = {
     if (!(await this.hasFbLogin())) {
       throw new Error('Chưa đăng nhập Facebook trên Chrome');
     }
-    const html = await this.fetchAuthHtml();
+    let html = await this.fetchAuthHtml();
+    if (groupId) {
+      try {
+        const groupUrl = `https://www.facebook.com/groups/${groupId}`;
+        const res = await this.fetchWithRetry(groupUrl, {
+          credentials: 'include',
+          redirect: 'follow',
+          headers: {
+            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            Referer: 'https://www.facebook.com/',
+          },
+        });
+        const groupHtml = await res.text();
+        if (groupHtml.length > 500 && !this.isLoginPage(groupHtml)) {
+          html = groupHtml;
+          this._warmupTokens = globalThis.GF?.fbCometTokens?.parseFromHtml?.(groupHtml) || null;
+        }
+      } catch { /* giữ html /settings */ }
+    }
     const parsed = this.parseSessionFromHtml(html);
     const cookies = await this.readActorCookies(preferredActorId);
     const uid = parsed.uid || cookies.personalId;
@@ -1150,6 +1649,10 @@ const S = globalThis.GF.fbSessionBg = {
     body.set('__a', '1');
     body.set('__comet_req', '15');
     body.set('__req', (this.reqCounter++).toString(36));
+    body.set('__ccg', 'EXCELLENT');
+    body.set('dpr', '1');
+    if (!this._webSessionId) this._webSessionId = this.freshWebSessionId();
+    body.set('__s', this._webSessionId);
     if (session.rev) body.set('__rev', session.rev);
     if (session.hs) body.set('__hs', session.hs);
     body.set('fb_dtsg', session.dtsg || session.fb_dtsg);
@@ -1163,19 +1666,70 @@ const S = globalThis.GF.fbSessionBg = {
     body.set('variables', JSON.stringify(variables));
     body.set('doc_id', docId);
     body.set('server_timestamps', 'true');
+    globalThis.GF?.fbCometTokens?.applyToSearchParams?.(body, session, this._warmupTokens);
     return body;
   },
 
-  graphqlHeaders(session, friendlyName) {
+  graphqlHeaders(session, friendlyName, referer = 'https://www.facebook.com/') {
     const headers = {
       'Content-Type': 'application/x-www-form-urlencoded',
       'X-ASBD-ID': '129477',
       'X-FB-Friendly-Name': friendlyName,
       Origin: 'https://www.facebook.com',
-      Referer: 'https://www.facebook.com/',
+      Referer: referer,
     };
     if (session.lsd) headers['X-FB-LSD'] = session.lsd;
     return headers;
+  },
+
+  /** Query string upload ảnh — khớp GPP worker (Comet). */
+  buildUploadQueryParams(session) {
+    const apiUser = session.uid || session.personalId;
+    const params = new URLSearchParams();
+    params.set('av', session.actorId || session.uid);
+    params.set('__user', apiUser);
+    params.set('__a', '1');
+    params.set('__comet_req', '15');
+    params.set('__req', (this.reqCounter++).toString(36));
+    params.set('__ccg', 'EXCELLENT');
+    params.set('dpr', '1');
+    if (!this._webSessionId) this._webSessionId = this.freshWebSessionId();
+    params.set('__s', this._webSessionId);
+    if (session.rev) params.set('__rev', session.rev);
+    params.set('fb_dtsg', session.dtsg || session.fb_dtsg);
+    if (session.lsd) params.set('lsd', session.lsd);
+    params.set('jazoest', session.jazoest || '25669');
+    if (session.spin_r) params.set('__spin_r', session.spin_r);
+    if (session.spin_b) params.set('__spin_b', session.spin_b);
+    if (session.spin_t) params.set('__spin_t', session.spin_t);
+    params.set('fb_api_caller_class', 'RelayModern');
+    params.set('server_timestamps', 'true');
+    globalThis.GF?.fbCometTokens?.applyToSearchParams?.(params, session, this._warmupTokens);
+    return params;
+  },
+
+  async warmupGroupContext(url) {
+    if (!url) return null;
+    try {
+      const res = await this.fetchWithRetry(url, {
+        credentials: 'include',
+        redirect: 'follow',
+        headers: {
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          Referer: 'https://www.facebook.com/',
+        },
+      });
+      const html = await res.text();
+      const tokens = globalThis.GF?.fbCometTokens?.parseFromHtml?.(html) || null;
+      this._warmupTokens = tokens;
+      if (tokens?.__hs && this._cache) {
+        this._cache.hs = tokens.__hs;
+      }
+      await new Promise((r) => setTimeout(r, 2500));
+      return tokens;
+    } catch {
+      return null;
+    }
   },
 
   async fetchWithRetry(url, options = {}, retries = 3) {
@@ -1199,24 +1753,157 @@ const S = globalThis.GF.fbSessionBg = {
     throw new Error('Fetch thất bại sau nhiều lần thử');
   },
 
-  async graphqlRequest(session, friendlyName, docId, variables) {
+  async graphqlRequest(session, friendlyName, docId, variables, opts = {}) {
+    const referer = opts.referer || 'https://www.facebook.com/';
     const body = this.buildGraphqlBody(session, friendlyName, docId, variables);
     const res = await this.fetchWithRetry(GRAPHQL_URL, {
       method: 'POST',
       credentials: 'include',
-      headers: this.graphqlHeaders(session, friendlyName),
+      headers: this.graphqlHeaders(session, friendlyName, referer),
       body,
     });
     const text = await res.text();
     if (!res.ok) throw new Error(`GraphQL HTTP ${res.status}`);
-    const json = this.parseGraphqlJson(text);
-    return { json, text };
+    const chunks = this.parseAllGraphqlJson(text);
+    for (const j of chunks) {
+      for (const gqlErr of j?.errors || []) {
+        if (gqlErr?.severity === 'WARNING') continue;
+        throw new Error(gqlErr?.message || 'GraphQL lỗi');
+      }
+    }
+    const json = this.pickGraphqlPayload(chunks);
+    return { json, text, chunks };
+  },
+};
+})();
+
+// ----- fbCometTokens.js -----
+(function () {
+globalThis.GF = globalThis.GF || {};
+/**
+ * Token Comet (__dyn, __csr, …) — khớp GPP worker (BitSet compressor).
+ * FB upload ảnh hay trả「Rất tiếc, đã xảy ra lỗi」nếu thiếu các param này.
+ */
+globalThis.GF = globalThis.GF || {};
+
+class BitSetCompressor {
+  constructor() {
+    this.bits = [];
+  }
+
+  update(indices) {
+    let max = -1;
+    for (const i of indices) {
+      if (i > max) max = i;
+    }
+    if (max >= this.bits.length) {
+      const next = new Array(max + 1).fill(0);
+      for (let t = 0; t < this.bits.length; t += 1) next[t] = this.bits[t];
+      this.bits = next;
+    }
+    for (const i of indices) this.bits[i] = 1;
+    return this;
+  }
+
+  compress() {
+    if (!this.bits.length) return '';
+    let out = '';
+    let run = 1;
+    let cur = this.bits[0];
+    out += cur.toString();
+    for (let i = 1; i < this.bits.length; i += 1) {
+      if (this.bits[i] === cur) {
+        run += 1;
+      } else {
+        const bin = run.toString(2);
+        out += '0'.repeat(bin.length - 1) + bin;
+        cur = this.bits[i];
+        run = 1;
+      }
+    }
+    const tail = run.toString(2);
+    out += '0'.repeat(tail.length - 1) + tail;
+    while (out.length % 6 !== 0) out += '0';
+    const alphabet = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_';
+    let encoded = '';
+    for (let i = 0; i < out.length; i += 6) {
+      encoded += alphabet[parseInt(out.slice(i, i + 6), 2)];
+    }
+    return encoded;
+  }
+}
+
+function pickRandomIndices(poolSize, count) {
+  return Array.from({ length: poolSize }, (_, i) => i)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, count);
+}
+
+function buildDynLike(poolSize, minPick, maxPick) {
+  try {
+    const c = new BitSetCompressor();
+    const n = Math.floor(Math.random() * (maxPick - minPick)) + minPick;
+    return c.update(pickRandomIndices(poolSize, n)).compress();
+  } catch {
+    return '';
+  }
+}
+
+function buildHsdpHblp(poolSize) {
+  try {
+    const c = new BitSetCompressor();
+    const n = Math.floor(Math.random() * (0.15 * poolSize)) + Math.floor(0.3 * poolSize);
+    return c.update(pickRandomIndices(poolSize, n)).compress();
+  } catch {
+    return '';
+  }
+}
+
+globalThis.GF.fbCometTokens = {
+  buildDyn() {
+    return buildDynLike(1600, 500, 700);
+  },
+  buildCsr() {
+    return buildDynLike(1800, 500, 700);
+  },
+  buildHsdp() {
+    return buildHsdpHblp(1800);
+  },
+  buildHblp() {
+    return buildHsdpHblp(1400);
+  },
+
+  parseFromHtml(html) {
+    const h = String(html || '');
+    const pick = (key) => {
+      const m = h.match(new RegExp(`"${key}":"([^"]+)"`))
+        || h.match(new RegExp(`${key}=([^&"']+)`));
+      return m?.[1] || null;
+    };
+    return {
+      __dyn: pick('__dyn'),
+      __csr: pick('__csr'),
+      __hs: h.match(/"haste_session":"([^"]+)"/)?.[1] || null,
+    };
+  },
+
+  applyToSearchParams(params, session, htmlTokens) {
+    const parsed = htmlTokens || {};
+    const CT = globalThis.GF.fbCometTokens;
+    params.set('__dyn', parsed.__dyn || CT.buildDyn());
+    params.set('__csr', parsed.__csr || CT.buildCsr());
+    params.set('__hsdp', CT.buildHsdp());
+    params.set('__hblp', CT.buildHblp());
+    params.set('__hs', parsed.__hs || session.hs || '20160.HYP:comet_pkg.2.1...1');
+    if (!params.get('__rev')) params.set('__rev', session.rev || '1007600000');
+    return params;
   },
 };
 })();
 
 // ----- postFormat.js -----
 (function () {
+globalThis.GF = globalThis.GF || {};
 /** FB colored post — preset map từ GPP worker (text_format_preset_id). */
 const GF_GLOBAL = typeof globalThis !== 'undefined' ? globalThis : typeof self !== 'undefined' ? self : {};
 GF_GLOBAL.GF = GF_GLOBAL.GF || {};
@@ -1274,10 +1961,35 @@ GF_GLOBAL.GF.postFormat = {
 
 // ----- fbPostBg.js -----
 (function () {
+globalThis.GF = globalThis.GF || {};
 /**
  * Đăng group qua GraphQL nền (không mở tab Facebook) — học từ Group Posting Pro directApi.
  */
-const DOC_COMPOSER_POST = '24010394355227871';
+/** GPP worker defaults — dp=text, dpu=media, l=link preview only */
+const DOC_TEXT_POST = '9469644099759635';
+const DOC_MEDIA_POST = '9286110778162996';
+const DOC_LINK_PREVIEW = '24010394355227871';
+
+/** Relay provider flags — GPP 2.3.2 worker (giúp mutation group khớp Comet). */
+const RELAY_INTERNAL_VARS = {
+  __relay_internal__pv__CometUFIShareActionMigrationrelayprovider: true,
+  __relay_internal__pv__GHLShouldChangeSponsoredDataFieldNamerelayprovider: false,
+  __relay_internal__pv__GHLShouldChangeAdIdFieldNamerelayprovider: false,
+  __relay_internal__pv__FBReels_deprecate_short_form_video_context_gkrelayprovider: true,
+  __relay_internal__pv__StoriesArmadilloReplyEnabledrelayprovider: true,
+  __relay_internal__pv__FBReelsMediaFooter_comet_enable_reels_ads_gkrelayprovider: true,
+  __relay_internal__pv__IsWorkUserrelayprovider: false,
+  __relay_internal__pv__CometImmersivePhotoCanUserDisable3DMotionrelayprovider: false,
+  __relay_internal__pv__CometFeedStoryDynamicResolutionPhotoAttachmentRenderer_experimentWidthrelayprovider: 500,
+  __relay_internal__pv__CometIsReplyPagerDisabledrelayprovider: false,
+  __relay_internal__pv__CometUFIReactionsEnableShortNamerelayprovider: false,
+  __relay_internal__pv__WorkCometIsEmployeeGKProviderrelayprovider: false,
+  __relay_internal__pv__IsMergQAPollsrelayprovider: false,
+  __relay_internal__pv__CometFeedPYMKHScrollInitialPaginationCountrelayprovider: 10,
+  __relay_internal__pv__FBReelsIFUTileContent_reelsIFUPlayOnHoverrelayprovider: false,
+  __relay_internal__pv__EventCometCardImage_prefetchEventImagerelayprovider: false,
+  __relay_internal__pv__GHLShouldChangeSponsoredAuctionDistanceFieldNamerelayprovider: true,
+};
 
 const FP = globalThis.GF.fbPostBg = {
   base64ToBlob(base64, mime = 'image/png') {
@@ -1288,118 +2000,397 @@ const FP = globalThis.GF.fbPostBg = {
     return new Blob([arr], { type: mime });
   },
 
+  buildComposedLexical(text) {
+    const t = String(text || '');
+    const lines = t.split(/\r?\n/);
+    const blocks = lines.length ? lines : [''];
+    return {
+      message: { ranges: [], text: t },
+      composed_text: {
+        blocks,
+        block_types: blocks.map(() => 0),
+        block_depths: blocks.map(() => 0),
+        block_data: blocks.map(() => '{}'),
+        entities: blocks.map(() => '[]'),
+        entity_map: '{}',
+        inline_styles: blocks.map(() => '[]'),
+      },
+    };
+  },
+
+  /** Giống GPP worker B() — WARNING/spam không fail cứng. */
+  parseGraphqlNotice(json, rawText, chunks = []) {
+    for (const p of [...(chunks || []), json]) {
+      const story = p?.data?.story_create?.story;
+      if (story?.is_marked_as_spam || story?.is_marked_as_spam_by_admin_assistant) {
+        return 'FB gắn cờ spam — mở nhóm kiểm tra bài';
+      }
+      if (this.idFromStoryCreate(p?.data?.story_create)) return null;
+    }
+    for (const p of [...(chunks || []), json]) {
+      const gqlErr = p?.errors?.[0];
+      if (gqlErr?.severity === 'WARNING') {
+        return gqlErr.message || gqlErr.summary || 'FB cảnh báo';
+      }
+    }
+    return null;
+  },
+
+  detectVideoProcessing(rawText) {
+    return /video.*processing|processing.*video|is_processing/i.test(String(rawText || ''));
+  },
+
   parseFbErrors(rawText) {
     const t = String(rawText || '').toLowerCase();
-    if (/rate_limit|rate limit|temporarily blocked|you can't post right now|action_blocked/.test(t)) {
+    if (/rate_limit|rate limit|rate_limit_exceeded|temporarily blocked|temporarily restricted|you can't post right now|you're temporarily blocked|action_blocked/.test(t)) {
       return { critical: true, message: 'Facebook giới hạn tạm thời — dừng đăng, thử lại sau' };
     }
     if (/checkpoint|account restricted/.test(t)) {
       return { critical: true, message: 'Tài khoản FB bị checkpoint/hạn chế' };
     }
-    if (/please log in|not logged in|session|expired/.test(t)) {
+    if (/please log in|not logged in|error_subcode":1348131|error_subcode":1357001|error_subcode":1357004/.test(t)) {
       return { auth: true, message: 'Session Facebook hết hạn — mở facebook.com' };
     }
-    if (/permission|does_not_have_permission/.test(t)) {
+    if (/permissionerror|permission|does_not_have_permission/.test(t)) {
       return { soft: true, message: 'Không có quyền đăng vào nhóm này' };
     }
     return null;
   },
 
-  extractPostId(json, rawText) {
-    const story = json?.data?.story_create?.story;
-    let id = json?.data?.story_create?.story_id
-      || json?.data?.story_create?.post_id
-      || story?.legacy_story_hideable_id
-      || story?.id;
-    if (id && !/^\d+$/.test(String(id))) {
+  normalizePostId(raw) {
+    if (raw == null || raw === '') return null;
+    let id = String(raw);
+    if (/^\d+$/.test(id)) return id;
+    try {
+      const m = atob(id).match(/(?:VK:|:)(\d+)(?:\D|$)/);
+      if (m) return m[1];
+    } catch { /* ignore */ }
+    const tail = id.split(':').pop();
+    if (tail && /^\d+$/.test(tail)) return tail;
+    return null;
+  },
+
+  idFromStoryCreate(sc) {
+    if (!sc) return null;
+    const story = sc.story;
+    const candidates = [
+      sc.story_id,
+      sc.post_id,
+      sc.legacy_story_hideable_id,
+      sc.legacy_fbid,
+      sc.legacy_api_post_id,
+      story?.legacy_story_hideable_id,
+      story?.legacy_fbid,
+      story?.legacy_id,
+      story?.legacy_story_id,
+      story?.post_id,
+      story?.id,
+      sc.feed_story_edge?.node?.legacy_story_hideable_id,
+      sc.feed_story_edge?.node?.legacy_fbid,
+      sc.feed_story_edge?.node?.id,
+    ];
+    for (const c of candidates) {
+      const id = this.normalizePostId(c);
+      if (id) return id;
+    }
+    if (story?.url) {
+      const m = String(story.url).match(/\/permalink\/(\d+)/)
+        || String(story.url).match(/\/posts\/(\d+)/);
+      if (m?.[1]) return m[1];
+    }
+    return null;
+  },
+
+  idFromPayload(json) {
+    if (!json?.data) return null;
+    const sc = json.data.story_create;
+    const fromStory = this.idFromStoryCreate(sc);
+    if (fromStory) return fromStory;
+    const altStory = json.data.createGroupPost?.group_feed_item_edge?.node?.story;
+    if (altStory) {
+      const id = this.normalizePostId(altStory.legacy_story_hideable_id || altStory.id);
+      if (id) return id;
+    }
+    return null;
+  },
+
+  idFromGraphqlLines(rawText) {
+    const S = globalThis.GF.fbSessionBg;
+    for (const line of String(rawText || '').split('\n')) {
+      if (!line.trim()) continue;
       try {
-        const m = atob(String(id)).match(/(?:VK:|:)(\d+)(?:\D|$)/);
-        if (m) id = m[1];
+        const data = JSON.parse(S.stripFbJsonPrefix(line))?.data;
+        if (!data) continue;
+        const id = this.idFromStoryCreate(data.story_create);
+        if (id) return id;
       } catch { /* ignore */ }
     }
-    if (!id) {
-      const m = String(rawText).match(/"legacy_story_hideable_id":"(\d+)"/)
-        || String(rawText).match(/"story_id":"(\d+)"/)
-        || String(rawText).match(/"post_id":"(\d+)"/);
-      id = m?.[1];
+    return null;
+  },
+
+  idFromRawText(rawText) {
+    const t = String(rawText || '');
+    const patterns = [
+      /"legacy_story_hideable_id"\s*:\s*"(\d+)"/,
+      /"legacy_api_post_id"\s*:\s*"(\d+)"/,
+      /"legacy_fbid"\s*:\s*"(\d+)"/,
+      /"legacy_story_id"\s*:\s*"(\d+)"/,
+      /"story_id"\s*:\s*"(\d+)"/,
+      /"post_id"\s*:\s*"(\d+)"/,
+      /"feedback_id"\s*:\s*"(\d{8,})"/,
+      /story_create[\s\S]{0,2000}?"legacy_story_hideable_id"\s*:\s*"(\d+)"/,
+      /story_create[\s\S]{0,2000}?"id"\s*:\s*"(\d{8,})"/,
+    ];
+    for (const re of patterns) {
+      const m = t.match(re);
+      if (m?.[1]) return m[1];
     }
-    return id ? String(id) : null;
+    return null;
+  },
+
+  extractPostId(json, rawText, chunks = []) {
+    const list = [...(chunks || []), json].filter(Boolean);
+    for (const p of list) {
+      const id = this.idFromPayload(p);
+      if (id) return id;
+    }
+    const fromLines = this.idFromGraphqlLines(rawText);
+    if (fromLines) return fromLines;
+    return this.idFromRawText(rawText);
+  },
+
+  storyCreateHasId(json, chunks = []) {
+    for (const p of [...(chunks || []), json]) {
+      if (this.idFromStoryCreate(p?.data?.story_create)) return true;
+    }
+    return false;
+  },
+
+  extractStoryCreateError(json, chunks = []) {
+    if (this.storyCreateHasId(json, chunks)) return null;
+    for (const p of [...(chunks || []), json]) {
+      const sc = p?.data?.story_create;
+      if (!sc) continue;
+      const err = sc.errors?.[0] || sc.error;
+      if (err) return err.description || err.message || String(err);
+    }
+    for (const p of [...(chunks || []), json]) {
+      const gqlErr = p?.errors?.[0];
+      if (gqlErr && gqlErr.severity !== 'WARNING') {
+        return gqlErr.message || gqlErr.summary || 'GraphQL lỗi';
+      }
+    }
+    return null;
+  },
+
+  detectSpamWarning(json, chunks = []) {
+    for (const p of [...(chunks || []), json]) {
+      const story = p?.data?.story_create?.story;
+      if (story?.is_marked_as_spam || story?.is_marked_as_spam_by_admin_assistant) {
+        return 'FB đánh dấu spam — mở nhóm kiểm tra';
+      }
+    }
+    return null;
+  },
+
+  detectPending(json, rawText, chunks = []) {
+    if (/requires_approval|pending_approval|is_pending|pending_review|GROUP_POST_PENDING|approval_required|admin_approval|post_pending|pending_post|needs_admin|group_pending|awaiting_approval|chờ duyệt|pending_story/i.test(rawText)) {
+      return true;
+    }
+    for (const p of [...(chunks || []), json]) {
+      const sc = p?.data?.story_create;
+      if (sc?.is_pending || sc?.story?.is_pending || sc?.story?.is_published === false) return true;
+      if (sc?.story == null && sc?.composer_session_id && !sc?.errors?.length) return true;
+    }
+    return false;
+  },
+
+  detectSubmittedWithoutId(json, rawText, chunks = []) {
+    if (this.extractStoryCreateError(json, chunks)) return false;
+    if (this.extractPostId(json, rawText, chunks)) return true;
+
+    for (const p of [...(chunks || []), json]) {
+      if (p?.errors?.some((e) => e.severity && e.severity !== 'WARNING')) return false;
+      const data = p?.data;
+      if (!data || !Object.prototype.hasOwnProperty.call(data, 'story_create')) continue;
+      const sc = data.story_create;
+      if (sc?.errors?.length) return false;
+      // story_create có mặt, không lỗi — kể cả null/{} (nhóm duyệt bài hay hay gặp)
+      return true;
+    }
+
+    if (/story_create/.test(rawText) && !this.extractStoryCreateError(json, chunks)) {
+      return true;
+    }
+    return false;
+  },
+
+  inspectGraphqlFailure(json, rawText, chunks = []) {
+    if (this.detectSubmittedWithoutId(json, rawText, chunks)) return null;
+    for (const p of [...(chunks || []), json]) {
+      const sc = p?.data?.story_create;
+      if (sc && !sc.story && !sc.story_id && !sc.post_id && !sc.legacy_story_hideable_id) {
+        return 'FB trả story_create rỗng — nhóm có thể chặn API hoặc cần duyệt';
+      }
+    }
+    if (/spam|action.?blocked/i.test(rawText)) {
+      return 'có thể bị FB chặn/spam';
+    }
+    return null;
+  },
+
+  mimeToUploadFilename(mime = 'image/png') {
+    const m = String(mime).toLowerCase();
+    if (m.includes('jpeg') || m.includes('jpg')) return 'image.jpg';
+    if (m.includes('webp')) return 'image.webp';
+    if (m.includes('gif')) return 'image.gif';
+    return 'image.png';
+  },
+
+  describeUploadFailure(text, S) {
+    const err = this.parseFbErrors(text);
+    if (err?.message) return err.message;
+    const stripped = S.stripFbJsonPrefix(text);
+    try {
+      const j = JSON.parse(stripped);
+      const msg = j?.errorSummary || j?.errorDescription || j?.error;
+      if (msg) return String(msg);
+    } catch { /* ignore */ }
+    if (/login|not logged/i.test(text)) return 'Session hết hạn — F5 facebook.com';
+    if (stripped.length < 8) return 'FB không phản hồi';
+    return stripped.slice(0, 140);
   },
 
   async uploadPhoto(imageBase64, session, groupId, mime = 'image/png') {
     const S = globalThis.GF.fbSessionBg;
-    const blob = this.base64ToBlob(imageBase64, mime);
-    const uploadId = `gf-${Date.now()}`;
-    const apiUser = session.personalId || session.uid;
+    const raw = String(imageBase64 || '').replace(/^data:[^;]+;base64,/, '').trim();
+    if (!raw || raw.length < 64) {
+      throw new Error('Ảnh trống hoặc chưa load — Sửa bài, gắn lại ảnh');
+    }
+    const blob = this.base64ToBlob(raw, mime);
+    if (!blob.size) throw new Error('File ảnh không hợp lệ');
+    if (blob.size > 8 * 1024 * 1024) {
+      throw new Error('Ảnh > 8MB — thu nhỏ hoặc dùng Cổ điển');
+    }
+
+    const groupUrl = groupId ? `https://www.facebook.com/groups/${groupId}` : 'https://www.facebook.com/';
     const url = new URL('https://upload.facebook.com/ajax/react_composer/attachments/photo/upload');
-    url.searchParams.set('av', session.actorId || session.uid);
-    url.searchParams.set('__user', apiUser);
-    url.searchParams.set('__a', '1');
-    url.searchParams.set('__comet_req', '15');
-    url.searchParams.set('fb_dtsg', session.dtsg || session.fb_dtsg);
-    if (session.lsd) url.searchParams.set('lsd', session.lsd);
+    const qp = S.buildUploadQueryParams(session);
+    qp.forEach((v, k) => url.searchParams.set(k, v));
 
     const form = new FormData();
     form.append('source', '8');
     form.append('profile_id', session.actorId || session.uid);
-    form.append('target_id', groupId);
-    form.append('upload_id', uploadId);
-    form.append('farr', blob, 'groupflow.png');
+    form.append('waterfallxapp', 'comet');
+    form.append('upload_id', `upload_${Date.now()}`);
+    form.append('farr', blob, this.mimeToUploadFilename(mime));
+
+    const headers = {
+      Accept: '*/*',
+      Origin: 'https://www.facebook.com',
+      Referer: groupUrl,
+    };
+    if (session.lsd) headers['X-FB-LSD'] = session.lsd;
 
     const res = await S.fetchWithRetry(url.toString(), {
       method: 'POST',
       body: form,
       credentials: 'include',
+      headers,
     });
     const text = await res.text();
+    const stripped = S.stripFbJsonPrefix(text);
+    try {
+      const j = JSON.parse(stripped);
+      const photoId = j?.payload?.photoID || j?.payload?.photo_id;
+      if (photoId) return String(photoId);
+      const errMsg = j?.errorSummary || j?.errorDescription || j?.error?.message || j?.error;
+      if (errMsg) throw new Error(String(errMsg));
+    } catch (e) {
+      if (e.message && !/JSON|Unexpected/i.test(e.message)) throw e;
+    }
     let photoId = text.match(/"photoID":"(\d+)"/)?.[1]
       || text.match(/"photo_id":"(\d+)"/)?.[1];
     if (!photoId) {
       try {
-        const j = JSON.parse(S.stripFbJsonPrefix(text));
+        const j = JSON.parse(stripped);
         photoId = j?.payload?.photoID || j?.payload?.photo_id;
       } catch { /* ignore */ }
     }
-    if (!photoId) throw new Error('Upload ảnh thất bại');
+    if (!photoId) {
+      if (/fb_dtsg|login|session/i.test(text)) S.invalidateCache?.();
+      throw new Error(`Upload ảnh thất bại — ${this.describeUploadFailure(text, S)}`);
+    }
     return String(photoId);
   },
 
-  buildComposeVariables({ groupId, text, attachments, session, backgroundColor }) {
-    const mutationId = String(Date.now());
-    const token = `gf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  pickComposerDocId({ hasMedia } = {}) {
+    return hasMedia ? DOC_MEDIA_POST : DOC_TEXT_POST;
+  },
+
+  buildComposeVariables({ groupId, text, attachments, session, backgroundColor, hasImages }) {
+    const clientToken = `client:${typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `gf-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`}`;
+    const mutationId = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : String(Date.now());
+    const lexical = this.buildComposedLexical(text);
+    const PF = globalThis.GF?.postFormat;
+    const presetId = PF?.isColored?.(backgroundColor) ? PF.presetId(backgroundColor) : '0';
     const variables = {
       input: {
-        composer_entry_point: 'inline_composer',
+        composer_entry_point: hasImages ? 'publisher_bar_media' : 'inline_composer',
         composer_source_surface: 'group',
         composer_type: 'group',
-        logging: { composer_session_id: token },
+        idempotence_token: clientToken,
         source: 'WWW',
-        message: { ranges: [], text },
+        ...lexical,
+        text_format_preset_id: presetId,
         attachments,
         audience: { to_id: String(groupId) },
         actor_id: session.actorId || session.uid,
         client_mutation_id: mutationId,
-        idempotence_token: token,
         navigation_data: {
           attribution_id_v2: 'CometGroupDiscussionRoot.react,comet.group,tap_bookmark,,,,,',
         },
+        tracking: [null],
+        event_share_metadata: { surface: 'newsfeed' },
+        inline_activities: [],
+        with_tags_ids: null,
+        logging: { composer_session_id: clientToken },
       },
+      displayCommentsContextEnableComment: null,
+      displayCommentsContextIsAdPreview: null,
+      displayCommentsContextIsAggregatedShare: null,
+      displayCommentsContextIsStorySet: null,
       feedLocation: 'GROUP',
       feedbackSource: 0,
       focusCommentID: null,
+      gridMediaWidth: hasImages ? 230 : null,
       groupID: String(groupId),
       scale: 1,
       privacySelectorRenderLocation: 'COMET_STREAM',
+      checkPhotosToReelsUpsellEligibility: false,
+      checkVideoToReelsUpsellEligibility: false,
       renderLocation: 'group',
       useDefaultActor: false,
+      inviteShortLinkKey: null,
       isFeed: false,
       isGroup: true,
       isTimeline: false,
       isPageNewsFeed: false,
       isEvent: false,
       isFundraiser: false,
+      isFunFactPost: false,
+      isSocialLearning: false,
+      isProfileReviews: false,
+      isWorkSharedDraft: false,
+      UFI2CommentsProvider_commentsKey: 'CometGroupDiscussionRootSuccessQuery',
+      hashtag: null,
+      canUserManageOffers: false,
+      ...RELAY_INTERNAL_VARS,
     };
-    const PF = globalThis.GF?.postFormat;
     if (PF?.isColored?.(backgroundColor)) {
       PF.applyToVariables(variables, { text, backgroundColor });
     }
@@ -1414,18 +2405,26 @@ const FP = globalThis.GF.fbPostBg = {
       : (images?.length
         ? images
         : (imageBase64 ? [{ base64: imageBase64, mime: mediaMime || 'image/png' }] : []));
+    const groupUrl = `https://www.facebook.com/groups/${groupId}`;
+    await S.warmupGroupContext?.(groupUrl);
+
     const attachments = [];
     for (const img of imgList) {
       const photoId = await this.uploadPhoto(img.base64, session, groupId, img.mime || 'image/png');
       attachments.push({ photo: { id: photoId } });
     }
 
-    const variables = this.buildComposeVariables({ groupId, text, attachments, session, backgroundColor });
-    const { json, text: rawText } = await S.graphqlRequest(
+    const hasMedia = imgList.length > 0;
+    const docId = this.pickComposerDocId({ hasMedia });
+    const variables = this.buildComposeVariables({
+      groupId, text, attachments, session, backgroundColor, hasImages: hasMedia,
+    });
+    const { json, text: rawText, chunks } = await S.graphqlRequest(
       session,
       'ComposerStoryCreateMutation',
-      DOC_COMPOSER_POST,
+      docId,
       variables,
+      { referer: groupUrl },
     );
 
     const err = this.parseFbErrors(rawText);
@@ -1435,14 +2434,18 @@ const FP = globalThis.GF.fbPostBg = {
       throw new Error(err.message);
     }
 
-    const pending = /requires_approval|pending_approval|is_pending/i.test(rawText);
-    const postId = this.extractPostId(json, rawText);
+    const postId = this.extractPostId(json, rawText, chunks);
+    const notice = this.parseGraphqlNotice(json, rawText, chunks);
+    const pending = !postId && this.detectPending(json, rawText, chunks);
+    const spamWarn = this.detectSpamWarning(json, chunks) || notice;
+    const videoProcessing = !postId && this.detectVideoProcessing(rawText);
 
     if (postId) {
       return {
         postId,
         mode: 'fast-bg',
-        url: `https://www.facebook.com/groups/${groupId}/permalink/${postId}/`,
+        url: `${groupUrl}/permalink/${postId}/`,
+        warning: notice || undefined,
       };
     }
     if (pending) {
@@ -1450,24 +2453,63 @@ const FP = globalThis.GF.fbPostBg = {
         postId: 'pending',
         status: 'pending_approval',
         mode: 'fast-bg',
-        url: `https://www.facebook.com/groups/${groupId}/`,
-        warning: 'Đã gửi — chờ admin duyệt',
+        url: `${groupUrl}/`,
+        warning: notice || 'Đã gửi — chờ admin duyệt',
       };
     }
+    if (spamWarn) {
+      return {
+        postId: 'hidden',
+        status: 'posted_uncertain',
+        mode: 'fast-bg',
+        url: `${groupUrl}/`,
+        warning: spamWarn,
+      };
+    }
+    if (videoProcessing) {
+      return {
+        postId: 'processing',
+        status: 'successful',
+        mode: 'fast-bg',
+        url: `${groupUrl}/`,
+        warning: 'Video đang xử lý trên FB',
+      };
+    }
+
+    const submitted = !postId && this.detectSubmittedWithoutId(json, rawText, chunks);
+    if (submitted) {
+      return {
+        postId: 'pending',
+        status: 'pending_approval',
+        mode: 'fast-bg',
+        url: `${groupUrl}/`,
+        warning: notice || 'Đã gửi API — FB không trả post_id (nhóm duyệt bài?). Mở nhóm kiểm tra.',
+      };
+    }
+
+    const storyErr = this.extractStoryCreateError(json, chunks);
+    if (storyErr) throw new Error(storyErr);
     if (err?.soft) throw new Error(err.message);
-    throw new Error('Đăng GraphQL không trả post_id');
+
+    const hint = this.inspectGraphqlFailure(json, rawText, chunks);
+    console.warn('[GroupFlow] Fast post no post_id', groupId, rawText.slice(0, 600));
+    throw new Error(
+      hint
+        ? `FB từ chối hoặc không phản hồi (${hint}) — mở nhóm kiểm tra; thử Cổ điển`
+        : 'FB không phản hồi rõ — mở nhóm xem bài đã lên chưa; nếu không → Cổ điển',
+    );
   },
 
   async postToGroup({ groupId, text, imageBase64, images, mediaMime, actorId, backgroundColor }) {
     const S = globalThis.GF.fbSessionBg;
     let session;
     try {
-      session = await S.resolveSession({ actorId });
+      session = await S.resolveSession({ actorId, groupId });
       return await this.createGroupPost({ groupId, text, imageBase64, images, mediaMime, session, backgroundColor });
     } catch (e) {
       if (e.message?.includes('hết hạn') || e.message?.includes('fb_dtsg') || e.message?.includes('token')) {
         S.invalidateCache();
-        session = await S.resolveSession({ force: true, actorId });
+        session = await S.resolveSession({ force: true, actorId, groupId });
         return await this.createGroupPost({ groupId, text, imageBase64, images, mediaMime, session, backgroundColor });
       }
       throw e;
@@ -1478,6 +2520,7 @@ const FP = globalThis.GF.fbPostBg = {
 
 // ----- fbCommentBg.js -----
 (function () {
+globalThis.GF = globalThis.GF || {};
 /**
  * Comment group qua GraphQL nền (không mở tab Facebook) — port từ GPP worker.js H()/q().
  */
@@ -1696,6 +2739,7 @@ const FC = globalThis.GF.fbCommentBg = {
 
 // ----- fbGroupsBg.js -----
 (function () {
+globalThis.GF = globalThis.GF || {};
 /**
  * Lấy nhóm đã tham gia qua session Chrome + GraphQL nội bộ FB (giống Group Posting Pro).
  * Không mở/chuyển tab Facebook.

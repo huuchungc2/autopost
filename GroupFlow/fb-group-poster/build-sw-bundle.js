@@ -7,9 +7,11 @@ const files = [
   'localProviders.js',
   'localAi.js',
   'postMedia.js',
+  'postMediaStore.js',
   'groupParse.js',
   'groupMetaStore.js',
   'fbSessionBg.js',
+  'fbCometTokens.js',
   'postFormat.js',
   'fbPostBg.js',
   'fbCommentBg.js',
@@ -19,7 +21,10 @@ const files = [
 let bundle = '/* AUTO-GENERATED — chạy: node build-sw-bundle.js */\n';
 for (const f of files) {
   let code = fs.readFileSync(path.join(root, f), 'utf8').trim();
-  code = code.replace(/^window\.GF = window\.GF \|\| \{\};/, 'globalThis.GF = globalThis.GF || {};');
+  code = code.replace(/\bwindow\.GF\b/g, 'globalThis.GF');
+  if (!/^globalThis\.GF\s*=/.test(code)) {
+    code = `globalThis.GF = globalThis.GF || {};\n${code}`;
+  }
   bundle += `\n// ----- ${f} -----\n(function () {\n${code}\n})();\n`;
 }
 

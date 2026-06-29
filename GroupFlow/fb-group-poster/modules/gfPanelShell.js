@@ -60,6 +60,7 @@
     state.iframe = document.createElement('iframe');
     state.iframe.className = 'GroupFlowPanel';
     state.iframe.setAttribute('title', 'GroupFlow');
+    state.iframe.setAttribute('scrolling', 'no');
     state.iframe.src = chrome.runtime.getURL('sidepanel.html');
     state.style = state.iframe.style;
     state.style.position = 'fixed';
@@ -72,23 +73,47 @@
     state.style.border = 'none';
     state.style.borderRadius = '14px';
     state.style.boxShadow = 'rgba(14, 30, 37, 0.12) 0px 2px 4px, rgba(14, 30, 37, 0.32) 0px 2px 16px';
-    state.style.background = 'transparent';
+    state.style.background = '#eef1f6';
     state.style.transition = 'right 0.35s ease-in-out';
     document.body.appendChild(state.iframe);
     state.mounted = true;
     return true;
   }
 
-  function show() {
+  function claimPanelTab() {
+    try {
+      chrome.runtime.sendMessage({ type: 'GF_PANEL_CLAIM_TAB' }).catch(() => {});
+    } catch { /* ignore */ }
+  }
+
+  function releasePanelTab() {
+    try {
+      chrome.runtime.sendMessage({ type: 'GF_PANEL_RELEASE_TAB' }).catch(() => {});
+    } catch { /* ignore */ }
+  }
+
+  function restorePanelIfNeeded() {
+    if (!runtimeAlive()) return;
+    try {
+      chrome.runtime.sendMessage({ type: 'GF_PANEL_CAN_RESTORE' }, (res) => {
+        if (chrome.runtime.lastError) return;
+        if (res?.ok) setTimeout(() => show({ skipClaim: true }), 500);
+      });
+    } catch { /* ignore */ }
+  }
+
+  function show({ skipClaim = false } = {}) {
     if (!ensurePanel()) return;
     state.style.right = '12px';
     state.open = true;
+    if (!skipClaim) claimPanelTab();
   }
 
   function hide() {
     if (!state.mounted || !state.style) return;
     state.style.right = HIDDEN_RIGHT;
     state.open = false;
+    releasePanelTab();
   }
 
   function toggle() {
@@ -112,7 +137,7 @@
       return false;
     }
     if (msg?.type === 'GF_PANEL_OPEN') {
-      show();
+      show({ skipClaim: true });
       sendResponse({ ok: true });
       return false;
     }
@@ -139,4 +164,12 @@
   });
 
   window.__gfPanelShell = { show, hide, toggle, teardownPanel, runtimeAlive };
+
+  if (runtimeAlive()) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', restorePanelIfNeeded, { once: true });
+    } else {
+      restorePanelIfNeeded();
+    }
+  }
 })();

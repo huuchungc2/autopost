@@ -1,6 +1,6 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-06-22
+> Cập nhật: 2026-06-27
 
 ## Done in v0.2.x (recent)
 
@@ -84,6 +84,32 @@ PRD: [`GroupFlow/fb-group-poster-PRD.md`](GroupFlow/fb-group-poster-PRD.md)
 - [x] Metadata nhóm (công khai/đóng/kín + duyệt đăng) + filter tab Nhóm FB (v1.0.17)
 - [x] Học duyệt đăng từ kết quả post + GraphQL About enrich (v1.0.18)
 - [x] Lọc vai trò + mời bạn bè vào nhóm (Classic) (v1.0.19)
+- [x] Cổ điển: tab FB active + retry composer + prepare scroll (v1.0.69)
+- [x] Sửa bài giữ ảnh/video khi không đổi media (v1.0.69)
+- [x] Đổi Nhanh/Cổ điển zero render — chỉ lưu preference (v1.0.87)
+- [x] Fix panel trắng khi đổi mode — chặn scroll radio ẩn (v1.0.88)
+- [x] Nhanh/Cổ điển: bỏ hết listener change — chỉ lưu khi Thêm/Đăng (v1.0.89)
+- [x] Fix mất ảnh/format nháp + sync nhóm 5p (v1.0.90)
+- [x] Giữ format Quill (delta) khi lưu/Sửa bài (v1.0.91)
+- [x] Ảnh queue lưu IndexedDB — không mất khi Lưu/Sửa (v1.0.81)
+- [x] Một vùng scroll (không body + content chồng) (v1.0.80)
+- [x] Bài mới vs sửa: Thêm danh sách / Cập nhật (v1.0.79)
+- [x] Tab Tạo bài: footer không chồng danh sách bài (v1.0.78)
+- [x] UX soạn bài: Lưu sửa → form trống + nút + Bài mới (v1.0.77)
+- [x] Cổ điển mặc định như GPP popup (v1.0.76)
+- [x] Sửa bài giữ ảnh — media backup khi Lưu (v1.0.76)
+- [x] Cổ điển chỉ tab FB cửa sổ thường — không ẩn danh Chrome (v1.0.70)
+- [x] Cổ điển bỏ popup FB「Bài viết ẩn danh」— chỉ composer công khai (v1.0.71)
+- [x] Nhanh: story_create rỗng → Chờ duyệt, không fail đỏ (v1.0.74)
+- [x] Panel một tab + Cổ điển không double/emoji + Dừng (v1.0.106)
+- [x] Cổ điển giữ emoji/đậm + scroll composer nhẹ (v1.0.107)
+- [x] Import Excel giữ emoji/icon (cell.w + PUA normalize) + bulk xóa/trạng thái queue (v1.0.122)
+- [x] Card queue: nút Đăng từng bài + toggle Tự xuất ảnh (v1.0.123)
+- [x] Tab Nhóm overflow + nút đóng header gọn (v1.0.124)
+- [x] Cổ điển hybrid paste/gõ theo dòng (v1.0.108)
+- [x] Comment mẫu chéo team + auto spin (v1.0.110)
+- [x] Nhanh: thiếu post_id nhưng có thể đã gửi → chờ duyệt, không fail cứng (v1.0.72)
+- [x] Sửa bài giữ media — snapshot + không xóa form sau Lưu (v1.0.72)
 
 ## Remaining (optional polish)
 

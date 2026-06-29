@@ -10,7 +10,8 @@
 |------|---------|
 | Bấm **icon extension** | Panel **iframe nổi** bên phải trang đang mở (FB, tidien.xyz, localhost…) — trượt vào/ra, **không** mở tab Chrome |
 | **✕ Đóng** (header) | Thu gọn panel; bấm icon lại để mở |
-| Chuyển tab Chrome | Panel vẫn nằm trong tab cũ; quay lại tab đó → nội dung + nháp vẫn còn |
+| Tab sở hữu panel | **Chỉ tab bấm icon extension** hiện panel (`gfPanelTabId`); tab FB khác không tự bật |
+| Chuyển tab Chrome | Panel **chỉ** trên tab đã bấm icon; tab FB khác không tự hiện panel |
 | Draft Nhập tay | Autosave `gfManualDraft` — restore khi mở lại panel |
 
 File: `modules/gfPanelShell.js` (content script), `sidepanel.html` trong iframe, `background.js` → `GF_TOGGLE_PANEL`.
@@ -128,6 +129,46 @@ Query `GET /`: `search`, `from_date`, `to_date`, `user_id` (admin).
 
 Segmented control: **Nhập tay** mở trước, Excel sau. Khi nhập tay có thể tick **nhóm đăng** ngay trên form.
 
+**v1.0.140:** Fix crash scrollIntoView; đóng dialog khi đổi nhóm; editor dialog FB.
+
+**v1.0.139:** Dialog composer mở → chèn chữ ngay.
+
+**v1.0.138:** Countdown composer; tidien push/pull rõ.
+
+**v1.0.137:** Chuyển nhóm 2+: chờ composer lâu hơn, retry feed.
+
+**v1.0.136:** Tab **Log → Nhật ký** — engine log 400 dòng (bước + lỗi).
+
+**v1.0.135:** Fix đăng treo — Hybrid/chữ thuần paste nhanh; verify trước bấm Đăng.
+
+**v1.0.134:** Cài đặt — pane từng mục, Lưu cố định đáy, tab chính luôn hiện.
+
+**v1.0.133:** **Đồng bộ ngay** tidien; nghỉ 1 nhóm → random phút; lịch tuần tự.
+
+**v1.0.132:** Cài đặt — menu con sticky + ← quay tab; countdown đăng mỗi giây.
+
+**v1.0.131:** Hybrid — paste/gõ theo đoạn; bỏ paste cả bài khi có emoji.
+
+**v1.0.130:** **Chọn nhóm** trên card — chip bộ custom gán nhanh.
+
+**v1.0.129:** Tab Cài đặt — nav nhanh 5 mục, card tách rõ (Đăng bài · AI · Ảnh & comment · Đồng bộ · Nâng cao).
+
+**v1.0.128:** Cài đặt **Nghỉ dài** — sau N nhóm (1 = mỗi nhóm), phút random min–max; đăng lịch dùng chung.
+
+**v1.0.126:** Chỉ **Cổ điển** (bỏ Nhanh). Cài đặt → **Paste cả bài** / **Hybrid**. Tab Nhóm: chip bộ gán nhanh.
+
+**v1.0.124:** Tab Nhóm — sửa list bài tràn chồng UI; nút đóng panel **✕** góc phải trên (icon gọn).
+
+**v1.0.123:** Mỗi card queue có nút **Đăng** (đăng ngay 1 bài); toggle **Tự xuất ảnh** trên card — bỏ tick → đăng text, không gọi API. Có lịch → extension vẫn tự chạy đúng giờ.
+
+**v1.0.122:** Import Excel đọc `cell.w` + `importTextNormalize` (emoji Wingdings → Unicode, giống website). Danh sách bài: tick nhiều → **Xóa đã chọn** / **Đổi trạng thái** (Chờ đăng, Đã đăng, Chờ duyệt…).
+
+**v1.0.117:** Chỉnh giờ thanh dưới → **tự hẹn alarm** + toast xác nhận; miss ≤1 phút watchdog chạy bù.
+
+**v1.0.116:** Tag **Đăng: …** trên card bấm được → chọn bài + focus thanh giờ dưới; đổi ngày/giờ thanh dưới → lưu vào bài đã tick ngay.
+
+**v1.0.115 — UI gọn:** Chế độ đăng / giãn cách / tránh đêm chỉ ở tab **Cài đặt**. Tab Tạo bài: soạn nội dung + **Thêm danh sách**; **một nút Đăng** ở thanh dưới (bài đang soạn hoặc tick queue). Lịch: ngày/giờ thanh dưới + **Lên lịch**.
+
 ### Nhập tay (tab Tạo bài) — v1.0.9
 
 | Tính năng | Mô tả |
@@ -140,7 +181,7 @@ Segmented control: **Nhập tay** mở trước, Excel sau. Khi nhập tay có t
 | **First comment** | Tự comment sau khi đăng thành công (`fbCommentBg`); card bài có **Mở bài** + **▶ Bot** comment lại tay |
 | **Campaign** | Tên chiến dịch + nút **Dàn** lên lịch nhiều bài cách nhau X phút |
 | Media / prompt AI | Ảnh/video upload hoặc generate qua **Image provider** |
-| **Chọn nhóm / bài** | Mỗi bài `groupIds[]` — nút **Chọn nhóm** inline trên card + tab **Nhóm** (batch) |
+| **Chọn nhóm / bài** | Mỗi bài `groupIds[]` — **Chọn nhóm** trên card: chip **bộ custom** gán nhanh + tick từng nhóm; tab **Nhóm** cho batch |
 
 File: `modules/composer.js`, `sidepanel.html`, `background.js` (`maybeFirstComment`).
 
@@ -151,19 +192,40 @@ File: `modules/composer.js`, `sidepanel.html`, `background.js` (`maybeFirstComme
 | Tình huống | Hành vi |
 |------------|---------|
 | Bài **đã có** ảnh/video | Đến `ngay_dang`/`gio_dang` → đăng thẳng vào `groupIds` |
-| Bài **chưa có** media + `autoGenerateImage` + `prompt_anh` | Đến giờ đăng → `ensurePostMedia` (Image provider) → đăng |
-| Có **lịch xuất ảnh** (`anh_*`) | Alarm `gf_img_*` xuất ảnh trước; đến giờ đăng đọc lại queue (đã có ảnh) |
-| **Quét đêm** (Settings) | `gf_image_schedule` mỗi phút: trong khung giờ + interval, xuất 1 bài queue cần ảnh |
+| Bài **chưa có** media + `autoGenerateImage` + `prompt_anh` | **Đăng ngay** hoặc đến giờ lịch → `ensurePostMedia` rồi đăng (mặc định, giống website) |
+| Có **`anh_*` từ Excel** (tùy chọn) | Xuất ảnh sớm hơn giờ đăng — chỉ import Excel, không còn form nhập tay |
+| **Quét đêm** (Settings) | `gf_image_schedule` — xuất ảnh hàng loạt ban đêm (tùy chọn) |
 
-Luồng lên lịch (tab **Đăng** → **Lên lịch**): mỗi bài tick + `groupIds` + ngày/giờ đăng; nếu có `anh_*` hợp lệ → thêm job **Xuất ảnh** trong Activity.
+Luồng lên lịch: tick bài → chọn **ngày/giờ ở thanh dưới** → **Lên lịch** (cùng giờ cho mọi bài đã tick). Giờ riêng từng bài: **Sửa** → ô lịch trên form. **Dàn**: nhiều bài cách nhau X phút.
+
+**Alarm (v1.0.113):** Sidepanel gửi `GF_SCHEDULE_ALARM` — payload **không** chứa base64 (media lấy từ queue/IndexedDB lúc chạy). Background lưu `alarm_${name}` rồi `chrome.alarms.create`. Đến giờ: `runScheduledJob` → `refreshScheduledPostPayload` → `runPostMatrix`. Thành công → xóa khỏi `activityUpcoming`. Lỗi / miss → `gf_retry_missed` (5 phút, Settings `retryMissed`) thử lại.
+
+### Nhật ký engine — debug lỗi đăng (v1.0.136)
+
+| Tab Log | Nội dung |
+|---------|----------|
+| **Sắp tới** | Lịch chờ (alarm) |
+| **Lịch sử** | Kết quả từng nhóm (OK / Lỗi + link bài) |
+| **Nhật ký** | Chi tiết từng bước engine (~400 dòng, `engineLog` trong storage) |
+
+Ghi khi: bắt đầu job, mở nhóm FB, mở composer, chèn chữ, bấm Đăng, **đẩy tidien**, timeout, lỗi content script. Nguồn: `engine` (background), `content` (tab FB). Khi lỗi → tự chuyển sub-tab **Nhật ký**; overlay **Live Activity** cũng ghi dòng thời gian.
+
+**Báo lỗi:** chụp tab **Log → Nhật ký** (hoặc **Lịch sử** nếu chỉ cần kết quả).
+
+| File | Việc |
+|------|------|
+| `background.js` | `appendEngineLog`, `logProgress` (hook `GF_PROGRESS`) |
+| `content.js` | `gfProgress` → `GF_PROGRESS`; lỗi `GF_POST` push `phase: error` |
+| `sidepanel.js` | Tab Nhật ký, overlay log, `GF_APPEND_ENGINE_LOG` |
 
 | File | Việc |
 |------|------|
 | `modules/postMedia.js` | `needsImageGeneration`, `ensurePostMedia`, proxy `/ai/image` |
 | `modules/aiApi.js` | Gọi `/ai-providers`, `/ai/image`, `/ai/text` từ popup |
 | `backend/.../groupPostAiService.js` | Proxy AI dùng `ai_providers` + RBAC |
-| `background.js` | `runImageGenerate`, `tickGroupImageSchedule`, reload queue trước đăng |
-| `sidepanel.js` | `schedulePost` + UI checkbox/lịch ảnh |
+| `background.js` | `runScheduledJob`, `refreshScheduledPostPayload`, alarm `gf_job_*` / `gf_retry_missed` |
+| `sidepanel.js` | `schedulePost`, `gfScheduleAlarm`, `buildSchedulePostPayload` |
+| `modules/scheduler.js` | `parseScheduleDate` (HH:mm / HH:mm:ss) |
 
 ### Chuyển Cá nhân / Fanpage
 
@@ -175,16 +237,29 @@ Header sidepanel: bấm **profile pill** → chọn tài khoản hoặc fanpage 
 | `sidepanel` | Dropdown chọn actor, lưu `activeActorId` |
 | `fbGraphApi` | `av` + `actor_id` = page khi đang acting as page; `__user` = `c_user` |
 
+- **Cá nhân** ở đây = đăng **với tài khoản cá nhân vào các nhóm đã chọn**, không phải đăng lên **bảng feed / timeline trang cá nhân**. GroupFlow **chưa hỗ trợ** đăng lên timeline; code cố tình tránh dialog「Chia sẻ」feed cá nhân (`content.js` → `isPersonalShareDialog`).
 - Extension tự inject lại content script nếu tab FB cũ (bridge version). F5 facebook.com nếu profile/switch vẫn lỗi.
+
+### Nghỉ dài giữa nhóm (Cài đặt)
+
+| Key storage | UI | Hành vi |
+|-------------|-----|---------|
+| `pauseEveryGroups` | Sau mỗi N nhóm | `1` = nghỉ thêm sau **mỗi** nhóm; mặc định `5` |
+| `pauseMinutesMin` / `pauseMinutesMax` | Phút nghỉ (random) | Mỗi lần nghỉ chọn ngẫu nhiên trong khoảng min–max |
+
+- **Giãn cách** (Nhanh / Cân bằng / An toàn) vẫn chờ ngắn giữa từng nhóm; **Nghỉ dài** là thêm sau đủ N nhóm.
+- Áp **cả đăng ngay và đăng theo lịch** — `runPostMatrix` đọc settings global từ storage; overlay hiện `done/total` + đếm ngược nghỉ.
+- File: `background.js` (`resolvePostAutomation`, `waitAfterPostAttempt`, `pauseDelayMs`), `sidepanel.js` (form Cài đặt), `modules/storage.js`.
 
 ### Extract danh sách group
 
 Chỉ lấy **nhóm bạn đã tham gia**. GroupPostingPro hiển thị “Extracted Groups — 32 liên kết” vì **tích lũy từ tab `/groups/joins` + scroll + network**; GraphQL session đôi khi chỉ trả ~23. GroupFlow v1.0.26 **merge cả hai nguồn** và ưu tiên joins khi thiếu.
 
-1. **GraphQL nền (SW)** — `fetchJoinedGroupsGraphqlLite`: 1 request, không mở tab FB (mặc định khi mở panel)
-2. **Quick (Ctrl+↻)** — GraphQL đủ trang + HTML joins trong SW, không cuộn tab
-3. **Deep (↻)** — Tab `/groups/joins` scroll DOM khi cần đủ \(N\) nhóm
-4. Mở panel: hiện **cache** ngay; cập nhật lite nền nếu trống/cũ — **không chặn UI**
+1. **GraphQL nền (SW)** — `fetchJoinedGroupsGraphqlLite` / `fetchJoinedGroupsQuick`: cookie Chrome, **không mở tab FB** (mặc định ↻ Làm mới)
+2. **Deep (Shift+↻)** — Chỉ khi GraphQL thiếu: tab `/groups/joins` scroll DOM để đủ \(N\) nhóm
+3. Mở panel: hiện **cache** ngay; cập nhật lite nền nếu trống/cũ — **không chặn UI**
+
+**v1.0.85:** Trước đó ↻ mặc định gọi deep sync (mở FB) — đã đảo lại: ↻ = GraphQL nền; Shift+↻ = quét joins.
 
 | File | Việc |
 |------|------|
@@ -221,6 +296,86 @@ Luồng gán (giống Posting Group Pro):
 | **Nhanh** (mặc định) | GraphQL nền trong service worker (`fbPostBg.js`): session cookie + `fb_dtsg`, upload + `ComposerStoryCreateMutation` — **không mở tab FB** | Text + ảnh; nhanh, giống Group Posting Pro |
 | **Cổ điển** | DOM trên tab FB: background mở đúng URL nhóm → content script mở composer, paste text (Lexical), attach ảnh, bấm Đăng — giống GPP Classic | Video, hoặc khi bật fallback trong Cài đặt |
 
+**Lưu ý Cổ điển:** tab Facebook **cửa sổ Chrome thường** (đã login). Một số nhóm có **2 cách đăng**: bài **công khai** (ô「Bạn viết gì đi…」) và **ẩn danh FB** (popup「Bài viết ẩn danh」) — extension v1.0.71+ **chỉ đăng công khai**, tự bấm Hủy popup ẩn danh nếu FB mở nhầm.
+
+**v1.0.121 — Cổ điển sau paste:** Không trả inline feed sớm (paste xong im vì thiếu nút Đăng) — click mở dialog, `finalizeComposerForSubmit` nudge Lexical, re-paste nếu đổi editor; overlay hiện「chờ nút Đăng sáng」.
+
+**v1.0.120 — Xuống dòng composer:** Export plain từ Quill (`extractPlainFromEditorDom`) — mỗi `<p>` = một `\n`, không chèn dòng trống thừa giữa các dòng liền nhau (copy ra FB/Zalo giữ đúng khoảng cách gốc).
+
+**v1.0.119 — Emoji copy composer:** FB/Zalo paste emoji dạng `<img alt="✅">` → chuẩn hóa Unicode trong Quill; copy handler xuất plain đủ emoji.
+
+**v1.0.111 — Footer đăng:** Tab Tạo bài — **Đăng bài này** (bài đang soạn) + **một** bar cuối panel **Đăng X bài** (queue đã tick); bỏ footer queue trùng giữa trang.
+
+**v1.0.110 — Comment mẫu:** Settings → textarea mẫu spintax (`{a|b|c}`, mỗi dòng một mẫu). Tab Comment: ô trống → random dòng + spin khi Chạy; nút **Điền mẫu vào ô trống**. Link bài FB: `/groups/{id}/posts/{post_id}/`.
+
+**v1.0.109 — Hybrid rule đơn giản:** paste nếu dòng có emoji ở **bất kỳ đâu** hoặc `**đậm**`; còn lại gõ. Emoji cuối dòng (`Rất hay ❤️`) cũng paste.
+
+**v1.0.108 — Hybrid paste/gõ:** `splitHybridSegments` — dòng bắt đầu emoji hoặc có `**đậm**` → **paste** khối; đoạn narrative thuần → **gõ** (`typeHumanLike`). Bài ZaloPilot kiểu 📌 hook + đoạn chữ + ✅ bullet + CTA: hook/bullet paste, story gõ. Bài chỉ emoji hoặc chỉ chữ: không hybrid (paste một lần hoặc gõ cả bài).
+
+**v1.0.107 — Emoji + scroll composer:** Cổ điển ưu tiên **paste HTML** một lần (giữ emoji 📦✅🌐 + `<strong>`); fallback `typeHumanLike` duyệt theo code point (không cắt surrogate). `markdownToHtml` không gỡ emoji đầu dòng làm bullet. Scroll: kiểm tra composer đã thấy → bỏ qua; tối đa kéo 120px `instant`/`nearest`; không lặp `scrollTo(0)` trong `waitForGroupComposerUi`; cache `prepareClassicPost` 20s.
+
+**v1.0.106 — Panel một tab + Cổ điển ổn định:** `gfPanelTabId` ghim tab sở hữu panel (đóng panel tab cũ khi mở tab mới). Cổ điển: **chỉ `typeHumanLike`** — unicode bold cho `**text**`, giữ emoji; không paste HTML (tránh double nội dung). Scroll composer tối đa 2 vòng. **Dừng:** `GF_STOP` → `GF_ABORT_POST` trên tab FB + `interruptibleDelay` thoát batch.
+
+**v1.0.105 — IndexedDB media:** `postMediaStore` retry khi DB đóng (panel reload / FB navigate); bỏ hydrate IDB lúc `gfPostingActive`.
+
+**v1.0.104 — Một tab FB / batch:** `runPostMatrix` ghim `_postingFbTabId` — tái dùng tab có sẵn hoặc tạo **một** tab nếu chưa có; bài 2+ chỉ `tabs.update` URL nhóm, không `tabs.create`, không steal focus mỗi lần.
+
+**v1.0.103 — Format + emoji Cổ điển:** Chuyển `**markdown**` → `<strong>` hoặc chữ đậm unicode (GPP); sau upload ảnh refocus composer rồi **gõ** (không paste thô); tự scroll feed tìm「Bạn viết gì đi…」.
+
+**v1.0.102 — Panel không mất sau đăng:** Cổ điển reload/navigate tab FB → iframe panel bị xóa. `gfPanelShell` + SW tự `GF_PANEL_OPEN` sau load; `chrome.storage.session` nhớ `gfPanelOpen` / `gfPostingActive`.
+
+**v1.0.101 — Cổ điển DOM (GPP):** Gắn ảnh **trước** chèn chữ. Paste `text/html` từ `variationDeltas` (bold/italic/list). Composer đóng sau Đăng → `posted_uncertain` (không fail đỏ). Tìm `Photo/video` + `input[type=file]` trong dialog.
+
+**v1.0.99 — Luồng đăng thống nhất:** `postGroupItem`: Nhanh fail → tự `sendToFb` Cổ điển (không fallback trùng trong `runPostMatrix`). Session Nhanh: `resolveSession({ groupId })` + warmup HTML nhóm. Cổ điển: **không** `switchActor` (tránh lạc feed cá nhân); đổi Page qua cookie `i_user` trước khi mở tab. Tìm composer thêm theo text「Bạn viết gì đi…」.
+
+**v1.0.98 — Nhanh = GPP core:** `9469644099759635` (text) / `9286110778162996` (ảnh) thay vì doc link-preview sai; `__dyn`/`__csr` trên GraphQL; Nhanh lỗi → tự Cổ điển (như GPP `failover_popup`).
+
+**v1.0.97 — Tìm ô soạn nhóm:** Quét `role="main"`, nhiều placeholder VI; chờ composer ~32s; tự về feed nếu đang About/Members.
+
+**v1.0.96 — Gõ chữ Cổ điển:** `typeHumanLike` — từng ký tự/đoạn ngắn, pause sau dấu câu & xuống dòng; không paste cả khối một lần.
+
+**v1.0.95 — Cổ điển không lạc Share:** Ảnh user = dialog「Chia sẻ」+ Bảng feed/Bạn bè (sai). Chỉ click composer **trong trang nhóm**; từ chối/đóng Share cá nhân.
+
+**v1.0.94 — Upload + Cổ điển DOM:** Token Comet cho upload ảnh Nhanh (khớp GPP). Cổ điển: `switchActor` xong **quay lại `/groups/{id}`**; chờ preview ảnh rồi mới bấm Đăng (không match「đăng nhập」).
+
+**v1.0.93 — Cổ điển + format queue:** Ảnh lấy từ SW/IDB (`GF_GET_POST_MEDIA`), không nhét base64 vào `tabs.sendMessage`. Cổ điển chèn từng dòng (Enter) giữ xuống dòng. `mergePostsFromStorage` giữ `variationDeltas` như media.
+
+**v1.0.92 — Nhanh upload ảnh:** Căn endpoint upload theo GPP (`waterfallxapp=comet`, đủ token Comet). Warmup nhóm trước upload. Lỗi rõ (session/ảnh trống/FB trả về).
+
+**v1.0.91 — Format soạn bài:** Lưu Quill Delta (`variationDeltas`) khi Thêm danh sách / nháp / Sửa — khôi phục B/I, list, xuống dòng. `noi_dung` plain vẫn dùng lúc đăng FB.
+
+**v1.0.90 — Ảnh / nháp / nhóm:** `persistAll` **không** xóa IndexedDB khi queue chỉ còn `mediaCached` (bug gây mất ảnh sau Lưu). Mở panel → hydrate ảnh từ IDB. Nháp `gfManualDraft` + IDB `__gfManualDraft__` giữ text, nhóm, prompt, ảnh. Sync nhóm nền mỗi **5 phút** (GraphQL SW).
+
+**v1.0.89 — Nhanh/Cổ điển (đúng kiểu GPP):** Radio = state form thuần HTML. **Không** `addEventListener('change')`. `postMode` lưu khi Thêm/Đăng/Lưu cài đặt.
+
+**v1.0.88 — Panel trắng/xám khi đổi mode:** Radio `sr-only` — CSS `position:fixed` chặn scroll nhảy (không JS).
+
+**v1.0.85:** ↻ sync nhóm = GraphQL nền; Shift+↻ = quét joins.
+
+**v1.0.83 — Performance UI:** Không hydrate toàn bộ queue lúc mở panel. Ảnh load lazy (IDB khi Sửa/Đăng).
+
+**v1.0.81 — Media IndexedDB:** Ảnh/video bài queue lưu `IndexedDB` (`modules/postMediaStore.js`); `chrome.storage` chỉ metadata + cờ `mediaCached`. Sửa/Lưu hydrate từ IDB; background đăng bài hydrate trước khi post.
+
+**v1.0.80 — Scroll:** Panel flex — header + tab cố định, **chỉ `.content` cuộn**; footer batch nằm cuối panel (không `position: fixed`). Iframe popup `scrolling=no`.
+
+**v1.0.79 — Bài mới vs sửa:** Soạn mới → **Thêm danh sách** (push queue) hoặc **Đăng ngay**. Sửa bài trong list → **Cập nhật** / **Cập nhật & đăng** (ghi đè post cũ, không tạo bài mới).
+
+**v1.0.78 — Layout tab Tạo bài:** Ẩn footer cố định (Dàn/Lên lịch/Đăng ngay) trên tab Tạo bài — tránh chồng danh sách queue. Batch queue chuyển xuống **dưới Danh sách bài** (inline). Nút soạn bài xếp **2 hàng** (Bài mới · Xem trước · Lịch / Queue · Đăng ngay).
+
+**v1.0.77 — UX soạn bài sau Sửa:** Bấm **💾 Lưu** → cập nhật queue + **xóa form** (soạn bài mới ngay). **+ Bài mới** / **Hủy sửa** xóa form không lưu. Banner sửa nằm trên composer.
+
+**v1.0.76 — Cổ điển mặc định + giữ ảnh khi sửa:** `postMode` mặc định `classic` (giống GPP popup). Sửa bài: snapshot media lúc mở Sửa (`_gfMediaBackup`), `resolvePostMediaOnSave` khôi phục nếu không đổi file.
+
+**v1.0.74 — Nhanh / post_id:** Check **sau** khi gọi `ComposerStoryCreateMutation` (upload ảnh → GraphQL → đọc response). `story_create` rỗng/null **không lỗi** → Lịch sử **Chờ duyệt** (nhóm hương duyệt bài). Chỉ đỏ khi FB trả lỗi rõ hoặc không có `story_create`.
+
+**v1.0.72 — Nhanh + sửa media:** Nhanh không fail cứng khi FB không trả `post_id` nhưng `story_create` có vẻ đã nhận (nhóm duyệt bài → **Chờ duyệt**). Sửa bài: snapshot media lúc mở Sửa; Lưu không reset form/xóa ảnh.
+
+**v1.0.71 — Bỏ popup ẩn danh FB:** `openComposer` ưu tiên trigger công khai; detect + dismiss dialog「Bài viết ẩn danh」; không bấm「Tạo bài viết ẩn danh」.
+
+**v1.0.70 — Tab thường:** chấm điểm tab (ưu tiên window đang focus, bỏ URL login); tạo tab mới chỉ trong cửa sổ thường; kiểm tra cookie `c_user` + `GF_GET_FB_USER` trước Cổ điển.
+
+**v1.0.69 — Cổ điển + sửa bài:** Đăng Cổ điển **bật tab FB** (FB không render composer trên tab nền); retry mở composer 3 lần; `GF_PREPARE_CLASSIC_POST` scroll feed. Lưu bài **giữ ảnh** nếu không chọn media mới.
+
 **v1.0.38:** Classic không còn `location.href` trong content script (tránh crash khi chuyển trang). Lịch sử đăng + progress log hiện **message lỗi** cụ thể.
 
 **v1.0.52 — Tìm nhóm:** Dropdown chọn nhóm không còn render lại ô search mỗi phím (giữ focus); lọc bỏ dấu tiếng Việt; gõ `hoi dong` khớp「Hội Đồng」; tab Nhóm dùng cùng logic.
@@ -232,6 +387,14 @@ Luồng gán (giống Posting Group Pro):
 **v1.0.49 — Lịch sử + link bài:** Tab Log →「Lịch sử」(`activityHistory` trong `chrome.storage.local`). Mỗi dòng OK có nút **Mở bài trên FB** (`permalink/{post_id}` hoặc `res.url` từ Fast); chờ duyệt → **Mở nhóm**. Sau `GF_PROGRESS` `done`, UI tự mở tab Log + sub-tab Lịch sử; `storage.onChanged` refresh danh sách khi đang đăng.
 
 **v1.0.47 — Cài đặt automation theo từng bài:** Form tạo bài bước 3 (chu kỳ nghỉ, bảo mật, Nhanh/Cổ điển, tránh đêm, first comment) lưu vào `postQueue`; `runPostMatrix` áp dụng giãn cách + nghỉ dài theo từng bài.
+
+**v1.0.68 — UI compose GPP:** Cấp độ bảo mật + Chiến lược (2 card) + Cài đặt bình luận (chip + Add spintax) luôn hiện; footer **Preview · Lên lịch · + Queue · Đăng ngay**; Nâng cao (nghỉ/đêm/lịch) trong `<details>`.
+
+**v1.0.67 — Sửa bài:** bấm **Sửa** trên queue → nhảy tab **Tạo bài / Viết tay**, nút **Lưu bài** (cùng form lúc tạo). Tag trên bài:「Đang sửa ↑」. Thanh「Cấu hình đăng」phản ánh `manualPostMode` (trước đó chỉ đọc Cài đặt chung).
+
+**v1.0.66 — Đăng Nhanh (fix post_id):** Mutation group khớp GPP hơn (`composed_text`, relay provider flags, warmup `groups/{id}` trước GraphQL, Referer nhóm). Parse `post_id` từ `legacy_fbid`, từng dòng JSON, pending/spam; lỗi rõ hơn khi `story_create` rỗng.
+
+**v1.0.65 — Sửa bài (đã thay v1.0.67):** ~~form inline trong card~~ → mở form Viết tay.
 
 **v1.0.46 — Nhiều ảnh + composer GPP:** `input[multiple]` tối đa 10 ảnh; `post.images[]`; UI `unified-composer-box` + magic blocks Media/Nền; thumbnail strip xóa từng ảnh.
 

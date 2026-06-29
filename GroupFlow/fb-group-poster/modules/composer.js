@@ -22,16 +22,143 @@ GF.composer = {
   htmlToPlain(html) {
     const el = document.createElement('div');
     el.innerHTML = html || '';
-    return (el.textContent || '').replace(/\u00a0/g, ' ').trim();
+    el.querySelectorAll('br').forEach((br) => br.replaceWith('\n'));
+    el.querySelectorAll('p, div, li, h1, h2, h3').forEach((block, i) => {
+      if (i > 0) block.insertAdjacentText('beforebegin', '\n');
+    });
+    return (el.textContent || '').replace(/\u00a0/g, ' ').replace(/\n+$/, '');
+  },
+
+  /** Plain text từ Quill — giữ emoji (kể cả paste dạng &lt;img alt="✅"&gt; từ FB/Zalo). */
+  getEditorPlainText(ed) {
+    if (!ed?.root) return '';
+    try {
+      const fromDom = this.extractPlainFromEditorDom(ed.root);
+      if (fromDom) return fromDom;
+    } catch { /* fallback */ }
+    if (!ed?.getText) return '';
+    return String(ed.getText())
+      .replace(/\u00a0/g, ' ')
+      .replace(/\n+$/, '');
+  },
+
+  extractInlinePlain(node) {
+    let s = '';
+    const go = (n) => {
+      if (n.nodeType === Node.TEXT_NODE) {
+        s += n.textContent || '';
+        return;
+      }
+      if (n.nodeType !== Node.ELEMENT_NODE) return;
+      if (n.tagName === 'BR') return;
+      if (n.tagName === 'IMG') {
+        s += n.getAttribute('alt') || n.getAttribute('data-emoji') || n.title || '';
+        return;
+      }
+      n.childNodes.forEach(go);
+    };
+    go(node);
+    return s;
+  },
+
+  extractPlainFromEditorDom(root) {
+    const blocks = root.querySelectorAll(':scope > *');
+    if (!blocks.length) {
+      return (root.textContent || '').replace(/\u00a0/g, ' ').replace(/\n+$/, '');
+    }
+    const lines = [];
+    blocks.forEach((block) => {
+      lines.push(this.extractInlinePlain(block));
+    });
+    // Mỗi <p> = 1 dòng (giống getText), không chèn thêm dòng trống giữa các <p> liền nhau.
+    return lines.join('\n').replace(/\u00a0/g, ' ').replace(/\n+$/, '');
+  },
+
+  /** FB/Zalo copy emoji dạng img — đổi thành ký tự Unicode trong model Quill. */
+  normalizeEmojiImages(ed) {
+    if (!ed?.root || typeof Quill === 'undefined') return;
+    const imgs = [...ed.root.querySelectorAll('img')];
+    for (const img of imgs) {
+      const ch = img.getAttribute('alt') || img.getAttribute('data-emoji') || img.title || '';
+      if (!ch || !/\p{Extended_Pictographic}/u.test(ch)) continue;
+      try {
+        const blot = Quill.find(img);
+        if (!blot) continue;
+        const index = ed.getIndex(blot);
+        ed.deleteText(index, 1, 'silent');
+        ed.insertText(index, ch, 'silent');
+      } catch { /* ignore */ }
+    }
+  },
+
+  _scheduleEmojiNormalize(ed) {
+    if (!ed) return;
+    const key = ed.root?.id || 'default';
+    if (!this._emojiNormTimers) this._emojiNormTimers = {};
+    clearTimeout(this._emojiNormTimers[key]);
+    this._emojiNormTimers[key] = setTimeout(() => {
+      this.normalizeEmojiImages(ed);
+      this.updateQualityBadge();
+    }, 100);
+  },
+
+  onEditorCopy(ed, e) {
+    const plain = this.getEditorPlainText(ed);
+    if (!plain || !e.clipboardData) return;
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', plain);
+  },
+
+  setEditorPlainText(ed, text) {
+    if (!ed) return;
+    ed.setText(String(text ?? ''));
+  },
+
+  getEditorDelta(ed) {
+    if (!ed?.getContents) return null;
+    if (ed.getLength() <= 1) return null;
+    try {
+      return JSON.parse(JSON.stringify(ed.getContents()));
+    } catch {
+      return ed.getContents();
+    }
+  },
+
+  setEditorDelta(ed, delta) {
+    if (!ed) return;
+    if (delta?.ops?.length) {
+      ed.setContents(delta);
+    } else {
+      ed.setText('');
+    }
+  },
+
+  getVariationDeltas() {
+    const out = {};
+    this.VAR_KEYS.forEach((k) => {
+      const d = this.getEditorDelta(this.editors?.[k]);
+      if (d) out[k] = d;
+    });
+    return out;
+  },
+
+  setVariationDeltas(deltas) {
+    if (!deltas || typeof deltas !== 'object') return;
+    this.VAR_KEYS.forEach((k) => {
+      const ed = this.editors?.[k];
+      if (!ed) return;
+      if (deltas[k]) this.setEditorDelta(ed, deltas[k]);
+      else this.setEditorPlainText(ed, '');
+    });
+    this.updateQualityBadge();
   },
 
   getVariationTexts() {
     const out = {};
     this.VAR_KEYS.forEach((k) => {
       const ed = this.editors?.[k];
-      const html = ed?.root?.innerHTML || '';
-      const plain = this.htmlToPlain(html);
-      if (plain) out[k] = plain;
+      const plain = this.getEditorPlainText(ed);
+      if (plain.trim()) out[k] = plain;
     });
     return out;
   },
@@ -45,7 +172,7 @@ GF.composer = {
     this.init();
     const ed = this.editors?.A;
     if (!ed) return;
-    ed.setText(String(text || ''));
+    this.setEditorPlainText(ed, text);
     this.setVariation('A');
     this.updateQualityBadge();
   },
@@ -160,7 +287,11 @@ GF.composer = {
         placeholder: k === 'A' ? 'Viết nội dung bài… Hỗ trợ {spintax|biến thể}' : `Biến thể ${k} (tuỳ chọn)`,
         modules: { toolbar: [['bold', 'italic'], [{ list: 'ordered' }, { list: 'bullet' }], ['clean']] },
       });
-      ed.on('text-change', () => this.updateQualityBadge());
+      ed.on('text-change', () => {
+        this.updateQualityBadge();
+        this._scheduleEmojiNormalize(ed);
+      });
+      ed.root.addEventListener('copy', (e) => this.onEditorCopy(ed, e));
       this.editors[k] = ed;
     });
 

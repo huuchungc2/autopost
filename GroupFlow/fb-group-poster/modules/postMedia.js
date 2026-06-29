@@ -1,3 +1,4 @@
+globalThis.GF = globalThis.GF || {};
 const PM = globalThis.GF.postMedia = {
   getPostImages(post) {
     if (post?.images?.length) return post.images;
@@ -80,11 +81,20 @@ const PM = globalThis.GF.postMedia = {
   },
 
   async persistPost(post) {
+    const PMS = globalThis.GF?.postMediaStore;
     const d = await chrome.storage.local.get('postQueue');
     const queue = d.postQueue || [];
     const idx = queue.findIndex((p) => p.id === post.id);
-    if (idx >= 0) queue[idx] = { ...queue[idx], ...post };
-    else queue.push(post);
+    if (PMS) {
+      if (PMS.hasPayload(post)) await PMS.save(post.id, post);
+      const lite = PMS.stripForQueue(post);
+      if (idx >= 0) queue[idx] = { ...queue[idx], ...lite };
+      else queue.push(lite);
+    } else if (idx >= 0) {
+      queue[idx] = { ...queue[idx], ...post };
+    } else {
+      queue.push(post);
+    }
     await chrome.storage.local.set({ postQueue: queue });
     return post;
   },

@@ -6,8 +6,14 @@ const GRAPHQL_URL = 'https://www.facebook.com/api/graphql/';
 const S = globalThis.GF.fbSessionBg = {
   _cache: null,
   _cacheAt: 0,
+  _webSessionId: null,
   CACHE_MS: 5 * 60 * 1000,
   reqCounter: 1,
+
+  freshWebSessionId() {
+    const seg = () => Math.floor(Math.random() * (36 ** 6)).toString(36).padStart(6, '0');
+    return `${seg()}:${seg()}:${seg()}`;
+  },
 
   async hasFbLogin() {
     try {
@@ -24,21 +30,42 @@ const S = globalThis.GF.fbSessionBg = {
     return raw;
   },
 
-  parseGraphqlJson(text) {
+  parseAllGraphqlJson(text) {
     const cleaned = this.stripFbJsonPrefix(text);
-    const lines = cleaned.split('\n').filter(Boolean);
-    for (const line of lines) {
+    const chunks = [];
+    for (const line of cleaned.split('\n').filter(Boolean)) {
       try {
-        const json = JSON.parse(line);
-        if (json.errors?.length) {
-          throw new Error(json.errors[0]?.message || 'GraphQL lỗi');
-        }
-        return json;
-      } catch (e) {
-        if (e.message && !e.message.startsWith('Unexpected token')) throw e;
+        chunks.push(JSON.parse(line));
+      } catch {
+        /* bỏ qua dòng không phải JSON */
       }
     }
-    return JSON.parse(cleaned);
+    if (!chunks.length) {
+      try {
+        chunks.push(JSON.parse(cleaned));
+      } catch {
+        /* ignore */
+      }
+    }
+    return chunks;
+  },
+
+  pickGraphqlPayload(chunks) {
+    for (const j of chunks || []) {
+      if (j?.data?.story_create) return j;
+      if (j?.data?.createGroupPost) return j;
+    }
+    return chunks?.[0] || {};
+  },
+
+  parseGraphqlJson(text) {
+    const chunks = this.parseAllGraphqlJson(text);
+    for (const json of chunks) {
+      if (json.errors?.length) {
+        throw new Error(json.errors[0]?.message || 'GraphQL lỗi');
+      }
+    }
+    return this.pickGraphqlPayload(chunks);
   },
 
   parseSessionFromHtml(html) {
@@ -115,7 +142,7 @@ const S = globalThis.GF.fbSessionBg = {
     throw lastErr || new Error('Không lấy được session Facebook');
   },
 
-  async resolveSession({ force = false, actorId: preferredActorId } = {}) {
+  async resolveSession({ force = false, actorId: preferredActorId, groupId } = {}) {
     if (!force && this._cache && Date.now() - this._cacheAt < this.CACHE_MS) {
       const s = { ...this._cache };
       if (preferredActorId) s.actorId = String(preferredActorId);
@@ -124,7 +151,25 @@ const S = globalThis.GF.fbSessionBg = {
     if (!(await this.hasFbLogin())) {
       throw new Error('Chưa đăng nhập Facebook trên Chrome');
     }
-    const html = await this.fetchAuthHtml();
+    let html = await this.fetchAuthHtml();
+    if (groupId) {
+      try {
+        const groupUrl = `https://www.facebook.com/groups/${groupId}`;
+        const res = await this.fetchWithRetry(groupUrl, {
+          credentials: 'include',
+          redirect: 'follow',
+          headers: {
+            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            Referer: 'https://www.facebook.com/',
+          },
+        });
+        const groupHtml = await res.text();
+        if (groupHtml.length > 500 && !this.isLoginPage(groupHtml)) {
+          html = groupHtml;
+          this._warmupTokens = globalThis.GF?.fbCometTokens?.parseFromHtml?.(groupHtml) || null;
+        }
+      } catch { /* giữ html /settings */ }
+    }
     const parsed = this.parseSessionFromHtml(html);
     const cookies = await this.readActorCookies(preferredActorId);
     const uid = parsed.uid || cookies.personalId;
@@ -158,6 +203,10 @@ const S = globalThis.GF.fbSessionBg = {
     body.set('__a', '1');
     body.set('__comet_req', '15');
     body.set('__req', (this.reqCounter++).toString(36));
+    body.set('__ccg', 'EXCELLENT');
+    body.set('dpr', '1');
+    if (!this._webSessionId) this._webSessionId = this.freshWebSessionId();
+    body.set('__s', this._webSessionId);
     if (session.rev) body.set('__rev', session.rev);
     if (session.hs) body.set('__hs', session.hs);
     body.set('fb_dtsg', session.dtsg || session.fb_dtsg);
@@ -171,19 +220,70 @@ const S = globalThis.GF.fbSessionBg = {
     body.set('variables', JSON.stringify(variables));
     body.set('doc_id', docId);
     body.set('server_timestamps', 'true');
+    globalThis.GF?.fbCometTokens?.applyToSearchParams?.(body, session, this._warmupTokens);
     return body;
   },
 
-  graphqlHeaders(session, friendlyName) {
+  graphqlHeaders(session, friendlyName, referer = 'https://www.facebook.com/') {
     const headers = {
       'Content-Type': 'application/x-www-form-urlencoded',
       'X-ASBD-ID': '129477',
       'X-FB-Friendly-Name': friendlyName,
       Origin: 'https://www.facebook.com',
-      Referer: 'https://www.facebook.com/',
+      Referer: referer,
     };
     if (session.lsd) headers['X-FB-LSD'] = session.lsd;
     return headers;
+  },
+
+  /** Query string upload ảnh — khớp GPP worker (Comet). */
+  buildUploadQueryParams(session) {
+    const apiUser = session.uid || session.personalId;
+    const params = new URLSearchParams();
+    params.set('av', session.actorId || session.uid);
+    params.set('__user', apiUser);
+    params.set('__a', '1');
+    params.set('__comet_req', '15');
+    params.set('__req', (this.reqCounter++).toString(36));
+    params.set('__ccg', 'EXCELLENT');
+    params.set('dpr', '1');
+    if (!this._webSessionId) this._webSessionId = this.freshWebSessionId();
+    params.set('__s', this._webSessionId);
+    if (session.rev) params.set('__rev', session.rev);
+    params.set('fb_dtsg', session.dtsg || session.fb_dtsg);
+    if (session.lsd) params.set('lsd', session.lsd);
+    params.set('jazoest', session.jazoest || '25669');
+    if (session.spin_r) params.set('__spin_r', session.spin_r);
+    if (session.spin_b) params.set('__spin_b', session.spin_b);
+    if (session.spin_t) params.set('__spin_t', session.spin_t);
+    params.set('fb_api_caller_class', 'RelayModern');
+    params.set('server_timestamps', 'true');
+    globalThis.GF?.fbCometTokens?.applyToSearchParams?.(params, session, this._warmupTokens);
+    return params;
+  },
+
+  async warmupGroupContext(url) {
+    if (!url) return null;
+    try {
+      const res = await this.fetchWithRetry(url, {
+        credentials: 'include',
+        redirect: 'follow',
+        headers: {
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          Referer: 'https://www.facebook.com/',
+        },
+      });
+      const html = await res.text();
+      const tokens = globalThis.GF?.fbCometTokens?.parseFromHtml?.(html) || null;
+      this._warmupTokens = tokens;
+      if (tokens?.__hs && this._cache) {
+        this._cache.hs = tokens.__hs;
+      }
+      await new Promise((r) => setTimeout(r, 2500));
+      return tokens;
+    } catch {
+      return null;
+    }
   },
 
   async fetchWithRetry(url, options = {}, retries = 3) {
@@ -207,17 +307,25 @@ const S = globalThis.GF.fbSessionBg = {
     throw new Error('Fetch thất bại sau nhiều lần thử');
   },
 
-  async graphqlRequest(session, friendlyName, docId, variables) {
+  async graphqlRequest(session, friendlyName, docId, variables, opts = {}) {
+    const referer = opts.referer || 'https://www.facebook.com/';
     const body = this.buildGraphqlBody(session, friendlyName, docId, variables);
     const res = await this.fetchWithRetry(GRAPHQL_URL, {
       method: 'POST',
       credentials: 'include',
-      headers: this.graphqlHeaders(session, friendlyName),
+      headers: this.graphqlHeaders(session, friendlyName, referer),
       body,
     });
     const text = await res.text();
     if (!res.ok) throw new Error(`GraphQL HTTP ${res.status}`);
-    const json = this.parseGraphqlJson(text);
-    return { json, text };
+    const chunks = this.parseAllGraphqlJson(text);
+    for (const j of chunks) {
+      for (const gqlErr of j?.errors || []) {
+        if (gqlErr?.severity === 'WARNING') continue;
+        throw new Error(gqlErr?.message || 'GraphQL lỗi');
+      }
+    }
+    const json = this.pickGraphqlPayload(chunks);
+    return { json, text, chunks };
   },
 };
