@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+- **Google Drive**: migrate từ Service Account sang OAuth2 User Authentication (Client ID/Secret + Refresh Token) — fix lỗi `Service Accounts do not have storage quota`. DB: 3 cột mới `google_drive_client_id/secret/refresh_token` thay `google_drive_service_account_json`; route `GET /api/auth/drive` + `/callback` để lấy refresh token qua consent flow. Xem `docs/GOOGLE_DRIVE.md`.
+
+### Fixed
+- **Google Drive OAuth2 migration**: migration `029_app_settings_drive_oauth.sql` (dọn key Service Account cũ) đã được tạo nhưng chưa wire vào `app.js`/`migrationRunner.js` như các migration khác — đã thêm `ensureDriveOAuthMigration()` để tự chạy lúc khởi động.
+
 ### Added
 - **GroupFlow v1.0.136** — Tab **Log → Nhật ký**: ghi lại từng bước đăng + lỗi chi tiết (lưu 400 dòng); overlay Live Activity log đầy đủ hơn; tự mở Nhật ký khi lỗi
 
