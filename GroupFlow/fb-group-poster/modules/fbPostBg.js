@@ -343,7 +343,7 @@ const FP = globalThis.GF.fbPostBg = {
       const errMsg = j?.errorSummary || j?.errorDescription || j?.error?.message || j?.error;
       if (errMsg) throw new Error(String(errMsg));
     } catch (e) {
-      if (e.message && !/JSON|Unexpected/i.test(e.message)) throw e;
+      if (!(e instanceof SyntaxError)) throw e;
     }
     let photoId = text.match(/"photoID":"(\d+)"/)?.[1]
       || text.match(/"photo_id":"(\d+)"/)?.[1];

@@ -12,6 +12,7 @@
 - **GroupFlow v1.0.136** — Tab **Log → Nhật ký**: ghi lại từng bước đăng + lỗi chi tiết (lưu 400 dòng); overlay Live Activity log đầy đủ hơn; tự mở Nhật ký khi lỗi
 
 ### Fixed
+- **GroupFlow v1.0.141** — Bug sweep: session cache dùng chung mọi actor (rủi ro nhầm danh tính Page/cá nhân khi comment); retry 429 trả lỗi chung chung thay vì response thật; cursor đồng bộ comment bị lùi gây gửi lại bài đã comment; `runPostMatrix` dừng giữa chừng không đánh dấu `failed` cho bài chưa đăng; thiếu `await` khi validate comment hàng loạt; provider ảnh đã tắt vẫn được dùng khi xuất ảnh nền; đăng nhập tidien ghi đè `fbUser` thành `undefined`; `uploadPhoto` có thể nuốt lỗi thật. Xem `TODO.md` mục "GroupFlow extension — bug sweep v1.0.141".
 - **GroupFlow v1.0.140** — Fix crash `scrollIntoView` (trigger/editor undefined); đóng dialog cũ khi chuyển nhóm; tìm editor dialog FB chắc hơn
 - **GroupFlow v1.0.139** — Composer dialog đã mở → chèn chữ ngay; không reload feed phía dưới
 - **GroupFlow v1.0.138** — Countdown composer; tidien đồng bộ push + message rõ

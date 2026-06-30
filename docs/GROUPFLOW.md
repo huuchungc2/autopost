@@ -1,5 +1,7 @@
 # GroupFlow — Chrome Extension FB Group
 
+**v1.0.141 — Bug sweep (2026-06-30):** rà soát 4 nhóm module (session/đăng, group/comment, UI/composer, storage/AI/sync) bằng agent độc lập, xác minh tay từng phát hiện trước khi sửa. Đã sửa: session cache không phân biệt actor (rủi ro comment/đăng nhầm danh tính Page ↔ cá nhân — `fbSessionBg.js` giờ cache theo key actor), retry 429 trả lỗi chung chung thay vì response thật, cursor đồng bộ comment bị lùi khi bài đã comment bị xoá khỏi danh sách pending (gây gửi lại bài cũ → có thể comment trùng — thêm `tidienSyncMeta.maxSeenPostId` làm mốc không giảm), `runPostMatrix` dừng giữa chừng (rate-limit) không đánh dấu `failed` cho các bài chưa kịp đăng, thiếu `await` khi validate comment hàng loạt (`collectSelectedCommentJobs`), provider ảnh đã tắt (`is_active:false`) vẫn được dùng khi tự xuất ảnh nền, đăng nhập tidien thiếu `fb_user_id` ghi đè `fbUser` đã lưu thành `undefined`, `uploadPhoto` có thể nuốt lỗi upload thật nếu message chứa từ "Unexpected"/"JSON". Chi tiết: `TODO.md` mục tương ứng. **Known issue chưa sửa** (rủi ro thấp, cần test trên FB thật): race điều kiện đọc-sửa-ghi `chrome.storage.local` trong `groupSets.js`/`groupMetaStore.js` khi nhiều thao tác chạy đồng thời.
+
 ## Tóm tắt
 
 **GroupFlow**: extension local đăng FB Group + **website tidien.xyz** xem/import draft + sync metadata. **Không** dùng job/cron fanpage (`posts` table).

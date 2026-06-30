@@ -23,14 +23,15 @@ GF.tidienAuth = {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Đăng nhập thất bại');
-    await GF.storage.set({
+    const patch = {
       tidienToken: data.token,
       tidienApiKey: data.api_key,
       tidienUser: data.user,
-      fbUser: data.fb_user_id
-        ? { id: data.fb_user_id, name: data.fb_user_name || data.user?.name }
-        : undefined,
-    });
+    };
+    if (data.fb_user_id) {
+      patch.fbUser = { id: data.fb_user_id, name: data.fb_user_name || data.user?.name };
+    }
+    await GF.storage.set(patch);
     return data;
   },
 

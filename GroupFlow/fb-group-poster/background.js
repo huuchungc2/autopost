@@ -1203,16 +1203,22 @@ const GF_BG = {
   },
 
   async applyPostMatrixResults(job, postResults, postGroupResults) {
-    if (!job?.posts?.length || !postResults?.size) return null;
+    if (!job?.posts?.length) return null;
     const d = await chrome.storage.local.get('postQueue');
     const queue = d.postQueue || [];
     const now = new Date().toISOString();
     let changed = false;
     for (const post of job.posts) {
-      const stats = postResults.get(post.id);
-      if (!stats) continue;
       const p = queue.find((x) => x.id === post.id);
       if (!p) continue;
+      const stats = postResults?.get(post.id);
+      if (!stats) {
+        if (this.stopRequested && !['posted', 'pending_approval', 'partial'].includes(p.postStatus)) {
+          p.postStatus = 'failed';
+          changed = true;
+        }
+        continue;
+      }
       p.lastPostedAt = now;
       p.lastPostStats = { ok: stats.ok, fail: stats.fail, pending: stats.pending, total: stats.total };
       const details = postGroupResults?.get(post.id);
@@ -2114,8 +2120,10 @@ const GF_BG = {
   },
 
   buildSyncPayload(cfg) {
+    const localMax = this.maxLocalId(cfg.tidienPendingComments);
+    const seenMax = Number(cfg.tidienSyncMeta?.maxSeenPostId) || 0;
     return {
-      last_post_id: this.maxLocalId(cfg.tidienPendingComments),
+      last_post_id: Math.max(localMax, seenMax),
       last_draft_id: this.maxLocalDraftId(cfg.postQueue),
     };
   },
@@ -2145,7 +2153,7 @@ const GF_BG = {
     let rounds = 0;
 
     for (let i = 0; i < maxRounds; i += 1) {
-      const cfg = await chrome.storage.local.get(['tidienPendingComments', 'postQueue']);
+      const cfg = await chrome.storage.local.get(['tidienPendingComments', 'postQueue', 'tidienSyncMeta']);
       const payload = this.buildSyncPayload(cfg);
 
       const status = await this.tidienPostJson(auth, '/api/group-posts/sync/status', payload, headers);
@@ -2161,10 +2169,16 @@ const GF_BG = {
 
       if (isPosts) {
         const merged = this.mergeCommentsIncremental(cfg.tidienPendingComments, rows);
+        const incomingMax = this.maxLocalId(rows);
+        const prevSeen = Number(cfg.tidienSyncMeta?.maxSeenPostId) || 0;
+        const nextMeta = { ...(cfg.tidienSyncMeta || {}), maxSeenPostId: Math.max(prevSeen, incomingMax) };
         await chrome.storage.local.set({
           tidienPendingComments: merged,
           tidienCommentsSyncedAt: Date.now(),
+          tidienSyncMeta: nextMeta,
         });
+        cfg.tidienSyncMeta = nextMeta;
+        cfg.tidienPendingComments = merged;
       } else {
         await this.mergeDraftsIntoQueue(rows);
       }

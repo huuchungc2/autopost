@@ -53,7 +53,8 @@ const PM = globalThis.GF.postMedia = {
 
   async resolveLocalImageProvider() {
     const d = await chrome.storage.local.get(['localProviders', 'activeImageLocalProviderId']);
-    return (d.localProviders || []).find((p) => String(p.id) === String(d.activeImageLocalProviderId)) || null;
+    const provider = (d.localProviders || []).find((p) => String(p.id) === String(d.activeImageLocalProviderId)) || null;
+    return provider?.is_active !== false ? provider : null;
   },
 
   async generateImage(prompt, settings) {

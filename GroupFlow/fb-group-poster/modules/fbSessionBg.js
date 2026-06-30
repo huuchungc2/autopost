@@ -4,8 +4,8 @@
 const GRAPHQL_URL = 'https://www.facebook.com/api/graphql/';
 
 const S = globalThis.GF.fbSessionBg = {
-  _cache: null,
-  _cacheAt: 0,
+  _cacheByActor: new Map(),
+  _lastCacheKey: null,
   _webSessionId: null,
   CACHE_MS: 5 * 60 * 1000,
   reqCounter: 1,
@@ -143,10 +143,10 @@ const S = globalThis.GF.fbSessionBg = {
   },
 
   async resolveSession({ force = false, actorId: preferredActorId, groupId } = {}) {
-    if (!force && this._cache && Date.now() - this._cacheAt < this.CACHE_MS) {
-      const s = { ...this._cache };
-      if (preferredActorId) s.actorId = String(preferredActorId);
-      return s;
+    const cacheKey = preferredActorId ? String(preferredActorId) : '__default__';
+    const cached = this._cacheByActor.get(cacheKey);
+    if (!force && cached && Date.now() - cached.at < this.CACHE_MS) {
+      return { ...cached.session };
     }
     if (!(await this.hasFbLogin())) {
       throw new Error('Chưa đăng nhập Facebook trên Chrome');
@@ -185,14 +185,14 @@ const S = globalThis.GF.fbSessionBg = {
       userId: String(actorId),
       fb_dtsg: parsed.dtsg,
     };
-    this._cache = { ...session };
-    this._cacheAt = Date.now();
+    this._cacheByActor.set(cacheKey, { session: { ...session }, at: Date.now() });
+    this._lastCacheKey = cacheKey;
     return session;
   },
 
   invalidateCache() {
-    this._cache = null;
-    this._cacheAt = 0;
+    this._cacheByActor.clear();
+    this._lastCacheKey = null;
   },
 
   buildGraphqlBody(session, friendlyName, docId, variables) {
@@ -291,6 +291,7 @@ const S = globalThis.GF.fbSessionBg = {
       try {
         const res = await fetch(url, options);
         if (res.status === 429) {
+          if (i === retries - 1) return res;
           await new Promise((r) => setTimeout(r, 15000 + i * 5000));
           continue;
         }

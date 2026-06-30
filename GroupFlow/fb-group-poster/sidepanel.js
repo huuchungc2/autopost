@@ -3491,7 +3491,7 @@ async function confirmNightAction() {
 }
 
 async function runAllComments() {
-  const jobs = collectSelectedCommentJobs();
+  const jobs = await collectSelectedCommentJobs();
   if (!jobs) return;
   if (!(await confirmNightAction())) return;
   const settings = await GF.storage.getSettings();
@@ -3514,7 +3514,7 @@ async function runAllComments() {
 }
 
 async function scheduleSelectedComments() {
-  const jobs = collectSelectedCommentJobs();
+  const jobs = await collectSelectedCommentJobs();
   if (!jobs) return;
   const input = $('#commentScheduleStart')?.value;
   if (!input) return alert('Chọn ngày giờ bắt đầu ở trên');
