@@ -391,3 +391,12 @@ export async function ensureGroupPostSyncDeviceId() {
     await runMigrationFile('028_group_sync_device_id.sql', 'Migration 028 applied: sync device_id');
   }
 }
+
+export async function ensureDriveOAuthMigration() {
+  if (!(await tableExists('app_settings'))) return;
+  const rows = await query(
+    "SELECT 1 FROM app_settings WHERE setting_key = 'google_drive_service_account_json' LIMIT 1"
+  );
+  if (rows.length === 0) return;
+  await runMigrationFile('029_app_settings_drive_oauth.sql', 'Migration 029 applied: Drive OAuth2 migration (service account key removed)');
+}
