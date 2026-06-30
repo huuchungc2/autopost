@@ -10,7 +10,7 @@ export const TEMPLATE_COLUMNS = [
   'gio_dang',
 ];
 
-const HEADER_ALIASES = {
+export const HEADER_ALIASES = {
   noi_dung: ['noi_dung', 'content', 'noi_dung_bai', 'caption', 'noi_dung'],
   prompt_anh: ['prompt_anh', 'prompt', 'image_prompt'],
   ngay_dang: ['ngay_dang', 'scheduled_date', 'ngay', 'noi_dang'],
@@ -55,7 +55,7 @@ function parseCsvLine(line) {
   return cells.map((c) => c.trim());
 }
 
-export function parseCsvText(text) {
+export function parseCsvText(text, { headerAliases = HEADER_ALIASES } = {}) {
   const raw = String(text || '').replace(/^\uFEFF/, '');
   const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const dataLines = lines.filter((l) => !l.startsWith('#'));
@@ -67,7 +67,7 @@ export function parseCsvText(text) {
   const headerCells = parseCsvLine(dataLines[0]).map(normalizeHeader);
   const fieldIndex = {};
 
-  for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+  for (const [field, aliases] of Object.entries(headerAliases)) {
     const idx = headerCells.findIndex((h) => aliases.includes(h));
     if (idx >= 0) fieldIndex[field] = idx;
   }
@@ -146,7 +146,7 @@ function readSheetRow(sheet, rowIndex, colCount) {
   return cells;
 }
 
-export function parseExcelBuffer(buffer) {
+export function parseExcelBuffer(buffer, options = {}) {
   const workbook = XLSX.read(buffer, { type: 'buffer' });
   const sheet = workbook.Sheets.Import || workbook.Sheets[workbook.SheetNames[0]];
   if (!sheet) return { rows: [] };
@@ -158,21 +158,21 @@ export function parseExcelBuffer(buffer) {
   for (let r = range.s.r; r <= range.e.r; r += 1) {
     data.push(readSheetRow(sheet, r, range.e.c + 1));
   }
-  return parseSheetRows(data);
+  return parseSheetRows(data, options);
 }
 
-function parseSheetRows(data) {
+function parseSheetRows(data, { headerAliases = HEADER_ALIASES, requiredField = 'noi_dung' } = {}) {
   let headerRowIndex = -1;
   let fieldIndex = {};
 
   for (let i = 0; i < data.length; i += 1) {
     const headerCells = data[i].map((cell) => normalizeHeader(cell));
     const index = {};
-    for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+    for (const [field, aliases] of Object.entries(headerAliases)) {
       const idx = headerCells.findIndex((h) => aliases.includes(h));
       if (idx >= 0) index[field] = idx;
     }
-    if (index.noi_dung != null) {
+    if (index[requiredField] != null) {
       headerRowIndex = i;
       fieldIndex = index;
       break;

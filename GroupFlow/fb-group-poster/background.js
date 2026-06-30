@@ -1663,17 +1663,9 @@ const GF_BG = {
               } catch { /* ignore */ }
             }
 
+            let tidienPushRes = null;
             if (res.postId && res.postId !== 'pending' && job.sync) {
-              const pushRes = await this.pushPostToTidien({ group, post, text, res, fbUser });
-              if (pushRes.ok && postedOk) {
-                const entry = postGroupResults.get(post.id)?.find(
-                  (x) => String(x.group_id) === String(group.id),
-                );
-                if (entry) {
-                  entry.tidienSynced = true;
-                  entry.tidienSyncedAt = new Date().toISOString();
-                }
-              }
+              tidienPushRes = await this.pushPostToTidien({ group, post, text, res, fbUser });
             }
 
             await this.appendHistory({
@@ -1690,6 +1682,10 @@ const GF_BG = {
             });
 
             if (postedOk) {
+              // tidienSynced phải nằm trong object lúc tạo entry — entry chưa tồn tại trước
+              // pushPostedGroupResult() nên không thể tìm-rồi-sửa (bug cũ: luôn no-op vì entry
+              // chưa được tạo, khiến bài đẩy tidien thành công nhưng cờ tidienSynced không lưu
+              // lại, gây đẩy lặp lần sau "Đồng bộ").
               this.pushPostedGroupResult(postGroupResults, post.id, {
                 group_id: String(group.id),
                 group_name: group.name,
@@ -1698,6 +1694,8 @@ const GF_BG = {
                 status: res.status || (res.postId === 'pending' ? 'pending_approval' : 'posted'),
                 posted_at: new Date().toISOString(),
                 firstCommentOk: null,
+                tidienSynced: Boolean(tidienPushRes?.ok),
+                tidienSyncedAt: tidienPushRes?.ok ? new Date().toISOString() : null,
               });
             }
 

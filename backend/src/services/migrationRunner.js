@@ -397,6 +397,11 @@ export async function ensurePostsPlatformPostType() {
   await runMigrationFile('030_posts_platform_post_type.sql', 'Migration 030 applied: posts.platform/post_type/seo_meta');
 }
 
+export async function ensureWebsitesTable() {
+  if (await tableExists('websites')) return;
+  await runMigrationFile('031_websites_table.sql', 'Migration 031 applied: websites table, posts.website_id/website_post_id/website_post_url/website_published_at');
+}
+
 export async function ensureDriveOAuthMigration() {
   if (!(await tableExists('app_settings'))) return;
   const rows = await query(

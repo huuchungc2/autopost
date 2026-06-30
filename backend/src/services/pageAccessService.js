@@ -44,6 +44,9 @@ export async function assertPostAccess(user, postId) {
     error.status = 404;
     throw error;
   }
+  // Bài platform='website' gắn website_id, không page_id — chưa có user_websites
+  // để phân quyền theo từng website, nên cho phép mọi user đăng nhập truy cập.
+  if (post.platform === 'website') return post;
   await assertPageAccess(user, post.page_id);
   return post;
 }

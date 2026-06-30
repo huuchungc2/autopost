@@ -5,11 +5,13 @@ import { query } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { generatePostWithMedia } from '../services/contentGenerationService.js';
 import { generateWebsiteBlog } from '../services/projectContentService.js';
+import { publishPostToWebsite } from '../services/websitePublishService.js';
 import { getPageGenerationConfig } from '../services/providerService.js';
 import { publishToFacebookWithFallback } from '../services/facebookPublishService.js';
 import { persistFacebookPublishIds } from '../services/postPublishService.js';
 import { ensurePostImageForPublish } from '../services/postImageService.js';
 import { runImageJobForPostId } from '../services/imageGenerateJobService.js';
+import { runWebsiteImageJobForPostId } from '../services/websiteImageJobService.js';
 import { createNotification } from '../services/notifyService.js';
 import {
   getAccessiblePageIds,
@@ -25,6 +27,12 @@ import {
   buildAutoScheduleSlots,
   MAX_IMPORT_ROWS,
 } from '../services/postImportExportService.js';
+import {
+  WEBSITE_HEADER_ALIASES,
+  WEBSITE_REQUIRED_FIELD,
+  buildWebsiteImportTemplateXlsx,
+  normalizeWebsiteImportRows,
+} from '../services/websiteImportExportService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { isScheduledInFuture } from '../utils/scheduleTime.js';
 import { normalizeImportContent } from '../utils/importTextNormalize.js';
@@ -64,6 +72,7 @@ const importUpload = multer({
 router.get('/', asyncHandler(async (req, res) => {
   const {
     page: pageFilter,
+    website_id: websiteFilter,
     status,
     media_type,
     date,
@@ -75,14 +84,25 @@ router.get('/', asyncHandler(async (req, res) => {
     offset: offsetRaw,
   } = req.query;
 
-  const accessibleIds = await getAccessiblePageIds(req.user);
   const conditions = [];
   const params = [];
 
-  const accessFilter = pageIdInClause(accessibleIds, 'posts.page_id');
-  if (accessFilter.clause) {
-    conditions.push(accessFilter.clause.replace(/^ AND /, ''));
-    params.push(...accessFilter.params);
+  // Website posts không có page_id (gắn website_id riêng, không qua user_pages) — bỏ filter
+  // theo quyền fanpage cho các bài này; mọi user đăng nhập đều thấy được (chưa có user_websites).
+  if (platform === 'website') {
+    // không filter theo fanpage
+  } else {
+    const accessibleIds = await getAccessiblePageIds(req.user);
+    const accessFilter = pageIdInClause(accessibleIds, 'posts.page_id');
+    if (accessFilter.clause) {
+      const fanpageAccessClause = accessFilter.clause.replace(/^ AND /, '');
+      conditions.push(
+        platform === 'all'
+          ? `(posts.platform = 'website' OR (${fanpageAccessClause}))`
+          : fanpageAccessClause
+      );
+      params.push(...accessFilter.params);
+    }
   }
 
   if (pageFilter) {
@@ -90,6 +110,7 @@ router.get('/', asyncHandler(async (req, res) => {
     conditions.push('posts.page_id = ?');
     params.push(pageFilter);
   }
+  if (websiteFilter) { conditions.push('posts.website_id = ?'); params.push(websiteFilter); }
   if (status) { conditions.push('posts.status = ?'); params.push(status); }
   if (media_type) { conditions.push('posts.media_type = ?'); params.push(media_type); }
   if (date) { conditions.push('DATE(posts.scheduled_at) = ?'); params.push(date); }
@@ -110,7 +131,9 @@ router.get('/', asyncHandler(async (req, res) => {
     : (pageNum - 1) * limit;
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-  const fromClause = 'FROM posts JOIN fb_pages ON fb_pages.id = posts.page_id';
+  const fromClause = `FROM posts
+    LEFT JOIN fb_pages ON fb_pages.id = posts.page_id
+    LEFT JOIN websites ON websites.id = posts.website_id`;
   const orderClause = `ORDER BY ${sortCol} IS NULL, ${sortCol} ${sortDir}, posts.id DESC`;
 
   const [countRow] = await query(
@@ -118,7 +141,7 @@ router.get('/', asyncHandler(async (req, res) => {
     params
   );
   const posts = await query(
-    `SELECT posts.*, fb_pages.name AS page_name ${fromClause} ${where} ${orderClause} LIMIT ? OFFSET ?`,
+    `SELECT posts.*, fb_pages.name AS page_name, websites.name AS website_name ${fromClause} ${where} ${orderClause} LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );
 
@@ -428,10 +451,95 @@ router.post('/import', importUpload.single('file'), asyncHandler(async (req, res
   });
 }));
 
+router.get('/import-website-blog/template', asyncHandler(async (req, res) => {
+  const xlsx = buildWebsiteImportTemplateXlsx();
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="mau-import-website-blog.xlsx"');
+  res.send(xlsx);
+}));
+
+router.post('/import-website-blog', importUpload.single('file'), asyncHandler(async (req, res) => {
+  const { website_id, csv, rows: rawRows, excel_base64 } = req.body;
+  const { autoGenerateImages, saveImageLocal } = parseImportOptions(req.body);
+
+  if (!website_id) {
+    return res.status(400).json({ error: 'website_id là bắt buộc — chọn website trước khi import' });
+  }
+
+  let parsedRows = [];
+  const parseOptions = { headerAliases: WEBSITE_HEADER_ALIASES, requiredField: WEBSITE_REQUIRED_FIELD };
+  if (req.file?.buffer) {
+    const parsed = parseExcelBuffer(req.file.buffer, parseOptions);
+    parsedRows = parsed.rows;
+  } else if (Array.isArray(rawRows) && rawRows.length) {
+    parsedRows = rawRows.map((row, i) => ({ ...row, _line: row._line || i + 2 }));
+  } else if (excel_base64 && String(excel_base64).trim()) {
+    const buffer = Buffer.from(String(excel_base64), 'base64');
+    const parsed = parseExcelBuffer(buffer, parseOptions);
+    parsedRows = parsed.rows;
+  } else if (csv && String(csv).trim()) {
+    const parsed = parseCsvText(csv, parseOptions);
+    parsedRows = parsed.rows;
+  } else {
+    return res.status(400).json({ error: 'Cần upload file Excel, rows (mảng), excel_base64 hoặc csv' });
+  }
+
+  if (parsedRows.length > MAX_IMPORT_ROWS) {
+    return res.status(400).json({ error: `Tối đa ${MAX_IMPORT_ROWS} dòng mỗi lần import` });
+  }
+  if (!parsedRows.length) {
+    return res.status(400).json({ error: 'File không có dòng dữ liệu hợp lệ (sheet Import, cần cột noi_dung)' });
+  }
+
+  const { rows, errors } = normalizeWebsiteImportRows(parsedRows, website_id);
+  if (!rows.length) {
+    return res.status(400).json({ error: 'Không có dòng hợp lệ để import', errors });
+  }
+
+  const created = [];
+  for (const row of rows) {
+    const autoGenerateImage = autoGenerateImages && Boolean(String(row.image_prompt || '').trim());
+    const imageJobStatus = autoGenerateImage ? 'pending' : null;
+    const result = await query(
+      `INSERT INTO posts (website_id, platform, content, image_prompt, auto_generate_image, image_job_status, save_image_local, media_type, status, seo_meta, created_by_type, created_by, created_at)
+       VALUES (?, 'website', ?, ?, ?, ?, ?, ?, 'draft', ?, 'manual', ?, NOW())`,
+      [
+        row.website_id,
+        row.content,
+        row.image_prompt,
+        autoGenerateImage,
+        imageJobStatus,
+        autoGenerateImage ? saveImageLocal : true,
+        row.image_prompt ? 'image' : 'none',
+        JSON.stringify(row.seo_meta),
+        req.user.id,
+      ]
+    );
+    created.push({
+      id: result.insertId,
+      line: row.line,
+      website_id: row.website_id,
+      auto_generate_image: autoGenerateImage,
+    });
+  }
+
+  res.status(201).json({
+    created_count: created.length,
+    auto_generate_image_count: created.filter((c) => c.auto_generate_image).length,
+    post_ids: created.map((c) => c.id),
+    errors,
+    posts: created,
+  });
+}));
+
 router.get('/:id', asyncHandler(async (req, res) => {
   await assertPostAccess(req.user, req.params.id);
   const posts = await query(
-    'SELECT posts.*, fb_pages.name AS page_name FROM posts JOIN fb_pages ON fb_pages.id = posts.page_id WHERE posts.id = ?',
+    `SELECT posts.*, fb_pages.name AS page_name, websites.name AS website_name
+     FROM posts
+     LEFT JOIN fb_pages ON fb_pages.id = posts.page_id
+     LEFT JOIN websites ON websites.id = posts.website_id
+     WHERE posts.id = ?`,
     [req.params.id]
   );
   res.json(posts[0]);
@@ -496,17 +604,16 @@ router.post('/generate', asyncHandler(async (req, res) => {
 }));
 
 router.post('/generate-website-blog', asyncHandler(async (req, res) => {
-  const { page_id, topic, research_brief } = req.body;
-  if (!page_id || !topic) return res.status(400).json({ error: 'page_id and topic are required' });
-  await assertPageAccess(req.user, page_id);
+  const { website_id, topic, research_brief } = req.body;
+  if (!website_id || !topic) return res.status(400).json({ error: 'website_id and topic are required' });
 
-  const generated = await generateWebsiteBlog({ pageId: page_id, topic, researchBrief: research_brief || '' });
+  const generated = await generateWebsiteBlog({ websiteId: website_id, topic, researchBrief: research_brief || '' });
 
   const result = await query(
-    `INSERT INTO posts (page_id, platform, topic, content, image_url, image_prompt, media_type, status, seo_meta, created_by_type, created_by, created_at)
+    `INSERT INTO posts (website_id, platform, topic, content, image_url, image_prompt, media_type, status, seo_meta, created_by_type, created_by, created_at)
      VALUES (?, 'website', ?, ?, ?, ?, ?, 'draft', ?, 'manual', ?, NOW())`,
     [
-      page_id,
+      website_id,
       topic,
       generated.content,
       generated.image_url,
@@ -519,7 +626,7 @@ router.post('/generate-website-blog', asyncHandler(async (req, res) => {
 
   res.status(201).json({
     id: result.insertId,
-    page_id,
+    website_id,
     topic,
     content: generated.content,
     image_url: generated.image_url,
@@ -528,6 +635,14 @@ router.post('/generate-website-blog', asyncHandler(async (req, res) => {
     missing_project_fields: generated.missingProjectFields,
     parse_failed: generated.parseFailed,
   });
+}));
+
+router.post('/:id/publish-website', asyncHandler(async (req, res) => {
+  const post = (await query('SELECT id, platform FROM posts WHERE id = ?', [req.params.id]))[0];
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+
+  const result = await publishPostToWebsite(req.params.id);
+  res.json(result);
 }));
 
 router.post('/generate-video', asyncHandler(async (req, res) => {
@@ -772,6 +887,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
     media_type,
     scheduled_at,
     status,
+    seo_meta: seoMetaInput,
   } = req.body;
 
   if (!content?.trim()) {
@@ -848,9 +964,20 @@ router.put('/:id', asyncHandler(async (req, res) => {
       : 'draft';
   }
 
+  let finalSeoMeta = post.seo_meta;
+  if (seoMetaInput !== undefined) {
+    let existingSeoMeta = {};
+    try {
+      existingSeoMeta = typeof post.seo_meta === 'string' ? JSON.parse(post.seo_meta) : (post.seo_meta || {});
+    } catch {
+      existingSeoMeta = {};
+    }
+    finalSeoMeta = JSON.stringify({ ...existingSeoMeta, ...seoMetaInput });
+  }
+
   await query(
     `UPDATE posts SET page_id = ?, topic = ?, content = ?, image_url = ?, image_prompt = ?, auto_generate_image = ?, save_image_local = ?, video_prompt = ?,
-     video_url = ?, video_thumb_url = ?, media_type = ?, scheduled_at = ?, status = ? WHERE id = ?`,
+     video_url = ?, video_thumb_url = ?, media_type = ?, scheduled_at = ?, status = ?, seo_meta = ? WHERE id = ?`,
     [
       targetPageId,
       finalTopic,
@@ -865,10 +992,31 @@ router.put('/:id', asyncHandler(async (req, res) => {
       resolvedMediaType,
       finalScheduledAt,
       resolvedStatus,
+      finalSeoMeta,
       req.params.id,
     ]
   );
   res.json({ message: 'Post updated' });
+}));
+
+router.post('/:id/generate-website-image', asyncHandler(async (req, res) => {
+  await assertPostAccess(req.user, req.params.id);
+
+  if (req.body?.prompt) {
+    await query(
+      `UPDATE posts SET image_prompt = ? WHERE id = ? AND platform = 'website'`,
+      [String(req.body.prompt).trim(), req.params.id]
+    );
+  }
+
+  const result = await runWebsiteImageJobForPostId(req.params.id);
+  if (result.skipped && result.post?.image_url) {
+    return res.json({ message: 'Bài đã có ảnh', image_url: result.post.image_url });
+  }
+  if (result.error) {
+    return res.status(502).json({ error: result.error });
+  }
+  res.json({ message: 'Đã generate ảnh', image_url: result.post?.image_url });
 }));
 
 router.post('/:id/generate-image', asyncHandler(async (req, res) => {

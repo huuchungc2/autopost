@@ -39,3 +39,11 @@ export function canManageSkills(req, res, next) {
   }
   next();
 }
+
+/** Admin + super_admin — website (blog publish target) management */
+export function canManageWebsites(req, res, next) {
+  if (!['super_admin', 'admin'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  next();
+}

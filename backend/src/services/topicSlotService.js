@@ -74,8 +74,8 @@ export async function generateAndPublishTopic(topic) {
   });
 
   const inserted = await query(
-    `INSERT INTO posts (page_id, topic, content, image_url, image_prompt, auto_generate_image, image_job_status, save_image_local, video_prompt, media_type, status, created_by_type, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 'auto', NOW())`,
+    `INSERT INTO posts (page_id, topic, content, image_url, image_prompt, auto_generate_image, image_job_status, save_image_local, video_prompt, media_type, post_type, status, created_by_type, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 'auto', NOW())`,
     [
       topic.page_id,
       topic.topic,
@@ -87,6 +87,7 @@ export async function generateAndPublishTopic(topic) {
       generated.save_image_local,
       generated.video_prompt,
       generated.media_type,
+      generated.post_type || null,
     ]
   );
 

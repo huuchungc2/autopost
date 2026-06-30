@@ -35,8 +35,8 @@ export async function processJob(job, cachedConfig = null) {
     const postStatus = scheduledAt ? 'scheduled' : 'pending_approval';
 
     const inserted = await query(
-      `INSERT INTO posts (page_id, topic, content, image_url, image_prompt, auto_generate_image, image_job_status, save_image_local, video_prompt, media_type, status, scheduled_at, created_by_type, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'auto', NOW())`,
+      `INSERT INTO posts (page_id, topic, content, image_url, image_prompt, auto_generate_image, image_job_status, save_image_local, video_prompt, media_type, post_type, status, scheduled_at, created_by_type, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'auto', NOW())`,
       [
         job.page_id,
         job.topic,
@@ -48,6 +48,7 @@ export async function processJob(job, cachedConfig = null) {
         generated.save_image_local,
         generated.video_prompt,
         generated.media_type,
+        generated.post_type || null,
         postStatus,
         scheduledAt,
       ]

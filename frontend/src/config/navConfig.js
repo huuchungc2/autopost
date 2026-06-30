@@ -4,6 +4,8 @@ import {
   Sparkles,
   Layers,
   Flag,
+  Globe,
+  Newspaper,
   Wand2,
   Cpu,
   Users,
@@ -25,6 +27,7 @@ export const navGroups = [
     label: 'Nội dung',
     items: [
       { to: '/posts', label: 'Bài viết', icon: FileText, roles: ['super_admin', 'admin', 'editor'] },
+      { to: '/website-posts', label: 'Bài Website Blog', icon: Newspaper, roles: ['super_admin', 'admin', 'editor'] },
       { to: '/groups', label: 'Group', icon: UsersRound, roles: ['super_admin', 'admin', 'editor'] },
       { to: '/generate', label: 'Tạo bài', icon: Sparkles, roles: ['super_admin', 'admin', 'editor'] },
       { to: '/batch-generate', label: 'Hàng loạt', icon: Layers, roles: ['super_admin', 'admin', 'editor'] },
@@ -35,6 +38,7 @@ export const navGroups = [
     label: 'Cấu hình',
     items: [
       { to: '/pages', label: 'Fanpage', icon: Flag, roles: ['super_admin', 'admin'] },
+      { to: '/websites', label: 'Website', icon: Globe, roles: ['super_admin', 'admin'] },
       { to: '/skills', label: 'Skill AI', icon: Wand2, roles: ['super_admin', 'admin'] },
       { to: '/providers', label: 'AI Provider', icon: Cpu, roles: ['super_admin', 'admin'] },
     ],
@@ -72,6 +76,7 @@ export function getPageTitle(pathname) {
   if (pathname === '/groups/drafts') return 'Group Drafts';
   if (pathname.startsWith('/groups')) return 'Group';
   if (/^\/posts\/\d+\/edit$/.test(pathname)) return 'Sửa bài viết';
+  if (/^\/website-posts\/\d+\/edit$/.test(pathname)) return 'Sửa bài Website Blog';
   for (const group of navGroups) {
     for (const item of group.items) {
       const matched = item.end ? pathname === item.to : pathname === item.to || pathname.startsWith(`${item.to}/`);

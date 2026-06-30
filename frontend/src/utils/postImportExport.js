@@ -8,6 +8,15 @@ const HEADER_ALIASES = {
   gio_dang: ['gio_dang', 'scheduled_time', 'gio'],
 };
 
+export const WEBSITE_HEADER_ALIASES = {
+  tieu_de: ['tieu_de', 'title', 'tieu_de_bai'],
+  slug: ['slug'],
+  meta_description: ['meta_description', 'meta_desc', 'mo_ta_meta'],
+  tu_khoa_chinh: ['tu_khoa_chinh', 'primary_keyword', 'tu_khoa'],
+  noi_dung: ['noi_dung', 'content', 'noi_dung_bai'],
+  prompt_anh: ['prompt_anh', 'prompt', 'image_prompt'],
+};
+
 function normalizeHeader(cell) {
   return String(cell || '')
     .trim()
@@ -36,14 +45,14 @@ function readSheetRow(sheet, rowIndex, colCount) {
   return cells;
 }
 
-function parseSheetRows(data) {
+function parseSheetRows(data, headerAliases = HEADER_ALIASES) {
   let headerRowIndex = -1;
   let fieldIndex = {};
 
   for (let i = 0; i < data.length; i += 1) {
     const headerCells = data[i].map((cell) => normalizeHeader(cell));
     const index = {};
-    for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+    for (const [field, aliases] of Object.entries(headerAliases)) {
       const idx = headerCells.findIndex((h) => aliases.includes(h));
       if (idx >= 0) index[field] = idx;
     }
@@ -83,7 +92,7 @@ function parseSheetRows(data) {
   return { rows, errors };
 }
 
-export function parseImportExcel(arrayBuffer) {
+export function parseImportExcel(arrayBuffer, headerAliases = HEADER_ALIASES) {
   const workbook = XLSX.read(arrayBuffer, { type: 'array' });
   const sheet = workbook.Sheets.Import || workbook.Sheets[workbook.SheetNames[0]];
   if (!sheet) {
@@ -99,7 +108,7 @@ export function parseImportExcel(arrayBuffer) {
   for (let r = range.s.r; r <= range.e.r; r += 1) {
     data.push(readSheetRow(sheet, r, range.e.c + 1));
   }
-  return parseSheetRows(data);
+  return parseSheetRows(data, headerAliases);
 }
 
 export function downloadBlob(filename, content, mimeType = 'application/octet-stream') {
@@ -116,6 +125,15 @@ export async function downloadImportTemplate(apiClient) {
   const response = await apiClient.get('/posts/import/template', { responseType: 'blob' });
   downloadBlob(
     'mau-import-bai-viet.xlsx',
+    response.data,
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+}
+
+export async function downloadWebsiteImportTemplate(apiClient) {
+  const response = await apiClient.get('/posts/import-website-blog/template', { responseType: 'blob' });
+  downloadBlob(
+    'mau-import-website-blog.xlsx',
     response.data,
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   );

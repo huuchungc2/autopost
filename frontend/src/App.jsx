@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Posts from './pages/Posts';
 import PostEditor from './pages/PostEditor';
 import PostImport from './pages/PostImport';
+import WebsiteImport from './pages/WebsiteImport';
 import GroupPosts from './pages/GroupPosts';
 import GroupDrafts from './pages/GroupDrafts';
 import GroupImport from './pages/GroupImport';
@@ -15,6 +16,10 @@ import BulkSchedule from './pages/BulkSchedule';
 import PageForm from './pages/PageForm';
 import PageTopics from './pages/PageTopics';
 import PageToken from './pages/PageToken';
+import Websites from './pages/Websites';
+import WebsiteForm from './pages/WebsiteForm';
+import WebsiteBlogPosts from './pages/WebsiteBlogPosts';
+import WebsiteBlogPostEditor from './pages/WebsiteBlogPostEditor';
 import Skills from './pages/Skills';
 import Providers from './pages/Providers';
 import UserManagement from './pages/UserManagement';
@@ -36,6 +41,7 @@ function App() {
             <Route path="posts/bulk-schedule" element={<BulkSchedule />} />
             <Route path="posts/new" element={<PostEditor />} />
             <Route path="posts/import" element={<PostImport />} />
+            <Route path="posts/import-website-blog" element={<WebsiteImport />} />
             <Route path="posts/:id/edit" element={<PostEditor />} />
             <Route path="groups" element={<GroupPosts />} />
             <Route path="groups/import" element={<GroupImport />} />
@@ -47,6 +53,11 @@ function App() {
             <Route path="pages/:id/edit" element={<PageForm />} />
             <Route path="pages/:id/topics" element={<PageTopics />} />
             <Route path="pages/:id/token" element={<PageToken />} />
+            <Route path="websites" element={<Websites />} />
+            <Route path="websites/new" element={<WebsiteForm />} />
+            <Route path="websites/:id/edit" element={<WebsiteForm />} />
+            <Route path="website-posts" element={<WebsiteBlogPosts />} />
+            <Route path="website-posts/:id/edit" element={<WebsiteBlogPostEditor />} />
             <Route path="skills" element={<Skills />} />
             <Route path="providers" element={<Providers />} />
             <Route path="users" element={<UserManagement />} />

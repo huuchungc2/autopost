@@ -22,9 +22,13 @@ export default function Generate() {
 
   const [pages, setPages] = useState([]);
 
+  const [websites, setWebsites] = useState([]);
+
   const [tab, setTab] = useState('text');
 
   const [pageId, setPageId] = useState('');
+
+  const [websiteId, setWebsiteId] = useState('');
 
   const [skillId, setSkillId] = useState('');
 
@@ -44,6 +48,8 @@ export default function Generate() {
 
   const [blogResult, setBlogResult] = useState(null);
 
+  const [isPublishingWebsite, setIsPublishingWebsite] = useState(false);
+
   const [isLoading, setIsLoading] = useState(false);
 
   const { showToast } = useToast();
@@ -55,6 +61,12 @@ export default function Generate() {
     api.get('/pages').then((response) => {
 
       setPages(response.data);
+
+    }).catch(console.error);
+
+    api.get('/websites').then((response) => {
+
+      setWebsites(response.data.filter((w) => w.is_active));
 
     }).catch(console.error);
 
@@ -213,8 +225,8 @@ export default function Generate() {
 
 
   const handleGenerateWebsiteBlog = async () => {
-    if (!pageId) {
-      showToast('Chọn fanpage (dùng làm dự án)', 'error');
+    if (!websiteId) {
+      showToast('Chọn website', 'error');
       return;
     }
     if (!topic) {
@@ -224,7 +236,7 @@ export default function Generate() {
     setIsLoading(true);
     try {
       const response = await api.post('/posts/generate-website-blog', {
-        page_id: Number(pageId),
+        website_id: Number(websiteId),
         topic,
         research_brief: researchBrief,
       });
@@ -236,6 +248,20 @@ export default function Generate() {
       showToast(error.response?.data?.error || 'Tạo bài blog thất bại', 'error');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handlePublishWebsite = async () => {
+    if (!blogResult?.id) return;
+    setIsPublishingWebsite(true);
+    try {
+      const response = await api.post(`/posts/${blogResult.id}/publish-website`);
+      setBlogResult((prev) => ({ ...prev, website_post_url: response.data.website_post_url, website_post_id: response.data.website_post_id }));
+      showToast('Đã publish lên website', 'success');
+    } catch (error) {
+      showToast(error.response?.data?.error || 'Publish lên website thất bại', 'error');
+    } finally {
+      setIsPublishingWebsite(false);
     }
   };
 
@@ -344,29 +370,59 @@ export default function Generate() {
 
         <div className="card form-card">
 
-          <label>
+          {tab === 'website' ? (
 
-            Fanpage
+            <label>
 
-            <select value={pageId} onChange={(e) => setPageId(e.target.value)}>
+              Website
 
-              <option value="">— Chọn fanpage —</option>
+              <select value={websiteId} onChange={(e) => setWebsiteId(e.target.value)}>
 
-              {pages.map((page) => (
+                <option value="">— Chọn website —</option>
 
-                <option key={page.id} value={page.id}>{page.name}</option>
+                {websites.map((website) => (
 
-              ))}
+                  <option key={website.id} value={website.id}>{website.name}</option>
 
-            </select>
+                ))}
 
-            {selectedPage && (
+              </select>
 
-              <span className="field-hint">Bài sẽ lưu cho: <strong>{selectedPage.name}</strong></span>
+              {!websites.length && (
 
-            )}
+                <span className="field-hint field-hint--warn">Chưa có website nào — <Link to="/websites">tạo trước</Link></span>
 
-          </label>
+              )}
+
+            </label>
+
+          ) : (
+
+            <label>
+
+              Fanpage
+
+              <select value={pageId} onChange={(e) => setPageId(e.target.value)}>
+
+                <option value="">— Chọn fanpage —</option>
+
+                {pages.map((page) => (
+
+                  <option key={page.id} value={page.id}>{page.name}</option>
+
+                ))}
+
+              </select>
+
+              {selectedPage && (
+
+                <span className="field-hint">Bài sẽ lưu cho: <strong>{selectedPage.name}</strong></span>
+
+              )}
+
+            </label>
+
+          )}
 
 
 
@@ -520,7 +576,7 @@ export default function Generate() {
 
             <>
 
-              <p className="field-hint">Bài blog SEO cho website — dùng chung fanpage làm "dự án" (tên + skill brand voice). Lưu nháp, không tự đăng FB.</p>
+              <p className="field-hint">Bài blog SEO cho website — độc lập với Fanpage Facebook. Lưu nháp, không tự đăng FB.</p>
 
               <label>
 
@@ -538,11 +594,15 @@ export default function Generate() {
 
               </label>
 
-              <Button type="button" onClick={handleGenerateWebsiteBlog} disabled={isLoading || !topic || !pageId}>
+              <Button type="button" onClick={handleGenerateWebsiteBlog} disabled={isLoading || !topic || !websiteId}>
 
                 {isLoading ? 'Đang tạo...' : 'Tạo bài blog'}
 
               </Button>
+
+              <p className="field-hint" style={{ marginTop: 16 }}>
+                Có sẵn nội dung viết tay/AI ngoài (vd ChatGPT)? <Link to={websiteId ? `/posts/import-website-blog?website=${websiteId}` : '/posts/import-website-blog'}>Import Excel hàng loạt →</Link>
+              </p>
 
             </>
 
@@ -602,7 +662,17 @@ export default function Generate() {
 
                 <textarea rows={14} readOnly value={blogResult.content} />
 
-                <Link to={`/posts/${blogResult.id}/edit`} className="btn-link">Mở bài trong trình sửa →</Link>
+                {blogResult.website_post_url ? (
+                  <p className="field-hint">
+                    Đã publish: <a href={blogResult.website_post_url} target="_blank" rel="noreferrer">{blogResult.website_post_url}</a>
+                  </p>
+                ) : (
+                  <Button type="button" variant="secondary" onClick={handlePublishWebsite} disabled={isPublishingWebsite}>
+                    {isPublishingWebsite ? 'Đang publish...' : 'Publish lên website'}
+                  </Button>
+                )}
+
+                <Link to={`/website-posts/${blogResult.id}/edit`} className="btn-link">Mở bài trong trình sửa →</Link>
 
               </div>
 

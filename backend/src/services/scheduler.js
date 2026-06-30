@@ -9,6 +9,7 @@ import { ensurePostImageForPublish } from './postImageService.js';
 import { runDueTopicSlots } from './topicSlotService.js';
 import { claimDueScheduledPosts, recoverStuckPublishingPosts } from './publishClaimService.js';
 import { runNextScheduledImageJob } from './imageGenerateJobService.js';
+import { processPendingWebsiteImageJobs } from './websiteImageJobService.js';
 import { getAssignedPageIds } from './pageAccessService.js';
 import {
   getEnabledPageImageSchedules,
@@ -40,6 +41,7 @@ export function startScheduler() {
   cron.schedule('* * * * *', () => runExclusive(runDueTopicSlots, 'runDueTopicSlots'));
   cron.schedule('* * * * *', () => runExclusive(tickImageSchedule, 'tickImageSchedule'));
   cron.schedule('*/5 * * * *', () => processPendingJobs(5));
+  cron.schedule('*/5 * * * *', () => processPendingWebsiteImageJobs(5).catch((err) => console.error('processPendingWebsiteImageJobs lỗi:', err.message)));
   cron.schedule('0 * * * *', () => runExclusive(checkPageTokens, 'checkPageTokens'));
 
   getEnabledImageSchedules().then((rows) => {
