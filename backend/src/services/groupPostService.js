@@ -74,6 +74,13 @@ export async function updateExtensionFbProfile(userId, { fb_user_id, fb_user_nam
   return { fb_user_id, fb_user_name };
 }
 
+function toMysqlDatetime(val) {
+  if (!val) return null;
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 export async function syncGroupPost(userId, body) {
   const {
     group_id,
@@ -116,7 +123,7 @@ export async function syncGroupPost(userId, body) {
         prompt_anh || null,
         ngay_dang || null,
         gio_dang || null,
-        posted_at || null,
+        toMysqlDatetime(posted_at),
         fbUserId,
         userId,
         group_name || null,
@@ -140,7 +147,7 @@ export async function syncGroupPost(userId, body) {
       prompt_anh || null,
       ngay_dang || null,
       gio_dang || null,
-      posted_at || null,
+      toMysqlDatetime(posted_at),
     ]
   );
 
