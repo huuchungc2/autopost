@@ -7,7 +7,8 @@
 | Doc | Khi nào đọc |
 |-----|-------------|
 | [TOKENS_AND_COMPOSIO.md](./TOKENS_AND_COMPOSIO.md) | Token FB manual + Composio, dual token, kiểm tra hiệu lực, đăng bài |
-| [GOOGLE_DRIVE.md](./GOOGLE_DRIVE.md) | Drive Service Account, folder gốc, folder riêng từng fanpage |
+| [GOOGLE_DRIVE.md](./GOOGLE_DRIVE.md) | Drive OAuth2, folder gốc, folder riêng từng fanpage |
+| [WEBSITE_BLOG.md](./WEBSITE_BLOG.md) | Tạo bài blog SEO website, tỷ lệ nội dung fanpage 70/20/10, getProjectContext |
 | [GROUPFLOW.md](./GROUPFLOW.md) | Chrome extension FB Group, API sync, đăng/comment nền, cài extension |
 | [../GroupFlow/fb-group-poster/README.md](../GroupFlow/fb-group-poster/README.md) | Cài load unpacked, SW, side panel, troubleshooting |
 | [../DEPLOY.md](../DEPLOY.md) | Deploy VPS, PM2, Nginx, migration, smoke test, lỗi production |

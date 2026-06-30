@@ -1,5 +1,28 @@
+import { query } from '../db.js';
 import { generateText } from './aiService.js';
 import { normalizeImportContent } from '../utils/importTextNormalize.js';
+
+const POST_TYPE_DB_TO_LABEL = { gia_tri: 'GIÁ TRỊ', gioi_thieu: 'GIỚI THIỆU', ban_hang: 'BÁN HÀNG' };
+const POST_TYPE_LABEL_TO_DB = { 'GIÁ TRỊ': 'gia_tri', 'GIỚI THIỆU': 'gioi_thieu', 'BÁN HÀNG': 'ban_hang' };
+
+function normalizePostType(value) {
+  if (!value) return null;
+  const upper = String(value).trim().toUpperCase();
+  if (POST_TYPE_LABEL_TO_DB[upper]) return POST_TYPE_LABEL_TO_DB[upper];
+  const lower = String(value).trim().toLowerCase().replace(/\s+/g, '_');
+  return ['gia_tri', 'gioi_thieu', 'ban_hang'].includes(lower) ? lower : null;
+}
+
+/** Tỷ lệ nội dung 70/20/10 (giá trị/giới thiệu/bán hàng) — xem prompts/fanpage-prompt.js. */
+function buildRatioGuide(recentPostTypes) {
+  const labels = (recentPostTypes || []).filter(Boolean).map((t) => POST_TYPE_DB_TO_LABEL[t] || t);
+  return `[TỶ LỆ LOẠI BÀI — Content Mix, nên tuân thủ]
+- 70% bài: GIÁ TRỊ — chia sẻ kinh nghiệm/mẹo/insight, không bán hàng trực tiếp, chỉ nhắc thương hiệu rất nhẹ nếu cần.
+- 20% bài: GIỚI THIỆU — giới thiệu tính năng/dịch vụ cụ thể gắn tình huống thật.
+- 10% bài: BÁN HÀNG — CTA mạnh, có giá/ưu đãi cụ thể.
+5-7 bài gần nhất: ${labels.length ? labels.join(', ') : 'chưa có dữ liệu'}.
+Dựa vào tỷ lệ và các bài gần nhất, tự chọn loại bài phù hợp để cân bằng lại tỷ lệ, ghi vào trường "post_type" trong JSON trả về (giá trị: gia_tri | gioi_thieu | ban_hang).`;
+}
 
 const DEFAULT_TEXT_RULES = `Viết bài Facebook bằng tiếng Việt, hấp dẫn, có emoji phù hợp.`;
 
@@ -24,17 +47,18 @@ export function resolveMediaMode({ mediaType, imageSkills, videoSkills, imagePro
   return 'none';
 }
 
-export function buildJsonFormatInstruction(mediaMode) {
+export function buildJsonFormatInstruction(mediaMode, { includePostType = false } = {}) {
+  const postTypeField = includePostType ? '"post_type":"gia_tri|gioi_thieu|ban_hang",' : '';
   if (mediaMode === 'image') {
     return `Trả về CHỈ một JSON hợp lệ (không markdown, không giải thích), dạng:
-{"content":"nội dung bài Facebook đầy đủ","image_prompt":"mô tả ảnh tiếng Anh khớp bài"}`;
+{${postTypeField}"content":"nội dung bài Facebook đầy đủ","image_prompt":"mô tả ảnh tiếng Anh khớp bài"}`;
   }
   if (mediaMode === 'video') {
     return `Trả về CHỈ một JSON hợp lệ (không markdown, không giải thích), dạng:
-{"content":"nội dung bài Facebook đầy đủ","video_prompt":"mô tả video tiếng Anh khớp bài"}`;
+{${postTypeField}"content":"nội dung bài Facebook đầy đủ","video_prompt":"mô tả video tiếng Anh khớp bài"}`;
   }
   return `Trả về CHỈ một JSON hợp lệ (không markdown, không giải thích), dạng:
-{"content":"nội dung bài Facebook đầy đủ"}`;
+{${postTypeField}"content":"nội dung bài Facebook đầy đủ"}`;
 }
 
 export function buildGenerationSystemPrompt({
@@ -42,6 +66,7 @@ export function buildGenerationSystemPrompt({
   imagePrompt = '',
   videoPrompt = '',
   mediaMode = 'image',
+  recentPostTypes = null,
 }) {
   const parts = [];
 
@@ -57,7 +82,12 @@ export function buildGenerationSystemPrompt({
     parts.push(`[SKILL VIDEO — chỉ dùng cho trường video_prompt]\n${videoPrompt || DEFAULT_VIDEO_RULES}`);
   }
 
-  parts.push(buildJsonFormatInstruction(mediaMode));
+  const includePostType = recentPostTypes !== null;
+  if (includePostType) {
+    parts.push(buildRatioGuide(recentPostTypes));
+  }
+
+  parts.push(buildJsonFormatInstruction(mediaMode, { includePostType }));
   return parts.join('\n\n');
 }
 
@@ -101,6 +131,7 @@ export function parseGenerationResponse(rawText, mediaMode = 'image') {
       content: normalizeImportContent(parsed.content).trim(),
       image_prompt: parsed.image_prompt ? String(parsed.image_prompt).trim() : '',
       video_prompt: parsed.video_prompt ? String(parsed.video_prompt).trim() : '',
+      post_type: normalizePostType(parsed.post_type),
     };
   }
 
@@ -108,6 +139,7 @@ export function parseGenerationResponse(rawText, mediaMode = 'image') {
     content: normalizeImportContent(rawText).trim(),
     image_prompt: '',
     video_prompt: '',
+    post_type: null,
     parseFailed: true,
   };
 }
@@ -139,11 +171,24 @@ export async function generatePostWithMedia({
   mediaMode,
 }) {
   const mode = mediaMode || config.mediaMode || 'image';
+  const pageId = config?.page?.id || null;
+  let recentPostTypes = [];
+  if (pageId) {
+    const rows = await query(
+      `SELECT post_type FROM posts
+       WHERE page_id = ? AND platform = 'fanpage' AND post_type IS NOT NULL
+       ORDER BY created_at DESC LIMIT 7`,
+      [pageId]
+    );
+    recentPostTypes = rows.map((r) => r.post_type);
+  }
+
   const systemPrompt = buildGenerationSystemPrompt({
     textPrompt: config.textSystemPrompt,
     imagePrompt: config.imageSystemPrompt,
     videoPrompt: config.videoSystemPrompt,
     mediaMode: mode,
+    recentPostTypes,
   });
 
   const raw = await generateText(userPrompt, config.textProvider, systemPrompt);
@@ -169,6 +214,7 @@ export async function generatePostWithMedia({
     image_url,
     image_prompt,
     video_prompt,
+    post_type: parsed.post_type,
     media_type: resolvedMediaType,
     parseFailed: parsed.parseFailed || false,
     ...queue,

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **Website Blog content**: tab mới trong Tạo bài — generate bài blog SEO cho website (title/meta/slug/keyword/FAQ/CTA), tách khỏi flow đăng Facebook (`platform='website'`, `status='draft'`, không vào cron publish). Ảnh đầu tiên auto-generate qua đúng cơ chế lưu trữ hiện tại (Drive/local) + convert WebP + tên file theo slug. Nâng cấp generate fanpage hiện tại với tỷ lệ nội dung 70/20/10 (`post_type`, additive — không đổi JSON contract cũ). Xem `docs/WEBSITE_BLOG.md`.
+
 ### Changed
 - **Google Drive**: migrate từ Service Account sang OAuth2 User Authentication (Client ID/Secret + Refresh Token) — fix lỗi `Service Accounts do not have storage quota`. DB: 3 cột mới `google_drive_client_id/secret/refresh_token` thay `google_drive_service_account_json`; route `GET /api/auth/drive` + `/callback` để lấy refresh token qua consent flow. Xem `docs/GOOGLE_DRIVE.md`.
 

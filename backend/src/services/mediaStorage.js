@@ -32,11 +32,21 @@ function ensureImagesDir() {
   fs.mkdirSync(imagesDir, { recursive: true });
 }
 
-function saveImageBufferLocal(buffer, ext = 'png') {
+function saveImageBufferLocal(buffer, ext = 'png', filename = null) {
   ensureImagesDir();
-  const filename = `generated-${Date.now()}.${ext}`;
-  fs.writeFileSync(path.join(imagesDir, filename), buffer);
-  return `/images/${filename}`;
+  const name = filename || `generated-${Date.now()}.${ext}`;
+  fs.writeFileSync(path.join(imagesDir, name), buffer);
+  return `/images/${name}`;
+}
+
+/** Tên file an toàn từ slug — chỉ a-z0-9 và dấu gạch ngang, tránh path traversal. */
+export function sanitizeImageFilename(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9.-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 150);
 }
 
 /**
@@ -48,8 +58,9 @@ export async function storeImageBuffer(buffer, {
   mimeType = 'image/png',
   pageId = null,
   driveFolderId = null,
+  filename: filenameOverride = null,
 } = {}) {
-  const filename = `autopost-${Date.now()}.${ext}`;
+  const filename = filenameOverride ? sanitizeImageFilename(filenameOverride) : `autopost-${Date.now()}.${ext}`;
 
   if (isUsingGoogleDrive()) {
     const folderId = driveFolderId || await getDriveFolderIdForPage(pageId);
@@ -57,7 +68,7 @@ export async function storeImageBuffer(buffer, {
     return `gdrive://${fileId}`;
   }
 
-  return saveImageBufferLocal(buffer, ext);
+  return saveImageBufferLocal(buffer, ext, filenameOverride ? filename : null);
 }
 
 export function parseImageRef(imageUrl) {

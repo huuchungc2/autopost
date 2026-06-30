@@ -392,6 +392,11 @@ export async function ensureGroupPostSyncDeviceId() {
   }
 }
 
+export async function ensurePostsPlatformPostType() {
+  if (await columnExists('posts', 'seo_meta')) return;
+  await runMigrationFile('030_posts_platform_post_type.sql', 'Migration 030 applied: posts.platform/post_type/seo_meta');
+}
+
 export async function ensureDriveOAuthMigration() {
   if (!(await tableExists('app_settings'))) return;
   const rows = await query(

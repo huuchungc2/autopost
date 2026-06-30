@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { query } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { generatePostWithMedia } from '../services/contentGenerationService.js';
+import { generateWebsiteBlog } from '../services/projectContentService.js';
 import { getPageGenerationConfig } from '../services/providerService.js';
 import { publishToFacebookWithFallback } from '../services/facebookPublishService.js';
 import { persistFacebookPublishIds } from '../services/postPublishService.js';
@@ -66,6 +67,7 @@ router.get('/', asyncHandler(async (req, res) => {
     status,
     media_type,
     date,
+    platform = 'fanpage',
     sort = 'scheduled_at',
     order = 'asc',
     limit: limitRaw = 30,
@@ -91,6 +93,7 @@ router.get('/', asyncHandler(async (req, res) => {
   if (status) { conditions.push('posts.status = ?'); params.push(status); }
   if (media_type) { conditions.push('posts.media_type = ?'); params.push(media_type); }
   if (date) { conditions.push('DATE(posts.scheduled_at) = ?'); params.push(date); }
+  if (platform && platform !== 'all') { conditions.push('posts.platform = ?'); params.push(platform); }
 
   const sortColumns = {
     scheduled_at: 'posts.scheduled_at',
@@ -455,10 +458,11 @@ router.post('/generate', asyncHandler(async (req, res) => {
 
   const status = scheduled_at ? 'scheduled' : 'pending_approval';
   const result = await query(
-    `INSERT INTO posts (page_id, topic, content, image_url, image_prompt, auto_generate_image, image_job_status, save_image_local, video_prompt, media_type, status, scheduled_at, created_by_type, created_by, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'auto', ?, NOW())`,
+    `INSERT INTO posts (page_id, platform, post_type, topic, content, image_url, image_prompt, auto_generate_image, image_job_status, save_image_local, video_prompt, media_type, status, scheduled_at, created_by_type, created_by, created_at)
+     VALUES (?, 'fanpage', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'auto', ?, NOW())`,
     [
       page_id,
+      generated.post_type || null,
       topic,
       generated.content,
       generated.image_url,
@@ -482,11 +486,47 @@ router.post('/generate', asyncHandler(async (req, res) => {
     image_url: generated.image_url,
     image_prompt: generated.image_prompt,
     video_prompt: generated.video_prompt,
+    post_type: generated.post_type,
     media_type: generated.media_type,
     auto_generate_image: generated.auto_generate_image,
     image_job_status: generated.image_job_status,
     skill_id: config.activeTextSkill?.id || null,
     skill_name: config.activeTextSkill?.name || null,
+  });
+}));
+
+router.post('/generate-website-blog', asyncHandler(async (req, res) => {
+  const { page_id, topic, research_brief } = req.body;
+  if (!page_id || !topic) return res.status(400).json({ error: 'page_id and topic are required' });
+  await assertPageAccess(req.user, page_id);
+
+  const generated = await generateWebsiteBlog({ pageId: page_id, topic, researchBrief: research_brief || '' });
+
+  const result = await query(
+    `INSERT INTO posts (page_id, platform, topic, content, image_url, image_prompt, media_type, status, seo_meta, created_by_type, created_by, created_at)
+     VALUES (?, 'website', ?, ?, ?, ?, ?, 'draft', ?, 'manual', ?, NOW())`,
+    [
+      page_id,
+      topic,
+      generated.content,
+      generated.image_url,
+      generated.image_prompt,
+      generated.image_url ? 'image' : 'none',
+      JSON.stringify(generated.seoMeta),
+      req.user.id,
+    ]
+  );
+
+  res.status(201).json({
+    id: result.insertId,
+    page_id,
+    topic,
+    content: generated.content,
+    image_url: generated.image_url,
+    image_prompt: generated.image_prompt,
+    seo_meta: generated.seoMeta,
+    missing_project_fields: generated.missingProjectFields,
+    parse_failed: generated.parseFailed,
   });
 }));
 

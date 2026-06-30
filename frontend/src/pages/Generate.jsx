@@ -40,6 +40,10 @@ export default function Generate() {
 
   const [preview, setPreview] = useState(null);
 
+  const [researchBrief, setResearchBrief] = useState('');
+
+  const [blogResult, setBlogResult] = useState(null);
+
   const [isLoading, setIsLoading] = useState(false);
 
   const { showToast } = useToast();
@@ -208,6 +212,33 @@ export default function Generate() {
 
 
 
+  const handleGenerateWebsiteBlog = async () => {
+    if (!pageId) {
+      showToast('Chọn fanpage (dùng làm dự án)', 'error');
+      return;
+    }
+    if (!topic) {
+      showToast('Nhập chủ đề bài blog', 'error');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const response = await api.post('/posts/generate-website-blog', {
+        page_id: Number(pageId),
+        topic,
+        research_brief: researchBrief,
+      });
+      setBlogResult(response.data);
+      showToast(`Đã tạo bài blog #${response.data.id} (nháp)`, 'success');
+      setTopic('');
+      setResearchBrief('');
+    } catch (error) {
+      showToast(error.response?.data?.error || 'Tạo bài blog thất bại', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleGenerateVideo = async () => {
 
     if (!pageId) {
@@ -282,6 +313,8 @@ export default function Generate() {
         <button type="button" className={tab === 'text' ? 'tab active' : 'tab'} onClick={() => setTab('text')}>AI văn bản + media</button>
 
         <button type="button" className={tab === 'video' ? 'tab active' : 'tab'} onClick={() => setTab('video')}>Video upload</button>
+
+        <button type="button" className={tab === 'website' ? 'tab active' : 'tab'} onClick={() => setTab('website')}>Website Blog</button>
 
         <button type="button" className={tab === 'manual' ? 'tab active' : 'tab'} onClick={() => setTab('manual')}>Viết tay</button>
 
@@ -435,7 +468,7 @@ export default function Generate() {
 
 
 
-          {tab === 'text' ? (
+          {tab === 'text' && (
 
             <>
 
@@ -459,7 +492,9 @@ export default function Generate() {
 
             </>
 
-          ) : (
+          )}
+
+          {tab === 'video' && (
 
             <>
 
@@ -481,9 +516,105 @@ export default function Generate() {
 
           )}
 
+          {tab === 'website' && (
+
+            <>
+
+              <p className="field-hint">Bài blog SEO cho website — dùng chung fanpage làm "dự án" (tên + skill brand voice). Lưu nháp, không tự đăng FB.</p>
+
+              <label>
+
+                Chủ đề bài blog
+
+                <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="VD: Kinh nghiệm chọn xe khách Sài Gòn - Tánh Linh" />
+
+              </label>
+
+              <label>
+
+                Research brief (tuỳ chọn)
+
+                <textarea rows={4} value={researchBrief} onChange={(e) => setResearchBrief(e.target.value)} placeholder="Từ khoá, đối thủ, khoảng trống nội dung..." />
+
+              </label>
+
+              <Button type="button" onClick={handleGenerateWebsiteBlog} disabled={isLoading || !topic || !pageId}>
+
+                {isLoading ? 'Đang tạo...' : 'Tạo bài blog'}
+
+              </Button>
+
+            </>
+
+          )}
+
         </div>
 
 
+
+        {tab === 'website' ? (
+
+          <div className="card">
+
+            <h3>Kết quả bài blog</h3>
+
+            {blogResult ? (
+
+              <div className="blog-result">
+
+                <p><strong>Tiêu đề:</strong> {blogResult.seo_meta?.title || '(trống)'}</p>
+
+                <p><strong>Slug:</strong> {blogResult.seo_meta?.slug}</p>
+
+                <p><strong>Meta description:</strong> {blogResult.seo_meta?.meta_description}</p>
+
+                <p><strong>Từ khoá chính:</strong> {blogResult.seo_meta?.primary_keyword}</p>
+
+                {blogResult.image_url && <p><strong>Ảnh đã tạo:</strong> {blogResult.image_url}</p>}
+
+                {blogResult.seo_meta?.image_prompts?.length > 1 && (
+
+                  <div>
+
+                    <strong>Ảnh còn lại cần tạo tay (prompt):</strong>
+
+                    <ul>{blogResult.seo_meta.image_prompts.slice(1).map((p, i) => <li key={i}>{p}</li>)}</ul>
+
+                  </div>
+
+                )}
+
+                {blogResult.missing_project_fields?.length > 0 && (
+
+                  <p className="field-hint field-hint--warn">
+
+                    TODO — thiếu dữ liệu thật: {blogResult.missing_project_fields.join(', ')}. Vào nội dung bài kiểm tra các đoạn [CẦN BỔ SUNG: ...] và điền tay.
+
+                  </p>
+
+                )}
+
+                {blogResult.parse_failed && (
+
+                  <p className="field-hint field-hint--warn">AI không trả đúng format mong đợi — nội dung dưới đây là raw, cần kiểm tra/sửa tay.</p>
+
+                )}
+
+                <textarea rows={14} readOnly value={blogResult.content} />
+
+                <Link to={`/posts/${blogResult.id}/edit`} className="btn-link">Mở bài trong trình sửa →</Link>
+
+              </div>
+
+            ) : (
+
+              <p className="field-hint">Chưa có bài blog nào được tạo trong phiên này.</p>
+
+            )}
+
+          </div>
+
+        ) : (
 
         <div className="card">
 
@@ -500,6 +631,8 @@ export default function Generate() {
           />
 
         </div>
+
+        )}
 
       </div>
 

@@ -2,6 +2,17 @@
 
 > Cập nhật: 2026-06-30
 
+## Website Blog content (2026-06-30)
+
+- [x] `getProjectContext()` khớp DB thật (fb_pages + skill, không có bảng projects) — xem `docs/WEBSITE_BLOG.md`
+- [x] `generateWebsiteBlog()` + nâng cấp generate fanpage (tỷ lệ 70/20/10, additive)
+- [x] Tab "Website Blog" trong UI Tạo bài (React)
+- [x] Migration `030`: `posts.platform`, `posts.post_type`, `posts.seo_meta`
+- [x] Ảnh: đúng cơ chế lưu trữ hiện tại + WebP (sharp) + tên file theo slug
+- [ ] **Cần Tony cung cấp**: dữ liệu kinh doanh thật (giá/USP/hotline/FAQ) — chưa có bảng lưu, hiện để placeholder `[CẦN BỔ SUNG: ...]` trong context AI
+- [ ] Cân nhắc: trang quản lý/danh sách bài blog riêng (hiện chỉ xem ngay sau khi tạo)
+- [ ] Cân nhắc: guard chặn "Đăng ngay" lên Facebook cho bài `platform='website'` trong PostEditor.jsx
+
 ## GroupFlow extension — bug sweep v1.0.141 (2026-06-30)
 
 - [x] Fix session cache dùng chung cho mọi actor (`fbSessionBg.js`) — comment/đăng có thể nhầm danh tính Page ↔ cá nhân khi gọi xen kẽ trong cùng cửa sổ cache 5 phút
