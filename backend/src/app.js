@@ -16,6 +16,7 @@ import uploadRoutes from './routes/upload.js';
 import mediaRoutes from './routes/media.js';
 import settingsRoutes from './routes/settings.js';
 import groupPostsRoutes from './routes/groupPosts.js';
+import driveAuthRoutes from './routes/driveAuth.js';
 import { activityLogger } from './middleware/activityLog.js';
 import { getMediaStorageMode, isUsingGoogleDrive } from './services/mediaStorage.js';
 import {
@@ -67,6 +68,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/group-posts', groupPostsRoutes);
+app.use('/api/auth/drive', driveAuthRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

@@ -1,22 +1,19 @@
 import { google } from 'googleapis';
 import { Readable } from 'stream';
 import {
-  getEffectiveDriveCredentials,
+  getEffectiveDriveOAuth2Config,
   getEffectiveDriveFolderId,
   isDriveConfiguredFromSettings,
 } from './appSettingsService.js';
 
 let driveClient = null;
 
-/** Service account + folder shared cần scope drive (drive.file không đọc được folder đã share). */
-const DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive'];
-
 export function resetDriveClient() {
   driveClient = null;
 }
 
-function getCredentials() {
-  return getEffectiveDriveCredentials();
+function getOAuth2Config() {
+  return getEffectiveDriveOAuth2Config();
 }
 
 function getFolderId() {
@@ -32,11 +29,10 @@ function getDrive() {
     throw new Error('Google Drive chưa cấu hình — vào Cài đặt hoặc xem .env.example');
   }
   if (!driveClient) {
-    const auth = new google.auth.GoogleAuth({
-      credentials: getCredentials(),
-      scopes: DRIVE_SCOPES,
-    });
-    driveClient = google.drive({ version: 'v3', auth });
+    const { clientId, clientSecret, refreshToken } = getOAuth2Config();
+    const oAuth2Client = new google.auth.OAuth2(clientId, clientSecret);
+    oAuth2Client.setCredentials({ refresh_token: refreshToken });
+    driveClient = google.drive({ version: 'v3', auth: oAuth2Client });
   }
   return driveClient;
 }
@@ -92,9 +88,9 @@ export async function downloadDriveFileBuffer(fileId) {
 
 export async function testDriveConnection(overrides = {}) {
   const folderId = overrides.folderId?.trim() || getFolderId();
-  const credentials = overrides.credentials || getCredentials();
-  if (!folderId || !credentials) {
-    const error = new Error('Thiếu Folder ID hoặc Service Account JSON');
+  const oauth2Config = overrides.oauth2Config || getOAuth2Config();
+  if (!folderId || !oauth2Config) {
+    const error = new Error('Thiếu Folder ID hoặc OAuth2 credentials (Client ID, Client Secret, Refresh Token)');
     error.status = 400;
     throw error;
   }
@@ -104,11 +100,10 @@ export async function testDriveConnection(overrides = {}) {
     throw error;
   }
 
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: DRIVE_SCOPES,
-  });
-  const drive = google.drive({ version: 'v3', auth });
+  const { clientId, clientSecret, refreshToken } = oauth2Config;
+  const oAuth2Client = new google.auth.OAuth2(clientId, clientSecret);
+  oAuth2Client.setCredentials({ refresh_token: refreshToken });
+  const drive = google.drive({ version: 'v3', auth: oAuth2Client });
   let folder;
   try {
     folder = await drive.files.get({
@@ -121,8 +116,7 @@ export async function testDriveConnection(overrides = {}) {
     if (msg.includes('File not found') || error?.code === 404) {
       const hint = new Error(
         'Folder không truy cập được — kiểm tra Folder ID (copy từ URL, phân biệt hoa/thường) '
-        + 'và Share folder với client_email trong JSON (quyền Editor). '
-        + 'Nếu folder nằm trong Shared drive, thêm service account vào ổ dùng chung.'
+        + 'và đảm bảo tài khoản Google đã cấp quyền OAuth2 có thể truy cập folder này.'
       );
       hint.status = 400;
       throw hint;

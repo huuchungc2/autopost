@@ -38,7 +38,7 @@ import {
 } from '../services/pageImageSchedule.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { testDriveConnection } from '../services/googleDriveService.js';
-import { getEffectiveDriveCredentials } from '../services/appSettingsService.js';
+import { getEffectiveDriveOAuth2Config } from '../services/appSettingsService.js';
 import { getDriveFolderIdForPage, normalizeDriveFolderId } from '../services/pageDriveService.js';
 
 const router = express.Router();
@@ -558,9 +558,9 @@ router.post('/:id/topics', authenticate, canManagePages, asyncHandler(async (req
 
 router.post('/:id/drive-folder/test', authenticate, canManagePages, asyncHandler(async (req, res) => {
   await assertPageAccess(req.user, req.params.id);
-  const credentials = getEffectiveDriveCredentials();
-  if (!credentials) {
-    return res.status(400).json({ error: 'Chưa cấu hình Service Account — vào Cài đặt → Google Drive' });
+  const oauth2Config = getEffectiveDriveOAuth2Config();
+  if (!oauth2Config) {
+    return res.status(400).json({ error: 'Chưa cấu hình OAuth2 Google Drive — vào Cài đặt → Google Drive' });
   }
 
   const bodyFolderId = req.body?.google_drive_folder_id;
@@ -574,7 +574,7 @@ router.post('/:id/drive-folder/test', authenticate, canManagePages, asyncHandler
     });
   }
 
-  const result = await testDriveConnection({ folderId, credentials });
+  const result = await testDriveConnection({ folderId, oauth2Config });
   res.json({
     message: 'Kết nối folder Drive thành công',
     folder: result,

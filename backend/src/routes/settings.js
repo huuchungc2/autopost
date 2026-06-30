@@ -14,7 +14,7 @@ import {
   saveMediaStorageSettings,
   getComposioSettingsStatus,
   saveComposioSettings,
-  getEffectiveDriveCredentials,
+  getEffectiveDriveOAuth2Config,
   getEffectiveComposioApiKey,
 } from '../services/appSettingsService.js';
 import { testDriveConnection } from '../services/googleDriveService.js';
@@ -127,7 +127,9 @@ router.put('/media-storage', requireRole('super_admin'), asyncHandler(async (req
   const {
     media_storage,
     google_drive_folder_id,
-    google_drive_service_account_json,
+    google_drive_client_id,
+    google_drive_client_secret,
+    google_drive_refresh_token,
   } = req.body || {};
 
   if (media_storage && media_storage !== 'local' && media_storage !== 'google_drive') {
@@ -137,7 +139,9 @@ router.put('/media-storage', requireRole('super_admin'), asyncHandler(async (req
   const updated = await saveMediaStorageSettings({
     media_storage,
     google_drive_folder_id,
-    google_drive_service_account_json,
+    google_drive_client_id,
+    google_drive_client_secret,
+    google_drive_refresh_token,
   });
 
   res.json({
@@ -147,26 +151,32 @@ router.put('/media-storage', requireRole('super_admin'), asyncHandler(async (req
 }));
 
 router.post('/media-storage/test', requireRole('super_admin'), asyncHandler(async (req, res) => {
-  const { google_drive_folder_id, google_drive_service_account_json } = req.body || {};
+  const {
+    google_drive_folder_id,
+    google_drive_client_id,
+    google_drive_client_secret,
+    google_drive_refresh_token,
+  } = req.body || {};
   const status = getMediaStorageStatus();
 
-  let credentials = getEffectiveDriveCredentials();
-  if (google_drive_service_account_json?.trim()) {
-    try {
-      credentials = JSON.parse(google_drive_service_account_json.trim());
-    } catch {
-      return res.status(400).json({ error: 'Service account JSON không hợp lệ' });
-    }
+  const folderId = google_drive_folder_id?.trim() || status.folder_id;
+
+  let oauth2Config = getEffectiveDriveOAuth2Config();
+  if (google_drive_client_id?.trim() && google_drive_client_secret?.trim() && google_drive_refresh_token?.trim()) {
+    oauth2Config = {
+      clientId: google_drive_client_id.trim(),
+      clientSecret: google_drive_client_secret.trim(),
+      refreshToken: google_drive_refresh_token.trim(),
+    };
   }
 
-  const folderId = google_drive_folder_id?.trim() || status.folder_id;
-  if (!credentials || !folderId) {
+  if (!oauth2Config || !folderId) {
     return res.status(400).json({
-      error: 'Cần Folder ID + Service Account JSON (dán JSON hoặc lưu cấu hình trước)',
+      error: 'Cần Folder ID + OAuth2 credentials (Client ID, Client Secret, Refresh Token)',
     });
   }
 
-  const result = await testDriveConnection({ folderId, credentials });
+  const result = await testDriveConnection({ folderId, oauth2Config });
   res.json({
     message: 'Kết nối Google Drive thành công',
     folder: result,

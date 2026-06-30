@@ -4,7 +4,9 @@ import { resetDriveClient } from './googleDriveService.js';
 const KEYS = {
   MEDIA_STORAGE: 'media_storage',
   GOOGLE_DRIVE_FOLDER_ID: 'google_drive_folder_id',
-  GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON: 'google_drive_service_account_json',
+  GOOGLE_DRIVE_CLIENT_ID: 'google_drive_client_id',
+  GOOGLE_DRIVE_CLIENT_SECRET: 'google_drive_client_secret',
+  GOOGLE_DRIVE_REFRESH_TOKEN: 'google_drive_refresh_token',
   COMPOSIO_API_KEY: 'composio_api_key',
   COMPOSIO_FACEBOOK_AUTH_CONFIG_ID: 'composio_facebook_auth_config_id',
   COMPOSIO_DEFAULT_USER_ID: 'composio_default_user_id',
@@ -49,40 +51,30 @@ export function getEffectiveDriveFolderId() {
   return process.env.GOOGLE_DRIVE_FOLDER_ID?.trim() || '';
 }
 
-export function getEffectiveDriveCredentials() {
-  const fromDb = getCachedSetting(KEYS.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON);
-  const raw = fromDb?.trim() || process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON?.trim();
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    console.error('Google Drive service account JSON is not valid');
-    return null;
-  }
+export function getEffectiveDriveOAuth2Config() {
+  const clientId = (getCachedSetting(KEYS.GOOGLE_DRIVE_CLIENT_ID) || '').trim();
+  const clientSecret = (getCachedSetting(KEYS.GOOGLE_DRIVE_CLIENT_SECRET) || '').trim();
+  const refreshToken = (getCachedSetting(KEYS.GOOGLE_DRIVE_REFRESH_TOKEN) || '').trim();
+  if (!clientId || !clientSecret || !refreshToken) return null;
+  return { clientId, clientSecret, refreshToken };
 }
 
 export function isDriveConfiguredFromSettings() {
-  return !!(getEffectiveDriveCredentials() && getEffectiveDriveFolderId());
+  return !!(getEffectiveDriveOAuth2Config() && getEffectiveDriveFolderId());
 }
 
-function maskServiceAccount(json) {
-  if (!json) return null;
-  try {
-    const parsed = typeof json === 'string' ? JSON.parse(json) : json;
-    return {
-      client_email: parsed.client_email || null,
-      project_id: parsed.project_id || null,
-    };
-  } catch {
-    return { client_email: null, project_id: null };
-  }
+function maskClientId(clientId) {
+  if (!clientId?.trim()) return null;
+  const k = clientId.trim();
+  if (k.length <= 20) return k;
+  return `${k.slice(0, 16)}…${k.slice(-8)}`;
 }
 
 export function getMediaStorageStatus() {
-  const credentials = getEffectiveDriveCredentials();
+  const oauth2 = getEffectiveDriveOAuth2Config();
   const folderId = getEffectiveDriveFolderId();
   const mode = getEffectiveMediaStorage();
-  const driveReady = !!(credentials && folderId);
+  const driveReady = !!(oauth2 && folderId);
   const resolvedMode = mode === 'google_drive' || (!mode && driveReady)
     ? (driveReady ? 'google_drive' : 'local')
     : (mode || 'local');
@@ -94,11 +86,12 @@ export function getMediaStorageStatus() {
     folder_id_source: getCachedSetting(KEYS.GOOGLE_DRIVE_FOLDER_ID)?.trim()
       ? 'database'
       : (process.env.GOOGLE_DRIVE_FOLDER_ID?.trim() ? 'env' : null),
-    service_account: maskServiceAccount(credentials),
-    credentials_source: getCachedSetting(KEYS.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON)?.trim()
-      ? 'database'
-      : (process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON?.trim() ? 'env' : null),
-    has_stored_credentials: !!getCachedSetting(KEYS.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON)?.trim(),
+    has_stored_credentials: !!(
+      getCachedSetting(KEYS.GOOGLE_DRIVE_CLIENT_ID)?.trim()
+      && getCachedSetting(KEYS.GOOGLE_DRIVE_CLIENT_SECRET)?.trim()
+      && getCachedSetting(KEYS.GOOGLE_DRIVE_REFRESH_TOKEN)?.trim()
+    ),
+    client_id_preview: maskClientId(getCachedSetting(KEYS.GOOGLE_DRIVE_CLIENT_ID)),
   };
 }
 
@@ -119,18 +112,14 @@ export async function saveMediaStorageSettings(updates = {}) {
     entries.push([KEYS.GOOGLE_DRIVE_FOLDER_ID, folderId]);
   }
 
-  if (updates.google_drive_service_account_json !== undefined) {
-    const raw = String(updates.google_drive_service_account_json || '').trim();
-    if (raw) {
-      try {
-        JSON.parse(raw);
-      } catch {
-        const error = new Error('Service account JSON không hợp lệ');
-        error.status = 400;
-        throw error;
-      }
-    }
-    entries.push([KEYS.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON, raw]);
+  if (updates.google_drive_client_id !== undefined) {
+    entries.push([KEYS.GOOGLE_DRIVE_CLIENT_ID, String(updates.google_drive_client_id || '').trim()]);
+  }
+  if (updates.google_drive_client_secret !== undefined) {
+    entries.push([KEYS.GOOGLE_DRIVE_CLIENT_SECRET, String(updates.google_drive_client_secret || '').trim()]);
+  }
+  if (updates.google_drive_refresh_token !== undefined) {
+    entries.push([KEYS.GOOGLE_DRIVE_REFRESH_TOKEN, String(updates.google_drive_refresh_token || '').trim()]);
   }
 
   for (const [key, value] of entries) {

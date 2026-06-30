@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Upload } from 'lucide-react';
 import api from '../services/api';
 import { formatDateTime } from '../utils/date';
 import useNotifications from '../hooks/useNotifications';
@@ -45,7 +44,6 @@ export default function Settings() {
   const [mediaForm, setMediaForm] = useState(null);
   const [mediaSaving, setMediaSaving] = useState(false);
   const [mediaTesting, setMediaTesting] = useState(false);
-  const [driveJsonFilename, setDriveJsonFilename] = useState('');
   const [composioForm, setComposioForm] = useState(null);
   const [composioSaving, setComposioSaving] = useState(false);
   const [composioLinking, setComposioLinking] = useState(false);
@@ -59,7 +57,9 @@ export default function Settings() {
         setMediaForm({
           media_storage: drive.media_storage || 'local',
           google_drive_folder_id: drive.folder_id || '',
-          google_drive_service_account_json: '',
+          google_drive_client_id: '',
+          google_drive_client_secret: '',
+          google_drive_refresh_token: '',
         });
       }
       const composio = r.data?.config?.composio;
@@ -173,9 +173,13 @@ export default function Settings() {
   const canTestDrive = useMemo(() => {
     if (!mediaForm) return false;
     const folderId = mediaForm.google_drive_folder_id?.trim();
-    const hasJson = !!mediaForm.google_drive_service_account_json?.trim();
-    const hasStored = driveStatus?.has_stored_credentials || driveStatus?.credentials_source === 'env';
-    return !!(folderId && (hasJson || hasStored) && !folderId.includes('@'));
+    const hasNewCredentials = !!(
+      mediaForm.google_drive_client_id?.trim()
+      && mediaForm.google_drive_client_secret?.trim()
+      && mediaForm.google_drive_refresh_token?.trim()
+    );
+    const hasStored = driveStatus?.has_stored_credentials;
+    return !!(folderId && (hasNewCredentials || hasStored) && !folderId.includes('@'));
   }, [mediaForm, driveStatus]);
 
   const hasComposioApiKey = useMemo(() => {
@@ -194,26 +198,6 @@ export default function Settings() {
     setMediaForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleDriveJsonFile = async (event) => {
-    const file = event.target?.files?.[0];
-    // allow re-selecting the same file
-    event.target.value = '';
-    if (!file) return;
-    if (!file.name?.toLowerCase().endsWith('.json')) {
-      showToast('Chỉ nhận file .json (Service Account key)', 'error');
-      return;
-    }
-    try {
-      const text = await file.text();
-      JSON.parse(text);
-      setDriveJsonFilename(file.name);
-      handleMediaChange('google_drive_service_account_json', text.trim());
-      showToast(`Đã nạp JSON từ file: ${file.name}`, 'success');
-    } catch (err) {
-      showToast(err?.message || 'Không đọc/parse được file JSON', 'error');
-    }
-  };
-
   const saveMediaStorage = async () => {
     if (!mediaForm) return;
     setMediaSaving(true);
@@ -222,8 +206,14 @@ export default function Settings() {
         media_storage: mediaForm.media_storage,
         google_drive_folder_id: mediaForm.google_drive_folder_id,
       };
-      if (mediaForm.google_drive_service_account_json?.trim()) {
-        payload.google_drive_service_account_json = mediaForm.google_drive_service_account_json.trim();
+      if (mediaForm.google_drive_client_id?.trim()) {
+        payload.google_drive_client_id = mediaForm.google_drive_client_id.trim();
+      }
+      if (mediaForm.google_drive_client_secret?.trim()) {
+        payload.google_drive_client_secret = mediaForm.google_drive_client_secret.trim();
+      }
+      if (mediaForm.google_drive_refresh_token?.trim()) {
+        payload.google_drive_refresh_token = mediaForm.google_drive_refresh_token.trim();
       }
       const response = await api.put('/settings/media-storage', payload);
       setSettings((prev) => ({
@@ -239,9 +229,10 @@ export default function Settings() {
         ...prev,
         media_storage: response.data.media_storage.media_storage,
         google_drive_folder_id: response.data.media_storage.folder_id || '',
-        google_drive_service_account_json: '',
+        google_drive_client_id: '',
+        google_drive_client_secret: '',
+        google_drive_refresh_token: '',
       }));
-      setDriveJsonFilename('');
       showToast('Đã lưu cấu hình Google Drive', 'success');
       invalidateMediaStorageCache();
     } catch (err) {
@@ -257,9 +248,9 @@ export default function Settings() {
       const payload = {
         google_drive_folder_id: mediaForm?.google_drive_folder_id?.trim(),
       };
-      if (mediaForm?.google_drive_service_account_json?.trim()) {
-        payload.google_drive_service_account_json = mediaForm.google_drive_service_account_json.trim();
-      }
+      if (mediaForm?.google_drive_client_id?.trim()) payload.google_drive_client_id = mediaForm.google_drive_client_id.trim();
+      if (mediaForm?.google_drive_client_secret?.trim()) payload.google_drive_client_secret = mediaForm.google_drive_client_secret.trim();
+      if (mediaForm?.google_drive_refresh_token?.trim()) payload.google_drive_refresh_token = mediaForm.google_drive_refresh_token.trim();
       const response = await api.post('/settings/media-storage/test', payload);
       const name = response.data?.folder?.folder_name || response.data?.folder?.folder_id;
       showToast(`Kết nối Drive OK — folder: ${name}`, 'success');
@@ -436,8 +427,7 @@ export default function Settings() {
             <div>
               <h3>Google Drive — lưu &amp; đăng ảnh</h3>
               <p className="field-hint">
-                AutoPost <strong>không dùng đăng nhập Google OAuth</strong> — server cần Service Account JSON
-                (tài khoản robot từ Google Cloud) để upload ảnh lên folder bạn chỉ định.
+                AutoPost dùng <strong>OAuth2 User Authentication</strong> để upload ảnh lên Google Drive của bạn.
                 Ảnh lưu dạng <code>gdrive://FILE_ID</code>. Khi đăng Facebook, server tải từ Drive rồi upload Graph API.
               </p>
             </div>
@@ -449,11 +439,11 @@ export default function Settings() {
           <div className="settings-drive-status" style={{ marginBottom: 16 }}>
             <p className="field-hint">
               Chế độ hiện tại: <strong>{driveStatus.media_storage === 'google_drive' ? 'Google Drive' : 'VPS local'}</strong>
-              {driveStatus.service_account?.client_email && (
-                <> — Service account: <code>{driveStatus.service_account.client_email}</code></>
+              {driveStatus.has_stored_credentials && driveStatus.client_id_preview && (
+                <> — Client ID: <code>{driveStatus.client_id_preview}</code></>
               )}
-              {driveStatus.credentials_source && (
-                <> (credentials: {driveStatus.credentials_source})</>
+              {driveStatus.has_stored_credentials && (
+                <> (credentials: database)</>
               )}
               {driveStatus.folder_id_source && (
                 <> — Folder: {driveStatus.folder_id_source}</>
@@ -485,42 +475,42 @@ export default function Settings() {
                 </label>
               </div>
 
+              <div className="settings-schedule-grid" style={{ marginTop: 12 }}>
+                <label>
+                  Client ID
+                  <input
+                    type="text"
+                    placeholder={driveStatus.has_stored_credentials ? 'Để trống để giữ nguyên' : 'xxx.apps.googleusercontent.com'}
+                    value={mediaForm.google_drive_client_id}
+                    onChange={(e) => handleMediaChange('google_drive_client_id', e.target.value)}
+                  />
+                </label>
+                <label>
+                  Client Secret
+                  <input
+                    type="password"
+                    placeholder={driveStatus.has_stored_credentials ? 'Để trống để giữ nguyên' : 'GOCSPX-...'}
+                    value={mediaForm.google_drive_client_secret}
+                    onChange={(e) => handleMediaChange('google_drive_client_secret', e.target.value)}
+                  />
+                </label>
+              </div>
               <label style={{ display: 'block', marginTop: 12 }}>
-                Service Account JSON
-                <div className="skill-file-upload" style={{ marginTop: 8, marginBottom: 10 }}>
-                  <label className="skill-file-label">
-                    <input
-                      type="file"
-                      accept="application/json,.json"
-                      onChange={handleDriveJsonFile}
-                      disabled={!canEditMediaStorage}
-                    />
-                    <Upload size={28} strokeWidth={1.5} />
-                    <span>Chọn file JSON từ máy (Browse)</span>
-                    <small>Service Account key tải từ Google Cloud — tự điền vào ô bên dưới</small>
-                  </label>
-                  {driveJsonFilename && (
-                    <div className="form-success">
-                      Đã nạp: <code>{driveJsonFilename}</code>
-                    </div>
-                  )}
-                </div>
-                <textarea
-                  rows={5}
-                  placeholder={driveStatus.has_stored_credentials || driveStatus.credentials_source === 'env'
-                    ? 'Để trống nếu giữ JSON hiện tại — chọn file hoặc dán JSON mới để thay'
-                    : 'Chọn file JSON ở trên hoặc dán toàn bộ JSON service account'}
-                  value={mediaForm.google_drive_service_account_json}
-                  onChange={(e) => handleMediaChange('google_drive_service_account_json', e.target.value)}
+                Refresh Token
+                <input
+                  type="password"
+                  placeholder={driveStatus.has_stored_credentials ? 'Để trống để giữ nguyên' : '1//0g...'}
+                  value={mediaForm.google_drive_refresh_token}
+                  onChange={(e) => handleMediaChange('google_drive_refresh_token', e.target.value)}
                 />
               </label>
 
               <p className="field-hint" style={{ marginTop: 8 }}>
-                1) Tạo Service Account trên Google Cloud → tải JSON.
-                2) Tạo folder Drive → Share với <code>client_email</code> trong JSON (quyền Editor).
-                3) Copy Folder ID từ URL (<code>drive.google.com/.../folders/<strong>ID_Ở_ĐÂY</strong></code>).
-                4) Chọn file JSON + Folder ID gốc → <strong>Kiểm tra kết nối</strong> → Lưu.
-                {' '}Mỗi fanpage có thể gán folder riêng tại <strong>Fanpage → Sửa</strong> (ảnh vào subfolder, không lộn xộn).
+                1) Google Cloud Console → Credentials → OAuth 2.0 Client ID (Desktop app) → copy Client ID &amp; Secret.
+                2) Dùng OAuth Playground hoặc script lấy Refresh Token với scope <code>https://www.googleapis.com/auth/drive</code>.
+                3) Copy Folder ID từ URL Drive (<code>drive.google.com/.../folders/<strong>ID_Ở_ĐÂY</strong></code>).
+                4) Điền đủ 3 trường + Folder ID → <strong>Kiểm tra kết nối</strong> → Lưu.
+                {' '}Mỗi fanpage có thể gán folder riêng tại <strong>Fanpage → Sửa</strong>.
               </p>
 
               <div style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
@@ -538,7 +528,7 @@ export default function Settings() {
               </div>
               {!canTestDrive && mediaForm.media_storage === 'google_drive' && (
                 <p className="field-hint field-hint--warn" style={{ marginTop: 8 }}>
-                  Cần Folder ID hợp lệ + Service Account JSON (dán mới hoặc đã lưu trước đó).
+                  Cần Folder ID hợp lệ + OAuth2 credentials (điền mới hoặc đã lưu trước đó).
                 </p>
               )}
             </>
