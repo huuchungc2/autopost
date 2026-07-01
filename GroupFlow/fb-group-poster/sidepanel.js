@@ -4881,6 +4881,10 @@ async function checkLicenseGate() {
   const btn = $('#overlayValidateBtn');
   const status = $('#overlayStatus');
   if (licenseKey && input) input.value = licenseKey;
+  $('#overlayCloseBtn')?.addEventListener('click', () => {
+    overlay.remove();
+    finishInit();
+  });
   $('#overlayRegisterLink')?.addEventListener('click', (e) => {
     e.preventDefault();
     const s = GF.storage.cachedSettings;

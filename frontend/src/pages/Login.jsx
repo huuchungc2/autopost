@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../services/authContext';
 import api from '../services/api';
 import Button from '../components/ui/Button';
@@ -72,6 +72,12 @@ export default function Login() {
             {submitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </Button>
         </form>
+        <div style={{ borderTop: '1px solid #e4e4e7', marginTop: 24, paddingTop: 16, textAlign: 'center', fontSize: 13, color: '#71717a' }}>
+          Người dùng GroupFlow?{' '}
+          <Link to="/user/register" style={{ color: '#2563eb' }}>Đăng ký</Link>
+          {' · '}
+          <Link to="/user/login" style={{ color: '#2563eb' }}>Đăng nhập</Link>
+        </div>
       </div>
     </div>
   );
