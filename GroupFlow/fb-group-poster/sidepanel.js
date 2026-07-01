@@ -3300,13 +3300,35 @@ async function rescheduleUpcoming(item) {
 }
 
 async function loadPostedPostsForComment() {
-  const d = await chrome.storage.local.get('postQueue');
+  const d = await chrome.storage.local.get(['postQueue', 'serverMyPosts']);
   const queue = d.postQueue || [];
+  const serverMyPosts = d.serverMyPosts || [];
+
   const localPosts = queue
     .filter((p) => p.postStatus === 'posted'
       && p.postedGroups?.some((g) => g.post_id && /^\d+$/.test(String(g.post_id))))
     .sort((a, b) => (b.lastPostedAt || '').localeCompare(a.lastPostedAt || ''))
     .map((p) => ({ ...p, _source: 'local' }));
+
+  // Bài của mình từ server chưa có trong local queue (multi-device sync)
+  const localPostIds = new Set(
+    localPosts.flatMap((p) => (p.postedGroups || []).map((g) => `${g.group_id}_${g.post_id}`))
+  );
+  const myServerItems = serverMyPosts
+    .filter((sp) => !localPostIds.has(`${sp.group_id}_${sp.post_id}`))
+    .map((sp) => ({
+      id: `server_${sp.id}`,
+      _serverId: sp.id,
+      _source: 'server',
+      noi_dung: sp.noi_dung || '',
+      lastPostedAt: sp.posted_at || '',
+      postedGroups: [{
+        group_id: sp.group_id,
+        group_name: sp.group_name || sp.group_id,
+        post_id: sp.post_id,
+        status: 'posted',
+      }],
+    }));
 
   const crossPosts = await fetchCrossPostsFromServer();
   const crossItems = crossPosts.map((cp) => ({
@@ -3324,7 +3346,7 @@ async function loadPostedPostsForComment() {
     }],
   }));
 
-  state.comments = [...localPosts, ...crossItems];
+  state.comments = [...localPosts, ...myServerItems, ...crossItems];
   const badge = $('#commentBadge');
   if (badge) badge.textContent = state.comments.length ? String(state.comments.length) : '';
   if ($('#tab-comment')?.classList.contains('active')) renderComments();
@@ -3390,6 +3412,7 @@ async function runTidienSyncNow() {
       return;
     }
     await syncLocalPostsToServer();
+    await pullMyPostsFromServer();
     await loadPostedPostsForComment();
     showToast('Đồng bộ xong', 'success', 3000);
   } catch (e) {
@@ -4558,6 +4581,7 @@ function bindEvents() {
   });
   $('#btnRefreshComments').addEventListener('click', async () => {
     await syncLocalPostsToServer().catch(() => {});
+    await pullMyPostsFromServer().catch(() => {});
     await loadComments();
   });
   $('#btnFillCommentTemplates')?.addEventListener('click', () => fillEmptyCommentDraftsFromTemplate());
@@ -4938,6 +4962,22 @@ async function syncLocalPostsToServer() {
   } catch { /* best-effort */ }
 }
 
+async function pullMyPostsFromServer() {
+  const { licenseKey } = await chrome.storage.local.get('licenseKey');
+  if (!licenseKey) return;
+  try {
+    const base = await getUserSyncBase();
+    const res = await fetch(`${base}/api/user-sync/my-posts?limit=200`, {
+      headers: { Authorization: `Bearer ${licenseKey}` },
+    });
+    if (!res.ok) return;
+    const serverPosts = await res.json();
+    if (Array.isArray(serverPosts)) {
+      await chrome.storage.local.set({ serverMyPosts: serverPosts });
+    }
+  } catch { /* best-effort */ }
+}
+
 async function fetchCrossPostsFromServer() {
   const { licenseKey } = await chrome.storage.local.get('licenseKey');
   if (!licenseKey) return [];
@@ -5031,6 +5071,7 @@ async function finishInit() {
     if (sess.gfPostingActive) showPostingUI(false);
   } catch { /* ignore */ }
   syncLocalPostsToServer().catch(() => {});
+  pullMyPostsFromServer().catch(() => {});
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

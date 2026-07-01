@@ -34,6 +34,19 @@ router.post('/posts', authenticateLicenseKey, asyncHandler(async (req, res) => {
   res.json({ ok: true, inserted });
 }));
 
+// GET /api/user-sync/my-posts — kéo bài của chính mình từ server về extension (multi-device sync)
+router.get('/my-posts', authenticateLicenseKey, asyncHandler(async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+  const since = req.query.since ? new Date(req.query.since) : null;
+  const rows = await query(
+    `SELECT id, post_queue_id, group_id, group_name, post_id, noi_dung, posted_at, needs_comment, created_at
+     FROM user_posts WHERE user_account_id = ?${since ? ' AND created_at > ?' : ''}
+     ORDER BY created_at DESC LIMIT ?`,
+    since ? [req.userAccount.id, since, limit] : [req.userAccount.id, limit]
+  );
+  res.json(rows);
+}));
+
 // GET /api/user-sync/cross-posts — kéo bài của user KHÁC về để comment chéo
 router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
