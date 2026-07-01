@@ -748,42 +748,29 @@
         <header class="settings-card-head">
           <span class="settings-card-icon" aria-hidden="true">↻</span>
           <div class="settings-card-head-text">
-            <h3 class="settings-card-title">Đồng bộ tidien.xyz</h3>
-            <p class="settings-card-desc">Tuỳ chọn — tải draft, sync bài đã đăng, comment chéo team.</p>
+            <h3 class="settings-card-title">Đồng bộ</h3>
+            <p class="settings-card-desc">Đẩy bài đã đăng lên server, tải bài comment chéo từ thành viên khác.</p>
           </div>
         </header>
 
         <div class="settings-block">
+          <div id="syncLicenseStatus" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#0369a1">
+            Đang kiểm tra license…
+          </div>
           <label class="settings-inline-field">
-            <span class="settings-field-label">URL website</span>
+            <span class="settings-field-label">URL server</span>
             <input type="url" id="tidienBaseUrl" placeholder="https://tidien.xyz" />
           </label>
-          <p class="hint">API: <code>{url}/api/group-posts/...</code></p>
-          <div class="settings-inline-grid">
-            <label class="settings-inline-field">
-              <span class="settings-field-label">Email</span>
-              <input type="email" id="tidienEmail" />
-            </label>
-            <label class="settings-inline-field">
-              <span class="settings-field-label">Password</span>
-              <input type="password" id="tidienPassword" />
-            </label>
-          </div>
-          <button type="button" id="btnTidienLogin" class="btn primary block">Đăng nhập</button>
-          <button type="button" id="btnTidienSyncNow" class="btn outline block" style="margin-top:8px">↻ Đồng bộ ngay</button>
-          <p class="hint" id="tidienSyncNowHint"><strong>Đồng bộ ngay</strong> = đẩy bài đã đăng lên web + tải draft/bài comment.「Không có mới」= không có draft/comment từ người khác — không có nghĩa bài bạn chưa lên web.</p>
-          <p class="hint">Hoặc dán <strong>API key</strong> ở mục Nâng cao. Tự động: bật bên dưới.</p>
+          <p class="hint">Xác thực qua license key — không cần đăng nhập riêng.</p>
+          <button type="button" id="btnTidienSyncNow" class="btn primary block" style="margin-top:8px">↻ Đồng bộ ngay</button>
+          <p class="hint" id="tidienSyncNowHint"><strong>Đồng bộ ngay</strong> = đẩy bài bạn đã đăng lên server + tải bài cần comment từ người khác.</p>
         </div>
 
         <div class="settings-block settings-block-panel">
           <h4 class="settings-block-title">Tự động</h4>
           <label class="switch-row">
             <input type="checkbox" id="tidienAutoSyncEnabled" checked />
-            <span>Tự đồng bộ từ tidien (comment + draft)</span>
-          </label>
-          <label class="switch-row">
-            <input type="checkbox" id="tidienAutoPullDrafts" checked />
-            <span>Tự tải draft mới khi sync</span>
+            <span>Tự đồng bộ khi mở extension</span>
           </label>
           <label class="settings-inline-field settings-inline-field-narrow">
             <span class="settings-field-label">Chu kỳ sync (phút)</span>

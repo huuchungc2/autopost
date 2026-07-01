@@ -1937,8 +1937,8 @@ const GF_BG = {
   },
 
   async getTidienAuth() {
-    const cfg = await chrome.storage.local.get(['tidienBaseUrl', 'tidienApiKey', 'tidienToken']);
-    const token = cfg.tidienApiKey || cfg.tidienToken;
+    const cfg = await chrome.storage.local.get(['tidienBaseUrl', 'tidienApiKey', 'tidienToken', 'licenseKey']);
+    const token = cfg.tidienApiKey || cfg.tidienToken || cfg.licenseKey;
     if (!token) return null;
     return {
       token,

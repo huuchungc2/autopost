@@ -3382,17 +3382,20 @@ async function runTidienSyncNow() {
   const btn = $('#btnTidienSyncNow');
   if (btn?.disabled) return;
   const label = btn?.textContent || '↻ Đồng bộ ngay';
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = 'Đang đồng bộ…';
-  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang đồng bộ…'; }
   try {
-    await triggerTidienAutoSync({ silent: false, force: true, scope: 'all' });
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = label;
+    const { licenseKey } = await chrome.storage.local.get('licenseKey');
+    if (!licenseKey) {
+      showToast('Chưa có license key — nhập key ở màn hình kích hoạt', 'warn');
+      return;
     }
+    await syncLocalPostsToServer();
+    await loadPostedPostsForComment();
+    showToast('Đồng bộ xong', 'success', 3000);
+  } catch (e) {
+    showToast(e.message || 'Đồng bộ lỗi', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = label; }
   }
 }
 
@@ -4112,6 +4115,25 @@ function initSettingsNav() {
   showSettingsPane('settings-posting');
 }
 
+async function showSyncLicenseStatus() {
+  const el = $('#syncLicenseStatus');
+  if (!el) return;
+  const { licenseKey, licenseInfo } = await chrome.storage.local.get(['licenseKey', 'licenseInfo']);
+  if (licenseKey && licenseInfo?.valid) {
+    const plan = licenseInfo.plan ? ` · ${licenseInfo.plan}` : '';
+    const email = licenseInfo.email ? ` · ${licenseInfo.email}` : '';
+    el.style.background = '#f0fdf4';
+    el.style.borderColor = '#86efac';
+    el.style.color = '#15803d';
+    el.textContent = `✅ License hợp lệ${plan}${email}`;
+  } else {
+    el.style.background = '#fff7ed';
+    el.style.borderColor = '#fdba74';
+    el.style.color = '#c2410c';
+    el.textContent = '⚠ Chưa có license key — nhập key ở màn hình kích hoạt';
+  }
+}
+
 async function loadSettingsForm() {
   const s = await GF.storage.getSettings();
   $('#tidienBaseUrl').value = s.tidienBaseUrl;
@@ -4125,7 +4147,6 @@ async function loadSettingsForm() {
   updateClassicTextModeUI(s.classicTextMode);
   applyPauseSettingsToForm(s);
   if ($('#tidienAutoSyncEnabled')) $('#tidienAutoSyncEnabled').checked = s.tidienAutoSyncEnabled !== false;
-  if ($('#tidienAutoPullDrafts')) $('#tidienAutoPullDrafts').checked = s.tidienAutoPullDrafts !== false;
   if ($('#tidienAutoSyncMinutes')) $('#tidienAutoSyncMinutes').value = String(s.tidienAutoSyncMinutes || 10);
   if ($('#commentTemplates')) {
     $('#commentTemplates').value = s.commentTemplates || GF.commentTemplates?.DEFAULT || '';
@@ -4153,6 +4174,7 @@ async function loadSettingsForm() {
   updateImageSaveModeUI(s.imageSaveMode);
   await loadLocalProviderSelects();
   await loadLocalSkillSelects();
+  await showSyncLicenseStatus();
 }
 
 async function saveSettingsForm() {
@@ -4576,20 +4598,6 @@ function bindEvents() {
     }
   });
 
-  $('#btnTidienLogin').addEventListener('click', async () => {
-    try {
-      await GF.tidienAuth.login($('#tidienEmail').value, $('#tidienPassword').value);
-      const res = await gfSendMessage({ type: 'GF_GET_FB_USER' });
-      if (res?.user) await GF.tidienAuth.saveFbProfile(res.user);
-      alert('Đăng nhập thành công');
-      await gfSendMessage({ type: 'GF_SCHEDULE_TIDIEN_SYNC' }).catch(() => {});
-      await triggerTidienAutoSync({ silent: false, force: true, scope: 'all' });
-      await loadLocalProviderSelects();
-      loadState();
-    } catch (e) {
-      alert(e.message);
-    }
-  });
   $('#btnTidienSyncNow')?.addEventListener('click', () => runTidienSyncNow());
   $('#btnSaveSettings').addEventListener('click', saveSettingsForm);
   $('#btnSaveActiveProviders')?.addEventListener('click', () => saveActiveProviders().catch((e) => alert(e.message)));
