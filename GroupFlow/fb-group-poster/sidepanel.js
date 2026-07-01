@@ -4107,11 +4107,6 @@ async function loadSettingsForm() {
   if ($('#commentTemplates')) {
     $('#commentTemplates').value = s.commentTemplates || GF.commentTemplates?.DEFAULT || '';
   }
-  if ($('#licenseKey')) {
-    const lk = (await chrome.storage.local.get('licenseKey')).licenseKey || '';
-    $('#licenseKey').value = lk;
-    updateLicenseStatus(lk);
-  }
   updatePostModeUI();
   updateSecurityUI(s.securityLevel);
   updatePostingConfigSummary();
@@ -4170,50 +4165,6 @@ async function saveSettingsForm() {
   try {
     await gfSendMessage({ type: 'GF_SCHEDULE_TIDIEN_SYNC' });
   } catch { /* ignore */ }
-}
-
-function updateLicenseStatus(key) {
-  const el = $('#licenseStatus');
-  if (!el) return;
-  if (!key) { el.textContent = ''; return; }
-  chrome.storage.local.get('licenseInfo').then((d) => {
-    const info = d.licenseInfo;
-    if (!info) { el.textContent = ''; return; }
-    el.textContent = info.valid
-      ? `✅ Hợp lệ · ${info.plan || 'free'} · ${info.email || ''}`
-      : `❌ ${info.error || 'Key không hợp lệ'}`;
-    el.style.color = info.valid ? '#4caf50' : '#e53e3e';
-  });
-}
-
-async function validateLicenseKey() {
-  const key = ($('#licenseKey')?.value || '').trim().toUpperCase();
-  const el = $('#licenseStatus');
-  const btn = $('#btnValidateLicense');
-  if (!key) { if (el) el.textContent = 'Nhập key trước'; return; }
-  if (btn) { btn.disabled = true; btn.textContent = 'Đang xác thực…'; }
-  if (el) { el.textContent = ''; el.style.color = ''; }
-  try {
-    const s = await GF.storage.getSettings();
-    const base = (s.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
-    const res = await fetch(`${base}/api/user-auth/validate-key`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key }),
-    });
-    const data = await res.json();
-    await chrome.storage.local.set({ licenseKey: key, licenseInfo: data });
-    if (el) {
-      el.textContent = data.valid
-        ? `✅ Hợp lệ · ${data.plan || 'free'} · ${data.email || ''}`
-        : `❌ ${data.error || 'Key không hợp lệ'}`;
-      el.style.color = data.valid ? '#4caf50' : '#e53e3e';
-    }
-  } catch (e) {
-    if (el) { el.textContent = `Lỗi kết nối: ${e.message}`; el.style.color = '#e53e3e'; }
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Xác thực key'; }
-  }
 }
 
 function bindEvents() {
@@ -4614,13 +4565,6 @@ function bindEvents() {
     }
   });
   $('#btnTidienSyncNow')?.addEventListener('click', () => runTidienSyncNow());
-  $('#btnValidateLicense')?.addEventListener('click', validateLicenseKey);
-  $('#linkRegister')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    const s = GF.storage.cachedSettings;
-    const base = (s?.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
-    chrome.tabs.create({ url: `${base}/user/register` });
-  });
   $('#btnSaveSettings').addEventListener('click', saveSettingsForm);
   $('#btnSaveActiveProviders')?.addEventListener('click', () => saveActiveProviders().catch((e) => alert(e.message)));
   $('#btnSaveProvider')?.addEventListener('click', () => saveProviderForm().catch((e) => alert(e.message)));
@@ -4925,9 +4869,55 @@ function bindEvents() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-  if (!gfRuntimeAlive()) showContextInvalidBanner();
-  document.body.classList.add('gf-tab-create');
+async function checkLicenseGate() {
+  const { licenseKey, licenseInfo } = await chrome.storage.local.get(['licenseKey', 'licenseInfo']);
+  if (licenseKey && licenseInfo?.valid) {
+    $('#gf-activation-overlay')?.remove();
+    return true;
+  }
+  const overlay = $('#gf-activation-overlay');
+  if (!overlay) return true;
+  const input = $('#overlayLicenseKey');
+  const btn = $('#overlayValidateBtn');
+  const status = $('#overlayStatus');
+  if (licenseKey && input) input.value = licenseKey;
+  $('#overlayRegisterLink')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const s = GF.storage.cachedSettings;
+    const base = (s?.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
+    chrome.tabs.create({ url: `${base}/user/register` });
+  });
+  btn?.addEventListener('click', async () => {
+    const key = (input?.value || '').trim().toUpperCase();
+    if (!key) { if (status) status.textContent = 'Nhập key trước'; return; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Đang xác thực…'; }
+    if (status) { status.textContent = ''; status.style.color = '#666'; }
+    try {
+      const s = await GF.storage.getSettings();
+      const base = (s?.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
+      const res = await fetch(`${base}/api/user-auth/validate-key`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+      const data = await res.json();
+      await chrome.storage.local.set({ licenseKey: key, licenseInfo: data });
+      if (data.valid) {
+        overlay.remove();
+        await finishInit();
+      } else {
+        if (status) { status.textContent = data.error || 'Key không hợp lệ'; status.style.color = '#e53e3e'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Xác thực key'; }
+      }
+    } catch {
+      if (status) { status.textContent = 'Lỗi kết nối server'; status.style.color = '#e53e3e'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Xác thực key'; }
+    }
+  });
+  return false;
+}
+
+async function finishInit() {
   bindEvents();
   initQueueScheduleDefaults();
   await loadSettingsForm();
@@ -4942,4 +4932,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const sess = await chrome.storage.session.get(['gfPostingActive']);
     if (sess.gfPostingActive) showPostingUI(false);
   } catch { /* ignore */ }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!gfRuntimeAlive()) showContextInvalidBanner();
+  document.body.classList.add('gf-tab-create');
+  const passed = await checkLicenseGate();
+  if (!passed) return;
+  await finishInit();
 });

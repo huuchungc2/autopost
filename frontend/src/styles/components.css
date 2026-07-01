@@ -559,15 +559,16 @@ button {
   align-items: center;
   justify-content: center;
   padding: var(--space-6);
-  background: var(--bg-base);
+  background: #09090b;
 }
 
 .login-card {
   width: min(400px, 100%);
   background: var(--bg-surface);
-  border: 1px solid var(--bg-border);
+  border: none;
+  border-top: 3px solid var(--color-primary);
   border-radius: var(--card-radius);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 24px 56px rgba(0,0,0,0.5);
   padding: var(--space-8);
 }
 
@@ -580,27 +581,29 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   background: var(--color-primary);
-  color: var(--text-inverse);
-  font-size: 14px;
+  color: #fff;
+  font-size: 15px;
   font-weight: 700;
+  letter-spacing: -0.02em;
   margin-bottom: var(--space-4);
 }
 
 .login-brand h1 {
   margin: 0 0 var(--space-2);
   font-size: var(--text-xl);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
 }
 
 .login-brand p {
   margin: 0;
   font-size: var(--text-sm);
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
 }
 
 .login-form {
@@ -620,19 +623,28 @@ button {
 
 .login-form input {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--bg-border);
+  padding: 10px 14px;
+  border: 1.5px solid var(--bg-border);
   border-radius: var(--input-radius);
-  font-size: var(--text-md);
-  background: var(--bg-surface);
+  font-size: var(--text-base);
+  background: #fff;
   color: var(--text-primary);
   transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
 }
 
 .login-form input:focus {
   outline: none;
-  border-color: var(--color-primary-border);
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-subtle);
+}
+
+.login-form input:-webkit-autofill,
+.login-form input:-webkit-autofill:hover,
+.login-form input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+  -webkit-text-fill-color: var(--text-primary);
+  border-color: var(--bg-border);
+  transition: background-color 9999s;
 }
 
 .login-form .form-error {
@@ -648,6 +660,22 @@ button {
 .login-form button {
   width: 100%;
   margin-top: var(--space-2);
+  height: 42px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.login-page-footer {
+  margin-top: var(--space-5);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: rgba(255,255,255,0.35);
+}
+
+.login-page-footer a {
+  color: rgba(255,255,255,0.55);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* Layout extras */
