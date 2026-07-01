@@ -445,3 +445,99 @@ export async function ensureUserPostsTable() {
   if (!(await tableExists('license_keys'))) return;
   await runMigrationFile('035_user_posts.sql', 'Migration 035 applied: user_posts');
 }
+
+async function findForeignKeyName(tableName, columnName, referencedTableName) {
+  const rows = await query(
+    `SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?
+       AND REFERENCED_TABLE_NAME = ? LIMIT 1`,
+    [tableName, columnName, referencedTableName]
+  );
+  return rows[0]?.CONSTRAINT_NAME || null;
+}
+
+async function dropForeignKeyIfExists(tableName, columnName, referencedTableName) {
+  const name = await findForeignKeyName(tableName, columnName, referencedTableName);
+  if (!name) return;
+  await query(`ALTER TABLE \`${tableName}\` DROP FOREIGN KEY \`${name}\``);
+}
+
+async function addForeignKeyIfMissing(tableName, columnName, referencedTableName, onDelete) {
+  const existing = await findForeignKeyName(tableName, columnName, referencedTableName);
+  if (existing) return;
+  await query(
+    `ALTER TABLE \`${tableName}\` ADD FOREIGN KEY (\`${columnName}\`) REFERENCES \`${referencedTableName}\`(id) ON DELETE ${onDelete}`
+  );
+}
+
+export async function ensureUserAccountsMergedIntoUsers() {
+  if (!(await tableExists('user_accounts'))) return;
+
+  await runMigrationFile(
+    '036_merge_user_accounts_into_users.sql',
+    'Migration 036 applied: users.role ENUM now includes group_user'
+  );
+
+  const { usernameFromEmail } = await import('./userUsernameService.js');
+
+  const accounts = await query(
+    'SELECT id, email, password_hash, name, status, created_at FROM user_accounts'
+  );
+  const existingUsernames = await query(
+    'SELECT username FROM users WHERE username IS NOT NULL AND username <> ""'
+  );
+  const usedUsernames = new Set(existingUsernames.map((row) => row.username.toLowerCase()));
+
+  const idMap = new Map();
+  let migratedCount = 0;
+
+  for (const account of accounts) {
+    const existingUser = await query('SELECT id FROM users WHERE email = ?', [account.email]);
+    if (existingUser.length) {
+      idMap.set(account.id, existingUser[0].id);
+      continue;
+    }
+
+    let candidate = usernameFromEmail(account.email);
+    let suffix = 1;
+    while (usedUsernames.has(candidate.toLowerCase())) {
+      candidate = `${usernameFromEmail(account.email)}${suffix}`;
+      suffix += 1;
+    }
+    usedUsernames.add(candidate.toLowerCase());
+
+    const result = await query(
+      `INSERT INTO users (name, username, email, password, role, is_active, created_at)
+       VALUES (?, ?, ?, ?, 'group_user', ?, ?)`,
+      [
+        account.name || candidate,
+        candidate,
+        account.email,
+        account.password_hash,
+        account.status === 'active' ? 1 : 0,
+        account.created_at,
+      ]
+    );
+    idMap.set(account.id, result.insertId);
+    migratedCount += 1;
+  }
+
+  await dropForeignKeyIfExists('license_keys', 'user_id', 'user_accounts');
+  await dropForeignKeyIfExists('user_posts', 'user_account_id', 'user_accounts');
+
+  // Two-phase remap through a negative sentinel so old/new id ranges can never collide mid-migration.
+  for (const oldId of idMap.keys()) {
+    await query('UPDATE license_keys SET user_id = ? WHERE user_id = ?', [-oldId, oldId]);
+    await query('UPDATE user_posts SET user_account_id = ? WHERE user_account_id = ?', [-oldId, oldId]);
+  }
+  for (const [oldId, newId] of idMap) {
+    await query('UPDATE license_keys SET user_id = ? WHERE user_id = ?', [newId, -oldId]);
+    await query('UPDATE user_posts SET user_account_id = ? WHERE user_account_id = ?', [newId, -oldId]);
+  }
+
+  await addForeignKeyIfMissing('license_keys', 'user_id', 'users', 'CASCADE');
+  await addForeignKeyIfMissing('user_posts', 'user_account_id', 'users', 'CASCADE');
+
+  await query('DROP TABLE user_accounts');
+  console.log(`Migration 036 applied: merged ${migratedCount} user_accounts into users (role=group_user), dropped user_accounts`);
+}

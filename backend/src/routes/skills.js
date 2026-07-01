@@ -25,16 +25,35 @@ async function getSkillPages(skillId) {
   );
 }
 
+/** group_user chỉ thấy/dùng skill do chính họ tạo, giống pattern user_pages/user_providers */
+async function assertSkillAccess(user, skillId) {
+  if (user.role !== 'group_user') return;
+  const rows = await query('SELECT created_by FROM skills WHERE id = ?', [skillId]);
+  if (!rows.length) {
+    const error = new Error('Skill not found');
+    error.status = 404;
+    throw error;
+  }
+  if (rows[0].created_by !== user.id) {
+    const error = new Error('Forbidden: no access to this skill');
+    error.status = 403;
+    throw error;
+  }
+}
+
 router.get('/', asyncHandler(async (req, res) => {
+  const ownFilter = req.user.role === 'group_user' ? ' WHERE s.created_by = ?' : '';
+  const ownParams = req.user.role === 'group_user' ? [req.user.id] : [];
   const skills = await query(
     `SELECT s.id, s.name, s.description, s.skill_type, s.created_by, s.created_at,
             LEFT(s.system_prompt, 120) AS prompt_preview,
             CHAR_LENGTH(s.system_prompt) AS prompt_length,
             COUNT(ps.page_id) AS page_count
      FROM skills s
-     LEFT JOIN page_skills ps ON ps.skill_id = s.id
+     LEFT JOIN page_skills ps ON ps.skill_id = s.id${ownFilter}
      GROUP BY s.id, s.name, s.description, s.skill_type, s.created_by, s.created_at, s.system_prompt
-     ORDER BY s.skill_type ASC, s.name ASC`
+     ORDER BY s.skill_type ASC, s.name ASC`,
+    ownParams
   ).catch(async () => {
     const rows = await query(
       `SELECT s.id, s.name, s.description, s.created_by, s.created_at,
@@ -42,9 +61,10 @@ router.get('/', asyncHandler(async (req, res) => {
               CHAR_LENGTH(s.system_prompt) AS prompt_length,
               COUNT(ps.page_id) AS page_count
        FROM skills s
-       LEFT JOIN page_skills ps ON ps.skill_id = s.id
+       LEFT JOIN page_skills ps ON ps.skill_id = s.id${ownFilter}
        GROUP BY s.id, s.name, s.description, s.created_by, s.created_at, s.system_prompt
-       ORDER BY s.name ASC`
+       ORDER BY s.name ASC`,
+      ownParams
     );
     return rows.map((r) => ({ ...r, skill_type: 'text' }));
   });
@@ -72,6 +92,7 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {
+  await assertSkillAccess(req.user, req.params.id);
   const skills = await query(
     'SELECT id, name, description, skill_type, system_prompt, created_by, created_at FROM skills WHERE id = ?',
     [req.params.id]
@@ -107,6 +128,7 @@ router.post('/', canManageSkills, asyncHandler(async (req, res) => {
 }));
 
 router.put('/:id', canManageSkills, asyncHandler(async (req, res) => {
+  await assertSkillAccess(req.user, req.params.id);
   const { name, description, system_prompt, skill_type } = req.body;
   if (!name?.trim() || !system_prompt?.trim()) {
     return res.status(400).json({ error: 'Tên và system prompt là bắt buộc' });
@@ -125,6 +147,7 @@ router.put('/:id', canManageSkills, asyncHandler(async (req, res) => {
 }));
 
 router.delete('/:id', canManageSkills, asyncHandler(async (req, res) => {
+  await assertSkillAccess(req.user, req.params.id);
   const linked = await query('SELECT COUNT(*) AS count FROM page_skills WHERE skill_id = ?', [req.params.id]);
   if (linked[0]?.count > 0) {
     return res.status(400).json({

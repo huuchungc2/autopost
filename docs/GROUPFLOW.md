@@ -73,6 +73,12 @@ Filter tab **Tất cả nhóm FB**. File: `groupMetaStore.js`, `groupParse.js`, 
 | 026 | `group_posts.group_name`, `group_post_drafts.is_shared`, `group_post_draft_pulls` |
 | 027 | `group_post_client_syncs` |
 | 028 | `device_id` trên sync tables — sổ theo thiết bị extension |
+| 033–035 | `user_accounts`, `license_keys`, `user_posts` (self-serve, cho user tự đăng ký bằng license key) |
+| 036 | Gộp `user_accounts` vào `users` (role mới `group_user`) — `license_keys.user_id`/`user_posts.user_account_id` giờ FK thẳng tới `users(id)`, `user_accounts` đã bị xoá. `userAuth.js`/`licenseAuth.js` query `users` (điều kiện `role='group_user'`) |
+
+### Auth extension ↔ backend
+
+`authenticateExtension` (`middleware/extensionAuth.js`, gate cho toàn bộ `/api/group-posts/*`) chấp nhận Bearer token theo thứ tự thử: (1) JWT đăng nhập admin/thường (`/api/group-posts/login`), (2) `extension_api_keys.api_key` (tidienApiKey/tidienToken lưu trong extension), (3) `license_keys.key_value` (user tự đăng ký, kích hoạt bằng license key trong overlay activation) — cả 3 đều resolve về cùng 1 `users.id` sau khi gộp `user_accounts`. Extension: `tidienAuth.authHeader()` fallback `tidienApiKey || tidienToken || licenseKey` nên user chỉ có license key vẫn gọi được `/drafts/pull`, `/sync`, `/pending-comments`… mà không cần đăng nhập email/password riêng.
 
 ### Draft chia sẻ team
 

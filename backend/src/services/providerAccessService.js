@@ -65,3 +65,7 @@ export async function getUserProviders(userId) {
 export async function linkProviderToUser(userId, providerId) {
   await query('INSERT IGNORE INTO user_providers (user_id, provider_id) VALUES (?, ?)', [userId, providerId]);
 }
+
+export async function unlinkProviderFromUser(userId, providerId) {
+  await query('DELETE FROM user_providers WHERE user_id = ? AND provider_id = ?', [userId, providerId]);
+}

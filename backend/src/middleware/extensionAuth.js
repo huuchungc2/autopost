@@ -14,6 +14,20 @@ async function loadUserById(userId) {
   return users[0] || null;
 }
 
+async function loadUserByLicenseKey(licenseKey) {
+  const rows = await query(
+    `SELECT u.id, u.name, u.username, u.email, u.role, u.is_active, u.must_change_password, lk.expires_at
+     FROM license_keys lk
+     JOIN users u ON u.id = lk.user_id
+     WHERE lk.key_value = ? AND lk.status = 'active'`,
+    [String(licenseKey).toUpperCase()]
+  );
+  const user = rows[0];
+  if (!user || !user.is_active) return null;
+  if (user.expires_at && new Date(user.expires_at) < new Date()) return null;
+  return user;
+}
+
 async function loadUserByApiKey(apiKey) {
   const rows = await query(
     `SELECT e.user_id, e.fb_user_id, e.fb_user_name, e.api_key,
@@ -74,15 +88,23 @@ export async function authenticateExtension(req, res, next) {
   }
 
   const apiResult = await loadUserByApiKey(token);
-  if (!apiResult) {
+  if (apiResult) {
+    req.user = apiResult.user;
+    req.extension = {
+      fb_user_id: apiResult.extension.fb_user_id,
+      fb_user_name: apiResult.extension.fb_user_name,
+      api_key: apiResult.extension.api_key,
+    };
+    req.authMode = 'api_key';
+    return next();
+  }
+
+  const licenseUser = await loadUserByLicenseKey(token);
+  if (!licenseUser) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  req.user = apiResult.user;
-  req.extension = {
-    fb_user_id: apiResult.extension.fb_user_id,
-    fb_user_name: apiResult.extension.fb_user_name,
-    api_key: apiResult.extension.api_key,
-  };
-  req.authMode = 'api_key';
+  req.user = licenseUser;
+  req.extension = null;
+  req.authMode = 'license_key';
   return next();
 }

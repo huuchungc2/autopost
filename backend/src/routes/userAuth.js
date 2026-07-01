@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { query } from '../db.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { authenticate } from '../middleware/auth.js';
+import { usernameFromEmail } from '../services/userUsernameService.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'replace_with_strong_secret';
@@ -28,19 +29,33 @@ async function requireUserAuth(req, res, next) {
   }
 }
 
+async function generateUniqueUsername(email) {
+  const base = usernameFromEmail(email);
+  let candidate = base;
+  let suffix = 1;
+  while (true) {
+    const existing = await query('SELECT id FROM users WHERE LOWER(username) = LOWER(?)', [candidate]);
+    if (!existing.length) return candidate;
+    candidate = `${base}${suffix}`;
+    suffix += 1;
+  }
+}
+
 // POST /api/user-auth/register
 router.post('/register', asyncHandler(async (req, res) => {
   const { email, password, name } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email và mật khẩu là bắt buộc' });
   if (password.length < 6) return res.status(400).json({ error: 'Mật khẩu tối thiểu 6 ký tự' });
 
-  const existing = await query('SELECT id FROM user_accounts WHERE email = ?', [email.toLowerCase()]);
+  const existing = await query('SELECT id FROM users WHERE email = ?', [email.toLowerCase()]);
   if (existing.length) return res.status(409).json({ error: 'Email đã được đăng ký' });
 
   const passwordHash = await bcrypt.hash(password, 10);
+  const username = await generateUniqueUsername(email);
   const result = await query(
-    'INSERT INTO user_accounts (email, password_hash, name) VALUES (?, ?, ?)',
-    [email.toLowerCase(), passwordHash, name || null]
+    `INSERT INTO users (name, username, email, password, role, is_active)
+     VALUES (?, ?, ?, ?, 'group_user', true)`,
+    [name || username, username, email.toLowerCase(), passwordHash]
   );
   const userId = result.insertId;
 
@@ -50,7 +65,7 @@ router.post('/register', asyncHandler(async (req, res) => {
     [userId, keyValue, 'free', 'active', null]
   );
 
-  const user = { id: userId, email: email.toLowerCase(), name: name || null };
+  const user = { id: userId, email: email.toLowerCase(), name: name || username };
   const token = signUserToken(user);
   res.status(201).json({ token, user, key: keyValue });
 }));
@@ -60,11 +75,14 @@ router.post('/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email và mật khẩu là bắt buộc' });
 
-  const rows = await query('SELECT * FROM user_accounts WHERE email = ? AND status = ?', [email.toLowerCase(), 'active']);
-  if (!rows.length) return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng' });
+  const rows = await query(
+    `SELECT id, email, name, password, is_active FROM users WHERE email = ? AND role = 'group_user'`,
+    [email.toLowerCase()]
+  );
+  if (!rows.length || !rows[0].is_active) return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng' });
 
   const account = rows[0];
-  const valid = await bcrypt.compare(password, account.password_hash);
+  const valid = await bcrypt.compare(password, account.password);
   if (!valid) return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng' });
 
   const user = { id: account.id, email: account.email, name: account.name };
@@ -75,7 +93,11 @@ router.post('/login', asyncHandler(async (req, res) => {
 // GET /api/user-auth/me
 router.get('/me', requireUserAuth, asyncHandler(async (req, res) => {
   const uid = req.userAccount.userId;
-  const rows = await query('SELECT id, email, name, status, created_at FROM user_accounts WHERE id = ?', [uid]);
+  const rows = await query(
+    `SELECT id, email, name, IF(is_active, 'active', 'suspended') AS status, created_at
+     FROM users WHERE id = ? AND role = 'group_user'`,
+    [uid]
+  );
   if (!rows.length) return res.status(404).json({ error: 'Tài khoản không tồn tại' });
 
   const keys = await query(
@@ -116,14 +138,14 @@ router.patch('/me', requireUserAuth, asyncHandler(async (req, res) => {
   if (new_password) {
     if (!current_password) return res.status(400).json({ error: 'Nhập mật khẩu hiện tại' });
     if (new_password.length < 6) return res.status(400).json({ error: 'Mật khẩu mới tối thiểu 6 ký tự' });
-    const [acc] = await query('SELECT password_hash FROM user_accounts WHERE id = ?', [uid]);
-    const valid = await bcrypt.compare(current_password, acc.password_hash);
+    const [acc] = await query('SELECT password FROM users WHERE id = ?', [uid]);
+    const valid = await bcrypt.compare(current_password, acc.password);
     if (!valid) return res.status(400).json({ error: 'Mật khẩu hiện tại không đúng' });
     const hash = await bcrypt.hash(new_password, 10);
-    await query('UPDATE user_accounts SET password_hash = ? WHERE id = ?', [hash, uid]);
+    await query('UPDATE users SET password = ? WHERE id = ?', [hash, uid]);
   }
   if (name !== undefined) {
-    await query('UPDATE user_accounts SET name = ? WHERE id = ?', [name || null, uid]);
+    await query('UPDATE users SET name = ? WHERE id = ?', [name || null, uid]);
   }
   res.json({ ok: true });
 }));
@@ -135,9 +157,9 @@ router.post('/validate-key', asyncHandler(async (req, res) => {
 
   const rows = await query(
     `SELECT lk.id, lk.user_id, lk.plan, lk.status, lk.expires_at,
-            ua.email, ua.name, ua.status AS user_status
+            u.email, u.name, u.is_active AS user_status
      FROM license_keys lk
-     JOIN user_accounts ua ON ua.id = lk.user_id
+     JOIN users u ON u.id = lk.user_id
      WHERE lk.key_value = ?`,
     [String(key).toUpperCase()]
   );
@@ -146,7 +168,7 @@ router.post('/validate-key', asyncHandler(async (req, res) => {
 
   const k = rows[0];
   if (k.status !== 'active') return res.json({ valid: false, error: 'Key đã bị vô hiệu hóa' });
-  if (k.user_status !== 'active') return res.json({ valid: false, error: 'Tài khoản đã bị khóa' });
+  if (!k.user_status) return res.json({ valid: false, error: 'Tài khoản đã bị khóa' });
   if (k.expires_at && new Date(k.expires_at) < new Date()) {
     return res.json({ valid: false, error: 'Key đã hết hạn' });
   }
@@ -170,20 +192,21 @@ router.post('/logout', requireUserAuth, (req, res) => {
 
 // ── Admin routes (yêu cầu admin JWT) ──────────────────────────────────────
 
-// GET /api/user-auth/admin/users — danh sách tất cả user_accounts + key + stats
+// GET /api/user-auth/admin/users — danh sách tất cả group_user + key + stats
 router.get('/admin/users', authenticate, asyncHandler(async (req, res) => {
   const rows = await query(
-    `SELECT ua.id, ua.email, ua.name, ua.status, ua.created_at,
+    `SELECT u.id, u.email, u.name, IF(u.is_active, 'active', 'suspended') AS status, u.created_at,
             lk.key_value, lk.plan, lk.status AS key_status,
             lk.expires_at, lk.last_validated_at,
             COUNT(DISTINCT up.group_id) AS group_count,
             COUNT(up.id) AS post_count,
             MAX(up.posted_at) AS last_post_at
-     FROM user_accounts ua
-     LEFT JOIN license_keys lk ON lk.user_id = ua.id
-     LEFT JOIN user_posts up ON up.user_account_id = ua.id
-     GROUP BY ua.id, lk.id
-     ORDER BY ua.created_at DESC`
+     FROM users u
+     LEFT JOIN license_keys lk ON lk.user_id = u.id
+     LEFT JOIN user_posts up ON up.user_account_id = u.id
+     WHERE u.role = 'group_user'
+     GROUP BY u.id, lk.id
+     ORDER BY u.created_at DESC`
   );
   res.json(rows);
 }));
@@ -212,7 +235,7 @@ router.patch('/admin/users/:id', authenticate, asyncHandler(async (req, res) => 
   const { status, plan, expires_at, key_status } = req.body;
 
   if (status) {
-    await query('UPDATE user_accounts SET status = ? WHERE id = ?', [status, id]);
+    await query(`UPDATE users SET is_active = ? WHERE id = ? AND role = 'group_user'`, [status === 'active' ? 1 : 0, id]);
   }
   if (plan || key_status || expires_at !== undefined) {
     const sets = [];
@@ -230,7 +253,7 @@ router.patch('/admin/users/:id', authenticate, asyncHandler(async (req, res) => 
 
 // DELETE /api/user-auth/admin/users/:id
 router.delete('/admin/users/:id', authenticate, asyncHandler(async (req, res) => {
-  await query('DELETE FROM user_accounts WHERE id = ?', [req.params.id]);
+  await query(`DELETE FROM users WHERE id = ? AND role = 'group_user'`, [req.params.id]);
   res.json({ ok: true });
 }));
 

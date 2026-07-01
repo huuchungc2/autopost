@@ -7,10 +7,10 @@ export async function authenticateLicenseKey(req, res, next) {
 
   const rows = await query(
     `SELECT lk.id, lk.user_id, lk.plan, lk.status, lk.expires_at,
-            ua.email, ua.name, ua.status AS user_status
+            u.email, u.name, u.is_active AS user_status
      FROM license_keys lk
-     JOIN user_accounts ua ON ua.id = lk.user_id
-     WHERE lk.key_value = ? AND lk.status = 'active' AND ua.status = 'active'`,
+     JOIN users u ON u.id = lk.user_id
+     WHERE lk.key_value = ? AND lk.status = 'active' AND u.is_active = 1`,
     [String(token).toUpperCase()]
   );
 

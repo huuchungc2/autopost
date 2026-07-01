@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   username VARCHAR(100) UNIQUE NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   password VARCHAR(255) NOT NULL,
-  role ENUM('super_admin', 'admin', 'editor') DEFAULT 'editor',
+  role ENUM('super_admin', 'admin', 'editor', 'group_user') DEFAULT 'editor',
   is_active BOOLEAN DEFAULT true,
   must_change_password BOOLEAN DEFAULT false,
   last_login TIMESTAMP NULL,

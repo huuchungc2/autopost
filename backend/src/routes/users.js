@@ -117,7 +117,7 @@ router.get('/', asyncHandler(async (req, res) => {
               (SELECT COUNT(*) FROM user_pages up WHERE up.user_id = u.id) AS assigned_page_count,
               (SELECT COUNT(*) FROM user_providers uv WHERE uv.user_id = u.id) AS assigned_provider_count
        FROM users u
-       WHERE u.deleted_at IS NULL${hideSuperAdmin}
+       WHERE u.deleted_at IS NULL AND u.role <> 'group_user'${hideSuperAdmin}
        ORDER BY u.name ASC`
     );
     return res.json(users);
@@ -125,7 +125,7 @@ router.get('/', asyncHandler(async (req, res) => {
     if (error?.code !== 'ER_NO_SUCH_TABLE') throw error;
     const users = await query(
       `SELECT id, name, email, role, is_active, must_change_password, created_at
-       FROM users WHERE deleted_at IS NULL${hideSuperAdmin.replace(/u\./g, '')}
+       FROM users WHERE deleted_at IS NULL AND role <> 'group_user'${hideSuperAdmin.replace(/u\./g, '')}
        ORDER BY name ASC`
     );
     res.json(users.map((u) => ({ ...u, assigned_page_count: null, assigned_provider_count: null })));

@@ -9,6 +9,7 @@ import {
   assertProviderAccess,
   providerIdInClause,
   linkProviderToUser,
+  unlinkProviderFromUser,
 } from '../services/providerAccessService.js';
 import { isSuperAdmin } from '../services/pageAccessService.js';
 import { getProviderTemplateById, listProviderTemplates } from '../services/providerTemplateService.js';
@@ -114,6 +115,36 @@ router.post('/', canManageProviders, asyncHandler(async (req, res) => {
     api_endpoint: payload.api_endpoint,
     is_active: payload.is_active,
   });
+}));
+
+/** Chủ sở hữu provider (hoặc super_admin/admin) tự cấp/gỡ quyền dùng chung cho 1 user cụ thể. */
+async function assertProviderOwner(user, providerId) {
+  if (isSuperAdmin(user) || user.role === 'admin') return;
+  const rows = await query('SELECT user_id FROM ai_providers WHERE id = ?', [providerId]);
+  if (!rows.length) {
+    const error = new Error('Provider not found');
+    error.status = 404;
+    throw error;
+  }
+  if (rows[0].user_id !== user.id) {
+    const error = new Error('Forbidden: not the owner of this provider');
+    error.status = 403;
+    throw error;
+  }
+}
+
+router.post('/:id/share', asyncHandler(async (req, res) => {
+  await assertProviderOwner(req.user, req.params.id);
+  const targetUserId = Number(req.body?.user_id);
+  if (!targetUserId) return res.status(400).json({ error: 'Thiếu user_id' });
+  await linkProviderToUser(targetUserId, req.params.id);
+  res.json({ ok: true });
+}));
+
+router.delete('/:id/share/:userId', asyncHandler(async (req, res) => {
+  await assertProviderOwner(req.user, req.params.id);
+  await unlinkProviderFromUser(Number(req.params.userId), req.params.id);
+  res.json({ ok: true });
 }));
 
 router.put('/:id', canManageProviders, asyncHandler(async (req, res) => {

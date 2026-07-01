@@ -6,12 +6,12 @@ GF.tidienAuth = {
     return s.tidienBaseUrl.replace(/\/$/, '');
   },
 
-  authHeader() {
-    return GF.storage.getSettings().then((s) => {
-      const token = s.tidienApiKey || s.tidienToken;
-      if (!token) throw new Error('Chưa đăng nhập tidien hoặc thiếu API key');
-      return { Authorization: `Bearer ${token}` };
-    });
+  async authHeader() {
+    const s = await GF.storage.getSettings();
+    const { licenseKey } = await chrome.storage.local.get('licenseKey');
+    const token = s.tidienApiKey || s.tidienToken || licenseKey;
+    if (!token) throw new Error('Chưa đăng nhập tidien hoặc thiếu API key');
+    return { Authorization: `Bearer ${token}` };
   },
 
   async login(email, password) {
