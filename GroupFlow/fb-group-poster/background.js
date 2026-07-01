@@ -54,10 +54,24 @@ const GF_BG = {
   _lastClassicGroupId: null,
 
   async getPostingFbTabId() {
-    if (!this._postingFbTabId) return null;
+    // _postingFbTabId chỉ sống trong bộ nhớ — service worker MV3 bị Chrome tắt/khởi động lại
+    // giữa chừng sẽ làm mất biến này, khiến extension "quên" tab đang dùng và mở tab khác dù
+    // tab cũ vẫn còn mở. chrome.storage.session sống sót qua restart (chỉ mất khi đóng browser)
+    // nên fallback đọc từ đó để tiếp tục dùng đúng 1 tab thay vì mở tràn lan.
+    let tabId = this._postingFbTabId;
+    if (!tabId) {
+      try {
+        const stored = await chrome.storage.session.get('gfPanelTabId');
+        tabId = stored.gfPanelTabId || null;
+      } catch { /* ignore */ }
+    }
+    if (!tabId) return null;
     try {
-      const t = await chrome.tabs.get(this._postingFbTabId);
-      if (t?.id && !t.incognito && /facebook\.com/i.test(t.url || '')) return t.id;
+      const t = await chrome.tabs.get(tabId);
+      if (t?.id && !t.incognito && /facebook\.com/i.test(t.url || '')) {
+        this._postingFbTabId = t.id;
+        return t.id;
+      }
     } catch { /* tab đã đóng */ }
     this._postingFbTabId = null;
     this._postingFbTabWarm = false;
@@ -875,23 +889,31 @@ const GF_BG = {
     return a + Math.floor(Math.random() * (b - a + 1));
   },
 
+  // chrome.storage là read-modify-write không nguyên tử — 2 lệnh gọi song song (vd 2 nhóm
+  // đăng gần như cùng lúc ở mode nền) có thể đọc cùng 1 bản cũ rồi ghi đè lẫn nhau, làm mất
+  // 1 entry. Nối tiếp mọi lệnh gọi qua 1 chain để đảm bảo không lệnh nào ghi đè lệnh khác.
+  _historyWriteChain: Promise.resolve(),
   async appendHistory(entry) {
-    const d = await chrome.storage.local.get('activityHistory');
-    const list = d.activityHistory || [];
-    const enriched = { ...entry, at: new Date().toISOString() };
-    if (!enriched.url && enriched.group_id && enriched.post_id && enriched.post_id !== 'pending') {
-      const pid = String(enriched.post_id);
-      if (/^\d+$/.test(pid)) {
-        enriched.url = `https://www.facebook.com/groups/${enriched.group_id}/posts/${pid}/`;
+    const run = async () => {
+      const d = await chrome.storage.local.get('activityHistory');
+      const list = d.activityHistory || [];
+      const enriched = { ...entry, at: new Date().toISOString() };
+      if (!enriched.url && enriched.group_id && enriched.post_id && enriched.post_id !== 'pending') {
+        const pid = String(enriched.post_id);
+        if (/^\d+$/.test(pid)) {
+          enriched.url = `https://www.facebook.com/groups/${enriched.group_id}/posts/${pid}/`;
+        }
       }
-    }
-    list.unshift(enriched);
-    const trimmed = list.slice(0, 300);
-    await chrome.storage.local.set({ activityHistory: trimmed });
-    chrome.runtime.sendMessage({
-      type: 'GF_ACTIVITY_REFRESH',
-      data: { entry: enriched, total: trimmed.length },
-    }).catch(() => {});
+      list.unshift(enriched);
+      const trimmed = list.slice(0, 300);
+      await chrome.storage.local.set({ activityHistory: trimmed });
+      chrome.runtime.sendMessage({
+        type: 'GF_ACTIVITY_REFRESH',
+        data: { entry: enriched, total: trimmed.length },
+      }).catch(() => {});
+    };
+    this._historyWriteChain = this._historyWriteChain.then(run, run);
+    return this._historyWriteChain;
   },
 
   shouldLogProgress(data = {}) {
@@ -1055,7 +1077,13 @@ const GF_BG = {
 
   resolvePostGroups(post, job, groupsMap) {
     const ids = post.groupIds || job.groupIds || [];
-    return ids.map((id) => groupsMap.get(String(id))).filter(Boolean);
+    // Bỏ qua nhóm đã có trong postedGroups (đăng thành công từ lần chạy trước) — quan trọng để
+    // 1 job bị gián đoạn giữa chừng (SW restart, lỗi, retry) không đăng trùng vào nhóm đã xong.
+    const alreadyPosted = new Set((post.postedGroups || []).map((g) => String(g.group_id)));
+    return ids
+      .filter((id) => !alreadyPosted.has(String(id)))
+      .map((id) => groupsMap.get(String(id)))
+      .filter(Boolean);
   },
 
   canPostInBackground(post, postMode) {
@@ -1150,6 +1178,20 @@ const GF_BG = {
       map.set(key, { ...(map.get(key) || {}), ...x });
     });
     return [...map.values()];
+  },
+
+  // Ghi ngay 1 group vừa đăng thành công vào postQueue — không đợi tới cuối job (finally của
+  // runPostMatrix) mới lưu. Nếu service worker bị Chrome tắt/khởi động lại giữa chừng (rất hay
+  // gặp với job nhiều nhóm/nhiều delay ở MV3), tiến độ các nhóm đã đăng vẫn không bị mất, nên
+  // lần retry sau (reconcileQueueSchedules hoặc job mới) sẽ không đăng lại nhóm đã xong.
+  async persistGroupProgress(postId, groupDetail) {
+    const d = await chrome.storage.local.get('postQueue');
+    const queue = d.postQueue || [];
+    const p = queue.find((x) => x.id === postId);
+    if (!p) return;
+    p.postedGroups = this.mergePostedGroups(p.postedGroups, [groupDetail]);
+    p.lastPostedAt = new Date().toISOString();
+    await chrome.storage.local.set({ postQueue: queue });
   },
 
   async markPostedGroupCommented(postQueueId, groupId, ok = true) {
@@ -1688,7 +1730,7 @@ const GF_BG = {
               // pushPostedGroupResult() nên không thể tìm-rồi-sửa (bug cũ: luôn no-op vì entry
               // chưa được tạo, khiến bài đẩy tidien thành công nhưng cờ tidienSynced không lưu
               // lại, gây đẩy lặp lần sau "Đồng bộ").
-              this.pushPostedGroupResult(postGroupResults, post.id, {
+              const groupDetail = {
                 group_id: String(group.id),
                 group_name: group.name,
                 post_id: res.postId,
@@ -1698,7 +1740,9 @@ const GF_BG = {
                 firstCommentOk: null,
                 tidienSynced: Boolean(tidienPushRes?.ok),
                 tidienSyncedAt: tidienPushRes?.ok ? new Date().toISOString() : null,
-              });
+              };
+              this.pushPostedGroupResult(postGroupResults, post.id, groupDetail);
+              await this.persistGroupProgress(post.id, groupDetail);
             }
 
             if (postedOk) {
@@ -1938,7 +1982,11 @@ const GF_BG = {
 
   async getTidienAuth() {
     const cfg = await chrome.storage.local.get(['tidienBaseUrl', 'tidienApiKey', 'tidienToken', 'licenseKey']);
-    const token = cfg.tidienApiKey || cfg.tidienToken || cfg.licenseKey;
+    // licenseKey đi trước: đây là danh tính "đang hoạt động" qua màn kích hoạt. tidienApiKey/
+    // tidienToken là kiểu đăng nhập cũ (email/password) — nếu máy nào còn sót lại 2 giá trị này
+    // từ trước (vd lúc test), ưu tiên chúng trước licenseKey sẽ đẩy nhầm bài lên đúng tên tài
+    // khoản cũ thay vì tài khoản đang thật sự dùng, dù UI panel đang hiển thị đúng người khác.
+    const token = cfg.licenseKey || cfg.tidienApiKey || cfg.tidienToken;
     if (!token) return null;
     return {
       token,

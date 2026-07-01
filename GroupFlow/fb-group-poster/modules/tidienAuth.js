@@ -9,7 +9,9 @@ GF.tidienAuth = {
   async authHeader() {
     const s = await GF.storage.getSettings();
     const { licenseKey } = await chrome.storage.local.get('licenseKey');
-    const token = s.tidienApiKey || s.tidienToken || licenseKey;
+    // licenseKey trước — danh tính đang hoạt động qua màn kích hoạt; xem chú thích ở
+    // getTidienAuth() (background.js) — tránh đẩy nhầm bài lên tên tài khoản cũ còn sót lại.
+    const token = licenseKey || s.tidienApiKey || s.tidienToken;
     if (!token) throw new Error('Chưa đăng nhập tidien hoặc thiếu API key');
     return { Authorization: `Bearer ${token}` };
   },

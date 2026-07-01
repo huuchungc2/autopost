@@ -2035,6 +2035,7 @@ function handleGfMessage(msg, sendResponse) {
         return sendResponse({ ok: true, ...result });
       }
       if (msg.type === 'GF_COMMENT') {
+        window.__gfAbortPost = false;
         C.lang = msg.lang || 'vi';
         await C.commentOnPost(msg);
         return sendResponse({ ok: true });

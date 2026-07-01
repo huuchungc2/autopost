@@ -2151,15 +2151,26 @@ function manualMediaHasPayload() {
   return state.manualMediaList.some((m) => m?.base64);
 }
 
+// Khi chính panel này ghi postQueue, listener storage.onChanged bên dưới không cần vẽ lại
+// toàn bộ danh sách bài — state.posts đã đúng và các chỗ cần cập nhật (đếm nhóm, tag...) đã
+// được sửa trực tiếp tại nơi gọi. Không suppress thì mỗi lần tick 1 nhóm sẽ làm render lại
+// hết danh sách, xóa mất vị trí cuộn/ô tìm kiếm đang mở trong khung chọn nhóm inline.
+let suppressPostQueueRerender = false;
+
 async function savePostsQuiet() {
-  const PMS = GF.postMediaStore;
-  if (!PMS) {
-    await chrome.storage.local.set({ postQueue: state.posts });
-    return;
+  suppressPostQueueRerender = true;
+  try {
+    const PMS = GF.postMediaStore;
+    if (!PMS) {
+      await chrome.storage.local.set({ postQueue: state.posts });
+      return;
+    }
+    await hydrateCachedMediaInPosts();
+    await PMS.persistAll(state.posts);
+    await chrome.storage.local.set({ postQueue: state.posts.map((p) => PMS.stripForQueue(p)) });
+  } finally {
+    setTimeout(() => { suppressPostQueueRerender = false; }, 200);
   }
-  await hydrateCachedMediaInPosts();
-  await PMS.persistAll(state.posts);
-  await chrome.storage.local.set({ postQueue: state.posts.map((p) => PMS.stripForQueue(p)) });
 }
 
 async function savePosts() {
@@ -3510,18 +3521,34 @@ async function runComment(id) {
   const validGroups = (c.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
   if (!validGroups.length) return alert('Bài chưa có post_id FB hợp lệ');
   const actorId = state.activeActorId || settings.activeActorId;
+  let okCount = 0;
+  let lastError = '';
   for (const g of validGroups) {
-    await gfSendMessage({
-      type: 'GF_RUN_COMMENT',
-      payload: {
-        post_queue_id: c.id,
-        group_id: g.group_id,
-        group_name: g.group_name,
-        post_id: g.post_id,
-        comment,
-        actorId,
-      },
-    });
+    try {
+      const res = await gfSendMessage({
+        type: 'GF_RUN_COMMENT',
+        payload: {
+          post_queue_id: c.id,
+          group_id: g.group_id,
+          group_name: g.group_name,
+          post_id: g.post_id,
+          comment,
+          actorId,
+        },
+      });
+      if (res?.ok === false) {
+        lastError = res.error || 'Lỗi không rõ';
+      } else {
+        okCount += 1;
+      }
+    } catch (e) {
+      lastError = e.message || 'Lỗi không rõ';
+    }
+  }
+  if (okCount > 0) {
+    showToast(`Đã comment ${okCount}/${validGroups.length} bài`, okCount === validGroups.length ? 'success' : 'warn');
+  } else {
+    showToast(`Comment thất bại: ${lastError}`, 'error', 6000);
   }
   if (c._source === 'cross' && c._serverId) {
     markCrossPostCommented(c._serverId).catch(() => {});
@@ -4939,7 +4966,7 @@ function bindEvents() {
     if (changes.engineLog) {
       renderEngineLog(changes.engineLog.newValue || []);
     }
-    if (changes.postQueue) {
+    if (changes.postQueue && !suppressPostQueueRerender) {
       mergePostsFromStorage(mapPostsFromQueue(changes.postQueue.newValue || []));
       scheduleRenderPosts();
     }
