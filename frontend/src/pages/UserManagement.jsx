@@ -9,10 +9,76 @@ import Button from '../components/ui/Button';
 
 const PLAN_LABEL = { free: 'Miễn phí', pro: 'Pro', enterprise: 'Enterprise' };
 const KEY_STATUS_LABEL = { active: '✅ Active', expired: '❌ Hết hạn', suspended: '⛔ Khóa' };
+const ACCOUNT_STATUS_COLOR = { active: '#15803d', suspended: '#b91c1c' };
+
+function fmtDate(v) { return v ? new Date(v).toLocaleDateString('vi') : '—'; }
+function fmtDatetime(v) { return v ? new Date(v).toLocaleString('vi') : '—'; }
+
+function GFUserDetail({ userId }) {
+  const [data, setData] = useState(null);
+  const [tab, setTab] = useState('groups');
+
+  useEffect(() => {
+    api.get(`/user-auth/admin/users/${userId}/detail`).then((r) => setData(r.data)).catch(() => {});
+  }, [userId]);
+
+  if (!data) return <p style={{ padding: '8px 0', color: 'var(--text-secondary)', fontSize: 13 }}>Đang tải…</p>;
+
+  return (
+    <div style={{ padding: '10px 0' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        {[['groups', `Nhóm (${data.groups.length})`], ['posts', `Bài gần đây (${data.posts.length})`]].map(([k, label]) => (
+          <button key={k} type="button" onClick={() => setTab(k)} style={{
+            padding: '4px 12px', border: '1px solid', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+            background: tab === k ? 'var(--color-primary)' : '#fff',
+            color: tab === k ? '#fff' : 'var(--text-secondary)',
+            borderColor: tab === k ? 'var(--color-primary)' : 'var(--bg-border)',
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {tab === 'groups' && (
+        <table className="table" style={{ fontSize: 12 }}>
+          <thead><tr><th>Tên nhóm</th><th>Group ID</th><th>Số bài</th><th>Lần cuối đăng</th></tr></thead>
+          <tbody>
+            {!data.groups.length && <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-tertiary)' }}>Chưa có nhóm nào</td></tr>}
+            {data.groups.map((g) => (
+              <tr key={g.group_id}>
+                <td>{g.group_name || '—'}</td>
+                <td><code style={{ fontSize: 11 }}>{g.group_id}</code></td>
+                <td>{g.post_count}</td>
+                <td>{fmtDatetime(g.last_posted_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {tab === 'posts' && (
+        <table className="table" style={{ fontSize: 12 }}>
+          <thead><tr><th>Nhóm</th><th>Post ID</th><th>Nội dung</th><th>Đăng lúc</th><th>Comment</th></tr></thead>
+          <tbody>
+            {!data.posts.length && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-tertiary)' }}>Chưa có bài nào</td></tr>}
+            {data.posts.map((p) => (
+              <tr key={p.id}>
+                <td>{p.group_name || p.group_id}</td>
+                <td><code style={{ fontSize: 11 }}>{p.post_id}</code></td>
+                <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.noi_dung || '—'}</td>
+                <td>{fmtDatetime(p.posted_at)}</td>
+                <td style={{ color: p.needs_comment ? '#b45309' : '#15803d' }}>{p.needs_comment ? 'Chờ comment' : 'Đã comment'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
 
 function GroupFlowUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState(null);
   const { showToast } = useToast();
 
   const load = async () => {
@@ -44,72 +110,108 @@ function GroupFlowUsers() {
     try {
       await api.delete(`/user-auth/admin/users/${id}`);
       showToast('Đã xóa', 'success');
+      setExpandedId(null);
       load();
     } catch {
       showToast('Lỗi xóa', 'error');
     }
   };
 
+  const copyKey = (key) => {
+    navigator.clipboard.writeText(key).then(() => showToast('Đã copy license key', 'success'));
+  };
+
+  const totalPosts = users.reduce((s, u) => s + Number(u.post_count || 0), 0);
+  const activeUsers = users.filter((u) => u.status === 'active' && u.key_status === 'active').length;
+
   if (loading) return <p style={{ padding: 16, color: 'var(--text-secondary)' }}>Đang tải…</p>;
 
   return (
     <div>
-      <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16 }}>
-        Danh sách tài khoản đăng ký dùng extension GroupFlow. Mỗi tài khoản có 1 license key.
-      </p>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+        {[
+          ['Tổng user', users.length, '#2563eb'],
+          ['Đang active', activeUsers, '#15803d'],
+          ['Tổng bài đăng', totalPosts, '#7c3aed'],
+        ].map(([label, val, color]) => (
+          <div key={label} className="card" style={{ flex: 1, padding: '12px 16px', textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color }}>{val}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
       <div className="card table-wrapper">
         <table className="table">
           <thead>
             <tr>
-              <th>Email</th><th>Tên</th><th>License Key</th>
-              <th>Plan</th><th>Key status</th><th>Hết hạn</th>
-              <th>Lần cuối dùng</th><th>Tài khoản</th><th>Thao tác</th>
+              <th></th>
+              <th>Email / Tên</th>
+              <th>License Key</th>
+              <th>Plan</th>
+              <th>Key</th>
+              <th>Nhóm</th>
+              <th>Bài đăng</th>
+              <th>Hoạt động lần cuối</th>
+              <th>Tài khoản</th>
+              <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {!users.length && (
-              <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-tertiary)' }}>Chưa có user nào</td></tr>
+              <tr><td colSpan={10} style={{ textAlign: 'center', color: 'var(--text-tertiary)' }}>Chưa có user nào</td></tr>
             )}
-            {users.map((u) => (
-              <tr key={u.id}>
-                <td>{u.email}</td>
-                <td>{u.name || '—'}</td>
-                <td><code style={{ fontSize: 11 }}>{u.key_value || '—'}</code></td>
+            {users.map((u) => [
+              <tr key={u.id} style={{ cursor: 'pointer' }}>
+                <td onClick={() => setExpandedId(expandedId === u.id ? null : u.id)} style={{ width: 24, userSelect: 'none', color: 'var(--text-secondary)' }}>
+                  {expandedId === u.id ? '▾' : '▸'}
+                </td>
+                <td onClick={() => setExpandedId(expandedId === u.id ? null : u.id)}>
+                  <div style={{ fontWeight: 500, fontSize: 13 }}>{u.email}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{u.name || '—'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Đăng ký {fmtDate(u.created_at)}</div>
+                </td>
                 <td>
-                  <select
-                    value={u.plan || 'free'}
-                    onChange={(e) => update(u.id, { plan: e.target.value })}
-                    style={{ fontSize: 12, padding: '2px 4px' }}
-                  >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <code style={{ fontSize: 10 }}>{u.key_value ? u.key_value.slice(0, 16) + '…' : '—'}</code>
+                    {u.key_value && (
+                      <button type="button" onClick={() => copyKey(u.key_value)} title="Copy key" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '0 2px', color: 'var(--color-primary)', fontSize: 13 }}>⎘</button>
+                    )}
+                  </div>
+                </td>
+                <td>
+                  <select value={u.plan || 'free'} onChange={(e) => update(u.id, { plan: e.target.value })} style={{ fontSize: 12, padding: '2px 4px' }}>
                     <option value="free">Miễn phí</option>
                     <option value="pro">Pro</option>
                     <option value="enterprise">Enterprise</option>
                   </select>
                 </td>
-                <td>{KEY_STATUS_LABEL[u.key_status] || u.key_status || '—'}</td>
-                <td style={{ fontSize: 12 }}>{u.expires_at ? new Date(u.expires_at).toLocaleDateString('vi') : 'Vĩnh viễn'}</td>
-                <td style={{ fontSize: 12 }}>{u.last_validated_at ? new Date(u.last_validated_at).toLocaleString('vi') : '—'}</td>
+                <td style={{ fontSize: 12 }}>{KEY_STATUS_LABEL[u.key_status] || u.key_status || '—'}</td>
+                <td style={{ textAlign: 'center', fontWeight: 600, color: Number(u.group_count) > 0 ? '#2563eb' : 'var(--text-tertiary)' }}>{u.group_count || 0}</td>
+                <td style={{ textAlign: 'center', fontWeight: 600, color: Number(u.post_count) > 0 ? '#7c3aed' : 'var(--text-tertiary)' }}>{u.post_count || 0}</td>
+                <td style={{ fontSize: 12 }}>{fmtDatetime(u.last_post_at || u.last_validated_at)}</td>
                 <td>
-                  <select
-                    value={u.status}
-                    onChange={(e) => update(u.id, { status: e.target.value })}
-                    style={{ fontSize: 12, padding: '2px 4px' }}
-                  >
+                  <select value={u.status} onChange={(e) => update(u.id, { status: e.target.value })} style={{ fontSize: 12, padding: '2px 4px', color: ACCOUNT_STATUS_COLOR[u.status] || undefined }}>
                     <option value="active">Active</option>
                     <option value="suspended">Suspended</option>
                   </select>
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  <Button
-                    type="button" variant="link" style={{ fontSize: 12 }}
-                    onClick={() => update(u.id, { key_status: u.key_status === 'active' ? 'suspended' : 'active' })}
-                  >
+                  <Button type="button" variant="link" style={{ fontSize: 12 }} onClick={() => update(u.id, { key_status: u.key_status === 'active' ? 'suspended' : 'active' })}>
                     {u.key_status === 'active' ? 'Khóa key' : 'Mở key'}
                   </Button>
                   <Button type="button" variant="link" style={{ fontSize: 12, color: 'var(--color-error)' }} onClick={() => remove(u.id, u.email)}>Xóa</Button>
                 </td>
-              </tr>
-            ))}
+              </tr>,
+              expandedId === u.id && (
+                <tr key={`${u.id}-detail`}>
+                  <td></td>
+                  <td colSpan={9} style={{ background: '#f8fafc', paddingTop: 0, paddingBottom: 8 }}>
+                    <GFUserDetail userId={u.id} />
+                  </td>
+                </tr>
+              ),
+            ])}
           </tbody>
         </table>
       </div>

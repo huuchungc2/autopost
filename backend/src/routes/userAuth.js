@@ -126,17 +126,40 @@ router.post('/logout', requireUserAuth, (req, res) => {
 
 // ── Admin routes (yêu cầu admin JWT) ──────────────────────────────────────
 
-// GET /api/user-auth/admin/users — danh sách tất cả user_accounts + key
+// GET /api/user-auth/admin/users — danh sách tất cả user_accounts + key + stats
 router.get('/admin/users', authenticate, asyncHandler(async (req, res) => {
   const rows = await query(
     `SELECT ua.id, ua.email, ua.name, ua.status, ua.created_at,
             lk.key_value, lk.plan, lk.status AS key_status,
-            lk.expires_at, lk.last_validated_at
+            lk.expires_at, lk.last_validated_at,
+            COUNT(DISTINCT up.group_id) AS group_count,
+            COUNT(up.id) AS post_count,
+            MAX(up.posted_at) AS last_post_at
      FROM user_accounts ua
      LEFT JOIN license_keys lk ON lk.user_id = ua.id
+     LEFT JOIN user_posts up ON up.user_account_id = ua.id
+     GROUP BY ua.id, lk.id
      ORDER BY ua.created_at DESC`
   );
   res.json(rows);
+}));
+
+// GET /api/user-auth/admin/users/:id/detail — groups + recent posts của 1 user
+router.get('/admin/users/:id/detail', authenticate, asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const groups = await query(
+    `SELECT group_id, group_name, COUNT(*) AS post_count, MAX(posted_at) AS last_posted_at
+     FROM user_posts WHERE user_account_id = ?
+     GROUP BY group_id, group_name ORDER BY last_posted_at DESC`,
+    [id]
+  );
+  const posts = await query(
+    `SELECT id, group_name, group_id, post_id, noi_dung, posted_at, needs_comment, created_at
+     FROM user_posts WHERE user_account_id = ?
+     ORDER BY created_at DESC LIMIT 20`,
+    [id]
+  );
+  res.json({ groups, posts });
 }));
 
 // PATCH /api/user-auth/admin/users/:id — cập nhật status / plan / expires_at
