@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **GroupFlow v1.0.149 — Dừng không cắt được bài đang đăng/comment**: `injectText()` (`content.js`) có 1 catch-all nuốt mọi lỗi khi gõ chữ để fallback sang paste — kể cả lỗi "Đã dừng đăng" cố ý ném ra bởi `checkAborted()`, khiến tín hiệu Dừng bị vô hiệu hoá và content script tiếp tục gõ/đăng dù background.js đã coi job là "stopped". `waitFor()` (chờ selector composer/comment box, tối đa 15s) hoàn toàn không kiểm tra cờ dừng trong lúc chờ. `commentOnPost()` không gọi `checkAborted()` ở bất kỳ đâu. Đã: (1) chỉ nuốt lỗi không phải abort trong `injectText`, ném lại nếu là abort; (2) thêm kiểm tra cờ dừng mỗi 300ms bên trong `waitFor()`; (3) thêm `checkAborted()` sau mỗi bước trong `commentOnPost()`. Đây là 2 hàm dùng chung cho cả đăng bài lẫn comment nên fix áp dụng cho cả hai luồng.
+
 ### Added
 - **GroupFlow v1.0.148 — hiển thị/thoát license key trong extension**: tab Cài đặt → Đồng bộ trước đây chỉ báo trạng thái license (hợp lệ/không) chứ không cho xem key thật hay đăng xuất — thêm ô hiện/ẩn key + nút "Thoát" (xoá `licenseKey`/`licenseInfo`, quay lại màn hình kích hoạt).
 - **License key tự cấp cho tài khoản nội bộ (Settings)**: `GET/POST /api/auth/my-license` cho phép bất kỳ user đang đăng nhập (admin/super_admin/editor) tự tạo/xem license key gắn thẳng vào `users.id` của chính họ — không tạo tài khoản `group_user` mới như `/api/user-auth/register`. UI: khối "License key của tôi" trong `GroupExtensionSettings.jsx` (Settings), cạnh API key extension đã có. Giải quyết việc admin/super_admin muốn tự dùng extension GroupFlow dưới đúng tài khoản của mình mà không phải đăng ký thêm 1 tài khoản tách biệt.

@@ -402,16 +402,27 @@ if (!GF_CONTENT) GF_CONTENT = {
     return new Promise((resolve, reject) => {
       const found = this.qs(sel);
       if (found) return resolve(found);
+      const cleanup = () => {
+        obs.disconnect();
+        clearTimeout(to);
+        clearInterval(abortTimer);
+      };
       const obs = new MutationObserver(() => {
         const el = this.qs(sel);
         if (el) {
-          obs.disconnect();
+          cleanup();
           resolve(el);
         }
       });
       obs.observe(document.documentElement, { childList: true, subtree: true });
-      setTimeout(() => {
-        obs.disconnect();
+      const abortTimer = setInterval(() => {
+        if (window.__gfAbortPost) {
+          cleanup();
+          reject(new Error('Đã dừng đăng'));
+        }
+      }, 300);
+      const to = setTimeout(() => {
+        cleanup();
         reject(new Error(`Timeout chờ ${sel}`));
       }, timeout);
     });
@@ -1379,7 +1390,10 @@ if (!GF_CONTENT) GF_CONTENT = {
       try {
         await this.typeHumanLike(el, plain);
         if (this.textInjectedOk(el, plain)) return;
-      } catch { /* fallback paste */ }
+      } catch (e) {
+        if (/đã dừng/i.test(e?.message || '')) throw e;
+        /* fallback paste */
+      }
     }
 
     const lines = plain.split(/\r?\n/);
@@ -1882,9 +1896,12 @@ if (!GF_CONTENT) GF_CONTENT = {
     if (!location.href.includes(`/groups/${groupId}/posts/${postId}`)) {
       throw new Error('Tab chưa ở đúng bài — thử lại');
     }
+    this.checkAborted();
     const boxSel = gfPickSelector(lang, 'commentBox');
     const box = await this.waitFor(boxSel);
+    this.checkAborted();
     await this.injectText(box, text);
+    this.checkAborted();
     await this.sleep(500);
     const submit = this.qsa(gfPickSelector(lang, 'commentSubmit')).find((el) => el.offsetParent);
     if (submit) submit.click();
