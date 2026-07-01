@@ -171,6 +171,15 @@ const FP = globalThis.GF.fbPostBg = {
 
   idFromRawText(rawText) {
     const t = String(rawText || '');
+
+    // Anchor search to the story_create section only — the full response can contain
+    // other users' posts (feed refresh), and a global search would pick up their IDs.
+    const scStart = t.indexOf('"story_create"');
+    if (scStart === -1) return null; // response has no story_create → not our target
+
+    // Take up to 8 KB after "story_create" to cover nested story object
+    const context = t.slice(scStart, scStart + 8000);
+
     const patterns = [
       /"legacy_story_hideable_id"\s*:\s*"(\d+)"/,
       /"legacy_api_post_id"\s*:\s*"(\d+)"/,
@@ -178,12 +187,9 @@ const FP = globalThis.GF.fbPostBg = {
       /"legacy_story_id"\s*:\s*"(\d+)"/,
       /"story_id"\s*:\s*"(\d+)"/,
       /"post_id"\s*:\s*"(\d+)"/,
-      /"feedback_id"\s*:\s*"(\d{8,})"/,
-      /story_create[\s\S]{0,2000}?"legacy_story_hideable_id"\s*:\s*"(\d+)"/,
-      /story_create[\s\S]{0,2000}?"id"\s*:\s*"(\d{8,})"/,
     ];
     for (const re of patterns) {
-      const m = t.match(re);
+      const m = context.match(re);
       if (m?.[1]) return m[1];
     }
     return null;
