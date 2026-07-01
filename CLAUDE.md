@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## CRITICAL RULE — Full-stack delivery (no partial work)
+
+**NEVER implement a feature partially and wait for the user to ask for the rest.**
+
+When a feature touches multiple layers, implement ALL layers in one shot:
+- Backend API route → Frontend UI → (if relevant) GroupFlow extension — all in the same task, no stopping between them.
+- If a feature needs a DB migration → write the SQL + `ensureXxx()` guard + wire it in `app.js` — all three, never just one.
+- If you touch the GroupFlow extension for any reason → bump the version in `manifest.json` in the same task.
+- Only stop and ask if there is a genuine ambiguity about *what* to build, not *whether* to build the next obvious layer.
+
+This rule exists because every half-done feature forces the user to chase you for the other half.
+
 ## What this is
 
 AutoPost: a Node.js/Express + MySQL backend, a React/Vite frontend, and a Chrome extension (**GroupFlow**) for scheduled Facebook content — both **fanpage posts** (cron-driven, server-side publish via Graph API) and **Facebook Group posts** (browser-automation, posted from the user's own logged-in session via the extension).

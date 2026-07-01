@@ -7,6 +7,116 @@ import { useAuth } from '../services/authContext';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 
+const PLAN_LABEL = { free: 'Miễn phí', pro: 'Pro', enterprise: 'Enterprise' };
+const KEY_STATUS_LABEL = { active: '✅ Active', expired: '❌ Hết hạn', suspended: '⛔ Khóa' };
+
+function GroupFlowUsers() {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { showToast } = useToast();
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/user-auth/admin/users');
+      setUsers(res.data);
+    } catch {
+      showToast('Không tải được danh sách GroupFlow users', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const update = async (id, patch) => {
+    try {
+      await api.patch(`/user-auth/admin/users/${id}`, patch);
+      showToast('Đã cập nhật', 'success');
+      load();
+    } catch {
+      showToast('Lỗi cập nhật', 'error');
+    }
+  };
+
+  const remove = async (id, email) => {
+    if (!window.confirm(`Xóa user ${email}?`)) return;
+    try {
+      await api.delete(`/user-auth/admin/users/${id}`);
+      showToast('Đã xóa', 'success');
+      load();
+    } catch {
+      showToast('Lỗi xóa', 'error');
+    }
+  };
+
+  if (loading) return <p style={{ padding: 16, color: 'var(--text-secondary)' }}>Đang tải…</p>;
+
+  return (
+    <div>
+      <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16 }}>
+        Danh sách tài khoản đăng ký dùng extension GroupFlow. Mỗi tài khoản có 1 license key.
+      </p>
+      <div className="card table-wrapper">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Email</th><th>Tên</th><th>License Key</th>
+              <th>Plan</th><th>Key status</th><th>Hết hạn</th>
+              <th>Lần cuối dùng</th><th>Tài khoản</th><th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {!users.length && (
+              <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-tertiary)' }}>Chưa có user nào</td></tr>
+            )}
+            {users.map((u) => (
+              <tr key={u.id}>
+                <td>{u.email}</td>
+                <td>{u.name || '—'}</td>
+                <td><code style={{ fontSize: 11 }}>{u.key_value || '—'}</code></td>
+                <td>
+                  <select
+                    value={u.plan || 'free'}
+                    onChange={(e) => update(u.id, { plan: e.target.value })}
+                    style={{ fontSize: 12, padding: '2px 4px' }}
+                  >
+                    <option value="free">Miễn phí</option>
+                    <option value="pro">Pro</option>
+                    <option value="enterprise">Enterprise</option>
+                  </select>
+                </td>
+                <td>{KEY_STATUS_LABEL[u.key_status] || u.key_status || '—'}</td>
+                <td style={{ fontSize: 12 }}>{u.expires_at ? new Date(u.expires_at).toLocaleDateString('vi') : 'Vĩnh viễn'}</td>
+                <td style={{ fontSize: 12 }}>{u.last_validated_at ? new Date(u.last_validated_at).toLocaleString('vi') : '—'}</td>
+                <td>
+                  <select
+                    value={u.status}
+                    onChange={(e) => update(u.id, { status: e.target.value })}
+                    style={{ fontSize: 12, padding: '2px 4px' }}
+                  >
+                    <option value="active">Active</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <Button
+                    type="button" variant="link" style={{ fontSize: 12 }}
+                    onClick={() => update(u.id, { key_status: u.key_status === 'active' ? 'suspended' : 'active' })}
+                  >
+                    {u.key_status === 'active' ? 'Khóa key' : 'Mở key'}
+                  </Button>
+                  <Button type="button" variant="link" style={{ fontSize: 12, color: 'var(--color-error)' }} onClick={() => remove(u.id, u.email)}>Xóa</Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 const initialForm = {
   name: '',
   username: '',
@@ -186,6 +296,8 @@ export default function UserManagement() {
     }
   };
 
+  const [tab, setTab] = useState('admin');
+
   if (!canManageUsers) {
     return <Navigate to="/" replace />;
   }
@@ -197,6 +309,26 @@ export default function UserManagement() {
         description={isSuperAdmin ? 'Super admin gán fanpage và AI provider cho admin/editor.' : 'Quản lý admin và biên tập — gán fanpage, provider.'}
       />
 
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--bg-border)', paddingBottom: 0 }}>
+        {[['admin', 'Admin / Biên tập'], ['groupflow', 'GroupFlow Users']].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            style={{
+              padding: '8px 16px', border: 'none', background: 'none', cursor: 'pointer',
+              fontSize: 14, fontWeight: tab === key ? 600 : 400,
+              color: tab === key ? 'var(--color-primary)' : 'var(--text-secondary)',
+              borderBottom: tab === key ? '2px solid var(--color-primary)' : '2px solid transparent',
+              marginBottom: -1,
+            }}
+          >{label}</button>
+        ))}
+      </div>
+
+      {tab === 'groupflow' && <GroupFlowUsers />}
+
+      {tab === 'admin' && <>
       {migrationWarning && (
         <div className="card modal-alert modal-alert--error" style={{ marginBottom: 16 }}>
           <p style={{ margin: 0 }}>{migrationWarning}</p>
@@ -301,6 +433,7 @@ export default function UserManagement() {
           </tbody>
         </table>
       </div>
+      </>}
     </div>
   );
 }

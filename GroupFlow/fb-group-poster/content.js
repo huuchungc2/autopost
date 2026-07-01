@@ -160,7 +160,14 @@ if (!GF_CONTENT) GF_CONTENT = {
       }
 
       const m = text.match(/"fb_api_req_friendly_name":"([^"]+)"[\s\S]{0,500}?"doc_id":"(\d+)"/);
-      if (m && window.GF?.fbGraphApi) GF.fbGraphApi.rememberDocId(m[1], m[2]);
+      if (m && window.GF?.fbGraphApi) {
+        GF.fbGraphApi.rememberDocId(m[1], m[2]);
+        // Persist key mutation doc_ids so service worker can use them
+        const KEY_MUTATIONS = ['useCometUFICreateCommentMutation', 'ComposerStoryCreateMutation'];
+        if (KEY_MUTATIONS.includes(m[1])) {
+          chrome.runtime.sendMessage({ type: 'GF_SAVE_KEY_DOC_ID', name: m[1], docId: m[2] }).catch(() => {});
+        }
+      }
       // Only extract post_id from responses that contain story_create — searching
       // all responses causes capturedPostId to be overwritten by other users' posts
       // that appear in feed-refresh chunks bundled with the same FB response.

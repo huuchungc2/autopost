@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import { query } from '../db.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'replace_with_strong_secret';
@@ -122,5 +123,48 @@ router.post('/validate-key', asyncHandler(async (req, res) => {
 router.post('/logout', requireUserAuth, (req, res) => {
   res.json({ ok: true });
 });
+
+// ── Admin routes (yêu cầu admin JWT) ──────────────────────────────────────
+
+// GET /api/user-auth/admin/users — danh sách tất cả user_accounts + key
+router.get('/admin/users', authenticate, asyncHandler(async (req, res) => {
+  const rows = await query(
+    `SELECT ua.id, ua.email, ua.name, ua.status, ua.created_at,
+            lk.key_value, lk.plan, lk.status AS key_status,
+            lk.expires_at, lk.last_validated_at
+     FROM user_accounts ua
+     LEFT JOIN license_keys lk ON lk.user_id = ua.id
+     ORDER BY ua.created_at DESC`
+  );
+  res.json(rows);
+}));
+
+// PATCH /api/user-auth/admin/users/:id — cập nhật status / plan / expires_at
+router.patch('/admin/users/:id', authenticate, asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status, plan, expires_at, key_status } = req.body;
+
+  if (status) {
+    await query('UPDATE user_accounts SET status = ? WHERE id = ?', [status, id]);
+  }
+  if (plan || key_status || expires_at !== undefined) {
+    const sets = [];
+    const vals = [];
+    if (plan) { sets.push('plan = ?'); vals.push(plan); }
+    if (key_status) { sets.push('status = ?'); vals.push(key_status); }
+    if (expires_at !== undefined) { sets.push('expires_at = ?'); vals.push(expires_at || null); }
+    if (sets.length) {
+      vals.push(id);
+      await query(`UPDATE license_keys SET ${sets.join(', ')} WHERE user_id = ?`, vals);
+    }
+  }
+  res.json({ ok: true });
+}));
+
+// DELETE /api/user-auth/admin/users/:id
+router.delete('/admin/users/:id', authenticate, asyncHandler(async (req, res) => {
+  await query('DELETE FROM user_accounts WHERE id = ?', [req.params.id]);
+  res.json({ ok: true });
+}));
 
 export default router;
