@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **GroupFlow v1.0.148 — hiển thị/thoát license key trong extension**: tab Cài đặt → Đồng bộ trước đây chỉ báo trạng thái license (hợp lệ/không) chứ không cho xem key thật hay đăng xuất — thêm ô hiện/ẩn key + nút "Thoát" (xoá `licenseKey`/`licenseInfo`, quay lại màn hình kích hoạt).
 - **License key tự cấp cho tài khoản nội bộ (Settings)**: `GET/POST /api/auth/my-license` cho phép bất kỳ user đang đăng nhập (admin/super_admin/editor) tự tạo/xem license key gắn thẳng vào `users.id` của chính họ — không tạo tài khoản `group_user` mới như `/api/user-auth/register`. UI: khối "License key của tôi" trong `GroupExtensionSettings.jsx` (Settings), cạnh API key extension đã có. Giải quyết việc admin/super_admin muốn tự dùng extension GroupFlow dưới đúng tài khoản của mình mà không phải đăng ký thêm 1 tài khoản tách biệt.
 
 ### Fixed

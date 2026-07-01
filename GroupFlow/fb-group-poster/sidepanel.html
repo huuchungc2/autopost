@@ -759,6 +759,14 @@
             Đang kiểm tra license…
           </div>
           <label class="settings-inline-field">
+            <span class="settings-field-label">License key</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="password" id="licenseKeyDisplay" readonly style="flex:1;font-family:monospace" />
+              <button type="button" id="btnToggleLicenseKey" class="btn secondary" style="padding:6px 10px">Hiện</button>
+              <button type="button" id="btnLogoutLicense" class="btn danger" style="padding:6px 10px">Thoát</button>
+            </div>
+          </label>
+          <label class="settings-inline-field">
             <span class="settings-field-label">URL server</span>
             <input type="url" id="tidienBaseUrl" placeholder="https://tidien.xyz" />
           </label>

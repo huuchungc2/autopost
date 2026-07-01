@@ -4142,6 +4142,8 @@ async function showSyncLicenseStatus() {
   const el = $('#syncLicenseStatus');
   if (!el) return;
   const { licenseKey, licenseInfo } = await chrome.storage.local.get(['licenseKey', 'licenseInfo']);
+  const keyInput = $('#licenseKeyDisplay');
+  if (keyInput) keyInput.value = licenseKey || '';
   if (licenseKey && licenseInfo?.valid) {
     const plan = licenseInfo.plan ? ` · ${licenseInfo.plan}` : '';
     const email = licenseInfo.email ? ` · ${licenseInfo.email}` : '';
@@ -4156,6 +4158,7 @@ async function showSyncLicenseStatus() {
     el.textContent = '⚠ Chưa có license key — nhập key ở màn hình kích hoạt';
   }
 }
+
 
 async function loadSettingsForm() {
   const s = await GF.storage.getSettings();
@@ -4623,6 +4626,22 @@ function bindEvents() {
   });
 
   $('#btnTidienSyncNow')?.addEventListener('click', () => runTidienSyncNow());
+
+  $('#btnToggleLicenseKey')?.addEventListener('click', () => {
+    const input = $('#licenseKeyDisplay');
+    const btn = $('#btnToggleLicenseKey');
+    if (!input || !btn) return;
+    const showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    btn.textContent = showing ? 'Hiện' : 'Ẩn';
+  });
+
+  $('#btnLogoutLicense')?.addEventListener('click', async () => {
+    if (!window.confirm('Thoát license key? Extension sẽ yêu cầu nhập lại key để dùng tiếp.')) return;
+    await chrome.storage.local.remove(['licenseKey', 'licenseInfo']);
+    showToast('Đã thoát license key', 'info');
+    location.reload();
+  });
   $('#btnSaveSettings').addEventListener('click', saveSettingsForm);
   $('#btnSaveActiveProviders')?.addEventListener('click', () => saveActiveProviders().catch((e) => alert(e.message)));
   $('#btnSaveProvider')?.addEventListener('click', () => saveProviderForm().catch((e) => alert(e.message)));
