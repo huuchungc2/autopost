@@ -74,14 +74,58 @@ router.post('/login', asyncHandler(async (req, res) => {
 
 // GET /api/user-auth/me
 router.get('/me', requireUserAuth, asyncHandler(async (req, res) => {
-  const rows = await query('SELECT id, email, name, status, created_at FROM user_accounts WHERE id = ?', [req.userAccount.userId]);
+  const uid = req.userAccount.userId;
+  const rows = await query('SELECT id, email, name, status, created_at FROM user_accounts WHERE id = ?', [uid]);
   if (!rows.length) return res.status(404).json({ error: 'Tài khoản không tồn tại' });
 
   const keys = await query(
     'SELECT key_value, plan, status, expires_at, created_at, last_validated_at FROM license_keys WHERE user_id = ? ORDER BY created_at DESC',
-    [req.userAccount.userId]
+    [uid]
   );
-  res.json({ user: rows[0], keys });
+  const [stats] = await query(
+    `SELECT COUNT(DISTINCT group_id) AS group_count, COUNT(*) AS post_count, MAX(posted_at) AS last_post_at
+     FROM user_posts WHERE user_account_id = ?`,
+    [uid]
+  );
+  res.json({ user: rows[0], keys, stats: stats || { group_count: 0, post_count: 0, last_post_at: null } });
+}));
+
+// GET /api/user-auth/me/detail — groups + recent posts của chính user
+router.get('/me/detail', requireUserAuth, asyncHandler(async (req, res) => {
+  const uid = req.userAccount.userId;
+  const groups = await query(
+    `SELECT group_id, group_name, COUNT(*) AS post_count, MAX(posted_at) AS last_posted_at
+     FROM user_posts WHERE user_account_id = ?
+     GROUP BY group_id, group_name ORDER BY last_posted_at DESC`,
+    [uid]
+  );
+  const posts = await query(
+    `SELECT id, group_name, group_id, post_id, noi_dung, posted_at, needs_comment, created_at
+     FROM user_posts WHERE user_account_id = ?
+     ORDER BY created_at DESC LIMIT 30`,
+    [uid]
+  );
+  res.json({ groups, posts });
+}));
+
+// PATCH /api/user-auth/me — đổi tên / mật khẩu
+router.patch('/me', requireUserAuth, asyncHandler(async (req, res) => {
+  const uid = req.userAccount.userId;
+  const { name, current_password, new_password } = req.body;
+
+  if (new_password) {
+    if (!current_password) return res.status(400).json({ error: 'Nhập mật khẩu hiện tại' });
+    if (new_password.length < 6) return res.status(400).json({ error: 'Mật khẩu mới tối thiểu 6 ký tự' });
+    const [acc] = await query('SELECT password_hash FROM user_accounts WHERE id = ?', [uid]);
+    const valid = await bcrypt.compare(current_password, acc.password_hash);
+    if (!valid) return res.status(400).json({ error: 'Mật khẩu hiện tại không đúng' });
+    const hash = await bcrypt.hash(new_password, 10);
+    await query('UPDATE user_accounts SET password_hash = ? WHERE id = ?', [hash, uid]);
+  }
+  if (name !== undefined) {
+    await query('UPDATE user_accounts SET name = ? WHERE id = ?', [name || null, uid]);
+  }
+  res.json({ ok: true });
 }));
 
 // POST /api/user-auth/validate-key  (gọi từ extension — public)
