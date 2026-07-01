@@ -195,29 +195,31 @@ const FP = globalThis.GF.fbPostBg = {
     return null;
   },
 
-  extractPostId(json, rawText, chunks = []) {
+  extractPostId(json, rawText, chunks = [], _debugLog) {
+    const log = _debugLog || (() => {});
     const list = [...(chunks || []), json].filter(Boolean);
     for (const p of list) {
       const id = this.idFromPayload(p);
       if (id) {
         const sc = p?.data?.story_create;
-        console.log('[GF] extractPostId via idFromPayload:', id,
-          '| sc keys:', sc ? Object.keys(sc).join(',') : 'n/a',
-          '| story keys:', sc?.story ? Object.keys(sc.story).join(',') : 'n/a');
+        const scKeys = sc ? Object.keys(sc).join(',') : 'n/a';
+        const storyKeys = sc?.story ? Object.keys(sc.story).join(',') : 'n/a';
+        log(`[DEBUG post_id] method=payload id=${id} sc_keys=[${scKeys}] story_keys=[${storyKeys}]`);
         return id;
       }
     }
     const fromLines = this.idFromGraphqlLines(rawText);
     if (fromLines) {
-      console.log('[GF] extractPostId via idFromGraphqlLines:', fromLines);
+      log(`[DEBUG post_id] method=graphql_lines id=${fromLines}`);
       return fromLines;
     }
     const fromRaw = this.idFromRawText(rawText);
     if (fromRaw) {
-      console.log('[GF] extractPostId via idFromRawText (fallback):', fromRaw);
+      log(`[DEBUG post_id] method=raw_text id=${fromRaw}`);
     } else {
-      console.warn('[GF] extractPostId: KHÔNG tìm được post_id. story_create snippet:',
-        rawText.slice(rawText.indexOf('"story_create"'), rawText.indexOf('"story_create"') + 500));
+      const scIdx = rawText.indexOf('"story_create"');
+      const snippet = scIdx >= 0 ? rawText.slice(scIdx, scIdx + 300) : '(story_create not found)';
+      log(`[DEBUG post_id] KHÔNG tìm được post_id. snippet: ${snippet}`);
     }
     return fromRaw;
   },
@@ -497,7 +499,14 @@ const FP = globalThis.GF.fbPostBg = {
       throw new Error(err.message);
     }
 
-    const postId = this.extractPostId(json, rawText, chunks);
+    const debugMsgs = [];
+    const postId = this.extractPostId(json, rawText, chunks, (m) => debugMsgs.push(m));
+    if (debugMsgs.length) {
+      globalThis.GF?.bg?.appendEngineLog?.({
+        level: 'info', phase: 'post-id-debug', message: debugMsgs.join(' | '),
+        groupId: String(groupId),
+      }).catch?.(() => {});
+    }
     const notice = this.parseGraphqlNotice(json, rawText, chunks);
     const pending = !postId && this.detectPending(json, rawText, chunks);
     const spamWarn = this.detectSpamWarning(json, chunks) || notice;
