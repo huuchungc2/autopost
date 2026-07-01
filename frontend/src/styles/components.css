@@ -563,117 +563,136 @@ button {
 }
 
 .login-card {
-  width: min(400px, 100%);
-  background: var(--bg-surface);
-  border: none;
-  border-top: 3px solid var(--color-primary);
-  border-radius: var(--card-radius);
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 24px 56px rgba(0,0,0,0.5);
-  padding: var(--space-8);
+  width: min(420px, 100%);
+  background: #18181b;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  box-shadow: 0 32px 64px rgba(0,0,0,0.6);
+  padding: 40px 36px;
 }
 
 .login-brand {
   text-align: center;
-  margin-bottom: var(--space-8);
+  margin-bottom: 32px;
 }
 
 .login-logo {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: var(--color-primary);
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #2563eb;
   color: #fff;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  margin-bottom: var(--space-4);
+  margin-bottom: 16px;
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.15);
 }
 
 .login-brand h1 {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-xl);
+  margin: 0 0 8px;
+  font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.03em;
-  color: var(--text-primary);
+  color: #fafafa;
 }
 
 .login-brand p {
   margin: 0;
-  font-size: var(--text-sm);
-  color: var(--text-tertiary);
+  font-size: 0.8125rem;
+  color: rgba(255,255,255,0.4);
 }
 
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 16px;
 }
 
 .login-form label {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
+  gap: 6px;
+  font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: rgba(255,255,255,0.55);
 }
 
 .login-form input {
   width: 100%;
-  padding: 10px 14px;
-  border: 1.5px solid var(--bg-border);
-  border-radius: var(--input-radius);
-  font-size: var(--text-base);
-  background: #fff;
-  color: var(--text-primary);
-  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+  padding: 11px 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: #27272a;
+  color: #fafafa;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.login-form input::placeholder {
+  color: rgba(255,255,255,0.25);
 }
 
 .login-form input:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-subtle);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.2);
 }
 
 .login-form input:-webkit-autofill,
 .login-form input:-webkit-autofill:hover,
 .login-form input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 1000px #fff inset;
-  -webkit-text-fill-color: var(--text-primary);
-  border-color: var(--bg-border);
+  -webkit-box-shadow: 0 0 0 1000px #27272a inset;
+  -webkit-text-fill-color: #fafafa;
+  border-color: rgba(255,255,255,0.1);
   transition: background-color 9999s;
 }
 
 .login-form .form-error {
   margin: 0;
   padding: 10px 12px;
-  border-radius: var(--input-radius);
-  background: var(--bg-error);
-  color: var(--color-error);
-  font-size: var(--text-sm);
-  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: rgba(220,38,38,0.12);
+  color: #fca5a5;
+  font-size: 0.8125rem;
+  border: 1px solid rgba(220,38,38,0.25);
 }
 
 .login-form button {
   width: 100%;
-  margin-top: var(--space-2);
-  height: 42px;
+  margin-top: 4px;
+  height: 44px;
   font-weight: 600;
+  font-size: 0.875rem;
   letter-spacing: 0.01em;
+  background: #2563eb !important;
+  color: #fff !important;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 150ms, opacity 150ms;
+}
+
+.login-form button:hover:not(:disabled) {
+  background: #1d4ed8 !important;
+}
+
+.login-form button:disabled {
+  opacity: 0.55;
 }
 
 .login-page-footer {
-  margin-top: var(--space-5);
+  margin-top: 20px;
   text-align: center;
-  font-size: var(--text-sm);
-  color: rgba(255,255,255,0.35);
+  font-size: 0.8125rem;
+  color: rgba(255,255,255,0.3);
 }
 
 .login-page-footer a {
-  color: rgba(255,255,255,0.55);
+  color: rgba(255,255,255,0.5);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
