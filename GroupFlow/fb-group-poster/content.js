@@ -161,12 +161,20 @@ if (!GF_CONTENT) GF_CONTENT = {
 
       const m = text.match(/"fb_api_req_friendly_name":"([^"]+)"[\s\S]{0,500}?"doc_id":"(\d+)"/);
       if (m && window.GF?.fbGraphApi) GF.fbGraphApi.rememberDocId(m[1], m[2]);
-      const postM = text.match(/"legacy_story_hideable_id":"(\d+)"/)
-        || text.match(/"legacy_story_id":"(\d+)"/)
-        || text.match(/"legacy_api_post_id":"(\d+)"/)
-        || text.match(/"post_id":"(\d+)"/)
-        || text.match(/story_create[\s\S]{0,3000}?"id":"(\d{8,})"/);
-      if (postM) this.capturedPostId = postM[1];
+      // Only extract post_id from responses that contain story_create — searching
+      // all responses causes capturedPostId to be overwritten by other users' posts
+      // that appear in feed-refresh chunks bundled with the same FB response.
+      if (text.includes('"story_create"')) {
+        const scIdx = text.indexOf('"story_create"');
+        const ctx = text.slice(scIdx, scIdx + 8000);
+        const postM = ctx.match(/"legacy_story_hideable_id":"(\d+)"/)
+          || ctx.match(/"legacy_api_post_id":"(\d+)"/)
+          || ctx.match(/"legacy_story_id":"(\d+)"/)
+          || ctx.match(/"legacy_fbid":"(\d+)"/)
+          || ctx.match(/"post_id":"(\d+)"/)
+          || ctx.match(/story_create[\s\S]{0,3000}?"id":"(\d{8,})"/);
+        if (postM) this.capturedPostId = postM[1];
+      }
     } catch { /* ignore */ }
   },
 
