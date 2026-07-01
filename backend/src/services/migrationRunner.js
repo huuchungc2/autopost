@@ -402,6 +402,19 @@ export async function ensureWebsitesTable() {
   await runMigrationFile('031_websites_table.sql', 'Migration 031 applied: websites table, posts.website_id/website_post_id/website_post_url/website_published_at');
 }
 
+export async function ensurePostsWebsiteColumns() {
+  // Separate guard so that if 031 ran but failed mid-way (websites table created,
+  // ALTER TABLE posts not reached), we still add the missing columns.
+  if (await columnExists('posts', 'website_id')) return;
+  await query('ALTER TABLE posts MODIFY COLUMN page_id INT NULL');
+  await query('ALTER TABLE posts ADD COLUMN website_id INT NULL AFTER page_id');
+  await query('ALTER TABLE posts ADD CONSTRAINT fk_posts_website_id FOREIGN KEY (website_id) REFERENCES websites(id)');
+  await query('ALTER TABLE posts ADD COLUMN website_post_id VARCHAR(255) NULL AFTER seo_meta');
+  await query('ALTER TABLE posts ADD COLUMN website_post_url VARCHAR(500) NULL AFTER website_post_id');
+  await query('ALTER TABLE posts ADD COLUMN website_published_at DATETIME NULL AFTER website_post_url');
+  console.log('Migration fix: posts.website_id and related columns added');
+}
+
 export async function ensureDriveOAuthMigration() {
   if (!(await tableExists('app_settings'))) return;
   const rows = await query(
