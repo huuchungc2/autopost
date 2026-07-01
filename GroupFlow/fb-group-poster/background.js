@@ -882,7 +882,7 @@ const GF_BG = {
     if (!enriched.url && enriched.group_id && enriched.post_id && enriched.post_id !== 'pending') {
       const pid = String(enriched.post_id);
       if (/^\d+$/.test(pid)) {
-        enriched.url = `https://www.facebook.com/groups/${enriched.group_id}/posts/${pid}/`;
+        enriched.url = `https://www.facebook.com/permalink.php?story_fbid=${pid}&id=${enriched.group_id}`;
       }
     }
     list.unshift(enriched);
@@ -1113,7 +1113,7 @@ const GF_BG = {
     const gid = String(groupId || '');
     const pid = String(postId || '');
     if (gid && pid && pid !== 'pending' && /^\d+$/.test(pid)) {
-      return `https://www.facebook.com/groups/${gid}/posts/${pid}/`;
+      return `https://www.facebook.com/permalink.php?story_fbid=${pid}&id=${gid}`;
     }
     if (gid) return `https://www.facebook.com/groups/${gid}/`;
     return null;

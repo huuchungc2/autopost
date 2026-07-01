@@ -432,7 +432,7 @@ export async function listPublishedGroupPosts(filters = {}) {
       ngay_dang: r.ngay_dang,
       gio_dang: r.gio_dang,
       comment_count: Number(r.comment_count) || 0,
-      fb_url: `https://www.facebook.com/groups/${r.group_id}/posts/${r.post_id}`,
+      fb_url: `https://www.facebook.com/permalink.php?story_fbid=${r.post_id}&id=${r.group_id}`,
     })),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
   };

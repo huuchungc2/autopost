@@ -109,21 +109,26 @@ const FP = globalThis.GF.fbPostBg = {
   idFromStoryCreate(sc) {
     if (!sc) return null;
     const story = sc.story;
+    // legacy_story_hideable_id / legacy_api_post_id are the correct public URL IDs.
+    // sc.story_id / sc.post_id are internal Facebook graph IDs that look numeric but
+    // don't map to the public permalink — so they go last as final fallbacks.
     const candidates = [
-      sc.story_id,
-      sc.post_id,
       sc.legacy_story_hideable_id,
-      sc.legacy_fbid,
       sc.legacy_api_post_id,
+      sc.legacy_fbid,
       story?.legacy_story_hideable_id,
+      story?.legacy_api_post_id,
       story?.legacy_fbid,
       story?.legacy_id,
       story?.legacy_story_id,
-      story?.post_id,
-      story?.id,
       sc.feed_story_edge?.node?.legacy_story_hideable_id,
       sc.feed_story_edge?.node?.legacy_fbid,
       sc.feed_story_edge?.node?.id,
+      // last resort: internal IDs that may not match the public URL
+      sc.story_id,
+      sc.post_id,
+      story?.post_id,
+      story?.id,
     ];
     for (const c of candidates) {
       const id = this.normalizePostId(c);
@@ -480,7 +485,7 @@ const FP = globalThis.GF.fbPostBg = {
       return {
         postId,
         mode: 'fast-bg',
-        url: `${groupUrl}/permalink/${postId}/`,
+        url: `https://www.facebook.com/permalink.php?story_fbid=${postId}&id=${groupId}`,
         warning: notice || undefined,
       };
     }

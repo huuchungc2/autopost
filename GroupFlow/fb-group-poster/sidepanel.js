@@ -3573,9 +3573,8 @@ function buildHistoryPostUrl(h) {
   if (pid && pid !== 'pending') {
     const s = String(pid);
     if (/^\d+$/.test(s)) {
-      return `https://www.facebook.com/groups/${gid}/posts/${s}/`;
+      return `https://www.facebook.com/permalink.php?story_fbid=${s}&id=${gid}`;
     }
-    return `https://www.facebook.com/groups/${gid}/posts/${encodeURIComponent(s)}`;
   }
   if (h?.ok) return `https://www.facebook.com/groups/${gid}`;
   return '';
@@ -3586,7 +3585,7 @@ function buildPostedGroupUrl(g) {
   const gid = g?.group_id;
   const pid = g?.post_id;
   if (gid && pid && pid !== 'pending' && /^\d+$/.test(String(pid))) {
-    return `https://www.facebook.com/groups/${gid}/posts/${String(pid)}/`;
+    return `https://www.facebook.com/permalink.php?story_fbid=${String(pid)}&id=${gid}`;
   }
   if (gid) return `https://www.facebook.com/groups/${gid}/`;
   return null;
