@@ -268,6 +268,22 @@
           <input type="checkbox" id="selectAllPosts" />
           <span>Chọn tất cả bài</span>
         </label>
+        <div class="post-filter-bar">
+          <div class="search-wrap post-filter-search">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="postSearch" placeholder="Tìm nội dung…" />
+          </div>
+          <select id="postFilterGroup" class="gf-select-sm">
+            <option value="all">Nhóm: Tất cả</option>
+            <option value="has">Có nhóm</option>
+            <option value="none">Chưa có nhóm</option>
+          </select>
+          <select id="postFilterImage" class="gf-select-sm">
+            <option value="all">Ảnh: Tất cả</option>
+            <option value="has">Có ảnh</option>
+            <option value="none">Chưa có ảnh</option>
+          </select>
+        </div>
         <div id="postList" class="list"></div>
       </div>
     </section>
@@ -340,7 +356,7 @@
           </div>
           <button type="button" id="btnRefreshComments" class="btn ghost sm">Làm mới</button>
         </div>
-        <p class="hint">Giãn cách ngẫu nhiên giữa mỗi comment theo mức <strong>Settings → Giãn cách</strong>. Danh sách <strong>tự sync</strong> từ tidien (~10 phút + khi mở panel). Ô comment <strong>để trống</strong> → dùng mẫu Settings (spintax, random dòng).</p>
+        <p class="hint">Danh sách là các bài đã đăng qua GroupFlow. Nhập spintax <code>{nội dung 1|nội dung 2}</code> hoặc chọn mẫu từ dropdown — để trống dùng mẫu Settings. Giãn cách theo <strong>Settings → Giãn cách</strong>.</p>
         <div class="row" style="margin-bottom: 10px">
           <button type="button" id="btnFillCommentTemplates" class="btn ghost sm">Điền mẫu vào ô trống</button>
         </div>
@@ -516,6 +532,7 @@
           <button type="button" class="settings-nav-btn active" data-settings-pane="settings-posting">Đăng bài</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-media">Ảnh</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-ai">AI</button>
+          <button type="button" class="settings-nav-btn" data-settings-pane="settings-license">🔑 Key</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-sync">Đồng bộ</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-advanced">Nâng cao</button>
         </nav>
@@ -713,6 +730,27 @@
           <h4 class="settings-block-title">Comment mẫu (chéo team)</h4>
           <p class="hint">Mỗi dòng một mẫu spintax <code>{a|b|c}</code>. Tab Comment: ô trống → random khi <strong>Chạy đã chọn</strong>.</p>
           <textarea id="commentTemplates" rows="4" placeholder="{Hay quá|Đúng ý}&#10;{Hữu ích|Ủng hộ bạn}"></textarea>
+        </div>
+      </div>
+
+      <div class="card settings-card settings-pane-hidden" id="settings-license">
+        <header class="settings-card-head">
+          <span class="settings-card-icon" aria-hidden="true">🔑</span>
+          <div class="settings-card-head-text">
+            <h3 class="settings-card-title">Kích hoạt extension</h3>
+            <p class="settings-card-desc">Dán License Key từ trang dashboard tài khoản của bạn.</p>
+          </div>
+        </header>
+        <div class="settings-block">
+          <label class="settings-inline-field">
+            <span class="settings-field-label">License Key</span>
+            <input type="text" id="licenseKey" placeholder="Dán key tại đây…" style="font-family:monospace;letter-spacing:1px" />
+          </label>
+          <div class="row" style="margin-top:10px;gap:8px">
+            <button type="button" id="btnValidateLicense" class="btn primary sm">Xác thực key</button>
+            <span id="licenseStatus" class="hint" style="align-self:center"></span>
+          </div>
+          <p class="hint" style="margin-top:8px">Chưa có key? <a href="#" id="linkRegister" target="_blank">Đăng ký tại đây</a></p>
         </div>
       </div>
 

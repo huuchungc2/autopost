@@ -28,6 +28,9 @@ import Settings from './pages/Settings';
 import ChangePassword from './pages/ChangePassword';
 import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
+import UserRegister from './pages/UserRegister';
+import UserLogin from './pages/UserLogin';
+import UserDashboard from './pages/UserDashboard';
 
 function App() {
   return (
@@ -35,6 +38,9 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/user/register" element={<UserRegister />} />
+          <Route path="/user/login" element={<UserLogin />} />
+          <Route path="/user/dashboard" element={<UserDashboard />} />
           <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route index element={<Dashboard />} />
             <Route path="posts" element={<Posts />} />

@@ -1772,8 +1772,9 @@ const GF_BG = {
     if (!comment) throw new Error('Chưa có nội dung comment');
     const validPostId = job.post_id && /^\d+$/.test(String(job.post_id));
     if (FC && validPostId) {
+      let bgRes;
       try {
-        return await FC.commentOnPost({
+        bgRes = await FC.commentOnPost({
           groupId: job.group_id,
           postId: job.post_id,
           text: comment,
@@ -1784,6 +1785,13 @@ const GF_BG = {
           .test(e.message || '');
         if (noDomFallback) throw e;
         console.warn('[GroupFlow] comment bg failed, fallback DOM:', e.message);
+      }
+      // Nếu Quick trả về commentId hợp lệ → dùng kết quả đó
+      if (bgRes?.commentId) return bgRes;
+      // Nếu Quick trả về ok:true nhưng không có commentId (doc_id hết hạn, FB không tạo comment)
+      // → fallback sang Classic DOM thay vì báo "OK" giả
+      if (bgRes) {
+        console.warn('[GroupFlow] comment bg returned no commentId, falling back to Classic DOM');
       }
     }
     await this.sendToFb('GF_COMMENT', {
@@ -1914,26 +1922,12 @@ const GF_BG = {
       throw e;
     }
 
-    const fbUser = settings.fbUser || await this.getFbUserFromCookie();
-    const base = (await chrome.storage.local.get('tidienBaseUrl')).tidienBaseUrl || 'https://tidien.xyz';
-    const key = await chrome.storage.local.get(['tidienApiKey', 'tidienToken']);
-    const token = key.tidienApiKey || key.tidienToken;
-    await fetch(`${base.replace(/\/$/, '')}/api/group-posts/${job.record_id}/commented`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ commenter_fb_user_id: fbUser?.id }),
-    });
-    const cached = await chrome.storage.local.get('tidienPendingComments');
-    const pruned = (cached.tidienPendingComments || [])
-      .filter((c) => String(c.id) !== String(job.record_id));
-    if (pruned.length !== (cached.tidienPendingComments || []).length) {
-      await chrome.storage.local.set({ tidienPendingComments: pruned });
-      chrome.runtime.sendMessage({ type: 'GF_TIDIEN_SYNCED', data: { comments: pruned.length } }).catch(() => {});
-    }
+    await this.markPostedGroupCommented(job.post_queue_id, job.group_id, true);
     await this.appendHistory({
       type: 'comment',
       ok: true,
       group_id: job.group_id,
+      group_name: job.group_name,
       post_id: job.post_id,
       comment_id: res.commentId,
       snippet: comment.slice(0, 80),
@@ -2658,6 +2652,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg.type === 'GF_SAVE_GRAPHQL_DOC_IDS') {
         const docIds = await globalThis.GF?.groupMetaStore?.saveDocIds(msg.docIds || {});
         sendResponse({ ok: true, docIds });
+        return;
+      }
+      if (msg.type === 'GF_SAVE_KEY_DOC_ID' && msg.name && msg.docId) {
+        const d = await chrome.storage.local.get('gf_key_doc_ids');
+        const existing = d.gf_key_doc_ids || {};
+        if (existing[msg.name] !== msg.docId) {
+          await chrome.storage.local.set({ gf_key_doc_ids: { ...existing, [msg.name]: msg.docId } });
+        }
+        sendResponse({ ok: true });
         return;
       }
       if (msg.type === 'GF_APPLY_GROUP_META') {

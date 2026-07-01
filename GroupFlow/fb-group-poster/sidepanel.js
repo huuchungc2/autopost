@@ -31,6 +31,9 @@ const state = {
   editingCustomSetId: null,
   postingPostId: null,
   postingProgress: { done: 0, total: 0 },
+  postSearch: '',
+  postFilterGroup: 'all',
+  postFilterImage: 'all',
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -323,7 +326,7 @@ async function loadState() {
   });
   await refreshJournalFromStorage();
   renderLeads(d.radarLeads || []);
-  await applyTidienCommentsFromStorage();
+  await loadPostedPostsForComment();
   const syncedAt = Number(d.groupsSyncedAt || 0);
   const GROUP_SYNC_STALE_MS = 5 * 60 * 1000;
   const needGroupSync = !state.groups.length
@@ -2377,10 +2380,27 @@ function updateBatchFooter() {
   syncQueueScheduleFooterFromSelection();
 }
 
+function getFilteredPosts() {
+  let posts = state.posts;
+  const q = (state.postSearch || '').trim().toLowerCase();
+  if (q) posts = posts.filter((p) => (p.noi_dung || '').toLowerCase().includes(q));
+  if (state.postFilterGroup === 'has') posts = posts.filter((p) => p.groupIds?.length > 0);
+  else if (state.postFilterGroup === 'none') posts = posts.filter((p) => !p.groupIds?.length);
+  if (state.postFilterImage === 'has') posts = posts.filter((p) => postHasMedia(p) || p.mediaCached);
+  else if (state.postFilterImage === 'none') posts = posts.filter((p) => !postHasMedia(p) && !p.mediaCached);
+  return posts;
+}
+
 function renderPosts() {
   const box = $('#postList');
   const countEl = $('#postCount');
-  if (countEl) countEl.textContent = String(state.posts.length);
+  const filtered = getFilteredPosts();
+  const total = state.posts.length;
+  if (countEl) {
+    countEl.textContent = filtered.length < total
+      ? `${filtered.length}/${total}`
+      : String(total);
+  }
 
   if (!state.posts.length) {
     box.innerHTML = emptyState('📋', 'Chưa có bài trong queue — import Excel hoặc tải từ web');
@@ -2389,7 +2409,14 @@ function renderPosts() {
     return;
   }
 
-  box.innerHTML = state.posts.map((p) => {
+  if (!filtered.length) {
+    box.innerHTML = emptyState('🔍', 'Không có bài khớp bộ lọc');
+    updatePostsBulkBar();
+    updateBatchFooter();
+    return;
+  }
+
+  box.innerHTML = filtered.map((p) => {
     ensurePostGroups(p);
     const isEditingInCompose = p.id === state.editingQueuePostId;
     const hasMedia = postHasMedia(p) || p.mediaCached;
@@ -3272,9 +3299,13 @@ async function rescheduleUpcoming(item) {
   loadState();
 }
 
-async function applyTidienCommentsFromStorage() {
-  const d = await chrome.storage.local.get(['tidienPendingComments', 'tidienCommentsSyncedAt']);
-  state.comments = d.tidienPendingComments || [];
+async function loadPostedPostsForComment() {
+  const d = await chrome.storage.local.get('postQueue');
+  const queue = d.postQueue || [];
+  state.comments = queue
+    .filter((p) => p.postStatus === 'posted'
+      && p.postedGroups?.some((g) => g.post_id && /^\d+$/.test(String(g.post_id))))
+    .sort((a, b) => (b.lastPostedAt || '').localeCompare(a.lastPostedAt || ''));
   const badge = $('#commentBadge');
   if (badge) badge.textContent = state.comments.length ? String(state.comments.length) : '';
   if ($('#tab-comment')?.classList.contains('active')) renderComments();
@@ -3292,7 +3323,7 @@ async function triggerTidienAutoSync({ silent = false, force = false, scope = 'c
       showToast('Vừa sync — thử lại sau vài phút', 'info');
       return res;
     }
-    await applyTidienCommentsFromStorage();
+    await loadPostedPostsForComment();
     if (res?.draftsAdded > 0) {
       const d = await chrome.storage.local.get('postQueue');
       state.posts = mapPostsFromQueue(d.postQueue || []);
@@ -3347,12 +3378,10 @@ async function runTidienSyncNow() {
 }
 
 async function loadComments() {
-  await applyTidienCommentsFromStorage();
+  await loadPostedPostsForComment();
   if (!state.comments.length) {
     const box = $('#commentList');
-    if (box) {
-      box.innerHTML = emptyState('💬', 'Chưa có bài — đăng nhập tidien trong Cài đặt; mở tab này để sync');
-    }
+    if (box) box.innerHTML = emptyState('💬', 'Chưa có bài đã đăng — đăng bài qua GroupFlow trước');
   } else {
     renderComments();
   }
@@ -3362,32 +3391,49 @@ async function loadComments() {
     const pad = (n) => String(n).padStart(2, '0');
     startEl.value = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`;
   }
-  triggerTidienAutoSync({ silent: true });
 }
 
 function renderComments() {
   const box = $('#commentList');
   if (!state.comments.length) {
-    box.innerHTML = emptyState('💬', 'Chưa có bài từ tidien — kiểm tra đăng nhập; sync thông minh ~10 phút hoặc bấm ↻');
+    box.innerHTML = emptyState('💬', 'Chưa có bài đã đăng — đăng bài qua GroupFlow trước');
     return;
   }
+  const rawTemplates = ($('#commentTemplates')?.value?.trim() || GF.commentTemplates?.DEFAULT || '').split('\n').filter((s) => s.trim());
+  const tplOptions = rawTemplates.length
+    ? `<option value="">📋 Chọn mẫu…</option>${rawTemplates.map((t) => `<option value="${escAttr(t)}">${esc(t.slice(0, 55))}</option>`).join('')}`
+    : '';
   box.innerHTML = state.comments.map((c) => {
     const draft = state.commentDrafts[c.id] || '';
+    const validGroups = (c.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
+    const groupInfo = validGroups.length === 1
+      ? esc(validGroups[0].group_name || validGroups[0].group_id)
+      : `${validGroups.length} nhóm`;
+    const postedAt = c.lastPostedAt ? new Date(c.lastPostedAt).toLocaleString('vi') : '';
     return `
     <div class="list-item">
-      <label class="check-row"><input type="checkbox" data-comment-id="${c.id}" checked /></label>
-      <div>${esc(c.noi_dung?.slice(0, 60) || '')}</div>
-      <div class="hint">${esc(c.group_name || c.group_id || '')} · ${esc(c.poster_name || c.posted_by)} · 💬×${c.my_comment_count || 0}</div>
-      <textarea data-draft="${c.id}" rows="2" placeholder="Để trống → dùng mẫu Settings">${esc(draft)}</textarea>
+      <label class="check-row"><input type="checkbox" data-comment-id="${escAttr(c.id)}" checked /></label>
+      <div>${esc(c.noi_dung?.slice(0, 70) || '—')}</div>
+      <div class="hint">${groupInfo}${postedAt ? ' · ' + postedAt : ''}</div>
+      <textarea data-draft="${escAttr(c.id)}" rows="2" placeholder="Spintax: {nội dung 1|nội dung 2} hoặc để trống dùng mẫu Settings">${esc(draft)}</textarea>
       <div class="row">
-        <button type="button" class="btn outline sm" data-ai-comment="${c.id}">AI</button>
-        <button type="button" class="btn primary sm" data-run-comment="${c.id}">▶ Chạy</button>
+        ${tplOptions ? `<select data-tpl-pick="${escAttr(c.id)}" class="gf-select-sm">${tplOptions}</select>` : ''}
+        <button type="button" class="btn outline sm" data-ai-comment="${escAttr(c.id)}">AI</button>
+        <button type="button" class="btn primary sm" data-run-comment="${escAttr(c.id)}">▶ Chạy</button>
       </div>
     </div>`;
   }).join('');
 
   box.querySelectorAll('[data-draft]').forEach((ta) => {
     ta.addEventListener('input', () => { state.commentDrafts[ta.dataset.draft] = ta.value; });
+  });
+  box.querySelectorAll('[data-tpl-pick]').forEach((sel) => {
+    sel.addEventListener('change', () => {
+      if (!sel.value) return;
+      const ta = box.querySelector(`[data-draft="${escAttr(sel.dataset.tplPick)}"]`);
+      if (ta) { ta.value = sel.value; state.commentDrafts[sel.dataset.tplPick] = sel.value; }
+      sel.value = '';
+    });
   });
   box.querySelectorAll('[data-ai-comment]').forEach((btn) => {
     btn.addEventListener('click', () => aiComment(btn.dataset.aiComment));
@@ -3415,16 +3461,22 @@ async function runComment(id) {
   if (settings.avoidNight !== false && GF.scheduler.isNightBlocked()) {
     if (!window.confirm('Đang trong khung 22:00–07:00. Vẫn comment?')) return;
   }
-  await gfSendMessage({
-    type: 'GF_RUN_COMMENT',
-    payload: {
-      record_id: c.id,
-      group_id: c.group_id,
-      post_id: c.post_id,
-      comment,
-      actorId: state.activeActorId || settings.activeActorId,
-    },
-  });
+  const validGroups = (c.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
+  if (!validGroups.length) return alert('Bài chưa có post_id FB hợp lệ');
+  const actorId = state.activeActorId || settings.activeActorId;
+  for (const g of validGroups) {
+    await gfSendMessage({
+      type: 'GF_RUN_COMMENT',
+      payload: {
+        post_queue_id: c.id,
+        group_id: g.group_id,
+        group_name: g.group_name,
+        post_id: g.post_id,
+        comment,
+        actorId,
+      },
+    });
+  }
   await loadComments();
 }
 
@@ -3459,19 +3511,23 @@ async function collectSelectedCommentJobs() {
     if (!c) continue;
     const comment = await resolveCommentForPost(state.commentDrafts[id], settings);
     if (!comment) {
-      alert(`Bài «${(c.noi_dung || c.group_name || id).toString().slice(0, 40)}»: nhập comment, bấm AI, hoặc cấu hình mẫu Settings`);
+      alert(`Bài «${(c.noi_dung || id).toString().slice(0, 40)}»: nhập comment, bấm AI, hoặc cấu hình mẫu Settings`);
       return null;
     }
-    jobs.push({
-      record_id: c.id,
-      group_id: c.group_id,
-      post_id: c.post_id,
-      comment,
-      label: (c.noi_dung || c.group_name || 'Comment').slice(0, 60),
-    });
+    const validGroups = (c.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
+    for (const g of validGroups) {
+      jobs.push({
+        post_queue_id: c.id,
+        group_id: g.group_id,
+        group_name: g.group_name,
+        post_id: g.post_id,
+        comment,
+        label: (c.noi_dung || g.group_name || 'Comment').slice(0, 60),
+      });
+    }
   }
   if (!jobs.length) {
-    alert('Chọn ít nhất một bài');
+    alert('Chọn ít nhất một bài có post_id hợp lệ');
     return null;
   }
   return jobs;
@@ -3538,7 +3594,7 @@ async function scheduleSelectedComments() {
 
   for (let i = 0; i < jobs.length; i += 1) {
     const job = jobs[i];
-    const alarmName = `gf_cmt_${job.record_id}_${Date.now()}_${i}`;
+    const alarmName = `gf_cmt_${job.post_queue_id || 'cmt'}_${job.group_id || i}_${Date.now()}_${i}`;
     const payload = { ...job, actorId };
     await gfScheduleAlarm({
       name: alarmName,
@@ -3550,7 +3606,7 @@ async function scheduleSelectedComments() {
       alarmName,
       kind: 'comment',
       when: cursor,
-      recordId: job.record_id,
+      recordId: job.post_queue_id,
       snippet: job.comment.slice(0, 80),
       payload,
       label: `Comment → ${job.label}`,
@@ -4051,6 +4107,11 @@ async function loadSettingsForm() {
   if ($('#commentTemplates')) {
     $('#commentTemplates').value = s.commentTemplates || GF.commentTemplates?.DEFAULT || '';
   }
+  if ($('#licenseKey')) {
+    const lk = (await chrome.storage.local.get('licenseKey')).licenseKey || '';
+    $('#licenseKey').value = lk;
+    updateLicenseStatus(lk);
+  }
   updatePostModeUI();
   updateSecurityUI(s.securityLevel);
   updatePostingConfigSummary();
@@ -4109,6 +4170,50 @@ async function saveSettingsForm() {
   try {
     await gfSendMessage({ type: 'GF_SCHEDULE_TIDIEN_SYNC' });
   } catch { /* ignore */ }
+}
+
+function updateLicenseStatus(key) {
+  const el = $('#licenseStatus');
+  if (!el) return;
+  if (!key) { el.textContent = ''; return; }
+  chrome.storage.local.get('licenseInfo').then((d) => {
+    const info = d.licenseInfo;
+    if (!info) { el.textContent = ''; return; }
+    el.textContent = info.valid
+      ? `✅ Hợp lệ · ${info.plan || 'free'} · ${info.email || ''}`
+      : `❌ ${info.error || 'Key không hợp lệ'}`;
+    el.style.color = info.valid ? '#4caf50' : '#e53e3e';
+  });
+}
+
+async function validateLicenseKey() {
+  const key = ($('#licenseKey')?.value || '').trim().toUpperCase();
+  const el = $('#licenseStatus');
+  const btn = $('#btnValidateLicense');
+  if (!key) { if (el) el.textContent = 'Nhập key trước'; return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang xác thực…'; }
+  if (el) { el.textContent = ''; el.style.color = ''; }
+  try {
+    const s = await GF.storage.getSettings();
+    const base = (s.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
+    const res = await fetch(`${base}/api/user-auth/validate-key`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+    const data = await res.json();
+    await chrome.storage.local.set({ licenseKey: key, licenseInfo: data });
+    if (el) {
+      el.textContent = data.valid
+        ? `✅ Hợp lệ · ${data.plan || 'free'} · ${data.email || ''}`
+        : `❌ ${data.error || 'Key không hợp lệ'}`;
+      el.style.color = data.valid ? '#4caf50' : '#e53e3e';
+    }
+  } catch (e) {
+    if (el) { el.textContent = `Lỗi kết nối: ${e.message}`; el.style.color = '#e53e3e'; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Xác thực key'; }
+  }
 }
 
 function bindEvents() {
@@ -4258,12 +4363,28 @@ function bindEvents() {
 
   $('#selectAllPosts')?.addEventListener('change', (e) => {
     const checked = e.target.checked;
-    state.posts.forEach((p) => { p.selected = checked; });
+    const visibleIds = new Set(getFilteredPosts().map((p) => p.id));
+    state.posts.forEach((p) => {
+      if (visibleIds.has(p.id)) p.selected = checked;
+    });
     savePosts();
     renderPosts();
   });
 
   $('#btnBulkDelete')?.addEventListener('click', () => bulkDeletePosts());
+
+  $('#postSearch')?.addEventListener('input', (e) => {
+    state.postSearch = e.target.value;
+    renderPosts();
+  });
+  $('#postFilterGroup')?.addEventListener('change', (e) => {
+    state.postFilterGroup = e.target.value;
+    renderPosts();
+  });
+  $('#postFilterImage')?.addEventListener('change', (e) => {
+    state.postFilterImage = e.target.value;
+    renderPosts();
+  });
 
   $('#btnBulkStatus')?.addEventListener('click', async () => {
     const status = $('#postsBulkStatus')?.value;
@@ -4439,7 +4560,7 @@ function bindEvents() {
       btn.textContent = 'AI';
     }
   });
-  $('#btnRefreshComments').addEventListener('click', () => triggerTidienAutoSync({ silent: false, force: true, scope: 'all' }));
+  $('#btnRefreshComments').addEventListener('click', () => loadComments());
   $('#btnFillCommentTemplates')?.addEventListener('click', () => fillEmptyCommentDraftsFromTemplate());
   $('#btnRunAllComments').addEventListener('click', () => runAllComments());
   $('#btnScheduleComments').addEventListener('click', () => scheduleSelectedComments());
@@ -4493,6 +4614,13 @@ function bindEvents() {
     }
   });
   $('#btnTidienSyncNow')?.addEventListener('click', () => runTidienSyncNow());
+  $('#btnValidateLicense')?.addEventListener('click', validateLicenseKey);
+  $('#linkRegister')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const s = GF.storage.cachedSettings;
+    const base = (s?.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
+    chrome.tabs.create({ url: `${base}/user/register` });
+  });
   $('#btnSaveSettings').addEventListener('click', saveSettingsForm);
   $('#btnSaveActiveProviders')?.addEventListener('click', () => saveActiveProviders().catch((e) => alert(e.message)));
   $('#btnSaveProvider')?.addEventListener('click', () => saveProviderForm().catch((e) => alert(e.message)));
@@ -4746,7 +4874,7 @@ function bindEvents() {
       }
     }
     if (msg.type === 'GF_TIDIEN_SYNCED') {
-      applyTidienCommentsFromStorage();
+      loadPostedPostsForComment();
       if (msg.data?.draftsAdded > 0) {
         chrome.storage.local.get('postQueue').then((d) => {
           state.posts = mapPostsFromQueue(d.postQueue || []);

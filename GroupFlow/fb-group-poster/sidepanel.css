@@ -1474,6 +1474,26 @@ video.thumb {
   gap: 6px;
 }
 
+.post-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.post-filter-search {
+  flex: 1;
+  margin: 0;
+  min-width: 0;
+}
+
+.post-filter-bar .gf-select-sm {
+  flex-shrink: 0;
+  max-width: 110px;
+}
+
 .gf-select-sm {
   min-height: 32px;
   font-size: 12px;

@@ -428,3 +428,14 @@ export async function ensureDriveOAuthMigration() {
   if (rows.length === 0) return;
   await runMigrationFile('029_app_settings_drive_oauth.sql', 'Migration 029 applied: Drive OAuth2 migration (service account key removed)');
 }
+
+export async function ensureUserAccountsTable() {
+  if (await tableExists('user_accounts')) return;
+  await runMigrationFile('033_user_accounts.sql', 'Migration 033 applied: user_accounts');
+}
+
+export async function ensureLicenseKeysTable() {
+  if (await tableExists('license_keys')) return;
+  if (!(await tableExists('user_accounts'))) return;
+  await runMigrationFile('034_license_keys.sql', 'Migration 034 applied: license_keys');
+}

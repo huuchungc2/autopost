@@ -2643,12 +2643,25 @@ const FC = globalThis.GF.fbCommentBg = {
   extractCommentId(json, rawText) {
     const fromJson = json?.data?.comment_create?.comment?.id
       || json?.data?.comment_create?.comment?.legacy_fbid
-      || json?.data?.comment_create?.feedback_comment_edge?.node?.id;
+      || json?.data?.comment_create?.feedback_comment_edge?.node?.id
+      || json?.data?.commentCreate?.comment?.id
+      || json?.data?.commentCreate?.comment?.legacy_fbid
+      || json?.data?.create_comment?.comment?.id
+      || json?.data?.create_comment?.comment?.legacy_fbid
+      || json?.data?.comment?.id
+      || json?.data?.comment?.legacy_fbid
+      || json?.extensions?.comment_id
+      || json?.extensions?.commentId;
     if (fromJson) return String(fromJson);
 
-    const m = String(rawText).match(/\?comment_id=(\d+)/)
-      || String(rawText).match(/"legacy_fbid"\s*:\s*"(\d+)"/)
-      || String(rawText).match(/"comment_id"\s*:\s*"(\d+)"/);
+    const t = String(rawText || '');
+    const ctxStart = t.search(/comment_create|commentCreate|create_comment/i);
+    const ctx = ctxStart >= 0 ? t.slice(ctxStart, ctxStart + 4000) : t;
+    const m = ctx.match(/\?comment_id=(\d+)/)
+      || ctx.match(/"legacy_fbid"\s*:\s*"(\d{8,})"/)
+      || ctx.match(/"comment_id"\s*:\s*"(\d{8,})"/)
+      || ctx.match(/"id"\s*:\s*"(\d{8,})"/)
+      || t.match(/\?comment_id=(\d+)/);
     return m?.[1] ? String(m[1]) : null;
   },
 
@@ -2683,10 +2696,12 @@ const FC = globalThis.GF.fbCommentBg = {
       scale: 1,
     };
 
+    const storedIds = (await chrome.storage.local.get('gf_key_doc_ids')).gf_key_doc_ids || {};
+    const resolvedDocId = storedIds['useCometUFICreateCommentMutation'] || DOC_COMMENT;
     const { json, text: rawText } = await S.graphqlRequest(
       session,
       'useCometUFICreateCommentMutation',
-      DOC_COMMENT,
+      resolvedDocId,
       variables,
     );
 
