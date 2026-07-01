@@ -439,3 +439,9 @@ export async function ensureLicenseKeysTable() {
   if (!(await tableExists('user_accounts'))) return;
   await runMigrationFile('034_license_keys.sql', 'Migration 034 applied: license_keys');
 }
+
+export async function ensureUserPostsTable() {
+  if (await tableExists('user_posts')) return;
+  if (!(await tableExists('license_keys'))) return;
+  await runMigrationFile('035_user_posts.sql', 'Migration 035 applied: user_posts');
+}
