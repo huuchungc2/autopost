@@ -199,11 +199,27 @@ const FP = globalThis.GF.fbPostBg = {
     const list = [...(chunks || []), json].filter(Boolean);
     for (const p of list) {
       const id = this.idFromPayload(p);
-      if (id) return id;
+      if (id) {
+        const sc = p?.data?.story_create;
+        console.log('[GF] extractPostId via idFromPayload:', id,
+          '| sc keys:', sc ? Object.keys(sc).join(',') : 'n/a',
+          '| story keys:', sc?.story ? Object.keys(sc.story).join(',') : 'n/a');
+        return id;
+      }
     }
     const fromLines = this.idFromGraphqlLines(rawText);
-    if (fromLines) return fromLines;
-    return this.idFromRawText(rawText);
+    if (fromLines) {
+      console.log('[GF] extractPostId via idFromGraphqlLines:', fromLines);
+      return fromLines;
+    }
+    const fromRaw = this.idFromRawText(rawText);
+    if (fromRaw) {
+      console.log('[GF] extractPostId via idFromRawText (fallback):', fromRaw);
+    } else {
+      console.warn('[GF] extractPostId: KHÔNG tìm được post_id. story_create snippet:',
+        rawText.slice(rawText.indexOf('"story_create"'), rawText.indexOf('"story_create"') + 500));
+    }
+    return fromRaw;
   },
 
   storyCreateHasId(json, chunks = []) {
