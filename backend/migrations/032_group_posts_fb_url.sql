@@ -1,0 +1,1 @@
+ALTER TABLE group_posts ADD COLUMN fb_url VARCHAR(500) NULL AFTER post_id;

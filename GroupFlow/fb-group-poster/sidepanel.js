@@ -3573,7 +3573,7 @@ function buildHistoryPostUrl(h) {
   if (pid && pid !== 'pending') {
     const s = String(pid);
     if (/^\d+$/.test(s)) {
-      return `https://www.facebook.com/permalink.php?story_fbid=${s}&id=${gid}`;
+      return `https://www.facebook.com/groups/${gid}/posts/${s}/`;
     }
   }
   if (h?.ok) return `https://www.facebook.com/groups/${gid}`;

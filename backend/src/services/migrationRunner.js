@@ -415,6 +415,11 @@ export async function ensurePostsWebsiteColumns() {
   console.log('Migration fix: posts.website_id and related columns added');
 }
 
+export async function ensureGroupPostsFbUrl() {
+  if (await columnExists('group_posts', 'fb_url')) return;
+  await runMigrationFile('032_group_posts_fb_url.sql', 'Migration 032 applied: group_posts.fb_url');
+}
+
 export async function ensureDriveOAuthMigration() {
   if (!(await tableExists('app_settings'))) return;
   const rows = await query(

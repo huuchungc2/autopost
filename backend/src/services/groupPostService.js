@@ -86,6 +86,7 @@ export async function syncGroupPost(userId, body) {
     group_id,
     group_name,
     post_id,
+    fb_url,
     noi_dung,
     prompt_anh,
     ngay_dang,
@@ -112,11 +113,14 @@ export async function syncGroupPost(userId, body) {
     [group_id, post_id]
   );
 
+  const storedUrl = fb_url || `https://www.facebook.com/groups/${group_id}/posts/${post_id}/`;
+
   if (existing[0]) {
     await query(
       `UPDATE group_posts
        SET noi_dung = ?, prompt_anh = ?, ngay_dang = ?, gio_dang = ?, posted_at = ?,
-           fb_user_id = ?, user_id = ?, group_name = COALESCE(?, group_name)
+           fb_user_id = ?, user_id = ?, group_name = COALESCE(?, group_name),
+           fb_url = COALESCE(fb_url, ?)
        WHERE id = ?`,
       [
         noi_dung || null,
@@ -127,6 +131,7 @@ export async function syncGroupPost(userId, body) {
         fbUserId,
         userId,
         group_name || null,
+        storedUrl,
         existing[0].id,
       ]
     );
@@ -135,14 +140,15 @@ export async function syncGroupPost(userId, body) {
 
   const result = await query(
     `INSERT INTO group_posts
-      (user_id, fb_user_id, group_id, group_name, post_id, noi_dung, prompt_anh, ngay_dang, gio_dang, posted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (user_id, fb_user_id, group_id, group_name, post_id, fb_url, noi_dung, prompt_anh, ngay_dang, gio_dang, posted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       userId,
       fbUserId,
       group_id,
       group_name || null,
       post_id,
+      storedUrl,
       noi_dung || null,
       prompt_anh || null,
       ngay_dang || null,
@@ -432,7 +438,7 @@ export async function listPublishedGroupPosts(filters = {}) {
       ngay_dang: r.ngay_dang,
       gio_dang: r.gio_dang,
       comment_count: Number(r.comment_count) || 0,
-      fb_url: `https://www.facebook.com/permalink.php?story_fbid=${r.post_id}&id=${r.group_id}`,
+      fb_url: r.fb_url || `https://www.facebook.com/groups/${r.group_id}/posts/${r.post_id}/`,
     })),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
   };

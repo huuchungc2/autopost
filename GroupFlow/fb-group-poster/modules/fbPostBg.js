@@ -491,7 +491,7 @@ const FP = globalThis.GF.fbPostBg = {
       return {
         postId,
         mode: 'fast-bg',
-        url: `https://www.facebook.com/permalink.php?story_fbid=${postId}&id=${groupId}`,
+        url: `https://www.facebook.com/groups/${groupId}/posts/${postId}/`,
         warning: notice || undefined,
       };
     }
