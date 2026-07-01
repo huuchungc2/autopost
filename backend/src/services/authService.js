@@ -5,30 +5,31 @@ import { query } from '../db.js';
 const jwtSecret = process.env.JWT_SECRET || 'replace_with_strong_secret';
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
 
+// role='group_user' (self-serve) không được đăng nhập qua đây — họ dùng /api/user-auth/login riêng.
 const LOGIN_QUERIES = [
   {
     sql: `SELECT id, name, username, email, password, role, is_active, must_change_password
           FROM users
-          WHERE deleted_at IS NULL
+          WHERE deleted_at IS NULL AND role <> 'group_user'
             AND (LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?))`,
     params: (login) => [login, login],
   },
   {
     sql: `SELECT id, name, email, password, role, is_active, must_change_password
           FROM users
-          WHERE deleted_at IS NULL AND LOWER(email) = LOWER(?)`,
+          WHERE deleted_at IS NULL AND role <> 'group_user' AND LOWER(email) = LOWER(?)`,
     params: (login) => [login],
   },
   {
     sql: `SELECT id, name, username, email, password, role, is_active, must_change_password
           FROM users
-          WHERE LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)`,
+          WHERE role <> 'group_user' AND (LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?))`,
     params: (login) => [login, login],
   },
   {
     sql: `SELECT id, name, email, password, role, is_active, must_change_password
           FROM users
-          WHERE LOWER(email) = LOWER(?)`,
+          WHERE role <> 'group_user' AND LOWER(email) = LOWER(?)`,
     params: (login) => [login],
   },
 ];

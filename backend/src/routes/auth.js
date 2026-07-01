@@ -1,4 +1,5 @@
 import express from 'express';
+import { query } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { authenticateUser, signToken, setPassword, verifyPassword } from '../services/authService.js';
 import { getUserPages, isSuperAdmin } from '../services/pageAccessService.js';
@@ -15,6 +16,13 @@ router.post('/login', asyncHandler(async (req, res) => {
   }
   const user = await authenticateUser(login, password);
   if (!user) {
+    const groupUser = await query(
+      `SELECT id FROM users WHERE role = 'group_user' AND (LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?))`,
+      [login, login]
+    );
+    if (groupUser.length) {
+      return res.status(401).json({ error: 'Tài khoản này đăng ký qua GroupFlow — đăng nhập tại /user/login' });
+    }
     return res.status(401).json({ error: 'Sai email/username hoặc mật khẩu' });
   }
   const token = signToken(user);

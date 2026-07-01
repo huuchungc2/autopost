@@ -5025,6 +5025,12 @@ async function checkLicenseGate() {
     const base = (s?.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
     chrome.tabs.create({ url: `${base}/user/register` });
   });
+  $('#overlayLoginLink')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const s = GF.storage.cachedSettings;
+    const base = (s?.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
+    chrome.tabs.create({ url: `${base}/user/login` });
+  });
   btn?.addEventListener('click', async () => {
     const key = (input?.value || '').trim().toUpperCase();
     if (!key) { if (status) status.textContent = 'Nhập key trước'; return; }
