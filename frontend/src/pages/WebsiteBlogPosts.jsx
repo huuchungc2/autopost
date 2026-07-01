@@ -66,9 +66,14 @@ export default function WebsiteBlogPosts() {
         title="Bài Website Blog"
         description="Bài blog SEO đã tạo cho website (generate qua UI hoặc import Excel) — sửa nội dung, generate ảnh, publish lên website."
         actions={
-          <Button type="button" onClick={() => navigate('/generate')}>
-            Tạo bài mới
-          </Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button type="button" variant="secondary" onClick={() => navigate('/posts/import-website-blog')}>
+              Import Excel
+            </Button>
+            <Button type="button" onClick={() => navigate('/generate?tab=website')}>
+              Tạo bài mới
+            </Button>
+          </div>
         }
       />
 

@@ -1,9 +1,27 @@
-import { NavLink } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getNavGroupsForRole } from '../config/navConfig';
 
+function navItemIsActive(item, location) {
+  const [itemPath, itemSearch] = item.to.split('?');
+  if (itemSearch) {
+    // Items with query string: must match both pathname and the query param(s)
+    if (location.pathname !== itemPath) return false;
+    const itemParams = new URLSearchParams(itemSearch);
+    const locationParams = new URLSearchParams(location.search);
+    for (const [k, v] of itemParams.entries()) {
+      if (locationParams.get(k) !== v) return false;
+    }
+    return true;
+  }
+  // Items without query string: pathname match (end-exact or prefix)
+  if (item.end) return location.pathname === itemPath;
+  return location.pathname === itemPath || location.pathname.startsWith(`${itemPath}/`);
+}
+
 export default function Sidebar({ role, collapsed, onToggle }) {
   const groups = getNavGroupsForRole(role || 'editor');
+  const location = useLocation();
 
   return (
     <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
@@ -37,21 +55,19 @@ export default function Sidebar({ role, collapsed, onToggle }) {
             <div className="sidebar-group-items">
               {group.items.map((item) => {
                 const Icon = item.icon;
+                const isActive = navItemIsActive(item, location);
                 return (
-                  <NavLink
+                  <Link
                     key={item.to}
                     to={item.to}
-                    end={item.end}
-                    className={({ isActive }) =>
-                      `sidebar-link${isActive ? ' active' : ''}`
-                    }
+                    className={`sidebar-link${isActive ? ' active' : ''}`}
                     title={collapsed ? item.label : undefined}
                   >
                     <span className="sidebar-link-icon" aria-hidden>
                       <Icon size={18} strokeWidth={2} />
                     </span>
                     {!collapsed && <span className="sidebar-link-label">{item.label}</span>}
-                  </NavLink>
+                  </Link>
                 );
               })}
             </div>

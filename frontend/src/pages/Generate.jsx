@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 
 import { fromDatetimeLocalInput } from '../utils/date';
 
@@ -19,12 +19,16 @@ import Button from '../components/ui/Button';
 export default function Generate() {
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [pages, setPages] = useState([]);
 
   const [websites, setWebsites] = useState([]);
 
-  const [tab, setTab] = useState('text');
+  const [tab, setTab] = useState(() => {
+    const t = searchParams.get('tab');
+    return ['text', 'video', 'website', 'manual'].includes(t) ? t : 'text';
+  });
 
   const [pageId, setPageId] = useState('');
 

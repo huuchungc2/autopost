@@ -1,9 +1,25 @@
-import { NavLink } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { X, KeyRound, LogOut } from 'lucide-react';
 import { getNavGroupsForRole } from '../config/navConfig';
 
+function navItemIsActive(item, location) {
+  const [itemPath, itemSearch] = item.to.split('?');
+  if (itemSearch) {
+    if (location.pathname !== itemPath) return false;
+    const itemParams = new URLSearchParams(itemSearch);
+    const locationParams = new URLSearchParams(location.search);
+    for (const [k, v] of itemParams.entries()) {
+      if (locationParams.get(k) !== v) return false;
+    }
+    return true;
+  }
+  if (item.end) return location.pathname === itemPath;
+  return location.pathname === itemPath || location.pathname.startsWith(`${itemPath}/`);
+}
+
 export default function MobileDrawer({ open, role, user, onClose, onLogout, onChangePassword }) {
   const groups = getNavGroupsForRole(role || 'editor');
+  const location = useLocation();
 
   if (!open) return null;
 
@@ -36,19 +52,17 @@ export default function MobileDrawer({ open, role, user, onClose, onLogout, onCh
               <div className="mobile-drawer-group-label">{group.label}</div>
               {group.items.map((item) => {
                 const Icon = item.icon;
+                const isActive = navItemIsActive(item, location);
                 return (
-                  <NavLink
+                  <Link
                     key={item.to}
                     to={item.to}
-                    end={item.end}
-                    className={({ isActive }) =>
-                      `mobile-drawer-link${isActive ? ' active' : ''}`
-                    }
+                    className={`mobile-drawer-link${isActive ? ' active' : ''}`}
                     onClick={onClose}
                   >
                     <Icon size={20} strokeWidth={2} />
                     <span>{item.label}</span>
-                  </NavLink>
+                  </Link>
                 );
               })}
             </div>
