@@ -1753,7 +1753,7 @@ if (!GF_CONTENT) GF_CONTENT = {
       }
     }
 
-    if (this.capturedPostId) return this.capturedPostId;
+    if (this.capturedPostId) return { postId: this.capturedPostId, status: 'posted' };
 
     if (this.composerDialogGone()) {
       return {

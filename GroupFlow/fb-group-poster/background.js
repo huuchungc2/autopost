@@ -1239,6 +1239,7 @@ const GF_BG = {
         await this.clearPostScheduleAlarms(post.id);
       } else if (stats.fail > 0) {
         p.postStatus = 'failed';
+        await this.clearPostScheduleAlarms(post.id);
       }
       changed = true;
     }
@@ -1337,7 +1338,7 @@ const GF_BG = {
 
   postScheduleAlreadyDone(post) {
     if (!post) return false;
-    if (post.postStatus === 'posted' || post.postStatus === 'pending_approval') return true;
+    if (['posted', 'pending_approval', 'partial', 'failed'].includes(post.postStatus)) return true;
     const stats = post.lastPostStats;
     if (stats && (stats.ok > 0 || stats.pending > 0)) return true;
     if (post.lastPostedAt && (post.postedGroups?.length || stats?.ok > 0)) return true;
@@ -1651,6 +1652,7 @@ const GF_BG = {
             (res.postId && !['hidden', 'uncertain'].includes(String(res.postId)))
             || res.status === 'pending_approval'
             || res.status === 'posted_uncertain'
+            || res.status === 'posted'
             || res.status === 'successful'
           ));
 
