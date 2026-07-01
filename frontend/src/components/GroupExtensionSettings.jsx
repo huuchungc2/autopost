@@ -11,6 +11,10 @@ export default function GroupExtensionSettings() {
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [license, setLicense] = useState(null);
+  const [licenseLoading, setLicenseLoading] = useState(true);
+  const [licenseCreating, setLicenseCreating] = useState(false);
+  const [showLicense, setShowLicense] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -24,9 +28,46 @@ export default function GroupExtensionSettings() {
     }
   };
 
+  const loadLicense = async () => {
+    setLicenseLoading(true);
+    try {
+      const res = await api.get('/auth/my-license');
+      setLicense(res.data);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Không tải được license key', 'error');
+    } finally {
+      setLicenseLoading(false);
+    }
+  };
+
   useEffect(() => {
     load();
+    loadLicense();
   }, []);
+
+  const handleCreateLicense = async () => {
+    setLicenseCreating(true);
+    try {
+      const res = await api.post('/auth/my-license');
+      setLicense(res.data);
+      setShowLicense(true);
+      showToast('Đã tạo license key', 'success');
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Tạo license key thất bại', 'error');
+    } finally {
+      setLicenseCreating(false);
+    }
+  };
+
+  const handleCopyLicense = async () => {
+    if (!license?.key_value) return;
+    try {
+      await navigator.clipboard.writeText(license.key_value);
+      showToast('Đã copy license key', 'success');
+    } catch {
+      showToast('Không copy được — chọn và copy thủ công', 'error');
+    }
+  };
 
   const handleCopy = async () => {
     if (!info?.api_key) return;
@@ -115,6 +156,38 @@ export default function GroupExtensionSettings() {
               <RefreshCw size={14} />
               {regenerating ? 'Đang tạo…' : 'Tạo lại API key'}
             </Button>
+          </div>
+
+          <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid var(--border, #e4e4e7)' }} />
+
+          <div className="settings-groupflow-grid">
+            <label>
+              License key của tôi (cách khác để dùng extension — thay cho API key ở trên)
+              {licenseLoading ? (
+                <p className="text-muted" style={{ margin: '4px 0 0' }}>Đang tải…</p>
+              ) : license ? (
+                <div className="input-with-actions">
+                  <input
+                    type={showLicense ? 'text' : 'password'}
+                    readOnly
+                    value={license.key_value || ''}
+                    className="input mono"
+                  />
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setShowLicense((v) => !v)}>
+                    {showLicense ? 'Ẩn' : 'Hiện'}
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={handleCopyLicense}>
+                    <Copy size={14} />
+                  </Button>
+                </div>
+              ) : (
+                <div style={{ marginTop: 6 }}>
+                  <Button type="button" variant="secondary" size="sm" onClick={handleCreateLicense} disabled={licenseCreating}>
+                    {licenseCreating ? 'Đang tạo…' : 'Tạo license key'}
+                  </Button>
+                </div>
+              )}
+            </label>
           </div>
 
           <ol className="field-hint" style={{ marginTop: 16, paddingLeft: 20 }}>

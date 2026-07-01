@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **License key tự cấp cho tài khoản nội bộ (Settings)**: `GET/POST /api/auth/my-license` cho phép bất kỳ user đang đăng nhập (admin/super_admin/editor) tự tạo/xem license key gắn thẳng vào `users.id` của chính họ — không tạo tài khoản `group_user` mới như `/api/user-auth/register`. UI: khối "License key của tôi" trong `GroupExtensionSettings.jsx` (Settings), cạnh API key extension đã có. Giải quyết việc admin/super_admin muốn tự dùng extension GroupFlow dưới đúng tài khoản của mình mà không phải đăng ký thêm 1 tài khoản tách biệt.
+
 ### Fixed
 - **GroupFlow v1.0.146 — "Tải web" báo "Chưa đăng nhập tidien" cho tài khoản license key**: commit trước đó xoá form đăng nhập email/password trong extension (cách duy nhất lấy `tidienApiKey`/`tidienToken`), nhưng `pullDraftsFromWebsite()`/`syncPost()`/... (`modules/tidienAuth.js`, `modules/tidienSync.js`) vẫn bắt buộc 1 trong 2 token đó, không nhận `licenseKey` — nên tài khoản tự đăng ký kích hoạt bằng license key luôn bị 401. `tidienAuth.authHeader()` giờ fallback thêm `licenseKey` (giống `background.js` đã làm). Backend: `authenticateExtension` (`extensionAuth.js`) thêm nhánh xác thực bằng `license_keys.key_value` bên cạnh JWT/`extension_api_keys.api_key`, để `/api/group-posts/*` chấp nhận license key trực tiếp.
 

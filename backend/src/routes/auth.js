@@ -1,4 +1,5 @@
 import express from 'express';
+import { randomUUID } from 'crypto';
 import { query } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { authenticateUser, signToken, setPassword, verifyPassword } from '../services/authService.js';
@@ -62,6 +63,30 @@ router.post('/change-password', authenticate, asyncHandler(async (req, res) => {
 
   await setPassword(req.user.id, new_password, false);
   res.json({ message: 'Password updated successfully' });
+}));
+
+/** License key để dùng extension GroupFlow dưới đúng tài khoản đang đăng nhập (mọi role) — không tạo user mới như /api/user-auth/register. */
+router.get('/my-license', authenticate, asyncHandler(async (req, res) => {
+  const rows = await query(
+    'SELECT key_value, plan, status, expires_at, created_at, last_validated_at FROM license_keys WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
+    [req.user.id]
+  );
+  res.json(rows[0] || null);
+}));
+
+router.post('/my-license', authenticate, asyncHandler(async (req, res) => {
+  const existing = await query(
+    'SELECT key_value, plan, status, expires_at, created_at, last_validated_at FROM license_keys WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
+    [req.user.id]
+  );
+  if (existing.length) return res.json(existing[0]);
+
+  const keyValue = randomUUID().replace(/-/g, '').slice(0, 32).toUpperCase();
+  await query(
+    'INSERT INTO license_keys (user_id, key_value, plan, status, expires_at) VALUES (?, ?, ?, ?, ?)',
+    [req.user.id, keyValue, 'free', 'active', null]
+  );
+  res.status(201).json({ key_value: keyValue, plan: 'free', status: 'active', expires_at: null, created_at: new Date() });
 }));
 
 export default router;
