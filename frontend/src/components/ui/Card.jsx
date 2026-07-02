@@ -10,7 +10,7 @@ export default function Card({ children, className, ...props }) {
 
 export function StatCard({ icon, iconTone = 'blue', label, value }) {
   return (
-    <div className="stat-card">
+    <div className={`stat-card stat-card--${iconTone}`}>
       <div className={`stat-card-icon stat-card-icon--${iconTone}`} aria-hidden>
         {icon}
       </div>

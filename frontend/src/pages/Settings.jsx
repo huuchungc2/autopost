@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import api from '../services/api';
 import { formatDateTime } from '../utils/date';
-import useNotifications from '../hooks/useNotifications';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../services/authContext';
 import { computeMaxImagesPerNight, formatScheduleTime } from '../utils/imageSchedule';
@@ -36,7 +35,6 @@ export default function Settings() {
   const [scheduleForm, setScheduleForm] = useState(null);
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [imageLogs, setImageLogs] = useState([]);
-  const { notifications, refresh } = useNotifications();
   const { showToast } = useToast();
   const { user } = useAuth();
   const canEditSchedule = ['super_admin', 'admin'].includes(user?.role);
@@ -87,23 +85,6 @@ export default function Settings() {
     if (!scheduleForm) return 0;
     return computeMaxImagesPerNight(scheduleForm);
   }, [scheduleForm]);
-
-  const markAllRead = async () => {
-    try {
-      await api.patch('/notifications/read-all');
-      refresh();
-      window.dispatchEvent(new Event('notificationsUpdated'));
-      showToast('Đã đánh dấu tất cả thông báo đã đọc', 'success');
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Thao tác thất bại', 'error');
-    }
-  };
-
-  const markRead = async (id) => {
-    await api.patch(`/notifications/${id}/read`);
-    refresh();
-    window.dispatchEvent(new Event('notificationsUpdated'));
-  };
 
   const handleScheduleChange = (field, value) => {
     setScheduleForm((prev) => ({ ...prev, [field]: value }));
@@ -367,12 +348,7 @@ export default function Settings() {
     <div className="page-shell">
       <PageHeader
         title="Cài đặt"
-        description="Cấu hình hệ thống và thông báo."
-        actions={(
-          <Button type="button" variant="secondary" onClick={markAllRead}>
-            Đánh dấu tất cả đã đọc
-          </Button>
-        )}
+        description="Cấu hình hệ thống."
       />
 
       {settings && (
@@ -780,32 +756,6 @@ export default function Settings() {
           )}
         </div>
       )}
-
-      <div className="card" style={{ marginTop: 24 }}>
-        <h3>Thông báo</h3>
-        <div className="table-wrapper">
-          <table className="table">
-            <thead>
-              <tr><th>Thời gian</th><th>Loại</th><th>Tiêu đề</th><th>Nội dung</th><th>Thao tác</th></tr>
-            </thead>
-            <tbody>
-              {notifications.map((item) => (
-                <tr key={item.id} className={item.is_read ? 'row-read' : ''}>
-                  <td>{formatDateTime(item.created_at)}</td>
-                  <td>{item.type}</td>
-                  <td>{item.title}</td>
-                  <td>{item.message}</td>
-                  <td>
-                    {!item.is_read && (
-                      <Button type="button" variant="link" onClick={() => markRead(item.id)}>Đánh dấu đã đọc</Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }

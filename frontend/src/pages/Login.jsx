@@ -72,11 +72,11 @@ export default function Login() {
             {submitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </Button>
         </form>
-        <div style={{ borderTop: '1px solid #e4e4e7', marginTop: 24, paddingTop: 16, textAlign: 'center', fontSize: 13, color: '#71717a' }}>
+        <div className="login-page-footer" style={{ borderTop: '1px solid var(--bg-border)', marginTop: 24, paddingTop: 16 }}>
           Người dùng GroupFlow?{' '}
-          <Link to="/user/register" style={{ color: '#2563eb' }}>Đăng ký</Link>
+          <Link to="/user/register">Đăng ký</Link>
           {' · '}
-          <Link to="/user/login" style={{ color: '#2563eb' }}>Đăng nhập</Link>
+          <Link to="/user/login">Đăng nhập</Link>
         </div>
       </div>
     </div>

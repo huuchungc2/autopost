@@ -168,9 +168,11 @@ a {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: 4px;
+  border-left: 2px solid transparent;
+  margin-left: -2px;
   color: var(--sidebar-text);
-  transition: background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default);
+  transition: background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default), border-color var(--duration-fast) var(--ease-default);
   white-space: nowrap;
   font-size: var(--text-sm);
   font-weight: 500;
@@ -202,6 +204,7 @@ a {
 
 .sidebar-link.active {
   background: var(--sidebar-item-active);
+  border-left-color: var(--sidebar-accent);
   color: var(--sidebar-text-active);
 }
 
@@ -367,20 +370,39 @@ button {
 }
 
 .form-card label,
-.form-card input,
+.form-card input:not([type="checkbox"]):not([type="radio"]),
 .form-card textarea,
 .form-card select {
   width: 100%;
 }
 
-.form-card input,
+/* checkbox/radio dính chung rule width:100% ở trên → bị kéo giãn thành khối vuông to
+   (đúng lỗi trong ảnh "Người dùng" — Gán fanpage/AI provider). Trả về kích thước chuẩn. */
+.form-card input[type="checkbox"],
+.form-card input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+}
+
+.form-card input:not([type="checkbox"]):not([type="radio"]),
 .form-card textarea,
 .form-card select {
   padding: 12px 14px;
   border: 1px solid var(--bg-border);
   border-radius: var(--input-radius);
-  background: var(--bg-base);
+  background: var(--bg-surface);
   color: var(--text-primary);
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+}
+
+.form-card input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+.form-card textarea:focus-visible,
+.form-card select:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-border);
 }
 
 .form-card textarea {
@@ -406,6 +428,8 @@ button {
 
 .table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
 }
 
 .row-read {
@@ -448,14 +472,14 @@ button {
   display: flex;
   align-items: center;
   font-size: 13px;
-  color: var(--color-primary, #6366f1);
+  color: var(--color-primary);
   font-weight: 500;
 }
 
 .batch-job-index {
   text-align: center;
   font-weight: 600;
-  color: var(--color-text-muted, #64748b);
+  color: var(--text-secondary);
 }
 
 .batch-settings-row {
@@ -553,21 +577,28 @@ button {
   gap: 8px;
 }
 
+/* Trước đây toàn bộ khối login hardcode màu riêng (theme Zinc cũ, #f0f2f5/#e4e4e7/#09090b...),
+   không đi qua token nên lệch tông rất nhẹ so với phần còn lại của site đã đổi sang xanh
+   dương. Chuyển hết sang token chung — giờ đổi theme sẽ tự lan luôn vào trang login. */
 .login-page {
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-6);
-  background: #f0f2f5;
+  width: 100%;
+  padding: var(--space-6) 0;
+  background: var(--bg-base);
+  box-sizing: border-box;
 }
 
+/* Canh giữa bằng margin auto + max-width thay vì flexbox/hàm min() — cách cổ điển,
+   không phụ thuộc hỗ trợ CSS hiện đại, để loại trừ khả năng lệch khung trên thiết bị/
+   trình duyệt cụ thể nào đó không render đúng flex-centering + min(). */
 .login-card {
-  width: min(420px, 100%);
-  background: #fff;
-  border: 1px solid #e4e4e7;
-  border-radius: 16px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+  width: calc(100% - 2 * var(--space-6));
+  max-width: 420px;
+  margin: 0 auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--bg-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-md);
   padding: 40px 36px;
 }
 
@@ -583,8 +614,8 @@ button {
   width: 48px;
   height: 48px;
   border-radius: 14px;
-  background: #2563eb;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--text-inverse);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -596,13 +627,13 @@ button {
   font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #09090b;
+  color: var(--text-primary);
 }
 
 .login-brand p {
   margin: 0;
   font-size: 0.8125rem;
-  color: #71717a;
+  color: var(--text-tertiary);
 }
 
 .login-form {
@@ -617,42 +648,42 @@ button {
   gap: 6px;
   font-size: 0.8125rem;
   font-weight: 500;
-  color: #52525b;
+  color: var(--text-secondary);
 }
 
 .login-form input {
   width: 100%;
   padding: 11px 14px;
-  border: 1.5px solid #e4e4e7;
-  border-radius: 8px;
+  border: 1.5px solid var(--bg-border);
+  border-radius: var(--input-radius);
   font-size: 0.875rem;
-  background: #fff;
-  color: #09090b;
+  background: var(--bg-surface);
+  color: var(--text-primary);
   transition: border-color 150ms, box-shadow 150ms;
 }
 
 .login-form input:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px #eff6ff;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-border);
 }
 
 .login-form input:-webkit-autofill,
 .login-form input:-webkit-autofill:hover,
 .login-form input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 1000px #fff inset;
-  -webkit-text-fill-color: #09090b;
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-surface) inset;
+  -webkit-text-fill-color: var(--text-primary);
   transition: background-color 9999s;
 }
 
 .login-form .form-error {
   margin: 0;
   padding: 10px 12px;
-  border-radius: 8px;
-  background: #fef2f2;
-  color: #dc2626;
+  border-radius: var(--input-radius);
+  background: var(--bg-error);
+  color: var(--color-error);
   font-size: 0.8125rem;
-  border: 1px solid #fecaca;
+  border: 1px solid var(--status-failed-bg);
 }
 
 .login-form button {
@@ -661,16 +692,16 @@ button {
   height: 44px;
   font-weight: 600;
   font-size: 0.875rem;
-  background: #2563eb !important;
-  color: #fff !important;
+  background: var(--color-primary) !important;
+  color: var(--text-inverse) !important;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--btn-radius);
   cursor: pointer;
   transition: background 150ms;
 }
 
 .login-form button:hover:not(:disabled) {
-  background: #1d4ed8 !important;
+  background: var(--color-primary-hover) !important;
 }
 
 .login-form button:disabled {
@@ -681,11 +712,11 @@ button {
   margin-top: 20px;
   text-align: center;
   font-size: 0.8125rem;
-  color: #71717a;
+  color: var(--text-tertiary);
 }
 
 .login-page-footer a {
-  color: #2563eb;
+  color: var(--color-primary);
   text-underline-offset: 3px;
 }
 
@@ -733,12 +764,223 @@ button {
   border-radius: var(--card-radius);
   padding: var(--card-padding);
   box-shadow: var(--shadow-xs);
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  border-color: var(--color-primary-border);
 }
 
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-4);
+}
+
+/* ── Dispatch hero — nền sáng như phần còn lại của trang (không tạo khối tối thứ 2
+   cạnh sidebar), điểm nhấn là 1 vạch cam mảnh + chữ chủ đề lớn, không tô cả khối. ── */
+.dispatch-hero {
+  background: var(--bg-surface);
+  border: 1px solid var(--bg-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--card-radius);
+  padding: var(--space-5) var(--space-6);
+  margin-bottom: var(--space-6);
+}
+
+.dispatch-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.dispatch-hero-body {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.dispatch-hero-next {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dispatch-hero-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.dispatch-hero-sub {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.dispatch-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.dispatch-next-countdown {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--color-primary);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.dispatch-next-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.dispatch-next-topic {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: var(--text-md);
+}
+
+.dispatch-next-topic--empty {
+  color: var(--text-tertiary);
+  font-weight: 500;
+  font-size: var(--text-lg);
+}
+
+.dispatch-next-time,
+.dispatch-next-channel {
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+}
+
+.dispatch-next-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dispatch-next-link:hover { color: var(--color-primary); }
+
+/* Ledger — 1 dải liền thay vì nhiều thẻ rời, chia bằng đường kẻ mảnh, số liệu dạng mono. */
+.dispatch-ledger {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  background: var(--bg-surface);
+  border: 1px solid var(--bg-border);
+  border-radius: var(--card-radius);
+  margin-bottom: var(--space-6);
+  overflow: hidden;
+}
+
+.dispatch-ledger-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-4) var(--space-5);
+  border-left: 1px solid var(--bg-border);
+}
+
+.dispatch-ledger-item:first-child { border-left: none; }
+
+/* Vạch tag ngắn ở góc thay vì kẻ hết chiều ngang — tránh 2 màu chạm nhau ở góc
+   nhìn giống lỗi render khi 2 ô cạnh nhau khác tone. */
+.dispatch-ledger-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: var(--space-5);
+  width: 24px;
+  height: 3px;
+  border-radius: 0 0 2px 2px;
+  background: var(--bg-border-strong);
+}
+
+.dispatch-ledger-item--blue::before { background: var(--color-info); }
+.dispatch-ledger-item--green::before { background: var(--color-success); }
+.dispatch-ledger-item--amber::before { background: var(--color-warning); }
+.dispatch-ledger-item--slate::before { background: var(--text-tertiary); }
+
+.dispatch-ledger-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.dispatch-ledger-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 900px) {
+  .dispatch-hero-body {
+    align-items: flex-start;
+  }
+  .dispatch-hero-side {
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  /* Ledger: lưới ngang không hợp mobile (lẻ dòng, để trống góc) — chuyển thành
+     danh sách dọc, mỗi dòng full-width, vạch màu bên trái thay vì trên đầu. */
+  .dispatch-ledger {
+    grid-template-columns: 1fr;
+  }
+  .dispatch-ledger-item,
+  .dispatch-ledger-item:first-child {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    border-left: 3px solid var(--bg-border-strong);
+    border-top: none;
+    border-bottom: 1px solid var(--bg-border);
+  }
+  .dispatch-ledger-item:last-child { border-bottom: none; }
+  /* Tắt vạch "tag" 24px của bản PC — mobile đã có vạch màu bên trái, để cả 2 chồng
+     lên nhau tạo ra cục màu thừa lòi phía trên mỗi dòng (đúng lỗi trong ảnh chụp). */
+  .dispatch-ledger-item::before {
+    display: none;
+  }
+  /* Selector kép để thắng đặc trưng của quy tắc :first-child ở trên (cùng cấp, khai
+     báo sau) — nếu không màu vạch của ô đầu tiên sẽ luôn bị xoá về màu trung tính. */
+  .dispatch-ledger-item.dispatch-ledger-item--blue { border-left-color: var(--color-info); }
+  .dispatch-ledger-item.dispatch-ledger-item--green { border-left-color: var(--color-success); }
+  .dispatch-ledger-item.dispatch-ledger-item--amber { border-left-color: var(--color-warning); }
+  .dispatch-ledger-item.dispatch-ledger-item--slate { border-left-color: var(--text-tertiary); }
+  .dispatch-ledger-label { order: -1; }
 }
 
 .dashboard-split {
@@ -757,7 +999,18 @@ button {
   border-radius: var(--card-radius);
   padding: var(--space-5);
   box-shadow: var(--shadow-xs);
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
 }
+
+.stat-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.stat-card--blue:hover { border-color: var(--color-info); }
+.stat-card--green:hover { border-color: var(--color-success); }
+.stat-card--amber:hover { border-color: var(--color-warning); }
+.stat-card--slate:hover { border-color: var(--text-tertiary); }
 
 .stat-card-icon {
   display: flex;
@@ -765,14 +1018,14 @@ button {
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: 12px;
   flex-shrink: 0;
 }
 
-.stat-card-icon--blue { background: var(--color-primary-subtle); color: var(--color-primary); }
+.stat-card-icon--blue { background: var(--bg-info); color: var(--color-info); }
 .stat-card-icon--green { background: var(--bg-success); color: var(--color-success); }
 .stat-card-icon--amber { background: var(--bg-warning); color: var(--color-warning); }
-.stat-card-icon--slate { background: var(--bg-muted); color: var(--text-secondary); }
+.stat-card-icon--slate { background: var(--bg-elevated); color: var(--text-secondary); }
 
 .stat-card-body {
   display: flex;
@@ -782,15 +1035,18 @@ button {
 }
 
 .stat-card-label {
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
 }
 
 .stat-card-value {
+  font-family: var(--font-mono);
   font-size: var(--text-2xl);
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
   line-height: 1.2;
 }
@@ -801,7 +1057,10 @@ button {
   font-weight: 600;
 }
 
-.table { width: 100%; border-collapse: collapse; }
+/* min-width bắt buộc để .table-wrapper (overflow-x:auto) có cái để cuộn — thiếu
+   dòng này, width:100% khiến bảng luôn vừa khít viewport, không bao giờ overflow,
+   nên trên mobile các cột tự bóp cứng làm chữ vỡ dòng (đúng lỗi trong ảnh Cài đặt). */
+.table { width: 100%; min-width: 640px; border-collapse: collapse; }
 .table th, .table td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--bg-border); }
 .table th {
   font-size: var(--text-xs);
@@ -809,8 +1068,29 @@ button {
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 .table tbody tr:hover { background: var(--bg-muted); }
+
+/* .table-responsive-cols — cuộn ngang (overflow-x) không đáng tin cậy trong mọi trình
+   duyệt/webview nhúng (đã thấy vỡ lặp lại dù .table-wrapper có overflow-x:auto). Với
+   bảng nhiều cột, ẩn hẳn cột phụ trên màn hẹp thay vì trông chờ vuốt ngang — bảng luôn
+   vừa khít, không cần thao tác gì thêm. */
+@media (max-width: 640px) {
+  .table-responsive-cols { min-width: 0; }
+  .table-responsive-cols th:nth-child(2),
+  .table-responsive-cols td:nth-child(2) {
+    display: none;
+  }
+  .table-responsive-cols.table-responsive-cols--wide th:nth-child(3),
+  .table-responsive-cols.table-responsive-cols--wide td:nth-child(3) {
+    display: none;
+  }
+  .table-responsive-cols td {
+    white-space: normal;
+    word-break: break-word;
+  }
+}
 
 /* Buttons */
 .btn {
@@ -866,14 +1146,24 @@ button {
   white-space: nowrap;
 }
 
-/* Badges */
+/* Badges — chấm đèn báo (currentColor) + nhãn, cùng ngôn ngữ với vạch tín hiệu stat-card */
 .badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 10px;
   border-radius: var(--badge-radius);
   font-size: 12px;
   font-weight: 600;
   text-transform: capitalize;
+}
+
+.badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  flex-shrink: 0;
 }
 
 .badge-draft { background: var(--status-draft-bg); color: var(--status-draft-text); }
@@ -2620,11 +2910,11 @@ button {
   justify-content: space-around;
   gap: 2px;
   padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
-  background: rgba(253, 252, 250, 0.94);
+  background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid var(--bg-border);
-  box-shadow: 0 -4px 24px rgba(18, 25, 42, 0.08);
+  box-shadow: 0 -4px 24px rgba(17, 24, 39, 0.08);
 }
 
 body.mobile-menu-open {
@@ -2986,7 +3276,7 @@ body.mobile-menu-open {
   }
 
   .bottom-nav-link--primary.active .bottom-nav-icon {
-    background: var(--color-primary-light);
+    background: var(--color-primary-hover);
     color: #fff;
   }
 
@@ -3193,6 +3483,25 @@ body.mobile-menu-open {
   align-items: center;
   flex: 1;
 }
+/* .input — base chưa từng được định nghĩa, chỉ có modifier → render thô mặc định
+   trình duyệt (khối xám không viền trên input type=date/select). Thêm base mirror .ui-input. */
+.input {
+  height: 40px;
+  padding: 8px 12px;
+  font-size: var(--text-sm);
+  border: 1.5px solid var(--bg-border);
+  border-radius: var(--input-radius);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+}
+
+.input:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-border);
+}
+
 .group-filters-row .input { max-width: 220px; min-width: 140px; }
 .input-icon-wrap { position: relative; flex: 1; min-width: 180px; max-width: 320px; }
 .input-icon-wrap .input { width: 100%; padding-left: 36px; max-width: none; }
@@ -3206,6 +3515,60 @@ body.mobile-menu-open {
 }
 .clickable-row { cursor: pointer; }
 .clickable-row:hover td { background: var(--bg-muted); }
+.clickable-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+
+/* .table-wrap/.data-table — cũng chưa từng có CSS, table co cứng theo viewport làm vỡ
+   chữ từng dòng trên mobile. Cho cuộn ngang thay vì bóp cột. */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  padding: 0;
+}
+
+.data-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--bg-border);
+  white-space: nowrap;
+}
+
+.data-table td {
+  white-space: normal;
+}
+
+.data-table th {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.data-table tbody tr:last-child td { border-bottom: none; }
+
+/* .data-table-content-priority (trang Group) — cột Nội dung là cột quan trọng nhất
+   nhưng bị đẩy khuất khi bảng phải cuộn ngang (không đáng tin cậy trong webview nhúng).
+   Trên màn hẹp: ẩn Người đăng + Group, ưu tiên hiện Nội dung/Comment/action. */
+@media (max-width: 640px) {
+  .data-table-content-priority {
+    min-width: 0;
+  }
+  .data-table-content-priority th:nth-child(2),
+  .data-table-content-priority td:nth-child(2),
+  .data-table-content-priority th:nth-child(3),
+  .data-table-content-priority td:nth-child(3) {
+    display: none;
+  }
+}
 .detail-dl { display: grid; grid-template-columns: 120px 1fr; gap: 8px 16px; margin: 0; }
 .detail-dl dt { font-weight: 600; color: var(--text-secondary); margin: 0; }
 .detail-dl dd { margin: 0; }
@@ -3222,3 +3585,128 @@ body.mobile-menu-open {
 .input.mono { font-family: ui-monospace, monospace; font-size: 13px; }
 .group-import-onboarding h4 { font-size: 15px; }
 .row-actions { display: flex; gap: 4px; align-items: center; }
+
+/* ── Rà soát toàn bộ: các class dùng trong JSX nhưng chưa từng có CSS (cùng loại lỗi
+   .input/.table trước đó) — render mặc định trình duyệt, nhìn lạc quẻ giữa UI đã bo tròn. */
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--bg-border);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border-radius: var(--btn-radius);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.icon-btn:hover {
+  background: var(--bg-muted);
+  color: var(--text-primary);
+  border-color: var(--bg-border-strong);
+}
+
+.icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--btn-radius);
+  color: var(--text-secondary);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.icon-link:hover {
+  background: var(--bg-muted);
+  color: var(--color-primary);
+}
+
+.upload-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px 16px;
+  border: 1.5px dashed var(--bg-border-strong);
+  border-radius: var(--card-radius);
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.upload-zone:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.pagination-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.error-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filters-row,
+.group-filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.post-import-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skill-form-card {
+  border: 1px solid var(--bg-border);
+  border-radius: var(--card-radius);
+  padding: var(--space-4);
+  background: var(--bg-surface);
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.blog-result {
+  border: 1px solid var(--bg-border);
+  border-radius: var(--card-radius);
+  padding: var(--space-4);
+  background: var(--bg-muted);
+}

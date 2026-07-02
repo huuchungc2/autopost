@@ -24,6 +24,7 @@ import Skills from './pages/Skills';
 import Providers from './pages/Providers';
 import UserManagement from './pages/UserManagement';
 import ActivityLog from './pages/ActivityLog';
+import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
 import ChangePassword from './pages/ChangePassword';
 import Login from './pages/Login';
@@ -68,6 +69,7 @@ function App() {
             <Route path="providers" element={<Providers />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="activity" element={<ActivityLog />} />
+            <Route path="notifications" element={<Notifications />} />
             <Route path="settings" element={<Settings />} />
             <Route path="change-password" element={<ChangePassword />} />
           </Route>

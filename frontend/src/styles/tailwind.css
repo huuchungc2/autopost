@@ -8,32 +8,63 @@
   }
 
   body {
-    @apply bg-[var(--bg-base)] text-foreground antialiased;
+    @apply antialiased;
     font-family: var(--font-body);
     font-size: var(--text-base);
     line-height: var(--leading-normal);
+    background: var(--bg-base);
+    color: var(--text-primary);
   }
 
   h1, h2, h3, h4 {
-    @apply text-foreground font-semibold tracking-tight;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    line-height: var(--leading-tight);
   }
 
   :focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
   }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--bg-border-strong);
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-tertiary);
+  }
 }
 
 @layer components {
   .ui-input {
-    @apply flex h-10 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground;
-    @apply placeholder:text-foreground-tertiary;
-    @apply focus-visible:outline-none focus-visible:border-primary-border;
-    box-shadow: none;
+    @apply flex h-10 w-full px-3 py-2 text-sm;
+    border: 1.5px solid var(--bg-border);
+    border-radius: var(--input-radius);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+  }
+
+  .ui-input::placeholder {
+    color: var(--text-tertiary);
   }
 
   .ui-input:focus-visible {
-    box-shadow: 0 0 0 3px var(--color-primary-subtle);
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-border);
   }
 
   .ui-input:disabled {
@@ -41,7 +72,8 @@
   }
 
   .ui-label {
-    @apply text-sm font-medium text-foreground-secondary;
+    @apply text-sm font-semibold;
+    color: var(--text-secondary);
   }
 }
 

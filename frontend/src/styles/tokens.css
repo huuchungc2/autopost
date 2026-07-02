@@ -1,57 +1,57 @@
 :root {
-  /* Brand */
+  /* ── Brand / Primary (Xanh dương chuyên nghiệp — theo yêu cầu, ưu tiên quen mắt/an toàn) ── */
   --color-primary: #2563eb;
   --color-primary-hover: #1d4ed8;
   --color-primary-subtle: #eff6ff;
   --color-primary-border: #bfdbfe;
-  --color-accent: #0ea5e9;
+  --color-accent: #2c6e9e;
 
-  /* Surfaces */
-  --bg-base: #fafafa;
+  /* ── Surfaces (Xám lạnh trung tính — hợp với accent xanh dương) ── */
+  --bg-base: #f4f6f9;
   --bg-surface: #ffffff;
   --bg-primary: #ffffff;
   --bg-card: #ffffff;
-  --bg-muted: #f4f4f5;
-  --bg-elevated: #f4f4f5;
-  --bg-border: #e4e4e7;
-  --bg-border-strong: #d4d4d8;
+  --bg-muted: #f5f7fa;
+  --bg-elevated: #eef1f6;
+  --bg-border: #e2e6ed;
+  --bg-border-strong: #cad1dc;
 
-  /* Sidebar */
-  --sidebar-bg: #09090b;
-  --sidebar-item-hover: #18181b;
-  --sidebar-item-active: #27272a;
-  --sidebar-text: #a1a1aa;
-  --sidebar-text-active: #fafafa;
-  --sidebar-border: #27272a;
-  --sidebar-accent: #3b82f6;
+  /* ── Sidebar (Navy đậm — cùng gốc với xanh dương chính, không phải charcoal trung tính) ── */
+  --sidebar-bg: #111a2e;
+  --sidebar-item-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-item-active: rgba(255, 255, 255, 0.05);
+  --sidebar-text: #8792a8;
+  --sidebar-text-active: #f5f7fa;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-accent: #5b9bf5;
 
-  /* Text */
-  --text-primary: #09090b;
-  --text-secondary: #71717a;
-  --text-tertiary: #a1a1aa;
+  /* ── Text ── */
+  --text-primary: #111827;
+  --text-secondary: #5b6472;
+  --text-tertiary: #97a0ac;
   --text-inverse: #ffffff;
 
-  /* Semantic */
+  /* ── Semantic ── */
   --color-success: #16a34a;
-  --color-warning: #d97706;
+  --color-warning: #b45309;
   --color-error: #dc2626;
-  --color-info: #0284c7;
-  --bg-success: #f0fdf4;
+  --color-info: #2563eb;
+  --bg-success: #ecfdf5;
   --bg-warning: #fffbeb;
   --bg-error: #fef2f2;
-  --bg-info: #f0f9ff;
+  --bg-info: #eff6ff;
 
-  /* Post status */
-  --status-draft-text: #71717a;
-  --status-draft-bg: #f4f4f5;
-  --status-scheduled-text: #b45309;
+  /* ── Post status ── */
+  --status-draft-text: #5b6472;
+  --status-draft-bg: #eef1f6;
+  --status-scheduled-text: #9a5b00;
   --status-scheduled-bg: #fffbeb;
-  --status-published-text: #15803d;
-  --status-published-bg: #f0fdf4;
+  --status-published-text: #0f7a45;
+  --status-published-bg: #ecfdf5;
   --status-failed-text: #b91c1c;
   --status-failed-bg: #fef2f2;
 
-  /* Typography */
+  /* ── Typography ── */
   --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --text-xs: 0.75rem;
@@ -66,7 +66,7 @@
   --leading-normal: 1.5;
   --leading-relaxed: 1.625;
 
-  /* Spacing */
+  /* ── Spacing ── */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -77,25 +77,25 @@
   --space-10: 40px;
   --space-12: 48px;
 
-  /* Layout */
-  --sidebar-width: 240px;
-  --sidebar-width-collapsed: 64px;
-  --header-height: 56px;
+  /* ── Layout ── */
+  --sidebar-width: 256px;
+  --sidebar-width-collapsed: 68px;
+  --header-height: 60px;
   --content-max: 1280px;
   --content-padding: 24px;
   --card-padding: 20px;
-  --card-radius: 12px;
-  --btn-radius: 8px;
-  --input-radius: 8px;
+  --card-radius: 16px;
+  --btn-radius: 10px;
+  --input-radius: 10px;
   --badge-radius: 999px;
 
-  /* Elevation */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.1);
+  /* ── Elevation ── */
+  --shadow-xs: 0 1px 2px rgba(17, 24, 39, 0.04);
+  --shadow-sm: 0 2px 6px rgba(17, 24, 39, 0.06), 0 1px 2px rgba(17, 24, 39, 0.04);
+  --shadow-md: 0 8px 24px rgba(17, 24, 39, 0.1), 0 2px 4px rgba(17, 24, 39, 0.05);
+  --shadow-lg: 0 16px 40px rgba(17, 24, 39, 0.14), 0 4px 8px rgba(17, 24, 39, 0.06);
 
-  /* Motion */
+  /* ── Motion ── */
   --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
   --duration-fast: 150ms;
   --duration-normal: 200ms;
