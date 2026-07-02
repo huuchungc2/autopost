@@ -12,5 +12,10 @@ const variants = {
 
 export default function Badge({ children, status }) {
   const label = status ? postStatusLabel(status) : children;
-  return <span className={`badge ${variants[status] || variants.default}`}>{label}</span>;
+  return (
+    <span className={`badge ${variants[status] || variants.default}`}>
+      <span className="badge-dot" aria-hidden />
+      {label}
+    </span>
+  );
 }

@@ -126,7 +126,7 @@ export default function GroupPosts() {
         </div>
       ) : (
         <div className="card table-wrap">
-          <table className="data-table">
+          <table className="data-table data-table-content-priority">
             <thead>
               <tr>
                 <th>Thời gian</th>

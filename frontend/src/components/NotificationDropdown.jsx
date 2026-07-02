@@ -54,7 +54,7 @@ export default function NotificationDropdown() {
               type="button"
               className="btn-link"
               onClick={() => {
-                navigate('/settings');
+                navigate('/notifications');
                 setOpen(false);
               }}
             >

@@ -3,19 +3,31 @@ import api from '../services/api';
 import Calendar from '../components/Calendar';
 import Badge from '../components/ui/Badge';
 import Skeleton from '../components/ui/Skeleton';
-import PageHeader from '../components/ui/PageHeader';
-import { StatCard } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../services/authContext';
-import { compareApiDates, formatDateTime } from '../utils/date';
-import { FileText, Facebook, Cpu, Users, UsersRound } from 'lucide-react';
+import { compareApiDates, formatDateTime, parseApiDate } from '../utils/date';
+import { ArrowRight, Radio } from 'lucide-react';
+
+function formatCountdown(dateValue) {
+  const target = parseApiDate(dateValue);
+  if (!target) return '';
+  const diffMs = target.getTime() - Date.now();
+  if (diffMs <= 0) return 'đang xử lý';
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 60) return `còn ${mins} phút`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `còn ${hours} giờ ${mins % 60 ? (mins % 60) + ' phút' : ''}`.trim();
+  const days = Math.floor(hours / 24);
+  return `còn ${days} ngày`;
+}
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const isSuperAdmin = user?.role === 'super_admin';
   const [stats, setStats] = useState(null);
   const [posts, setPosts] = useState([]);
+  const [pages, setPages] = useState([]);
   const [filterDate, setFilterDate] = useState('');
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
@@ -55,6 +67,7 @@ export default function Dashboard() {
         const usersData = isSuperAdmin ? getData(4, 'người dùng') : null;
 
         setPosts(postsList);
+        setPages(Array.isArray(pagesData) ? pagesData : []);
         const byStatus = postsList.reduce((acc, p) => {
           acc[p.status] = (acc[p.status] || 0) + 1;
           return acc;
@@ -86,6 +99,12 @@ export default function Dashboard() {
     .sort((a, b) => compareApiDates(a.scheduled_at, b.scheduled_at))
     .slice(0, 5);
 
+  const pageNameById = pages.reduce((acc, p) => {
+    acc[p.id] = p.name;
+    return acc;
+  }, {});
+  const nextDispatch = upcoming[0];
+
   if (authLoading || (!stats && !loadError)) {
     return (
       <div className="page-shell">
@@ -109,19 +128,46 @@ export default function Dashboard() {
 
   return (
     <div className="page-shell">
-      <PageHeader
-        title="Bảng tin"
-        description={
-          isSuperAdmin
-            ? 'Tổng quan toàn bộ hệ thống AutoPost.'
-            : 'Tổng quan fanpage và bài viết được gán cho bạn.'
-        }
-        actions={
-          <Button onClick={() => navigate('/generate')}>
-            Tạo bài mới
-          </Button>
-        }
-      />
+      <div className="dispatch-hero">
+        <span className="dispatch-hero-eyebrow">
+          <Radio size={13} /> Bài kế tiếp sẽ tự động đăng
+        </span>
+        {nextDispatch ? (
+          <div className="dispatch-hero-body">
+            <div className="dispatch-hero-next">
+              <span className="dispatch-next-countdown">{formatCountdown(nextDispatch.scheduled_at)}</span>
+              <div className="dispatch-next-meta">
+                <span className="dispatch-next-topic">{nextDispatch.topic || 'Bài chưa đặt tiêu đề'}</span>
+                <span className="dispatch-next-time">{formatDateTime(nextDispatch.scheduled_at)}</span>
+                {pageNameById[nextDispatch.page_id] && (
+                  <span className="dispatch-next-channel">→ {pageNameById[nextDispatch.page_id]}</span>
+                )}
+              </div>
+            </div>
+            <div className="dispatch-hero-side">
+              <span className="dispatch-hero-sub">{stats.pages} fanpage · {stats.posts} bài trong hệ thống</span>
+              <div className="dispatch-hero-actions">
+                <button type="button" className="dispatch-next-link" onClick={() => navigate('/posts?status=scheduled')}>
+                  Xem tất cả lịch <ArrowRight size={14} />
+                </button>
+                <Button onClick={() => navigate('/generate')}>Tạo bài mới</Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="dispatch-hero-body">
+            <div className="dispatch-hero-next">
+              <span className="dispatch-next-topic dispatch-next-topic--empty">Chưa có bài nào chờ lịch</span>
+            </div>
+            <div className="dispatch-hero-side">
+              <span className="dispatch-hero-sub">{stats.pages} fanpage · {stats.posts} bài trong hệ thống</span>
+              <div className="dispatch-hero-actions">
+                <Button onClick={() => navigate('/generate')}>Tạo bài đầu tiên</Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {loadError && (
         <div className="card modal-alert modal-alert--error" style={{ marginBottom: 16 }}>
@@ -132,18 +178,28 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="dashboard-grid">
-        <StatCard icon={<FileText size={20} />} iconTone="blue" label="Bài viết" value={stats.posts} />
-        <StatCard icon={<Facebook size={20} />} iconTone="green" label="Fanpage" value={stats.pages} />
-        <StatCard
-          icon={<UsersRound size={20} />}
-          iconTone="slate"
-          label="Group đã đăng"
-          value={stats.group?.total_posts ?? '—'}
-        />
-        <StatCard icon={<Cpu size={20} />} iconTone="amber" label="AI Provider" value={stats.providers} />
+      <div className="dispatch-ledger">
+        <div className="dispatch-ledger-item dispatch-ledger-item--blue">
+          <span className="dispatch-ledger-value">{stats.posts}</span>
+          <span className="dispatch-ledger-label">Bài viết</span>
+        </div>
+        <div className="dispatch-ledger-item dispatch-ledger-item--green">
+          <span className="dispatch-ledger-value">{stats.pages}</span>
+          <span className="dispatch-ledger-label">Fanpage</span>
+        </div>
+        <div className="dispatch-ledger-item dispatch-ledger-item--slate">
+          <span className="dispatch-ledger-value">{stats.group?.total_posts ?? '—'}</span>
+          <span className="dispatch-ledger-label">Group đã đăng</span>
+        </div>
+        <div className="dispatch-ledger-item dispatch-ledger-item--amber">
+          <span className="dispatch-ledger-value">{stats.providers}</span>
+          <span className="dispatch-ledger-label">AI Provider</span>
+        </div>
         {isSuperAdmin && (
-          <StatCard icon={<Users size={20} />} iconTone="slate" label="Người dùng" value={stats.users} />
+          <div className="dispatch-ledger-item dispatch-ledger-item--slate">
+            <span className="dispatch-ledger-value">{stats.users}</span>
+            <span className="dispatch-ledger-label">Người dùng</span>
+          </div>
         )}
       </div>
 

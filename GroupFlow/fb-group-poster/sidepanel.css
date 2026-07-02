@@ -1,26 +1,27 @@
 :root {
-  --bg: #eef1f6;
+  /* Đồng bộ với website AutoPost (tokens.css) — xanh dương chuyên nghiệp, bo tròn mềm */
+  --bg: #f4f6f9;
   --surface: #ffffff;
-  --surface-2: #f4f6fa;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
-  --text: #0f172a;
-  --text-muted: #64748b;
-  --text-faint: #94a3b8;
-  --primary: #4f46e5;
-  --primary-hover: #4338ca;
-  --primary-soft: #eef2ff;
-  --accent: #0ea5e9;
-  --success: #10b981;
-  --error: #ef4444;
-  --warning: #f59e0b;
-  --header: #0f172a;
-  --header-2: #1e293b;
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
-  --radius: 12px;
-  --radius-sm: 8px;
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --surface-2: #f5f7fa;
+  --border: #e2e6ed;
+  --border-strong: #cad1dc;
+  --text: #111827;
+  --text-muted: #5b6472;
+  --text-faint: #97a0ac;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-soft: #eff6ff;
+  --accent: #2563eb;
+  --success: #16a34a;
+  --error: #dc2626;
+  --warning: #b45309;
+  --header: #111a2e;
+  --header-2: #1a2744;
+  --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.06);
+  --shadow-md: 0 8px 24px rgba(17, 24, 39, 0.12);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -133,7 +134,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.4);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
 }
 
 .brand-text {
@@ -297,7 +298,7 @@ body {
 
 .profile-option.active {
   background: var(--primary-soft);
-  border-color: rgba(79, 70, 229, 0.25);
+  border-color: rgba(37, 99, 235, 0.25);
 }
 
 .profile-option-info {
@@ -551,6 +552,12 @@ body.gf-tab-settings .footer-global {
   padding: 14px;
   margin-bottom: 10px;
   box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
 }
 
 .card-head {
@@ -639,7 +646,7 @@ body.gf-tab-settings .footer-global {
   background: var(--primary);
   color: #fff;
   font-weight: 600;
-  box-shadow: 0 1px 4px rgba(79, 70, 229, 0.35);
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35);
 }
 
 .segmented-btn:hover:not(:has(input:checked)):not(.active) {
@@ -773,7 +780,7 @@ input, textarea, select {
 input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 .search-wrap {
@@ -864,16 +871,17 @@ input:focus, textarea:focus, select:focus {
 .btn.primary {
   background: var(--primary);
   color: #fff;
-  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
 }
 
 .btn.primary:hover {
   background: var(--primary-hover);
-  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
 }
 
 .btn.primary.cta {
-  background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
+  background: var(--primary);
   padding: 11px 16px;
   font-size: 13px;
 }
@@ -892,12 +900,12 @@ input:focus, textarea:focus, select:focus {
 
 .btn.ghost.accent {
   color: var(--primary);
-  border-color: rgba(79, 70, 229, 0.25);
+  border-color: rgba(37, 99, 235, 0.25);
   background: var(--primary-soft);
 }
 
 .btn.ghost.accent:hover {
-  background: #e0e7ff;
+  background: var(--border);
 }
 
 .btn.block { width: 100%; margin-top: 10px; }
@@ -1039,7 +1047,7 @@ input:focus, textarea:focus, select:focus {
 .list-item.selected {
   border-color: var(--primary);
   background: var(--primary-soft);
-  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.15);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.15);
 }
 
 .group-row {
@@ -1066,7 +1074,7 @@ input:focus, textarea:focus, select:focus {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #e0e7ff, #dbeafe);
+  background: linear-gradient(135deg, #dbeafe, var(--primary-soft));
   color: var(--primary);
   font-weight: 700;
   font-size: 13px;
@@ -1322,7 +1330,7 @@ video.thumb {
 .strategy-card:has(input:checked) {
   border-color: var(--primary);
   background: var(--primary-soft);
-  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 
 .strategy-card:hover:not(:has(input:checked)) {
@@ -1833,7 +1841,7 @@ video.thumb {
 
 .settings-nav-btn.active {
   background: var(--primary-soft);
-  border-color: rgba(79, 70, 229, 0.45);
+  border-color: rgba(37, 99, 235, 0.45);
   color: var(--primary);
 }
 
@@ -2414,7 +2422,7 @@ video.thumb {
 }
 
 .posting-config-bar:hover {
-  border-color: rgba(79, 70, 229, 0.4);
+  border-color: rgba(37, 99, 235, 0.4);
 }
 
 .posting-config-label {
@@ -2440,8 +2448,8 @@ video.thumb {
 }
 
 .card-posting-strategy {
-  border-color: rgba(79, 70, 229, 0.25);
-  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.08);
+  border-color: rgba(37, 99, 235, 0.25);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.08);
 }
 
 .create-flow {
@@ -2548,7 +2556,7 @@ video.thumb {
 }
 
 .gf-group-trigger.has-groups {
-  border-color: rgba(79, 70, 229, 0.35);
+  border-color: rgba(37, 99, 235, 0.35);
   background: var(--primary-soft);
 }
 
@@ -2867,7 +2875,7 @@ body.gf-posting-active .footer {
 
 #btnToggleAdvanced.active {
   background: var(--primary-soft);
-  border-color: rgba(79, 70, 229, 0.35);
+  border-color: rgba(37, 99, 235, 0.35);
   color: var(--primary);
 }
 

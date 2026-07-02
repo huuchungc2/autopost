@@ -27,7 +27,7 @@ export default function ActivityLog() {
         {error && <div className="form-error">{error}</div>}
         {!error && logs.length === 0 && <p>Chưa có nhật ký nào.</p>}
         {logs.length > 0 && (
-          <table className="table">
+          <table className="table table-responsive-cols">
             <thead>
               <tr>
                 <th>Thời gian</th>

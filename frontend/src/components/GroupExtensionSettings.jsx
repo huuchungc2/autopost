@@ -158,7 +158,7 @@ export default function GroupExtensionSettings() {
             </Button>
           </div>
 
-          <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid var(--border, #e4e4e7)' }} />
+          <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid var(--bg-border)' }} />
 
           <div className="settings-groupflow-grid">
             <label>

@@ -132,7 +132,7 @@ function GroupFlowUsers() {
         {[
           ['Tổng user', users.length, '#2563eb'],
           ['Đang active', activeUsers, '#15803d'],
-          ['Tổng bài đăng', totalPosts, '#7c3aed'],
+          ['Tổng bài đăng', totalPosts, 'var(--color-warning)'],
         ].map(([label, val, color]) => (
           <div key={label} className="card" style={{ flex: 1, padding: '12px 16px', textAlign: 'center' }}>
             <div style={{ fontSize: 22, fontWeight: 700, color }}>{val}</div>
@@ -188,7 +188,7 @@ function GroupFlowUsers() {
                 </td>
                 <td style={{ fontSize: 12 }}>{KEY_STATUS_LABEL[u.key_status] || u.key_status || '—'}</td>
                 <td style={{ textAlign: 'center', fontWeight: 600, color: Number(u.group_count) > 0 ? '#2563eb' : 'var(--text-tertiary)' }}>{u.group_count || 0}</td>
-                <td style={{ textAlign: 'center', fontWeight: 600, color: Number(u.post_count) > 0 ? '#7c3aed' : 'var(--text-tertiary)' }}>{u.post_count || 0}</td>
+                <td style={{ textAlign: 'center', fontWeight: 600, color: Number(u.post_count) > 0 ? 'var(--color-warning)' : 'var(--text-tertiary)' }}>{u.post_count || 0}</td>
                 <td style={{ fontSize: 12 }}>{fmtDatetime(u.last_post_at || u.last_validated_at)}</td>
                 <td>
                   <select value={u.status} onChange={(e) => update(u.id, { status: e.target.value })} style={{ fontSize: 12, padding: '2px 4px', color: ACCOUNT_STATUS_COLOR[u.status] || undefined }}>
