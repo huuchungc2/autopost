@@ -81,27 +81,27 @@ export default function UserDashboard() {
       <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Header */}
-        <div style={{ background: 'var(--bg-surface)', borderRadius: 14, border: '1px solid var(--bg-border)', padding: '18px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 14, border: '1px solid var(--bg-border)', padding: '18px 24px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: 'var(--color-primary)', color: 'var(--text-inverse)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16 }}>GF</div>
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: 'var(--color-primary)', color: 'var(--text-inverse)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16, flexShrink: 0 }}>GF</div>
             <div>
               <div style={{ fontWeight: 700, fontSize: 16 }}>{data.user.name || 'GroupFlow User'}</div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{data.user.email} · Đăng ký {fmtDate(data.user.created_at)}</div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
             {key && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: KEY_STATUS_BG[key.status] || 'var(--bg-muted)', border: `1px solid`, borderColor: key.status === 'active' ? 'var(--color-success)' : 'var(--color-error)', borderRadius: 8, padding: '5px 10px', fontSize: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, whiteSpace: 'nowrap', background: KEY_STATUS_BG[key.status] || 'var(--bg-muted)', border: `1px solid`, borderColor: key.status === 'active' ? 'var(--color-success)' : 'var(--color-error)', borderRadius: 8, padding: '5px 10px', fontSize: 12 }}>
                 <span style={{ color: KEY_STATUS_COLOR[key.status] || 'var(--text-secondary)', fontWeight: 600 }}>{KEY_STATUS_LABEL[key.status]}</span>
                 <span style={{ color: 'var(--text-secondary)' }}>· {PLAN_LABEL[key.plan] || key.plan}</span>
               </div>
             )}
-            <button onClick={handleLogout} style={{ background: 'none', border: '1px solid var(--bg-border)', borderRadius: 8, cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: 13, padding: '6px 12px' }}>Đăng xuất</button>
+            <button onClick={handleLogout} style={{ background: 'none', border: '1px solid var(--bg-border)', borderRadius: 8, cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 13, padding: '6px 12px', flexShrink: 0 }}>Đăng xuất</button>
           </div>
         </div>
 
         {/* Stats + License key row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 2fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
           {[
             ['Nhóm đang dùng', stats.group_count || 0, 'var(--color-primary)'],
             ['Bài đã đăng', stats.post_count || 0, 'var(--color-warning)'],
@@ -152,7 +152,8 @@ export default function UserDashboard() {
                 ) : !detail.posts.length ? (
                   <p style={{ padding: '20px', color: 'var(--text-secondary)', fontSize: 13 }}>Chưa có bài nào được đồng bộ. Dùng extension đăng bài và bấm "Đồng bộ" để thấy ở đây.</p>
                 ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', minWidth: 560, borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-muted)', borderBottom: '1px solid var(--bg-border)' }}>
                         <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 12, whiteSpace: 'nowrap' }}>Thời gian</th>
@@ -200,6 +201,7 @@ export default function UserDashboard() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             )}
@@ -212,7 +214,8 @@ export default function UserDashboard() {
                 ) : !detail.groups.length ? (
                   <p style={{ padding: '20px', color: 'var(--text-secondary)', fontSize: 13 }}>Chưa có nhóm nào. Dùng extension đăng bài vào nhóm để thấy ở đây.</p>
                 ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', minWidth: 420, borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-muted)', borderBottom: '1px solid var(--bg-border)' }}>
                         <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 12 }}>Tên nhóm</th>
@@ -233,6 +236,7 @@ export default function UserDashboard() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             )}
