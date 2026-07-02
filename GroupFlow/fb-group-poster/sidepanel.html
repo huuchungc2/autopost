@@ -12,16 +12,16 @@
 </head>
 <body>
   <!-- Activation gate: shown when no valid license key -->
-  <div id="gf-activation-overlay" style="position:fixed;inset:0;z-index:9999;background:#f0f2f5;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;gap:14px;font-family:inherit">
-    <button type="button" id="overlayCloseBtn" title="Đóng" style="position:absolute;top:14px;right:14px;background:#e4e4e7;border:none;color:#71717a;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center">✕</button>
-    <div style="width:44px;height:44px;border-radius:12px;background:#2563eb;color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:-0.02em">GF</div>
-    <div style="font-size:18px;font-weight:700;letter-spacing:-0.5px;color:#09090b">GroupFlow</div>
-    <p style="color:#71717a;text-align:center;margin:0;font-size:13px;max-width:260px">Nhập License Key để sử dụng extension</p>
-    <input type="text" id="overlayLicenseKey" placeholder="Dán key tại đây…" style="width:100%;max-width:300px;padding:11px 14px;border:1.5px solid #e4e4e7;border-radius:8px;background:#fff;color:#09090b;font-family:monospace;letter-spacing:1px;font-size:12px;text-align:center;outline:none" />
-    <button type="button" id="overlayValidateBtn" style="width:100%;max-width:300px;height:42px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Xác thực key</button>
-    <p id="overlayStatus" style="font-size:12px;color:#71717a;min-height:16px;text-align:center;margin:0"></p>
-    <p style="font-size:12px;color:#a1a1aa;text-align:center;margin:0">Chưa có key? <a href="#" id="overlayRegisterLink" style="color:#2563eb">Đăng ký tại tidien.xyz</a></p>
-    <p style="font-size:12px;color:#a1a1aa;text-align:center;margin:0">Có tài khoản rồi? <a href="#" id="overlayLoginLink" style="color:#2563eb">Đăng nhập để xem lại key</a></p>
+  <div id="gf-activation-overlay" class="gf-activation-overlay">
+    <button type="button" id="overlayCloseBtn" title="Đóng" class="gf-activation-close">✕</button>
+    <div class="gf-activation-logo">GF</div>
+    <div class="gf-activation-title">GroupFlow</div>
+    <p class="gf-activation-desc">Nhập License Key để sử dụng extension</p>
+    <input type="text" id="overlayLicenseKey" placeholder="Dán key tại đây…" class="gf-activation-input" />
+    <button type="button" id="overlayValidateBtn" class="gf-activation-submit">Xác thực key</button>
+    <p id="overlayStatus" class="gf-activation-status"></p>
+    <p class="gf-activation-hint">Chưa có key? <a href="#" id="overlayRegisterLink">Đăng ký tại tidien.xyz</a></p>
+    <p class="gf-activation-hint">Có tài khoản rồi? <a href="#" id="overlayLoginLink">Đăng nhập để xem lại key</a></p>
   </div>
 
   <header class="header">
@@ -31,6 +31,7 @@
       <div class="brand-text">
         <span class="brand-name">GroupFlow</span>
         <span class="brand-tag">FB Group Poster</span>
+        <span class="brand-license" id="headerLicenseInfo" title=""></span>
       </div>
     </div>
     <div class="profile-picker" id="profilePicker">

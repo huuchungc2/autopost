@@ -816,7 +816,7 @@ const GF_BG = {
     const s = await chrome.storage.local.get('securityLevel');
     const key = level || s.securityLevel || 'balanced';
     const map = {
-      fast: { betweenGroups: [60, 120], betweenPosts: 180, betweenComments: [90, 180] },
+      fast: { betweenGroups: [5, 60], betweenPosts: 180, betweenComments: [90, 180] },
       balanced: { betweenGroups: [180, 300], betweenPosts: 420, betweenComments: [180, 300] },
       safe: { betweenGroups: [420, 600], betweenPosts: 900, betweenComments: [300, 600] },
     };

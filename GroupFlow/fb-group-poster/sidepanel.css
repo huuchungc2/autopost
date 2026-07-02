@@ -71,6 +71,149 @@ body {
   border: 0;
 }
 
+/* ── Activation gate ── */
+.gf-activation-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  gap: 14px;
+  font-family: var(--font);
+}
+
+.gf-activation-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.gf-activation-close:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.gf-activation-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: -0.02em;
+  box-shadow: var(--shadow-md);
+}
+
+.gf-activation-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+
+.gf-activation-desc {
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0;
+  font-size: 13px;
+  max-width: 260px;
+}
+
+.gf-activation-input {
+  width: 100%;
+  max-width: 300px;
+  padding: 11px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: monospace;
+  letter-spacing: 1px;
+  font-size: 12px;
+  text-align: center;
+  outline: none;
+}
+
+.gf-activation-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.gf-activation-submit {
+  width: 100%;
+  max-width: 300px;
+  height: 42px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.gf-activation-submit:hover:not(:disabled) {
+  background: var(--primary-hover);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
+}
+
+.gf-activation-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.gf-activation-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-height: 16px;
+  text-align: center;
+  margin: 0;
+}
+
+.gf-activation-status--ok {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.gf-activation-status--error {
+  color: var(--error);
+}
+
+.gf-activation-hint {
+  font-size: 12px;
+  color: var(--text-faint);
+  text-align: center;
+  margin: 0;
+}
+
+.gf-activation-hint a {
+  color: var(--primary);
+}
+
 /* ── Header ── */
 .header {
   position: relative;
@@ -155,6 +298,19 @@ body {
   color: rgba(255, 255, 255, 0.55);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.brand-license {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+.brand-license:empty {
+  display: none;
 }
 
 .fb-status-dot.on {

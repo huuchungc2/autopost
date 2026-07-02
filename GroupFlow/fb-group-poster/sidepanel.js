@@ -4265,19 +4265,21 @@ async function saveSettingsForm() {
   } catch { /* ignore */ }
 }
 
+function closeSidePanel() {
+  try {
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: 'GF_PANEL_CLOSE' }, '*');
+    } else {
+      window.close();
+    }
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
 function bindEvents() {
   initSettingsNav();
-  $('#btnPopout')?.addEventListener('click', () => {
-    try {
-      if (window.parent !== window) {
-        window.parent.postMessage({ type: 'GF_PANEL_CLOSE' }, '*');
-      } else {
-        window.close();
-      }
-    } catch (e) {
-      alert(e.message);
-    }
-  });
+  $('#btnPopout')?.addEventListener('click', closeSidePanel);
 
   $$('#tabBar button').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -5049,9 +5051,24 @@ async function markCrossPostCommented(serverPostId) {
   } catch { /* best-effort */ }
 }
 
+function renderLicenseBadge(licenseInfo) {
+  const el = $('#headerLicenseInfo');
+  if (!el) return;
+  if (licenseInfo?.valid) {
+    const plan = licenseInfo.plan ? ` · ${licenseInfo.plan}` : '';
+    const text = `${licenseInfo.email || ''}${plan}`;
+    el.textContent = text;
+    el.title = text;
+  } else {
+    el.textContent = '';
+    el.title = '';
+  }
+}
+
 async function checkLicenseGate() {
   const { licenseKey, licenseInfo } = await chrome.storage.local.get(['licenseKey', 'licenseInfo']);
   if (licenseKey && licenseInfo?.valid) {
+    renderLicenseBadge(licenseInfo);
     $('#gf-activation-overlay')?.remove();
     return true;
   }
@@ -5061,10 +5078,7 @@ async function checkLicenseGate() {
   const btn = $('#overlayValidateBtn');
   const status = $('#overlayStatus');
   if (licenseKey && input) input.value = licenseKey;
-  $('#overlayCloseBtn')?.addEventListener('click', () => {
-    overlay.remove();
-    finishInit();
-  });
+  $('#overlayCloseBtn')?.addEventListener('click', closeSidePanel);
   $('#overlayRegisterLink')?.addEventListener('click', (e) => {
     e.preventDefault();
     const s = GF.storage.cachedSettings;
@@ -5081,7 +5095,7 @@ async function checkLicenseGate() {
     const key = (input?.value || '').trim().toUpperCase();
     if (!key) { if (status) status.textContent = 'Nhập key trước'; return; }
     if (btn) { btn.disabled = true; btn.textContent = 'Đang xác thực…'; }
-    if (status) { status.textContent = ''; status.style.color = '#666'; }
+    if (status) { status.textContent = ''; status.className = 'gf-activation-status'; }
     try {
       const s = await GF.storage.getSettings();
       const base = (s?.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
@@ -5093,14 +5107,15 @@ async function checkLicenseGate() {
       const data = await res.json();
       await chrome.storage.local.set({ licenseKey: key, licenseInfo: data });
       if (data.valid) {
+        renderLicenseBadge(data);
         overlay.remove();
         await finishInit();
       } else {
-        if (status) { status.textContent = data.error || 'Key không hợp lệ'; status.style.color = '#e53e3e'; }
+        if (status) { status.textContent = data.error || 'Key không hợp lệ'; status.className = 'gf-activation-status gf-activation-status--error'; }
         if (btn) { btn.disabled = false; btn.textContent = 'Xác thực key'; }
       }
     } catch {
-      if (status) { status.textContent = 'Lỗi kết nối server'; status.style.color = '#e53e3e'; }
+      if (status) { status.textContent = 'Lỗi kết nối server'; status.className = 'gf-activation-status gf-activation-status--error'; }
       if (btn) { btn.disabled = false; btn.textContent = 'Xác thực key'; }
     }
   });
