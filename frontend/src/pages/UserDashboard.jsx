@@ -100,30 +100,32 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* Stats + License key row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-          {[
-            ['Nhóm đang dùng', stats.group_count || 0, 'var(--color-primary)'],
-            ['Bài đã đăng', stats.post_count || 0, 'var(--color-warning)'],
-            ['Hoạt động cuối', stats.last_post_at ? fmtDate(stats.last_post_at) : '—', 'var(--color-info)'],
-          ].map(([label, val, color]) => (
-            <div key={label} style={{ background: 'var(--bg-surface)', borderRadius: 'var(--card-radius)', border: '1px solid var(--bg-border)', padding: '14px 16px', textAlign: 'center' }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color }}>{val}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{label}</div>
-            </div>
-          ))}
+        {/* Stats + License key — 1 card gộp nhiều dòng cho dễ nhìn thay vì tách 4 card rời */}
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 14, border: '1px solid var(--bg-border)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+            {[
+              ['Nhóm đang dùng', stats.group_count || 0, 'var(--color-primary)'],
+              ['Bài đã đăng', stats.post_count || 0, 'var(--color-warning)'],
+              ['Hoạt động cuối', stats.last_post_at ? fmtDate(stats.last_post_at) : '—', 'var(--color-info)'],
+            ].map(([label, val, color], i) => (
+              <div key={label} style={{ flex: '1 1 140px', padding: '16px', textAlign: 'center', borderLeft: i > 0 ? '1px solid var(--bg-border)' : 'none' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color }}>{val}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{label}</div>
+              </div>
+            ))}
+          </div>
           {key && (
-            <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--card-radius)', border: '1px solid var(--bg-border)', padding: '12px 14px' }}>
+            <div style={{ borderTop: '1px solid var(--bg-border)', padding: '14px 16px' }}>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 6 }}>License Key</div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <code style={{ flex: 1, background: 'var(--bg-muted)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '7px 10px', fontSize: 11, wordBreak: 'break-all', fontFamily: 'monospace' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <code style={{ flex: '1 1 220px', background: 'var(--bg-muted)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '7px 10px', fontSize: 12, wordBreak: 'break-all', fontFamily: 'monospace' }}>
                   {key.key_value}
                 </code>
-                <button onClick={() => handleCopy(key.key_value)} style={{ padding: '7px 12px', background: copied ? 'var(--color-success)' : 'var(--color-primary)', color: 'var(--text-inverse)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                  {copied ? '✓' : 'Copy'}
+                <button onClick={() => handleCopy(key.key_value)} style={{ padding: '7px 16px', background: copied ? 'var(--color-success)' : 'var(--color-primary)', color: 'var(--text-inverse)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  {copied ? '✓ Đã copy' : 'Copy'}
                 </button>
               </div>
-              {key.last_validated_at && <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 4 }}>Kích hoạt lần cuối: {fmtDatetime(key.last_validated_at)}</div>}
+              {key.last_validated_at && <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 6 }}>Kích hoạt lần cuối: {fmtDatetime(key.last_validated_at)}</div>}
             </div>
           )}
         </div>
