@@ -142,6 +142,11 @@ a {
 }
 
 .sidebar-group-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -149,6 +154,23 @@ a {
   color: rgba(255, 255, 255, 0.38);
   padding: 8px 12px 4px;
   white-space: nowrap;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.sidebar-group-label:hover {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.sidebar-group-chevron {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.sidebar-group-chevron--collapsed {
+  transform: rotate(-90deg);
 }
 
 .sidebar-group-divider {
@@ -3197,7 +3219,7 @@ body.mobile-menu-open {
     min-height: 40px;
   }
 
-  .login-form {
+  .login-card {
     width: min(420px, 94vw);
     padding: 24px 20px;
     border-radius: 16px;
