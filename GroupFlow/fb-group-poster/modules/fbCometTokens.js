@@ -105,11 +105,17 @@ globalThis.GF.fbCometTokens = {
     };
   },
 
-  applyToSearchParams(params, session, htmlTokens) {
+  // __dyn/__csr là bitset mã hoá CHÍNH XÁC module JS/CSS trang đang tải — không đoán/sinh ngẫu
+  // nhiên được, Facebook coi giá trị sai/ngẫu nhiên là dấu hiệu bot rõ ràng (lỗi 1357004 chung
+  // chung). Ưu tiên giá trị THẬT bắt được từ chính request trang Facebook tự gửi lúc user browse
+  // bình thường (content.js/pageNetworkHook.js → gf_comet_tokens), rồi mới tới giá trị parse từ
+  // HTML lúc warmup, ngẫu nhiên chỉ còn là phao cứu sinh cuối cùng khi chưa bắt được lần nào.
+  async applyToSearchParams(params, session, htmlTokens) {
     const parsed = htmlTokens || {};
     const CT = globalThis.GF.fbCometTokens;
-    params.set('__dyn', parsed.__dyn || CT.buildDyn());
-    params.set('__csr', parsed.__csr || CT.buildCsr());
+    const stored = (await chrome.storage.local.get('gf_comet_tokens').catch(() => ({}))).gf_comet_tokens || {};
+    params.set('__dyn', stored.dyn || parsed.__dyn || CT.buildDyn());
+    params.set('__csr', stored.csr || parsed.__csr || CT.buildCsr());
     params.set('__hsdp', CT.buildHsdp());
     params.set('__hblp', CT.buildHblp());
     params.set('__hs', parsed.__hs || session.hs || '20160.HYP:comet_pkg.2.1...1');

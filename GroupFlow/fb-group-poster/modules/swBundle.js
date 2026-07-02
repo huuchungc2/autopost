@@ -1458,12 +1458,42 @@ const S = globalThis.GF.fbSessionBg = {
   _cacheByActor: new Map(),
   _lastCacheKey: null,
   _webSessionId: null,
+  _ajaxIdentityLoaded: false,
   CACHE_MS: 5 * 60 * 1000,
   reqCounter: 1,
 
   freshWebSessionId() {
     const seg = () => Math.floor(Math.random() * (36 ** 6)).toString(36).padStart(6, '0');
     return `${seg()}:${seg()}:${seg()}`;
+  },
+
+  // MV3 service worker bị Chrome tắt sau ~30s không hoạt động — trong khi giãn cách giữa các
+  // nhóm (Settings) thường dài hơn thế nhiều, nên hầu như MỖI LẦN đăng nhóm tiếp theo, SW đã bị
+  // khởi động lại từ đầu, xoá sạch _webSessionId/reqCounter trong bộ nhớ. Kết quả: mỗi request
+  // đều mang __s (session id ajax) mới tinh + __req luôn về lại 1 — không giống hành vi trình
+  // duyệt thật (nơi __s sống suốt cả phiên duyệt), dễ bị Facebook nghi ngờ (lỗi 1357004 chung
+  // chung). Lưu 2 giá trị này vào chrome.storage.local để sống sót qua các lần SW khởi động lại.
+  async ensureAjaxIdentity() {
+    if (this._ajaxIdentityLoaded) return;
+    this._ajaxIdentityLoaded = true;
+    try {
+      const d = await chrome.storage.local.get(['gfWebSessionId', 'gfReqCounter']);
+      if (d.gfWebSessionId) {
+        this._webSessionId = d.gfWebSessionId;
+        this.reqCounter = Number(d.gfReqCounter) || 1;
+      } else {
+        this._webSessionId = this.freshWebSessionId();
+        chrome.storage.local.set({ gfWebSessionId: this._webSessionId, gfReqCounter: this.reqCounter }).catch(() => {});
+      }
+    } catch {
+      if (!this._webSessionId) this._webSessionId = this.freshWebSessionId();
+    }
+  },
+
+  nextReq() {
+    const val = this.reqCounter++;
+    chrome.storage.local.set({ gfReqCounter: this.reqCounter }).catch(() => {});
+    return val;
   },
 
   async hasFbLogin() {
@@ -1519,6 +1549,17 @@ const S = globalThis.GF.fbSessionBg = {
     return this.pickGraphqlPayload(chunks);
   },
 
+  // jazoest là checksum của CHÍNH fb_dtsg (tổng mã ký tự, tiền tố "2") — Facebook dùng để phát
+  // hiện request giả mạo/dtsg không khớp. Trước đây hardcode cứng '25669' bất kể dtsg thật là gì
+  // → dtsg mới lấy được nhưng jazoest cũ không khớp → FB trả lỗi chung chung (vd error 1357004
+  // "Vui lòng thử đóng và mở lại cửa sổ trình duyệt") thay vì lỗi rõ ràng, rất khó đoán nguyên nhân.
+  computeJazoest(dtsg) {
+    if (!dtsg) return null;
+    let sum = 0;
+    for (let i = 0; i < dtsg.length; i += 1) sum += dtsg.charCodeAt(i);
+    return `2${sum}`;
+  },
+
   parseSessionFromHtml(html) {
     const h = String(html || '');
     const uid = h.match(/"USER_ID":"(\d+)"/)?.[1]
@@ -1531,12 +1572,16 @@ const S = globalThis.GF.fbSessionBg = {
     const lsd = h.match(/"LSD",\[\],\{"token":"([^"]+)"/)?.[1]
       || h.match(/"lsd":"([^"]+)"/)?.[1]
       || null;
+    const jazoest = h.match(/name="jazoest"\s+value="([^"]+)"/)?.[1]
+      || h.match(/"jazoest":"([^"]+)"/)?.[1]
+      || this.computeJazoest(dtsg)
+      || '25669';
     return {
       uid,
       personalId: uid,
       dtsg,
       lsd,
-      jazoest: '25669',
+      jazoest,
       rev: h.match(/"client_revision":(\d+)/)?.[1] || '1007600000',
       hs: h.match(/"haste_session":"([^"]+)"/)?.[1] || null,
       spin_r: h.match(/"__spin_r":(\d+)/)?.[1] || null,
@@ -1594,9 +1639,20 @@ const S = globalThis.GF.fbSessionBg = {
   },
 
   async resolveSession({ force = false, actorId: preferredActorId, groupId } = {}) {
+    await this.ensureAjaxIdentity();
     const cacheKey = preferredActorId ? String(preferredActorId) : '__default__';
     const cached = this._cacheByActor.get(cacheKey);
     if (!force && cached && Date.now() - cached.at < this.CACHE_MS) {
+      console.info('[GroupFlow] session debug (from cache):', {
+        hasDtsg: Boolean(cached.session.dtsg),
+        hasLsd: Boolean(cached.session.lsd),
+        jazoest: cached.session.jazoest,
+        rev: cached.session.rev,
+        hs: cached.session.hs,
+        spin_r: cached.session.spin_r,
+        spin_b: cached.session.spin_b,
+        spin_t: cached.session.spin_t,
+      });
       return { ...cached.session };
     }
     if (!(await this.hasFbLogin())) {
@@ -1636,6 +1692,19 @@ const S = globalThis.GF.fbSessionBg = {
       userId: String(actorId),
       fb_dtsg: parsed.dtsg,
     };
+    // Log chẩn đoán tạm — error 1357004 chung chung của FB thường do thiếu/lỗi __rev, __hs,
+    // __spin_r/b/t (tham số "phiên bản build" FB dùng để chặn client cũ), không phải do dtsg/lsd.
+    // Không log dtsg/lsd thật (nhạy cảm) — chỉ log CÓ lấy được hay không + giá trị rev/hs/spin.
+    console.info('[GroupFlow] session debug:', {
+      hasDtsg: Boolean(parsed.dtsg),
+      hasLsd: Boolean(parsed.lsd),
+      jazoest: session.jazoest,
+      rev: session.rev,
+      hs: session.hs,
+      spin_r: session.spin_r,
+      spin_b: session.spin_b,
+      spin_t: session.spin_t,
+    });
     this._cacheByActor.set(cacheKey, { session: { ...session }, at: Date.now() });
     this._lastCacheKey = cacheKey;
     return session;
@@ -1646,14 +1715,14 @@ const S = globalThis.GF.fbSessionBg = {
     this._lastCacheKey = null;
   },
 
-  buildGraphqlBody(session, friendlyName, docId, variables) {
+  async buildGraphqlBody(session, friendlyName, docId, variables) {
     const apiUser = session.personalId || session.uid;
     const body = new URLSearchParams();
     body.set('av', session.actorId || session.uid);
     body.set('__user', apiUser);
     body.set('__a', '1');
     body.set('__comet_req', '15');
-    body.set('__req', (this.reqCounter++).toString(36));
+    body.set('__req', this.nextReq().toString(36));
     body.set('__ccg', 'EXCELLENT');
     body.set('dpr', '1');
     if (!this._webSessionId) this._webSessionId = this.freshWebSessionId();
@@ -1671,7 +1740,7 @@ const S = globalThis.GF.fbSessionBg = {
     body.set('variables', JSON.stringify(variables));
     body.set('doc_id', docId);
     body.set('server_timestamps', 'true');
-    globalThis.GF?.fbCometTokens?.applyToSearchParams?.(body, session, this._warmupTokens);
+    await globalThis.GF?.fbCometTokens?.applyToSearchParams?.(body, session, this._warmupTokens);
     return body;
   },
 
@@ -1688,14 +1757,14 @@ const S = globalThis.GF.fbSessionBg = {
   },
 
   /** Query string upload ảnh — khớp GPP worker (Comet). */
-  buildUploadQueryParams(session) {
+  async buildUploadQueryParams(session) {
     const apiUser = session.uid || session.personalId;
     const params = new URLSearchParams();
     params.set('av', session.actorId || session.uid);
     params.set('__user', apiUser);
     params.set('__a', '1');
     params.set('__comet_req', '15');
-    params.set('__req', (this.reqCounter++).toString(36));
+    params.set('__req', this.nextReq().toString(36));
     params.set('__ccg', 'EXCELLENT');
     params.set('dpr', '1');
     if (!this._webSessionId) this._webSessionId = this.freshWebSessionId();
@@ -1709,7 +1778,7 @@ const S = globalThis.GF.fbSessionBg = {
     if (session.spin_t) params.set('__spin_t', session.spin_t);
     params.set('fb_api_caller_class', 'RelayModern');
     params.set('server_timestamps', 'true');
-    globalThis.GF?.fbCometTokens?.applyToSearchParams?.(params, session, this._warmupTokens);
+    await globalThis.GF?.fbCometTokens?.applyToSearchParams?.(params, session, this._warmupTokens);
     return params;
   },
 
@@ -1761,7 +1830,7 @@ const S = globalThis.GF.fbSessionBg = {
 
   async graphqlRequest(session, friendlyName, docId, variables, opts = {}) {
     const referer = opts.referer || 'https://www.facebook.com/';
-    const body = this.buildGraphqlBody(session, friendlyName, docId, variables);
+    const body = await this.buildGraphqlBody(session, friendlyName, docId, variables);
     const res = await this.fetchWithRetry(GRAPHQL_URL, {
       method: 'POST',
       credentials: 'include',
@@ -1893,11 +1962,17 @@ globalThis.GF.fbCometTokens = {
     };
   },
 
-  applyToSearchParams(params, session, htmlTokens) {
+  // __dyn/__csr là bitset mã hoá CHÍNH XÁC module JS/CSS trang đang tải — không đoán/sinh ngẫu
+  // nhiên được, Facebook coi giá trị sai/ngẫu nhiên là dấu hiệu bot rõ ràng (lỗi 1357004 chung
+  // chung). Ưu tiên giá trị THẬT bắt được từ chính request trang Facebook tự gửi lúc user browse
+  // bình thường (content.js/pageNetworkHook.js → gf_comet_tokens), rồi mới tới giá trị parse từ
+  // HTML lúc warmup, ngẫu nhiên chỉ còn là phao cứu sinh cuối cùng khi chưa bắt được lần nào.
+  async applyToSearchParams(params, session, htmlTokens) {
     const parsed = htmlTokens || {};
     const CT = globalThis.GF.fbCometTokens;
-    params.set('__dyn', parsed.__dyn || CT.buildDyn());
-    params.set('__csr', parsed.__csr || CT.buildCsr());
+    const stored = (await chrome.storage.local.get('gf_comet_tokens').catch(() => ({}))).gf_comet_tokens || {};
+    params.set('__dyn', stored.dyn || parsed.__dyn || CT.buildDyn());
+    params.set('__csr', stored.csr || parsed.__csr || CT.buildCsr());
     params.set('__hsdp', CT.buildHsdp());
     params.set('__hblp', CT.buildHblp());
     params.set('__hs', parsed.__hs || session.hs || '20160.HYP:comet_pkg.2.1...1');
@@ -2079,21 +2154,26 @@ const FP = globalThis.GF.fbPostBg = {
   idFromStoryCreate(sc) {
     if (!sc) return null;
     const story = sc.story;
+    // legacy_story_hideable_id / legacy_api_post_id are the correct public URL IDs.
+    // sc.story_id / sc.post_id are internal Facebook graph IDs that look numeric but
+    // don't map to the public permalink — so they go last as final fallbacks.
     const candidates = [
-      sc.story_id,
-      sc.post_id,
       sc.legacy_story_hideable_id,
-      sc.legacy_fbid,
       sc.legacy_api_post_id,
+      sc.legacy_fbid,
       story?.legacy_story_hideable_id,
+      story?.legacy_api_post_id,
       story?.legacy_fbid,
       story?.legacy_id,
       story?.legacy_story_id,
-      story?.post_id,
-      story?.id,
       sc.feed_story_edge?.node?.legacy_story_hideable_id,
       sc.feed_story_edge?.node?.legacy_fbid,
       sc.feed_story_edge?.node?.id,
+      // last resort: internal IDs that may not match the public URL
+      sc.story_id,
+      sc.post_id,
+      story?.post_id,
+      story?.id,
     ];
     for (const c of candidates) {
       const id = this.normalizePostId(c);
@@ -2136,6 +2216,15 @@ const FP = globalThis.GF.fbPostBg = {
 
   idFromRawText(rawText) {
     const t = String(rawText || '');
+
+    // Anchor search to the story_create section only — the full response can contain
+    // other users' posts (feed refresh), and a global search would pick up their IDs.
+    const scStart = t.indexOf('"story_create"');
+    if (scStart === -1) return null; // response has no story_create → not our target
+
+    // Take up to 8 KB after "story_create" to cover nested story object
+    const context = t.slice(scStart, scStart + 8000);
+
     const patterns = [
       /"legacy_story_hideable_id"\s*:\s*"(\d+)"/,
       /"legacy_api_post_id"\s*:\s*"(\d+)"/,
@@ -2143,26 +2232,41 @@ const FP = globalThis.GF.fbPostBg = {
       /"legacy_story_id"\s*:\s*"(\d+)"/,
       /"story_id"\s*:\s*"(\d+)"/,
       /"post_id"\s*:\s*"(\d+)"/,
-      /"feedback_id"\s*:\s*"(\d{8,})"/,
-      /story_create[\s\S]{0,2000}?"legacy_story_hideable_id"\s*:\s*"(\d+)"/,
-      /story_create[\s\S]{0,2000}?"id"\s*:\s*"(\d{8,})"/,
     ];
     for (const re of patterns) {
-      const m = t.match(re);
+      const m = context.match(re);
       if (m?.[1]) return m[1];
     }
     return null;
   },
 
-  extractPostId(json, rawText, chunks = []) {
+  extractPostId(json, rawText, chunks = [], _debugLog) {
+    const log = _debugLog || (() => {});
     const list = [...(chunks || []), json].filter(Boolean);
     for (const p of list) {
       const id = this.idFromPayload(p);
-      if (id) return id;
+      if (id) {
+        const sc = p?.data?.story_create;
+        const scKeys = sc ? Object.keys(sc).join(',') : 'n/a';
+        const storyKeys = sc?.story ? Object.keys(sc.story).join(',') : 'n/a';
+        log(`[DEBUG post_id] method=payload id=${id} sc_keys=[${scKeys}] story_keys=[${storyKeys}]`);
+        return id;
+      }
     }
     const fromLines = this.idFromGraphqlLines(rawText);
-    if (fromLines) return fromLines;
-    return this.idFromRawText(rawText);
+    if (fromLines) {
+      log(`[DEBUG post_id] method=graphql_lines id=${fromLines}`);
+      return fromLines;
+    }
+    const fromRaw = this.idFromRawText(rawText);
+    if (fromRaw) {
+      log(`[DEBUG post_id] method=raw_text id=${fromRaw}`);
+    } else {
+      const scIdx = rawText.indexOf('"story_create"');
+      const snippet = scIdx >= 0 ? rawText.slice(scIdx, scIdx + 300) : '(story_create not found)';
+      log(`[DEBUG post_id] KHÔNG tìm được post_id. snippet: ${snippet}`);
+    }
+    return fromRaw;
   },
 
   storyCreateHasId(json, chunks = []) {
@@ -2281,7 +2385,7 @@ const FP = globalThis.GF.fbPostBg = {
 
     const groupUrl = groupId ? `https://www.facebook.com/groups/${groupId}` : 'https://www.facebook.com/';
     const url = new URL('https://upload.facebook.com/ajax/react_composer/attachments/photo/upload');
-    const qp = S.buildUploadQueryParams(session);
+    const qp = await S.buildUploadQueryParams(session);
     qp.forEach((v, k) => url.searchParams.set(k, v));
 
     const form = new FormData();
@@ -2330,7 +2434,14 @@ const FP = globalThis.GF.fbPostBg = {
     return String(photoId);
   },
 
-  pickComposerDocId({ hasMedia } = {}) {
+  // content.js tự "nghe" request GraphQL thật của chính trang Facebook lúc user browse bình
+  // thường, bắt doc_id mới nhất cho ComposerStoryCreateMutation và lưu vào gf_key_doc_ids — nên
+  // khi FB đổi doc_id, máy nào có mở Facebook là tự cập nhật, không cần chờ bản extension mới.
+  // Ưu tiên giá trị bắt được thật; hằng số cứng chỉ là fallback khi chưa bắt được lần nào.
+  async pickComposerDocId({ hasMedia } = {}) {
+    const stored = (await chrome.storage.local.get('gf_key_doc_ids')).gf_key_doc_ids || {};
+    const captured = stored.ComposerStoryCreateMutation;
+    if (captured) return captured;
     return hasMedia ? DOC_MEDIA_POST : DOC_TEXT_POST;
   },
 
@@ -2421,7 +2532,7 @@ const FP = globalThis.GF.fbPostBg = {
     }
 
     const hasMedia = imgList.length > 0;
-    const docId = this.pickComposerDocId({ hasMedia });
+    const docId = await this.pickComposerDocId({ hasMedia });
     const variables = this.buildComposeVariables({
       groupId, text, attachments, session, backgroundColor, hasImages: hasMedia,
     });
@@ -2434,13 +2545,26 @@ const FP = globalThis.GF.fbPostBg = {
     );
 
     const err = this.parseFbErrors(rawText);
+    if (err?.critical || err?.auth) {
+      // Log raw text khi gặp lỗi critical/auth (checkpoint, rate limit, session hết hạn...) —
+      // parseFbErrors chỉ match substring rất rộng (vd "checkpoint" ở bất kỳ đâu trong response),
+      // nên cần thấy nguyên văn để biết có đúng là lỗi thật hay match nhầm vào field không liên quan.
+      console.warn('[GroupFlow] Fast post critical/auth error:', err.message, '| raw:', rawText.slice(0, 800));
+    }
     if (err?.critical) throw new Error(err.message);
     if (err?.auth) {
       S.invalidateCache();
       throw new Error(err.message);
     }
 
-    const postId = this.extractPostId(json, rawText, chunks);
+    const debugMsgs = [];
+    const postId = this.extractPostId(json, rawText, chunks, (m) => debugMsgs.push(m));
+    if (debugMsgs.length) {
+      globalThis.GF?.bg?.appendEngineLog?.({
+        level: 'info', phase: 'post-id-debug', message: debugMsgs.join(' | '),
+        groupId: String(groupId),
+      }).catch?.(() => {});
+    }
     const notice = this.parseGraphqlNotice(json, rawText, chunks);
     const pending = !postId && this.detectPending(json, rawText, chunks);
     const spamWarn = this.detectSpamWarning(json, chunks) || notice;
@@ -2450,7 +2574,7 @@ const FP = globalThis.GF.fbPostBg = {
       return {
         postId,
         mode: 'fast-bg',
-        url: `${groupUrl}/permalink/${postId}/`,
+        url: `https://www.facebook.com/groups/${groupId}/posts/${postId}/`,
         warning: notice || undefined,
       };
     }
@@ -2596,7 +2720,15 @@ const FC = globalThis.GF.fbCommentBg = {
       if (html.includes('story_title') || html.includes('story_token') || html.includes('likeAction')) {
         return { canComment: true };
       }
-      return { canComment: false, reason: 'Không xác nhận được bài (có thể pending/hạn chế)' };
+      // Trang tải OK (không 404), khong thay dau hieu bi xoa/pending ro rang - nhung cung khong
+      // tim thay marker cu (story_title/story_token/likeAction) de XAC NHAN chac chan, rat co
+      // the do Facebook doi cau truc trang tu luc code nay viet. Truoc day coi "khong xac nhan
+      // duoc" = KHONG cho comment (fail closed) - chan nham ca bai hoan toan binh thuong moi khi
+      // marker cu khong khop, khien Nhanh luon rot xuong Co dien du bai comment duoc binh thuong.
+      // Doi sang fail open: trang load duoc, khong co tin hieu xau ro rang thi cu coi la
+      // commentable, de createComment() that su quyet dinh dung/sai - neu van sai thi co che
+      // fallback Co dien da co san lo.
+      return { canComment: true };
     } catch (e) {
       return { canComment: false, reason: e.message || 'Lỗi kiểm tra bài' };
     }
@@ -2641,6 +2773,7 @@ const FC = globalThis.GF.fbCommentBg = {
   },
 
   extractCommentId(json, rawText) {
+    // Try structured JSON paths first (multiple response shapes FB has used)
     const fromJson = json?.data?.comment_create?.comment?.id
       || json?.data?.comment_create?.comment?.legacy_fbid
       || json?.data?.comment_create?.feedback_comment_edge?.node?.id
@@ -2654,6 +2787,7 @@ const FC = globalThis.GF.fbCommentBg = {
       || json?.extensions?.commentId;
     if (fromJson) return String(fromJson);
 
+    // Fallback: search raw text — anchor to comment_create context to avoid false positives
     const t = String(rawText || '');
     const ctxStart = t.search(/comment_create|commentCreate|create_comment/i);
     const ctx = ctxStart >= 0 ? t.slice(ctxStart, ctxStart + 4000) : t;

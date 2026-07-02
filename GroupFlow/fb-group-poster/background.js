@@ -52,6 +52,32 @@ const GF_BG = {
   _postingFbTabId: null,
   _postingFbTabWarm: false,
   _lastClassicGroupId: null,
+  /** Tab đang active trước khi Cổ điển comment tự active hoá tab FB — restore lại sau khi xong. */
+  _prevActiveTabBeforeComment: null,
+
+  // Hàng đợi tuần tự DUY NHẤT cho mọi thao tác đụng tới tab Facebook dùng chung (đăng bài, comment
+  // — cả chạy tay lẫn theo lịch alarm/tick). Trước đây `running`/`commentRunning` chỉ chặn riêng
+  // post-với-post và comment-với-comment (chạy tay) — 1 lịch đăng bài và 1 lịch comment trùng giờ,
+  // hoặc lịch alarm bắn trong lúc user đang bấm "▶ Chạy" tay, vẫn chạy CHỒNG NHAU, tranh giành cùng
+  // 1 tab FB (nhảy nhóm/gõ nhầm bài đang mở). Giờ mọi task xếp vào 1 hàng đợi Promise duy nhất —
+  // task nào tới lượt mới chạy, không còn báo lỗi "đang bận" hay chạy chồng nữa.
+  _taskQueue: Promise.resolve(),
+  _queueLength: 0,
+
+  enqueueTask(taskFn) {
+    this._queueLength += 1;
+    const run = async () => {
+      try {
+        return await taskFn();
+      } finally {
+        this._queueLength -= 1;
+      }
+    };
+    const result = this._taskQueue.then(run, run);
+    // Chain tiếp tục dù task này lỗi — 1 task lỗi không được làm kẹt toàn bộ hàng đợi sau nó.
+    this._taskQueue = result.then(() => {}, () => {});
+    return result;
+  },
 
   async getPostingFbTabId() {
     // _postingFbTabId chỉ sống trong bộ nhớ — service worker MV3 bị Chrome tắt/khởi động lại
@@ -318,14 +344,19 @@ const GF_BG = {
   },
 
   async getFbTab({ createIfMissing = true, forClassic = false } = {}) {
-    if (this.running) {
-      const pinned = await this.getPostingFbTabId();
-      if (pinned) return chrome.tabs.get(pinned);
-    }
+    // Trước đây chỉ check tab đã ghim (gfPanelTabId — tab đang mở panel extension) khi
+    // this.running (chỉ true lúc đăng bài) — comment (this.commentRunning) không bao giờ vào
+    // nhánh này, nên luôn rơi xuống pickBestFbTab() chấm điểm TOÀN BỘ tab FB đang mở, có thể chọn
+    // 1 tab khác hẳn tab người dùng đang nhìn (vd nhiều cửa sổ, nhiều tab FB) — cảm giác "tự nhảy
+    // sang tab khác". Bỏ điều kiện this.running, luôn ưu tiên tab đã ghim nếu còn hợp lệ.
+    const pinned = await this.getPostingFbTabId();
+    if (pinned) return chrome.tabs.get(pinned);
     const tabs = await this.listFbTabs();
     const existing = await this.pickBestFbTab(tabs);
     if (existing) {
-      if (this.running) await this.bindPostingFbTab(existing);
+      // Ghim luôn (không chỉ lúc đăng bài) — lần chạy tiếp theo (kể cả comment) dùng lại đúng tab
+      // này thay vì chấm điểm lại từ đầu mỗi lần.
+      await this.bindPostingFbTab(existing);
       return existing;
     }
 
@@ -728,11 +759,21 @@ const GF_BG = {
         }).catch(() => {});
       }
     } else if (type === 'GF_COMMENT' && payload.groupId && payload.postId) {
+      // Khác với luồng đăng bài (ép active: true khi mở nhóm), luồng comment trước đây KHÔNG bao
+      // giờ active hoá tab — nếu user đang xem tab khác, tab comment nằm nền, Chrome giảm tốc
+      // setTimeout mạnh (gõ DOM/chờ composer dùng setTimeout) → tự "kẹt" tới khi user tình cờ
+      // chuyển sang đúng tab đó thì mới chạy tiếp (đúng hiện tượng đã báo cáo). Ghi lại tab đang
+      // active để restore lại sau khi comment xong (xem cuối hàm) — không ép user kẹt luôn ở tab
+      // Facebook.
+      const [prevActiveTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true }).catch(() => []);
+      this._prevActiveTabBeforeComment = prevActiveTab?.id ? prevActiveTab : null;
       const tab0 = await this.getFbTab();
       const url = `https://www.facebook.com/groups/${payload.groupId}/posts/${payload.postId}`;
       if (!tab0.url?.includes(`/groups/${payload.groupId}/posts/${payload.postId}`)) {
-        await chrome.tabs.update(tab0.id, { url });
+        await chrome.tabs.update(tab0.id, { url, active: true });
         await this.waitForTabLoad(tab0.id);
+      } else {
+        await chrome.tabs.update(tab0.id, { active: true }).catch(() => {});
       }
       const ready = await this.ensureFbBridge(tab0.id, 10);
       if (!ready) throw new Error('Không kết nối tab Facebook — F5 trang rồi thử lại');
@@ -767,7 +808,19 @@ const GF_BG = {
       while (!this.stopRequested) await this.delay(350);
       throw new Error('Đã dừng đăng');
     })();
-    const res = await Promise.race([sendPromise, timeoutPromise, stopPromise]);
+    let res;
+    try {
+      res = await Promise.race([sendPromise, timeoutPromise, stopPromise]);
+    } finally {
+      // Restore lại tab/window user đang xem trước khi comment tự active hoá tab FB — chạy dù
+      // thành công hay lỗi/timeout, không để user bị "kẹt" ở tab Facebook sau khi xong.
+      if (type === 'GF_COMMENT' && this._prevActiveTabBeforeComment) {
+        const prev = this._prevActiveTabBeforeComment;
+        this._prevActiveTabBeforeComment = null;
+        chrome.tabs.update(prev.id, { active: true }).catch(() => {});
+        if (prev.windowId) chrome.windows.update(prev.windowId, { focused: true }).catch(() => {});
+      }
+    }
     if (payload.queuePostId) this._classicMediaCache.delete(payload.queuePostId);
     if (classicPost && tab?.id) {
       await this.ensurePanelOpenOnTab(tab.id);
@@ -1075,48 +1128,50 @@ const GF_BG = {
     }
   },
 
-  // Lịch comment "lặp lại hàng ngày": mỗi tick (1 phút, xem ensureGroupFlowPeriodicAlarms) chỉ
-  // chạy TỐI ĐA 1 job toàn cục — giống hệt cơ chế tickGroupImageSchedule ở trên — để tự giãn cách
-  // nhiều job trong cùng khung giờ thay vì bắn hàng loạt cùng lúc lúc vừa vào khung.
-  async tickCommentDailySchedule() {
-    const d = await chrome.storage.local.get([
-      'commentDailySchedules', 'commentDailyScheduleLastRun', 'activeActorId',
-    ]);
-    const list = d.commentDailySchedules || [];
+  // Lịch "lặp lại hàng ngày" giờ CỐ ĐỊNH cho cả bài đăng (kind:'post') lẫn comment (kind:'comment')
+  // — thay cơ chế khung giờ ngẫu nhiên cũ (chỉ chạy 1 job/3 phút trong 1 range giờ). Giờ mỗi entry
+  // có sẵn timeOfDay riêng (tính từ giờ bắt đầu + giãn cách user tự chọn lúc lên lịch — xem
+  // sidepanel.js scheduleSelectedComments()/confirmCampaignStagger()), nên không cần random nữa —
+  // mỗi tick (1 phút) chạy MỌI entry khớp đúng giờ:phút hiện tại và chưa chạy hôm nay.
+  async tickDailyFixedSchedules() {
+    const d = await chrome.storage.local.get('dailyFixedSchedules');
+    const list = d.dailyFixedSchedules || [];
     if (!list.length) return;
 
-    const minGapMs = 3 * 60 * 1000;
-    if (d.commentDailyScheduleLastRun && Date.now() - d.commentDailyScheduleLastRun < minGapMs) return;
-
     const now = new Date();
-    const hour = now.getHours();
+    const pad = (n) => String(n).padStart(2, '0');
+    const hhmm = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
     const today = now.toISOString().slice(0, 10);
-    const idx = list.findIndex((e) => hour >= e.dailyStart && hour < e.dailyEnd && e.lastRunDate !== today);
-    if (idx === -1) return;
-    const candidate = list[idx];
+    let changed = false;
 
-    const job = {
-      post_queue_id: candidate.post_queue_id,
-      group_id: candidate.group_id,
-      group_name: candidate.group_name,
-      post_id: candidate.post_id,
-      comment: candidate.comment || '',
-      actorId: d.activeActorId,
-    };
-    try {
-      await this.runComment(job);
-      if (candidate.crossServerId) {
-        await this.markCrossPostCommentedFromBg(candidate.crossServerId);
-      }
-    } catch (e) {
-      console.warn('[GroupFlow] comment daily schedule failed:', e.message);
-    } finally {
-      list[idx] = { ...candidate, lastRunDate: today, lastRunAt: Date.now() };
-      await chrome.storage.local.set({
-        commentDailySchedules: list,
-        commentDailyScheduleLastRun: Date.now(),
+    for (let i = 0; i < list.length; i += 1) {
+      const entry = list[i];
+      if (entry.lastRunDate === today) continue;
+      // So sánh chuỗi "HH:MM" (đã zero-pad) hoạt động đúng như so sánh giờ thật. Trước đây chỉ
+      // khớp ĐÚNG phút hiện tại — service worker/trình duyệt tắt đúng lúc đó (máy tắt, Chrome
+      // đóng) thì bị bỏ qua hẳn hôm đó, chỉ chạy lại vào đúng giờ này NGÀY MAI. Giờ bắt kịp: giờ
+      // đã qua hôm nay mà chưa chạy thì vẫn chạy ngay khi tick tiếp theo tới (dù trễ), chỉ bỏ qua
+      // nếu giờ đó CHƯA tới.
+      if (entry.timeOfDay > hhmm) continue;
+      changed = true;
+      // Đánh dấu "đã nhận" NGAY (trước khi chạy thật) — tách phát hiện (nhanh) khỏi chạy thật (có
+      // thể chờ lâu trong hàng đợi nếu đang bận việc khác). Nếu không, tick sau (1 phút, có thể
+      // tới trước khi task này tới lượt chạy) sẽ phát hiện lại đúng entry này lần nữa → xếp hàng
+      // đợi trùng lặp.
+      list[i] = { ...entry, lastRunDate: today, lastRunAt: Date.now() };
+      this.enqueueTask(async () => {
+        // Jitter vài giây — tránh bắn đúng giây y hệt mỗi ngày (dễ bị soi hơn giờ:phút cố định do
+        // user tự chọn, vốn đã chấp nhận được).
+        await this.delay(Math.floor(Math.random() * 20) * 1000);
+        try {
+          if (entry.kind === 'post') await this.runPostMatrix(entry.payload);
+          else if (entry.kind === 'comment') await this.runComment(entry.payload);
+        } catch (e) {
+          console.warn('[GroupFlow] daily fixed schedule failed:', entry.id, e.message);
+        }
       });
     }
+    if (changed) await chrome.storage.local.set({ dailyFixedSchedules: list });
   },
 
   async markCrossPostCommentedFromBg(serverId) {
@@ -1176,6 +1231,29 @@ const GF_BG = {
 
   async postGroupItem(payload) {
     if (this.stopRequested) throw new Error('Đã dừng đăng');
+    // Nhanh (GraphQL nền, không mở tab) thử trước — giống hệt cách comment đã làm
+    // (commentOnPostBgOrClassic). Video chưa hỗ trợ upload qua GraphQL nền nên bỏ qua thẳng
+    // sang Cổ điển. Mọi lỗi Nhanh (session hết hạn, FB từ chối, không rõ kết quả...) đều fallback
+    // Cổ điển — 2 cơ chế độc lập nhau nên lỗi bên Nhanh không có nghĩa Cổ điển cũng lỗi.
+    const FP = globalThis.GF?.fbPostBg;
+    const isVideo = payload.mediaType === 'video' || Boolean(payload.videoBase64);
+    if (FP && !isVideo && payload.groupId) {
+      try {
+        const res = await FP.postToGroup({
+          groupId: payload.groupId,
+          text: payload.text,
+          imageBase64: payload.imageBase64,
+          images: payload.images,
+          mediaMime: payload.mediaMime,
+          actorId: payload.actorId,
+          backgroundColor: payload.backgroundColor,
+        });
+        if (res?.postId) return res;
+      } catch (e) {
+        console.warn('[GroupFlow] fast post failed, fallback Classic:', e.message);
+      }
+      if (this.stopRequested) throw new Error('Đã dừng đăng');
+    }
     return this.sendToFb('GF_POST', {
       ...payload,
       postMode: 'classic',
@@ -1299,7 +1377,7 @@ const GF_BG = {
     }
   },
 
-  async applyPostMatrixResults(job, postResults, postGroupResults) {
+  async applyPostMatrixResults(job, postResults, postGroupResults, crashError) {
     if (!job?.posts?.length) return null;
     const d = await chrome.storage.local.get('postQueue');
     const queue = d.postQueue || [];
@@ -1310,9 +1388,18 @@ const GF_BG = {
       if (!p) continue;
       const stats = postResults?.get(post.id);
       if (!stats) {
-        if (this.stopRequested && !['posted', 'pending_approval', 'partial'].includes(p.postStatus)) {
+        // Không có stats nghĩa là bài này chưa kịp thử đăng nhóm nào — do user bấm Dừng, HOẶC do
+        // job crash giữa chừng (vd generateImage() lỗi trước bước đăng). Cả 2 trường hợp đều phải
+        // đánh dấu 'failed' — nếu không, postStatus giữ nguyên như cũ (chưa "done"),
+        // reconcileQueueSchedules() sẽ coi bài vẫn "chưa xong" và lặp lại job y hệt mỗi khi service
+        // worker khởi động lại, tạo vòng lặp lỗi vô hạn mà người dùng không thấy lý do.
+        if ((this.stopRequested || crashError) && !['posted', 'pending_approval', 'partial'].includes(p.postStatus)) {
           p.postStatus = 'failed';
           changed = true;
+          // Job crash (không phải user bấm Dừng) => lỗi không tự khỏi khi thử lại y hệt (thiếu
+          // provider, sai cấu hình...) — dọn luôn alarm/activityUpcoming của bài này, nếu không
+          // gf_retry_missed (mỗi phút) vẫn cứ chạy lại job đã biết chắc sẽ lỗi.
+          if (crashError) await this.clearPostScheduleAlarms(post.id);
         }
         continue;
       }
@@ -1508,23 +1595,14 @@ const GF_BG = {
       }).catch(() => {});
       if (data.kind === 'post') {
         const payload = await this.refreshScheduledPostPayload({ ...data.payload });
-        if (this.running) {
-          const maxWaitMs = 30 * 60 * 1000;
-          const stepMs = 5000;
-          let waited = 0;
-          while (this.running && waited < maxWaitMs) {
-            await this.delay(stepMs);
-            waited += stepMs;
-          }
-          if (this.running) {
-            throw new Error('Đang đăng bài khác — lịch này chờ trong hàng đợi, thử lại sau');
-          }
-        }
-        await this.runPostMatrix(payload);
+        // Xếp vào hàng đợi tuần tự chung thay vì tự chờ-rồi-báo-lỗi sau 30 phút — lịch đăng bài
+        // và lịch comment trùng giờ (hoặc trùng với thao tác tay của user) giờ chạy tuần tự, không
+        // còn báo "đang bận, thử lại sau" nữa.
+        await this.enqueueTask(() => this.runPostMatrix(payload));
       } else if (data.kind === 'generate_image') {
         await this.runImageGenerate(data.payload);
       } else if (data.kind === 'comment') {
-        await this.runComment(data.payload);
+        await this.enqueueTask(() => this.runComment(data.payload));
       } else {
         return false;
       }
@@ -1599,6 +1677,7 @@ const GF_BG = {
     const PM = globalThis.GF?.postMedia;
     const mediaSettings = await this.getMediaSettings();
 
+    let matrixError = null;
     try {
       for (let pi = 0; pi < job.posts.length; pi += 1) {
         if (this.stopRequested) break;
@@ -1635,6 +1714,22 @@ const GF_BG = {
         }
 
         const groups = this.resolvePostGroups(post, job, groupsMap);
+        if (!groups.length) {
+          // Lên lịch không còn bắt buộc chọn nhóm trước — nếu tới giờ chạy vẫn chưa gán nhóm thì
+          // bỏ qua đúng bài này (không chặn cả job), báo rõ trong Log để user tự vào gán nhóm rồi
+          // đăng tay/chờ lượt lặp lại kế tiếp (lịch cố định hàng ngày) thay vì im lặng bỏ qua.
+          chrome.runtime.sendMessage({
+            type: 'GF_PROGRESS',
+            data: {
+              phase: 'error',
+              done,
+              total,
+              post: post.noi_dung?.slice(0, 40) || '',
+              snippet: 'Bỏ qua — bài chưa chọn nhóm',
+            },
+          }).catch(() => {});
+          continue;
+        }
         for (let gi = 0; gi < groups.length; gi += 1) {
           if (this.stopRequested) break;
           const group = groups[gi];
@@ -1667,7 +1762,7 @@ const GF_BG = {
               done,
               total,
               group: group.name,
-              snippet: 'Cổ điển (DOM trên FB)…',
+              snippet: 'Đang đăng (Nhanh, dự phòng Cổ điển nếu lỗi)…',
             },
           }).catch(() => {});
           try {
@@ -1841,10 +1936,17 @@ const GF_BG = {
           await this.interruptibleDelay(this.randBetween([delays.betweenPosts, delays.betweenPosts + 60]) * 1000);
         }
       }
+    } catch (e) {
+      // Job crash giữa chừng (vd generateImage() lỗi trước khi kịp đăng nhóm nào) — bắt lại để
+      // finally bên dưới còn kịp đánh dấu bài 'failed' + báo lỗi thật ra Log, thay vì để finally
+      // luôn báo phase 'done' như thành công dù chưa đăng được gì (đã gây vòng lặp job lỗi vô hạn:
+      // reconcileQueueSchedules() thấy bài chưa "done" nên cứ chạy lại job y hệt mỗi khi service
+      // worker khởi động lại, không có lỗi rõ ràng nào hiện ra để biết vì sao).
+      matrixError = e;
     } finally {
       this.running = false;
       this.resetPostingFbTab();
-      const summary = await this.applyPostMatrixResults(job, postResults, postGroupResults);
+      const summary = await this.applyPostMatrixResults(job, postResults, postGroupResults, matrixError);
       const sess = await chrome.storage.session.get(['gfPanelTabId']).catch(() => ({}));
       await this.markPostingSession(false);
       if (sess.gfPanelTabId) {
@@ -1853,16 +1955,19 @@ const GF_BG = {
       chrome.runtime.sendMessage({
         type: 'GF_PROGRESS',
         data: {
-          phase: this.stopRequested ? 'stopped' : 'done',
+          phase: matrixError ? 'error' : (this.stopRequested ? 'stopped' : 'done'),
           done,
           total,
           okCount: successCount,
           failCount,
           summary,
-          snippet: this.stopRequested ? 'Đã dừng đăng bài' : undefined,
+          snippet: matrixError
+            ? `Lỗi — dừng giữa chừng: ${String(matrixError.message || matrixError).slice(0, 150)}`
+            : (this.stopRequested ? 'Đã dừng đăng bài' : undefined),
         },
       }).catch(() => {});
     }
+    if (matrixError) throw matrixError;
   },
 
   async commentOnPostBgOrClassic(job, settings) {
@@ -2022,6 +2127,9 @@ const GF_BG = {
     }
 
     await this.markPostedGroupCommented(job.post_queue_id, job.group_id, true);
+    if (job.crossServerId) {
+      await this.markCrossPostCommentedFromBg(job.crossServerId);
+    }
     await this.appendHistory({
       type: 'comment',
       ok: true,
@@ -2621,8 +2729,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     await GF_BG.tickGroupImageSchedule();
   }
   if (alarm.name === 'gf_comment_daily') {
-    await GF_BG.tickCommentDailySchedule().catch((e) => {
-      console.warn('[GroupFlow] comment daily schedule tick:', e.message);
+    await GF_BG.tickDailyFixedSchedules().catch((e) => {
+      console.warn('[GroupFlow] daily fixed schedule tick:', e.message);
     });
   }
   if (alarm.name === 'gf_tidien_sync') {
@@ -2657,10 +2765,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       if (msg.type === 'GF_COMMENT_OWN_POST') {
         const settings = await chrome.storage.local.get(['activeActorId']);
-        await GF_BG.runCommentOwn({
+        await GF_BG.enqueueTask(() => GF_BG.runCommentOwn({
           ...msg.payload,
           actorId: msg.payload?.actorId || settings.activeActorId,
-        });
+        }));
         sendResponse({ ok: true });
         return;
       }
@@ -2679,7 +2787,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
       if (msg.type === 'GF_START_POST') {
-        GF_BG.runPostMatrix(msg.payload).catch((e) => {
+        GF_BG.enqueueTask(() => GF_BG.runPostMatrix(msg.payload)).catch((e) => {
           console.warn('[GroupFlow] GF_START_POST:', e.message);
           chrome.runtime.sendMessage({
             type: 'GF_PROGRESS',
@@ -2785,12 +2893,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
       if (msg.type === 'GF_RUN_COMMENT') {
-        await GF_BG.runComment(msg.payload);
-        sendResponse({ ok: true });
+        // Trước đây bấm "Chạy" liên tục nhiều bài khác nhau chạy CHỒNG NHAU (không hàng đợi), 2
+        // job Cổ điển cùng lúc sẽ giành quyền điều khiển chung 1 tab FB (nhảy nhóm/gõ nhầm bài),
+        // Nhanh thì bắn nhiều request đồng thời dễ bị FB để ý hơn — trước đó vá bằng cách báo lỗi
+        // "đang bận" nếu chạy chồng. Giờ dùng hàng đợi tuần tự chung (`enqueueTask`) — không còn
+        // báo lỗi, tự chờ tới lượt và chạy sau, kể cả khi trùng với lịch alarm đang chạy.
+        try {
+          await GF_BG.enqueueTask(async () => {
+            GF_BG.commentRunning = true;
+            try {
+              await GF_BG.runComment(msg.payload);
+            } finally {
+              GF_BG.commentRunning = false;
+            }
+          });
+          sendResponse({ ok: true });
+        } catch (e) {
+          sendResponse({ ok: false, error: e.message });
+        }
         return;
       }
       if (msg.type === 'GF_RUN_COMMENT_BATCH') {
-        const res = await GF_BG.runCommentBatch(msg.payload?.jobs, msg.payload?.actorId);
+        const res = await GF_BG.enqueueTask(() => GF_BG.runCommentBatch(msg.payload?.jobs, msg.payload?.actorId));
         sendResponse(res);
         return;
       }
@@ -2852,6 +2976,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (existing[msg.name] !== msg.docId) {
           await chrome.storage.local.set({ gf_key_doc_ids: { ...existing, [msg.name]: msg.docId } });
         }
+        sendResponse({ ok: true });
+        return;
+      }
+      // __dyn/__csr là bitset mã hoá module JS/CSS trang đang tải thật — không tự sinh ngẫu
+      // nhiên được (fbCometTokens.js cũ làm vậy, gần như chắc chắn là nguyên nhân lỗi 1357004
+      // dai dẳng của Nhanh). Bắt giá trị THẬT từ chính request mà trang Facebook tự gửi đi lúc
+      // user browse bình thường (content.js/pageNetworkHook.js), lưu lại dùng cho Nhanh.
+      if (msg.type === 'GF_SAVE_COMET_TOKENS' && (msg.dyn || msg.csr)) {
+        const d = await chrome.storage.local.get('gf_comet_tokens');
+        const existing = d.gf_comet_tokens || {};
+        await chrome.storage.local.set({
+          gf_comet_tokens: {
+            dyn: msg.dyn || existing.dyn,
+            csr: msg.csr || existing.csr,
+            capturedAt: Date.now(),
+          },
+        });
         sendResponse({ ok: true });
         return;
       }

@@ -340,7 +340,7 @@ const FP = globalThis.GF.fbPostBg = {
 
     const groupUrl = groupId ? `https://www.facebook.com/groups/${groupId}` : 'https://www.facebook.com/';
     const url = new URL('https://upload.facebook.com/ajax/react_composer/attachments/photo/upload');
-    const qp = S.buildUploadQueryParams(session);
+    const qp = await S.buildUploadQueryParams(session);
     qp.forEach((v, k) => url.searchParams.set(k, v));
 
     const form = new FormData();
@@ -389,7 +389,14 @@ const FP = globalThis.GF.fbPostBg = {
     return String(photoId);
   },
 
-  pickComposerDocId({ hasMedia } = {}) {
+  // content.js tự "nghe" request GraphQL thật của chính trang Facebook lúc user browse bình
+  // thường, bắt doc_id mới nhất cho ComposerStoryCreateMutation và lưu vào gf_key_doc_ids — nên
+  // khi FB đổi doc_id, máy nào có mở Facebook là tự cập nhật, không cần chờ bản extension mới.
+  // Ưu tiên giá trị bắt được thật; hằng số cứng chỉ là fallback khi chưa bắt được lần nào.
+  async pickComposerDocId({ hasMedia } = {}) {
+    const stored = (await chrome.storage.local.get('gf_key_doc_ids')).gf_key_doc_ids || {};
+    const captured = stored.ComposerStoryCreateMutation;
+    if (captured) return captured;
     return hasMedia ? DOC_MEDIA_POST : DOC_TEXT_POST;
   },
 
@@ -480,7 +487,7 @@ const FP = globalThis.GF.fbPostBg = {
     }
 
     const hasMedia = imgList.length > 0;
-    const docId = this.pickComposerDocId({ hasMedia });
+    const docId = await this.pickComposerDocId({ hasMedia });
     const variables = this.buildComposeVariables({
       groupId, text, attachments, session, backgroundColor, hasImages: hasMedia,
     });
@@ -493,6 +500,12 @@ const FP = globalThis.GF.fbPostBg = {
     );
 
     const err = this.parseFbErrors(rawText);
+    if (err?.critical || err?.auth) {
+      // Log raw text khi gặp lỗi critical/auth (checkpoint, rate limit, session hết hạn...) —
+      // parseFbErrors chỉ match substring rất rộng (vd "checkpoint" ở bất kỳ đâu trong response),
+      // nên cần thấy nguyên văn để biết có đúng là lỗi thật hay match nhầm vào field không liên quan.
+      console.warn('[GroupFlow] Fast post critical/auth error:', err.message, '| raw:', rawText.slice(0, 800));
+    }
     if (err?.critical) throw new Error(err.message);
     if (err?.auth) {
       S.invalidateCache();

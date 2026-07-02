@@ -626,6 +626,19 @@ body {
   margin-top: 8px;
 }
 
+.tag-clickable {
+  cursor: pointer;
+  border: none;
+  font: inherit;
+  line-height: inherit;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.tag-clickable:hover {
+  filter: brightness(0.95);
+}
+
 .tag-schedule.tag-clickable {
   cursor: pointer;
   border: none;
@@ -673,7 +686,12 @@ body {
   pointer-events: none;
 }
 
-body:not(.gf-tab-create) .footer-global {
+body:not(.gf-tab-create) #batchFooterGlobal,
+body:not(.gf-tab-create) #campaignStaggerPanel,
+body:not(.gf-tab-create) #postDailyScheduleList,
+body:not(.gf-tab-comment) #commentFooterGlobal,
+body:not(.gf-tab-comment) #commentStaggerPanel,
+body:not(.gf-tab-comment) #commentDailyScheduleList {
   display: none;
 }
 
@@ -1068,6 +1086,52 @@ input:focus, textarea:focus, select:focus {
 .history-item .history-snippet { margin: 4px 0 8px; }
 .history-item .history-link { margin-top: 6px; display: inline-block; }
 
+.comment-post-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 700;
+  padding: 0 2px;
+}
+
+.comment-post-link:hover {
+  text-decoration: underline;
+}
+
+.comment-post-preview {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  margin: -4px -6px;
+  transition: background 0.12s;
+}
+
+.comment-post-preview:hover,
+.comment-post-preview:focus-visible {
+  background: var(--surface-2);
+}
+
+.comment-draft-preview {
+  margin: 4px 0 0;
+  font-style: italic;
+}
+
+.comment-item-actions {
+  margin-top: 8px;
+}
+
+.comment-editor-panel,
+.comment-schedule-panel {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.comment-editor-panel textarea {
+  margin-bottom: 6px;
+}
+
 .activity-journal-hint { margin: -4px 0 10px; font-size: 11px; }
 .journal-toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
 .engine-log-list { display: flex; flex-direction: column; gap: 6px; }
@@ -1194,6 +1258,18 @@ input:focus, textarea:focus, select:focus {
   padding: 10px;
   background: var(--surface);
   transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.list-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 0 4px;
+}
+
+.list-pager .hint {
+  white-space: nowrap;
 }
 
 .list-item:hover {

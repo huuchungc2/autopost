@@ -201,8 +201,12 @@ if (!GF_CONTENT) GF_CONTENT = {
 
     this.injectPageNetworkHook();
     window.addEventListener('message', (e) => {
-      if (e.source !== window || e.data?.source !== 'gf-page-hook' || e.data?.type !== 'ingest') return;
-      this.ingestNetworkText(e.data.text);
+      if (e.source !== window || e.data?.source !== 'gf-page-hook') return;
+      if (e.data.type === 'ingest') {
+        this.ingestNetworkText(e.data.text);
+      } else if (e.data.type === 'ingest-req' && (e.data.dyn || e.data.csr)) {
+        chrome.runtime.sendMessage({ type: 'GF_SAVE_COMET_TOKENS', dyn: e.data.dyn, csr: e.data.csr }).catch(() => {});
+      }
     });
 
     const ingest = (text) => this.ingestNetworkText(text);
@@ -1081,7 +1085,10 @@ if (!GF_CONTENT) GF_CONTENT = {
     const plain = String(expected || '').trim();
     if (!plain) return true;
     const got = (el.innerText || el.textContent || '').replace(/\u00a0/g, ' ').trim();
-    const minLen = Math.max(8, Math.floor(plain.length * 0.82));
+    // San toi thieu 8 ky tu khong duoc vuot qua do dai that can go (plain.length) - neu khong,
+    // comment ngan (vd 6 ky tu) se luon bi coi la go thieu du da go du, khien code tuong loi roi
+    // tu xoa-go-lai (execCommand khong xoa sach duoc Lexical editor cua FB), noi dung bi nhan doi.
+    const minLen = Math.min(plain.length, Math.max(8, Math.floor(plain.length * 0.82)));
     return got.length >= minLen;
   },
 

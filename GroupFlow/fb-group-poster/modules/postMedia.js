@@ -108,11 +108,21 @@ const PM = globalThis.GF.postMedia = {
     post.imageStatus = 'generating';
     await this.persistPost(post);
 
-    const img = await this.generateImage(String(post.prompt_anh).trim(), settings);
-    this.applyImageToPost(post, img);
-    await this.maybeSaveImageLocal(img.base64, `groupflow-${post.id}.png`, settings);
-    await this.persistPost(post);
-    return post;
+    try {
+      const img = await this.generateImage(String(post.prompt_anh).trim(), settings);
+      this.applyImageToPost(post, img);
+      await this.maybeSaveImageLocal(img.base64, `groupflow-${post.id}.png`, settings);
+      await this.persistPost(post);
+      return post;
+    } catch (e) {
+      // Không để imageStatus kẹt ở 'generating' mãi — post nhìn như đang chạy vô thời hạn dù
+      // generateImage() đã lỗi từ lâu (thiếu provider/API key/network). Ghi rõ lỗi để card + Log
+      // hiển thị được, rồi ném lại cho runPostMatrix() xử lý (đánh dấu bài 'failed', không lặp).
+      post.imageStatus = 'error';
+      post.imageError = e.message;
+      await this.persistPost(post);
+      throw e;
+    }
   },
 
   async maybeSaveImageLocal(base64, filename, settings) {

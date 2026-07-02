@@ -67,7 +67,15 @@ const FC = globalThis.GF.fbCommentBg = {
       if (html.includes('story_title') || html.includes('story_token') || html.includes('likeAction')) {
         return { canComment: true };
       }
-      return { canComment: false, reason: 'Không xác nhận được bài (có thể pending/hạn chế)' };
+      // Trang tải OK (không 404), khong thay dau hieu bi xoa/pending ro rang - nhung cung khong
+      // tim thay marker cu (story_title/story_token/likeAction) de XAC NHAN chac chan, rat co
+      // the do Facebook doi cau truc trang tu luc code nay viet. Truoc day coi "khong xac nhan
+      // duoc" = KHONG cho comment (fail closed) - chan nham ca bai hoan toan binh thuong moi khi
+      // marker cu khong khop, khien Nhanh luon rot xuong Co dien du bai comment duoc binh thuong.
+      // Doi sang fail open: trang load duoc, khong co tin hieu xau ro rang thi cu coi la
+      // commentable, de createComment() that su quyet dinh dung/sai - neu van sai thi co che
+      // fallback Co dien da co san lo.
+      return { canComment: true };
     } catch (e) {
       return { canComment: false, reason: e.message || 'Lỗi kiểm tra bài' };
     }
@@ -192,6 +200,15 @@ const FC = globalThis.GF.fbCommentBg = {
       return { ok: true, commentId, mode: 'fast-bg' };
     }
     if (err?.soft) throw new Error(err.message);
+
+    // Không thấy lỗi GraphQL (đã throw ở graphqlRequest nếu có) nhưng cũng không trích được
+    // commentId — nghĩa là response 200 OK nhưng đúng shape JSON không khớp path nào trong
+    // extractCommentId() (rất có thể FB đổi shape mutation, giống loạt lỗi __dyn/__csr/jazoest đã
+    // gặp ở luồng đăng bài trước đây). Không đoán mò thêm path — log lại top-level keys + đoạn
+    // response thật để lần sau có dữ liệu thật mà sửa đúng, thay vì luôn âm thầm rớt xuống Cổ điển
+    // không rõ lý do.
+    console.warn('[GroupFlow] Nhanh comment: không trích được commentId — top-level keys:',
+      json?.data ? Object.keys(json.data) : json && Object.keys(json), 'raw snippet:', String(rawText || '').slice(0, 800));
 
     return {
       ok: true,

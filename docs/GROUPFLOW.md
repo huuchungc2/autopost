@@ -18,6 +18,10 @@
 | Chuyển tab Chrome | Panel **chỉ** trên tab đã bấm icon; tab FB khác không tự hiện panel |
 | Draft Nhập tay | Autosave `gfManualDraft` — restore khi mở lại panel |
 
+**Comment chạy trên tab "lạ" (v1.0.172):** vì panel không tự hiện trên tab khác (dòng trên), `getFbTab()` phải ưu tiên đúng tab đã ghim (`gfPanelTabId`) khi làm bất kỳ thao tác nào cần tab Facebook thật — trước bản này chỉ ưu tiên tab ghim khi `this.running` (chỉ true lúc đăng bài), comment (`this.commentRunning`) luôn rơi xuống `pickBestFbTab()` chấm điểm lại toàn bộ tab FB đang mở, có thể chọn nhầm 1 tab khác hẳn tab đang mở panel — cảm giác "tự nhảy tab" vì panel không hiện ở tab đó để theo dõi. Đã sửa: luôn ưu tiên tab ghim cho mọi thao tác (không riêng đăng bài).
+
+**Cổ điển comment không active hoá tab, dễ bị Chrome giảm tốc (v1.0.175):** khác đăng bài (`sendToFb()` ép `active: true` lúc mở tab nhóm lần đầu), Cổ điển comment trước đây chỉ đổi URL tab bằng `chrome.tabs.update()` không kèm `active` — tab nằm nền (user đang xem tab khác) bị Chrome giảm tốc mạnh `setTimeout` (gõ DOM/chờ composer đều dùng) → "đứng hình" tới khi user tình cờ chuyển đúng sang tab đó mới chạy tiếp. Đã thêm `active: true`; đồng thời tự lưu + restore lại tab/window đang active trước đó ngay sau khi comment xong (dù thành công hay lỗi), không kẹt user ở tab Facebook.
+
 File: `modules/gfPanelShell.js` (content script), `sidepanel.html` trong iframe, `background.js` → `GF_TOGGLE_PANEL`.
 
 ```
@@ -175,7 +179,7 @@ Segmented control: **Nhập tay** mở trước, Excel sau. Khi nhập tay có t
 
 **v1.0.128:** Cài đặt **Nghỉ dài** — sau N nhóm (1 = mỗi nhóm), phút random min–max; đăng lịch dùng chung.
 
-**v1.0.126:** Chỉ **Cổ điển** (bỏ Nhanh). Cài đặt → **Paste cả bài** / **Hybrid**. Tab Nhóm: chip bộ gán nhanh.
+**v1.0.126:** Chỉ **Cổ điển** (bỏ Nhanh). Cài đặt → **Paste cả bài** / **Hybrid**. Tab Nhóm: chip bộ gán nhanh. *(Đã bật lại Nhanh làm mặc định ở v1.0.161 — xem mục "Chiến lược đăng bài" bên dưới; lý do tắt lúc này không có ghi chú lại trong repo.)*
 
 **v1.0.124:** Tab Nhóm — sửa list bài tràn chồng UI; nút đóng panel **✕** góc phải trên (icon gọn).
 
@@ -199,7 +203,7 @@ Segmented control: **Nhập tay** mở trước, Excel sau. Khi nhập tay có t
 | **AI viết lại** | Hấp dẫn / sửa lỗi / tạo spintax — **Text provider** (hoặc 9Router dự phòng) |
 | **Nền màu FB** | 8 màu — chỉ **chế độ Nhanh** + **bài text** (không ảnh/video/prompt AI); `postFormat.js` + `text_format_preset_id` |
 | **First comment** | Tự comment sau khi đăng thành công (`fbCommentBg`); card bài có **Mở bài** + **▶ Bot** comment lại tay |
-| **Campaign** | Tên chiến dịch + nút **Dàn** lên lịch nhiều bài cách nhau X phút |
+| **Campaign** | Tên chiến dịch + nút **Dàn** — lên lịch giãn cách (giờ bắt đầu + gap phút/giờ/ngày, tuỳ chọn lặp lại hàng ngày), xem [Lên lịch giãn cách](#lên-lịch-giãn-cách-v10165) |
 | Media / prompt AI | Ảnh/video upload hoặc generate qua **Image provider** |
 | **Chọn nhóm / bài** | Mỗi bài `groupIds[]` — **Chọn nhóm** trên card: chip **bộ custom** gán nhanh + tick từng nhóm; tab **Nhóm** cho batch |
 
@@ -216,9 +220,37 @@ File: `modules/composer.js`, `sidepanel.html`, `background.js` (`maybeFirstComme
 | Có **`anh_*` từ Excel** (tùy chọn) | Xuất ảnh sớm hơn giờ đăng — chỉ import Excel, không còn form nhập tay |
 | **Quét đêm** (Settings) | `gf_image_schedule` — xuất ảnh hàng loạt ban đêm (tùy chọn) |
 
-Luồng lên lịch: tick bài → chọn **ngày/giờ ở thanh dưới** → **Lên lịch** (cùng giờ cho mọi bài đã tick). Giờ riêng từng bài: **Sửa** → ô lịch trên form. **Dàn**: nhiều bài cách nhau X phút.
+Luồng lên lịch: tick bài → chọn **ngày/giờ ở thanh dưới** → **Lên lịch** (cùng giờ cho mọi bài đã tick, **bắt buộc đã chọn nhóm** — dùng `buildPostJob()`). Giờ riêng từng bài: **Sửa** → ô lịch trên form. **Dàn**: xem [Lên lịch giãn cách](#lên-lịch-giãn-cách-v10165) — **không bắt buộc** đã chọn nhóm.
 
-**Alarm (v1.0.113):** Sidepanel gửi `GF_SCHEDULE_ALARM` — payload **không** chứa base64 (media lấy từ queue/IndexedDB lúc chạy). Background lưu `alarm_${name}` rồi `chrome.alarms.create`. Đến giờ: `runScheduledJob` → `refreshScheduledPostPayload` → `runPostMatrix`. Thành công → xóa khỏi `activityUpcoming`. Lỗi / miss → `gf_retry_missed` (5 phút, Settings `retryMissed`) thử lại.
+**Alarm (v1.0.113):** Sidepanel gửi `GF_SCHEDULE_ALARM` — payload **không** chứa base64 (media lấy từ queue/IndexedDB lúc chạy). Background lưu `alarm_${name}` rồi `chrome.alarms.create`. Đến giờ: `runScheduledJob` → `refreshScheduledPostPayload` → `runPostMatrix`. Thành công → xóa khỏi `activityUpcoming`. Lỗi / miss → `gf_retry_missed` (mỗi phút, Settings `retryMissed`) thử lại — cộng thêm `reconcileQueueSchedules()` chạy lại **mỗi lần service worker khởi động lại** (MV3 tự tắt sau ~30s rảnh) để bắt các bài bị miss lịch khi máy tắt/đóng trình duyệt.
+
+**Job crash giữa chừng (v1.0.165):** nếu `runPostMatrix()` ném lỗi trước khi kịp đăng nhóm nào (vd `ensurePostMedia()` lỗi vì thiếu Image provider) — bài được đánh dấu `postStatus: 'failed'` + dọn alarm/`activityUpcoming` ngay (không chờ user bấm Dừng), và Live Activity báo đúng `phase: 'error'` kèm message thật. Trước bản này, các case này bị `finally` báo nhầm `phase: 'done'`, `postStatus` không bao giờ thành "xong" nên bị `reconcileQueueSchedules()`/`gf_retry_missed` chạy lại job y hệt liên tục — nhìn như engine kẹt chạy mãi không rõ lý do.
+
+**Hàng đợi tuần tự chung (v1.0.174):** `GF_BG.enqueueTask(taskFn)` — 1 Promise chain duy nhất, mọi thao tác đụng tab Facebook (đăng bài, comment; chạy tay lẫn theo lịch) xếp vào đây, chạy đúng 1 việc tại 1 thời điểm, không còn báo lỗi "đang bận" hay chạy chồng khi 2 lịch trùng giờ. `tickDailyFixedSchedules()` tách "phát hiện + đánh dấu đã nhận" (nhanh, đồng bộ) khỏi "chạy thật" (`enqueueTask`, có thể chờ) để tick 1-phút-sau không phát hiện lại đúng entry đang chờ hàng đợi. Lịch lặp lại hàng ngày giờ cũng **bắt kịp lịch bị lỡ** — khớp "giờ đã qua trong ngày mà chưa chạy" thay vì chỉ khớp đúng phút, nên máy tắt đúng lúc lịch tới vẫn chạy bù khi mở lại (thay vì bỏ qua hẳn tới hôm sau).
+
+### Lên lịch giãn cách (v1.0.165)
+
+Theo phản hồi Tony — khung lên lịch cũ (nút **Dàn** dùng `window.prompt()`, chỉ theo phút, không lặp lại; Comment "1 lần cụ thể"/"Lặp lại hàng ngày" tách rời, khung giờ ngẫu nhiên) đổi thành **1 component dùng chung cho cả Tạo bài (Dàn) và Comment (Lên lịch đã chọn)**:
+
+- **Giờ bắt đầu** (bài/comment đầu tiên) + **giãn cách** (giá trị + đơn vị phút/giờ/ngày) — mục thứ *i* (0-based) được gán `start + i × gap`. Ví dụ bài A 8h, giãn cách 30 phút → bài B 8h30, bài C 9h...
+- **Lặp lại hàng ngày** (checkbox, tắt mặc định = chạy 1 lần): bật lên thì KHÔNG đặt alarm 1 lần — ghi vào `dailyFixedSchedules` (`chrome.storage.local`) với `timeOfDay` = giờ:phút đã tính cho mục đó, chạy lại **đúng giờ này mỗi ngày**. Thay hẳn cơ chế "khung giờ ngẫu nhiên, tối đa 1 job/3 phút" cũ của Comment.
+- **Tạo bài không còn bắt buộc đã chọn nhóm** khi dùng Dàn (`buildPostJobRelaxed()`, khác `buildPostJob()` của nút "Lên lịch" thường) — tới giờ chạy, `runPostMatrix()` tự bỏ qua đúng bài chưa có nhóm (log `phase: 'error'`, snippet "Bỏ qua — bài chưa chọn nhóm"), không chặn các bài khác trong job.
+- **Comment không còn bắt buộc nhập mẫu** ở bất kỳ đường nào (Chạy / Chạy đã chọn / Lên lịch) — để trống thì `resolveJobComment()` (background.js) tự random mẫu Settings lúc chạy thật, giống hệt cơ chế "Lặp lại hàng ngày" cũ đã làm.
+- **UI (v1.0.168)**: dropdown đơn vị đặt **trước** ô số (không phải sau) — đổi đơn vị thì `bindGapUnitDefaultReset()` tự reset số về mặc định của đơn vị (phút=15, giờ=1, ngày=1), tránh giữ số cũ sai nghĩa (vd "10" từ phút giữ nguyên khi đổi sang ngày). Tab Comment: 3 trường Giờ bắt đầu/Giãn cách/Lặp lại hàng ngày không còn cố định trên đầu — dồn vào khung `#commentStaggerPanel` ẩn/hiện khi bấm "Lên lịch đã chọn" (nút "Xác nhận" riêng bên trong), y hệt khung `#campaignStaggerPanel` của nút Dàn.
+- **Auto-lên-lịch bài chưa có lịch (v1.0.169)**: `autoScheduleUnscheduledComments()` chạy mỗi lần tab Comment tải/làm mới (không cần bật gì, không còn Settings toggle `commentAutoScheduleEnabled` cũ) — MỌI bài trong `state.comments` chưa có trong `commentScheduleMap` (kể cả bài cũ còn sót, không chỉ bài đồng đội mới kéo về) tự động xếp "1 lần cụ thể", cách nhau 15 phút, bắt đầu sau lịch comment muộn nhất trong `activityUpcoming` (hoặc từ giờ hiện tại nếu chưa có lịch nào). Gọi lại nhiều lần vẫn an toàn — chỉ nhắm bài chưa có lịch.
+- **Tránh đêm cứng (v1.0.169)**: `avoidNightTime(ms)`/`avoidNightHHMM(hhmm)` (`sidepanel.js`) — mốc nào rơi 22:00–06:59 tự dời về 07:00 (cùng ngày nếu đang trước 07:00, hôm sau nếu đã qua 22:00). Áp dụng bên trong `scheduleCommentJobsOnce()` (nên tự động che luôn mọi caller: bulk stagger, lên lịch riêng 1 bài, auto-lên-lịch) và ở `confirmCampaignStagger()`/`scheduleSelectedComments()`/`scheduleOneComment()` cho nhánh lặp lại hàng ngày (`timeOfDay`). Thay hẳn `confirmNightAction()`/`isNightBlocked()` cho các luồng LÊN LỊCH (không hỏi confirm nữa, tự dời) — luồng CHẠY NGAY (▶ Chạy, Chạy đã chọn, Đăng ngay) vẫn giữ confirm cũ vì không có "ngày mai" để dời tới.
+
+| Storage key | Việc |
+|-------------|------|
+| `activityUpcoming` | Alarm 1 lần (`gf_job_*`/`gf_cmt_*`) — không đổi |
+| `dailyFixedSchedules` | Lặp lại hàng ngày giờ cố định — entry `{id, kind:'post'\|'comment', timeOfDay:'HH:MM', payload, label, lastRunDate}`, tick mỗi phút qua alarm `gf_comment_daily` (tên cũ, dùng chung) → `tickDailyFixedSchedules()` |
+
+| File | Việc |
+|------|------|
+| `sidepanel.js` | `staggerGapMs`, `timeOfDayHHMM`, `avoidNightTime`, `avoidNightHHMM`, `addDailyFixedSchedules`, `renderDailyFixedSchedules`, `autoScheduleUnscheduledComments`; Tạo bài: `confirmCampaignStagger`, `buildPostJobRelaxed`; Comment: `scheduleSelectedComments`, `scheduleOneComment` |
+| `background.js` | `tickDailyFixedSchedules` (alarm `gf_comment_daily`, mỗi phút, chạy MỌI entry khớp giờ:phút hiện tại + chưa chạy hôm nay, cả `runPostMatrix` lẫn `runComment`) |
+
+**Filter tab Comment (v1.0.169)**: 3 select độc lập kết hợp AND — `#commentFilterPerson` (Người: Tất cả/Của tôi/tên đồng đội, option tên đồng đội tự sinh qua `populateCommentFilterPersonOptions()`), `#commentFilterTemplate` (Mẫu: Tất cả/Có/Chưa có, đọc `commentDrafts`), `#commentFilterSchedule` (Lịch: Tất cả/Đã/Chưa lên lịch, đọc `commentScheduleMap`) — thay combobox gõ-tìm gộp chung trước đó, cùng kiểu `<select class="gf-select-sm">` như "Nhóm:"/"Ảnh:" ở tab Tạo bài. Nút "Điền mẫu vào ô trống" đã bỏ (không còn ý nghĩa vì mẫu trống tự random lúc chạy).
 
 ### Nhật ký engine — debug lỗi đăng (v1.0.136)
 
@@ -311,10 +343,17 @@ Luồng gán (giống Posting Group Pro):
 
 ### Chiến lược đăng bài (Settings tab)
 
+**v1.0.161 — bật lại Nhanh làm mặc định (đã tắt từ v1.0.126, xem ghi chú bên dưới):** `postGroupItem()` (`background.js`) thử `fbPostBg.postToGroup()` (Nhanh) trước, bỏ qua thẳng Cổ điển nếu là video (GraphQL nền chưa hỗ trợ upload video), lỗi gì cũng fallback Cổ điển — không cần bật gì trong Cài đặt, tự động hoàn toàn, cùng kiểu `commentOnPostBgOrClassic()` đã dùng cho comment. Đồng thời sửa `fbPostBg.js` đọc `gf_key_doc_ids` (doc_id `ComposerStoryCreateMutation` do `content.js` tự bắt được từ traffic GraphQL thật của Facebook lúc user browse — xem mục doc_id bên dưới) thay vì chỉ dùng hằng số cứng, để khi FB đổi doc_id thì Nhanh tự cập nhật theo, không cần chờ bản extension mới. **Nhớ chạy `node build-sw-bundle.js` sau khi sửa bất kỳ file nào trong `modules/` — `background.js` load code qua `modules/swBundle.js` (bundle build sẵn), không đọc trực tiếp từng file.**
+
+**v1.0.161 — chuỗi debug lỗi 1357004 (FB error chung chung "Rất tiếc, đã xảy ra lỗi") sau khi bật Nhanh, theo đúng thứ tự phát hiện:**
+1. `jazoest` hardcode cứng trong `fbSessionBg.js` (không tính từ `fb_dtsg` thật) → `computeJazoest(dtsg)`.
+2. `__s`/`__req` (session id + bộ đếm ajax) chỉ lưu bộ nhớ, mất mỗi lần service worker MV3 tự tắt (~30s idle, ngắn hơn giãn cách giữa các nhóm) → mỗi lần đăng đều là "khởi động lạnh" → `ensureAjaxIdentity()`/`nextReq()` lưu vào `chrome.storage.local`.
+3. **Nguyên nhân chính:** `fbCometTokens.js` tự sinh ngẫu nhiên `__dyn`/`__csr` (bitset mã hoá module JS/CSS đang tải) khi không lấy được từ HTML — giá trị giả này gần như chắc chắn bị FB phát hiện. Đã thêm bắt giá trị **thật**: `pageNetworkHook.js` chặn request (không chỉ response) của chính trang FB tìm `__dyn=`/`__csr=` → `GF_SAVE_COMET_TOKENS` → lưu `chrome.storage.local.gf_comet_tokens` → `applyToSearchParams()` (đổi `async`) ưu tiên đọc giá trị này. **User cần browse Facebook bình thường vài giây trước khi đăng** để cơ chế bắt kịp giá trị thật, nếu không vẫn rơi về ngẫu nhiên như cũ.
+
 | Chế độ | Cách hoạt động | Khi nào dùng |
 |--------|----------------|--------------|
-| **Nhanh** (mặc định) | GraphQL nền trong service worker (`fbPostBg.js`): session cookie + `fb_dtsg`, upload + `ComposerStoryCreateMutation` — **không mở tab FB** | Text + ảnh; nhanh, giống Group Posting Pro |
-| **Cổ điển** | DOM trên tab FB: background mở đúng URL nhóm → content script mở composer, paste text (Lexical), attach ảnh, bấm Đăng — giống GPP Classic | Video, hoặc khi bật fallback trong Cài đặt |
+| **Nhanh** (mặc định, v1.0.161+) | GraphQL nền trong service worker (`fbPostBg.js`): session cookie + `fb_dtsg`, upload + `ComposerStoryCreateMutation` — **không mở tab FB** | Text + ảnh; nhanh, giống Group Posting Pro `directApi`, miễn nhiễm throttle tab của Chrome khi trình duyệt bị đẩy xuống nền |
+| **Cổ điển** | DOM trên tab FB: background mở đúng URL nhóm → content script mở composer, paste text (Lexical), attach ảnh, bấm Đăng — giống GPP Classic | Video (bắt buộc), hoặc dự phòng tự động khi Nhanh lỗi |
 
 **Lưu ý Cổ điển:** tab Facebook **cửa sổ Chrome thường** (đã login). Một số nhóm có **2 cách đăng**: bài **công khai** (ô「Bạn viết gì đi…」) và **ẩn danh FB** (popup「Bài viết ẩn danh」) — extension v1.0.71+ **chỉ đăng công khai**, tự bấm Hủy popup ẩn danh nếu FB mở nhầm.
 
@@ -449,17 +488,20 @@ Cấp độ **Giãn cách** (`securityLevel`): delay ngẫu nhiên khi đăng nh
 
 Luồng **chỉ GroupFlow có** (GPP không có backend tidien):
 
-1. User A đăng + `POST /sync` → `group_posts` trên website
-2. Extension user B/C: **tự** `GET /pending-comments` (alarm + tab Comment) — incremental, không full pull mỗi lần
-3. Soạn / AI generate → **▶ Chạy**
+1. User A đăng + `POST /api/user-sync/posts` (license key) → `user_posts` trên website (`needs_comment=1`)
+2. Extension user B/C: tab Comment tự `GET /api/user-sync/cross-posts` — trả **cả** bài của user khác đã comment lẫn chưa (v1.0.171: bỏ lọc `needs_comment=1` để bài không biến mất khỏi danh sách sau khi comment xong — client tự hiện tag "✓ Đã comment" theo field `needs_comment`/`_needsComment` thay vì server lọc mất). Badge số tab Comment chỉ đếm bài còn chưa comment.
+   - **Tự động lên lịch (luôn bật, v1.0.169)**: mỗi lần tab Comment tải/làm mới, `autoScheduleUnscheduledComments()` (`sidepanel.js`) tự xếp MỌI bài chưa có lịch (bỏ qua bài cross đã comment rồi) vào "1 lần cụ thể", cách nhau 15 phút, sau lịch muộn nhất hiện có — không cần bật gì, không cần tự tay chọn/bấm. Xem thêm mục "Lên lịch giãn cách" bên dưới.
+3. Soạn / chọn mẫu → **▶ Chạy** (1 bài) / **Chạy đã chọn** (nhiều bài) / **Lên lịch** (1 lần cụ thể hoặc lặp lại hàng ngày) — hoặc để tự động như trên
 4. `fbCommentBg.commentOnPost` (nền):
    - Fetch permalink — bỏ qua nếu 404 / pending approval / bài ẩn
    - `CometUFILiveTypingBroadcastMutation` + delay theo độ dài text
    - `useCometUFICreateCommentMutation` doc_id `9550500205043457`
 5. **Chạy đã chọn** — `runCommentBatch`: delay ngẫu nhiên giữa từng comment (theo Settings)
 6. **Lên lịch đã chọn** — datetime bắt đầu + alarm `gf_cmt_*` giãn cách tự động; xem tab Activity
-7. `PATCH /:id/commented` + Activity log
+7. Comment thành công → `runComment()` (`background.js`) tự gọi `markCrossPostCommentedFromBg()` → `PATCH /api/user-sync/posts/:id/commented` (chỉ khi job có `crossServerId` — tức bài của người khác, không phải bài của chính mình) + ghi Activity log. Dùng chung, gọi đúng 1 lần cho cả 4 cách chạy ở trên (trước đây "Chạy đã chọn" và "Lên lịch 1 lần" thiếu `crossServerId` trong job nên không đồng bộ được, đã sửa).
 8. Lỗi GraphQL → fallback DOM (`content.js` `GF_COMMENT`) — trừ bài không comment được
+
+**UI card** (`renderComments()`, `sidepanel.js`) dùng chung class với card tab Tạo bài (`post-card`/`post-meta`/`post-actions`/`tag`) thay vì layout riêng: tag lịch đọc từ `commentScheduleMap` (gộp `activityUpcoming` + `dailyFixedSchedules`) hiện đúng ngày giờ/giờ lặp lại đang có, tag mẫu hiện đã nhập hay chưa — bấm tag để mở khung sửa tương ứng, không cần nút riêng. Filter phía trên danh sách là ô gõ tìm (`#commentFilterInput`) + dropdown (`#commentFilterDropdown`, `getCommentFilterOptions()`) liệt kê **Tất cả / Của tôi / Đã lên lịch / Chưa lên lịch / Có mẫu / Chưa có mẫu** + tên từng đồng đội (từ `_userLabel`) — gõ để lọc option, chọn 1 dòng để lọc theo đúng tiêu chí đó (đọc thẳng từ state có sẵn, không gọi thêm API).
 
 | Mức giãn cách | Giữa các comment |
 |---------------|------------------|
@@ -470,10 +512,11 @@ Luồng **chỉ GroupFlow có** (GPP không có backend tidien):
 | File | Việc |
 |------|------|
 | `modules/fbCommentBg.js` | Comment GraphQL nền |
-| `modules/tidienSync.js` | `fetchPendingComments`, `markCommented` |
-| `sidepanel.js` | Tab Comment, AI, batch + lịch |
-| `background.js` | `runComment`, `runCommentBatch`, `commentOnPostBgOrClassic`; alarm `gf_cmt_*` |
+| `sidepanel.js` | Tab Comment, AI, batch + lịch; `fetchCrossPostsFromServer()`, `autoScheduleNewCrossComments()` |
+| `background.js` | `runComment`, `runCommentBatch`, `tickCommentDailySchedule`, `commentOnPostBgOrClassic`, `markCrossPostCommentedFromBg`; alarm `gf_cmt_*` |
 | `modules/scheduler.js` | `DELAYS.betweenComments`, `getDelays()` |
+
+`modules/tidienSync.js` (`fetchPendingComments`, `markCommented`) là phần còn sót lại của hệ thống JWT cũ (`/pending-comments`, `group_posts`) — không còn được gọi ở đâu, đã bị thay bằng hệ thống license-key (`/api/user-sync/cross-posts`) ở trên.
 
 ### File đăng bài
 

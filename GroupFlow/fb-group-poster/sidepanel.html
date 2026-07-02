@@ -373,39 +373,28 @@
           </div>
           <button type="button" id="btnRefreshComments" class="btn ghost sm">Làm mới</button>
         </div>
-        <p class="hint">Danh sách là các bài đã đăng qua GroupFlow — cả của bạn lẫn đồng đội (cần comment chéo). Nhập spintax <code>{nội dung 1|nội dung 2}</code> hoặc chọn mẫu từ dropdown — để trống dùng mẫu Settings. Giãn cách theo <strong>Settings → Giãn cách</strong>.</p>
-        <div class="row" style="margin-bottom: 10px">
-          <button type="button" data-comment-filter="all" class="segmented-btn active">Tất cả</button>
-          <button type="button" data-comment-filter="mine" class="segmented-btn">Của mình</button>
-        </div>
-        <div class="row" style="margin-bottom: 10px">
-          <button type="button" id="btnFillCommentTemplates" class="btn ghost sm">Điền mẫu vào ô trống</button>
-        </div>
-        <label class="field-label">Kiểu lịch</label>
-        <div class="row" style="margin-bottom: 8px">
-          <button type="button" data-comment-schedule-mode="once" class="segmented-btn active">1 lần cụ thể</button>
-          <button type="button" data-comment-schedule-mode="daily" class="segmented-btn">Lặp lại hàng ngày</button>
-        </div>
-        <div id="commentScheduleOnceFields">
-          <label class="field-label">Bắt đầu lịch</label>
-          <input type="datetime-local" id="commentScheduleStart" />
-        </div>
-        <div id="commentScheduleDailyFields" class="hidden">
-          <label class="field-label">Khung giờ mỗi ngày (0–23h, tự chạy lần lượt trong khung, mỗi bài 1 lần/ngày)</label>
-          <div class="row">
-            <input type="number" id="commentScheduleDailyStart" min="0" max="23" placeholder="Từ giờ" value="8" />
-            <input type="number" id="commentScheduleDailyEnd" min="1" max="24" placeholder="Đến giờ" value="21" />
-          </div>
+        <p class="hint">Danh sách là các bài đã đăng qua GroupFlow — cả của bạn lẫn đồng đội (cần comment chéo). Nhập spintax <code>{nội dung 1|nội dung 2}</code> hoặc chọn mẫu từ dropdown — để trống cũng <strong>Chạy</strong>/<strong>Lên lịch</strong> được, tự random mẫu ở <strong>Settings → Comment mẫu</strong>. Bài chưa có lịch tự động được xếp lịch (cách nhau 15 phút, sau lịch muộn nhất hiện có). Giãn cách trong nhóm theo <strong>Settings → Giãn cách</strong>.</p>
+        <label class="select-all" id="commentSelectAllWrap" style="margin-bottom: 8px">
+          <input type="checkbox" id="commentSelectAll" />
+          <span>Chọn tất cả</span>
+        </label>
+        <div class="post-filter-bar" style="flex-wrap: wrap; padding: 0 0 10px; border-bottom: none">
+          <select id="commentFilterPerson" class="gf-select-sm">
+            <option value="all">Người: Tất cả</option>
+            <option value="mine">Của tôi</option>
+          </select>
+          <select id="commentFilterTemplate" class="gf-select-sm">
+            <option value="all">Mẫu: Tất cả</option>
+            <option value="has">Có mẫu</option>
+            <option value="none">Chưa có mẫu</option>
+          </select>
+          <select id="commentFilterSchedule" class="gf-select-sm">
+            <option value="all">Lịch: Tất cả</option>
+            <option value="has">Đã lên lịch</option>
+            <option value="none">Chưa lên lịch</option>
+          </select>
         </div>
         <div id="commentList" class="list"></div>
-        <div class="row" style="margin-top: 12px">
-          <button type="button" id="btnRunAllComments" class="btn primary">Chạy đã chọn</button>
-          <button type="button" id="btnScheduleComments" class="btn outline">Lên lịch đã chọn</button>
-        </div>
-        <div id="commentDailyScheduleList" class="hidden" style="margin-top: 14px">
-          <label class="field-label">Đang lặp lại hàng ngày</label>
-          <div id="commentDailyScheduleItems" class="list"></div>
-        </div>
       </div>
     </section>
 
@@ -527,8 +516,8 @@
           <li><strong>Nút “Lỗi” đỏ / không load</strong>: kiểm tra không copy nhầm thư mục <code>_ref-*</code> hoặc <code>2.3.2_0</code> vào folder extension → Reload.</li>
           <li><strong>Không thấy nhóm</strong>: đăng nhập Facebook trong Chrome → vào tab <strong>Nhóm</strong> → <strong>↻ Làm mới</strong>.</li>
           <li><strong>Generate/AI báo thiếu key</strong>: vào <strong>Cài đặt</strong> → đăng nhập tidien → chọn provider; 9Router key chỉ là dự phòng.</li>
-          <li><strong>Video không đăng</strong>: chuyển <strong>Chế độ Cổ điển</strong> (Settings) vì video cần DOM.</li>
-          <li><strong>Lỗi Nhanh / mở FB bất ngờ</strong>: mặc định Nhanh <em>không</em> mở FB; nếu lỗi xem đúng dòng đỏ trong Lịch sử (vd. thiếu session → mở facebook.com F5). Chỉ bật「Nhanh lỗi → Cổ điển」khi cần dự phòng DOM.</li>
+          <li><strong>Video</strong>: luôn đăng qua Cổ điển (mở tab FB) — Nhanh chưa hỗ trợ upload video.</li>
+          <li><strong>Nhanh lỗi → tự mở tab FB</strong>: đăng bài/comment đều thử Nhanh (không mở tab) trước; lỗi thì tự động dự phòng Cổ điển (mở tab FB), không cần bật gì thêm. Xem dòng đỏ trong Lịch sử nếu cả 2 đều lỗi (vd. thiếu session → mở facebook.com F5).</li>
         </ul>
       </div>
     </section>
@@ -582,7 +571,7 @@
           <span class="settings-card-icon" aria-hidden="true">⏱</span>
           <div class="settings-card-head-text">
             <h3 class="settings-card-title">Đăng bài</h3>
-            <p class="settings-card-desc">Luôn Cổ điển — mở tab FB và composer. Áp cho đăng ngay và lịch hẹn.</p>
+            <p class="settings-card-desc">Nhanh (GraphQL nền, không mở tab) thử trước — lỗi thì tự động dự phòng Cổ điển (mở tab FB và composer). Video luôn đi thẳng Cổ điển. Áp cho đăng ngay và lịch hẹn.</p>
           </div>
         </header>
 
@@ -766,7 +755,7 @@
 
         <div class="settings-block">
           <h4 class="settings-block-title">Comment mẫu (chéo team)</h4>
-          <p class="hint">Mỗi dòng một mẫu spintax <code>{a|b|c}</code>. Tab Comment: ô trống → random khi <strong>Chạy đã chọn</strong>.</p>
+          <p class="hint">Mỗi dòng một mẫu spintax <code>{a|b|c}</code>. Tab Comment: ô trống → tự random khi Chạy/Lên lịch. Bài chưa có lịch tự động được xếp lịch — cách nhau 15 phút, tránh khung 22:00–07:00.</p>
           <textarea id="commentTemplates" rows="4" placeholder="{Hay quá|Đúng ý}&#10;{Hữu ích|Ủng hộ bạn}"></textarea>
         </div>
       </div>
@@ -899,7 +888,7 @@
           <div id="postingProgressText" class="gf-ard-progress-text">0%</div>
         </div>
         <h3 id="postingStatus" class="gf-ard-status">Đang chuẩn bị engine…</h3>
-        <p class="gf-ard-hint" id="postingClassicHint">Cổ điển mở composer <strong>công khai</strong> trên tab FB — tự bỏ qua popup「Bài viết ẩn danh」.</p>
+        <p class="gf-ard-hint" id="postingClassicHint">Cổ điển mở composer <strong>công khai</strong> trên tab FB — tự bỏ qua popup「Bài viết ẩn danh」. <strong>Đừng chuyển sang tab/cửa sổ khác</strong> lúc đang chạy — Chrome tự giảm tốc tab chạy nền, dễ gây lỗi "quá lâu (timeout)".</p>
       </div>
       <div class="gf-ard-logs">
         <div class="gf-ard-logs-head">
@@ -911,6 +900,30 @@
     </div>
   </div>
 
+  <div id="campaignStaggerPanel" class="comment-schedule-panel hidden" style="margin: 0 12px 8px">
+    <label class="field-label">Giờ bắt đầu (bài đầu tiên)</label>
+    <input type="datetime-local" id="campaignStaggerStart" />
+    <label class="field-label">Giãn cách giữa các bài</label>
+    <div class="row" style="margin-bottom: 8px">
+      <select id="campaignStaggerGapUnit" class="gf-select-sm">
+        <option value="minute" selected>phút</option>
+        <option value="hour">giờ</option>
+        <option value="day">ngày</option>
+      </select>
+      <input type="number" id="campaignStaggerGapValue" min="0" value="15" style="max-width: 6rem" />
+    </div>
+    <label class="switch-row">
+      <input type="checkbox" id="campaignStaggerRepeatDaily" />
+      <span>Lặp lại hàng ngày (đúng giờ đã tính cho từng bài)</span>
+    </label>
+    <p class="hint">Không cần đã chọn nhóm — bài nào chưa có nhóm lúc tới giờ sẽ bị bỏ qua (báo trong Log), các bài khác vẫn chạy.</p>
+    <button type="button" id="btnConfirmCampaignStagger" class="btn primary sm" style="margin-top: 4px">Xác nhận</button>
+  </div>
+  <div id="postDailyScheduleList" class="hidden" style="margin: 0 12px 8px">
+    <label class="field-label">Đang lặp lại hàng ngày (giờ cố định)</label>
+    <div id="postDailyScheduleItems" class="list"></div>
+  </div>
+
   <footer class="footer footer-global" id="batchFooterGlobal" aria-label="Lên lịch hàng loạt">
     <span class="batch-queue-label batch-queue-label-global" id="batchFooterLabel">Tick bài → chọn ngày/giờ → Lên lịch</span>
     <div class="batch-schedule-row" title="Áp cho tất cả bài đã tick khi bấm Lên lịch">
@@ -919,6 +932,35 @@
     </div>
     <button type="button" id="btnScheduleCampaign" class="btn ghost sm" title="Lên lịch dàn các bài đã chọn">Dàn</button>
     <button type="button" id="btnSchedule" class="btn ghost">Lên lịch</button>
+  </footer>
+
+  <div id="commentStaggerPanel" class="comment-schedule-panel hidden" style="margin: 0 12px 8px">
+    <label class="field-label">Giờ bắt đầu (bài đầu tiên)</label>
+    <input type="datetime-local" id="commentScheduleStart" />
+    <label class="field-label">Giãn cách giữa các bài</label>
+    <div class="row" style="margin-bottom: 8px">
+      <select id="commentScheduleGapUnit" class="gf-select-sm">
+        <option value="minute" selected>phút</option>
+        <option value="hour">giờ</option>
+        <option value="day">ngày</option>
+      </select>
+      <input type="number" id="commentScheduleGapValue" min="0" value="15" style="max-width: 6rem" />
+    </div>
+    <label class="switch-row">
+      <input type="checkbox" id="commentScheduleRepeatDaily" />
+      <span>Lặp lại hàng ngày (đúng giờ đã tính cho từng bài)</span>
+    </label>
+    <button type="button" id="btnConfirmCommentSchedule" class="btn primary sm" style="margin-top: 8px">Xác nhận</button>
+  </div>
+  <div id="commentDailyScheduleList" class="hidden" style="margin: 0 12px 8px">
+    <label class="field-label">Đang lặp lại hàng ngày (giờ cố định)</label>
+    <div id="commentDailyScheduleItems" class="list"></div>
+  </div>
+
+  <footer class="footer footer-global" id="commentFooterGlobal" aria-label="Chạy hoặc lên lịch comment">
+    <span class="batch-queue-label batch-queue-label-global">Tick bài → Chạy hoặc Lên lịch</span>
+    <button type="button" id="btnRunAllComments" class="btn primary">Chạy đã chọn</button>
+    <button type="button" id="btnScheduleComments" class="btn outline">Lên lịch đã chọn</button>
   </footer>
 
   <script src="lib/quill.js"></script>

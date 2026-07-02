@@ -33,8 +33,11 @@
     fileInput: 'input[type="file"][accept*="image"], input[type="file"][accept*="video"]',
     postBtn: '[aria-label="Đăng"], [aria-label="Đăng bài"], [aria-label="Post"], [aria-label="Publish"]',
     closeBtn: '[aria-label="Đóng hộp thoại của công cụ tạo"]',
-    commentBox: '[aria-label="Viết bình luận..."], [aria-label="Write a comment..."], [role="textbox"][contenteditable="true"]',
-    commentSubmit: '[aria-label="Đăng"], [aria-label="Post"]',
+    commentBox: '[aria-label^="Bình luận dưới tên"][contenteditable="true"], [aria-label="Viết bình luận..."], [aria-label="Write a comment..."], [role="textbox"][contenteditable="true"]',
+    // #focused-state-composer-submit là id nội bộ Facebook tự đặt cho khung nút Đăng bình luận —
+    // không đổi theo ngôn ngữ hiển thị (khác aria-label bị dịch, hay đổi chữ). Ưu tiên tìm theo
+    // đây trước, chữ label chỉ còn là dự phòng nếu FB đổi luôn cả id.
+    commentSubmit: '#focused-state-composer-submit [role="button"], [aria-label="Đăng bình luận"], [aria-label="Đăng"], [aria-label="Post"]',
   },
   en: {
     postTrigger: '[aria-placeholder="Write something..."], [role="button"][aria-label*="Write"]',
@@ -43,8 +46,8 @@
     fileInput: 'input[type="file"][accept*="image"]',
     postBtn: '[aria-label="Post"]',
     closeBtn: '[aria-label="Close"]',
-    commentBox: '[aria-label="Write a comment..."], [role="textbox"][contenteditable="true"]',
-    commentSubmit: '[aria-label="Post"]',
+    commentBox: '[aria-label^="Comment as"][contenteditable="true"], [aria-label="Write a comment..."], [role="textbox"][contenteditable="true"]',
+    commentSubmit: '#focused-state-composer-submit [role="button"], [aria-label="Post comment"], [aria-label="Post"]',
   },
   };
 

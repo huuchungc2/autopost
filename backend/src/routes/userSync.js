@@ -47,7 +47,9 @@ router.get('/my-posts', authenticateLicenseKey, asyncHandler(async (req, res) =>
   res.json(rows);
 }));
 
-// GET /api/user-sync/cross-posts — kéo bài của user KHÁC về để comment chéo
+// GET /api/user-sync/cross-posts — kéo bài của user KHÁC về để comment chéo. Trả cả bài đã comment
+// rồi (needs_comment=0) — không lọc bỏ nữa — để extension giữ bài trong danh sách kèm trạng thái
+// "Đã comment" thay vì biến mất hẳn khỏi tab Comment ngay khi vừa comment xong.
 router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
   const rows = await query(
@@ -56,7 +58,7 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
             u.name AS user_name, u.email AS user_email
      FROM user_posts up
      JOIN users u ON u.id = up.user_account_id
-     WHERE up.user_account_id != ? AND up.needs_comment = 1
+     WHERE up.user_account_id != ?
      ORDER BY up.posted_at DESC
      LIMIT ?`,
     [req.userAccount.id, limit]
