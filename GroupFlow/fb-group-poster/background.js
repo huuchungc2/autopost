@@ -897,7 +897,7 @@ const GF_BG = {
     const run = async () => {
       const d = await chrome.storage.local.get('activityHistory');
       const list = d.activityHistory || [];
-      const enriched = { ...entry, at: new Date().toISOString() };
+      const enriched = { ...entry, at: new Date().toISOString(), id: entry.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` };
       if (!enriched.url && enriched.group_id && enriched.post_id && enriched.post_id !== 'pending') {
         const pid = String(enriched.post_id);
         if (/^\d+$/.test(pid)) {
@@ -1073,6 +1073,61 @@ const GF_BG = {
         error: e.message,
       });
     }
+  },
+
+  // Lịch comment "lặp lại hàng ngày": mỗi tick (1 phút, xem ensureGroupFlowPeriodicAlarms) chỉ
+  // chạy TỐI ĐA 1 job toàn cục — giống hệt cơ chế tickGroupImageSchedule ở trên — để tự giãn cách
+  // nhiều job trong cùng khung giờ thay vì bắn hàng loạt cùng lúc lúc vừa vào khung.
+  async tickCommentDailySchedule() {
+    const d = await chrome.storage.local.get([
+      'commentDailySchedules', 'commentDailyScheduleLastRun', 'activeActorId',
+    ]);
+    const list = d.commentDailySchedules || [];
+    if (!list.length) return;
+
+    const minGapMs = 3 * 60 * 1000;
+    if (d.commentDailyScheduleLastRun && Date.now() - d.commentDailyScheduleLastRun < minGapMs) return;
+
+    const now = new Date();
+    const hour = now.getHours();
+    const today = now.toISOString().slice(0, 10);
+    const idx = list.findIndex((e) => hour >= e.dailyStart && hour < e.dailyEnd && e.lastRunDate !== today);
+    if (idx === -1) return;
+    const candidate = list[idx];
+
+    const job = {
+      post_queue_id: candidate.post_queue_id,
+      group_id: candidate.group_id,
+      group_name: candidate.group_name,
+      post_id: candidate.post_id,
+      comment: candidate.comment || '',
+      actorId: d.activeActorId,
+    };
+    try {
+      await this.runComment(job);
+      if (candidate.crossServerId) {
+        await this.markCrossPostCommentedFromBg(candidate.crossServerId);
+      }
+    } catch (e) {
+      console.warn('[GroupFlow] comment daily schedule failed:', e.message);
+    } finally {
+      list[idx] = { ...candidate, lastRunDate: today, lastRunAt: Date.now() };
+      await chrome.storage.local.set({
+        commentDailySchedules: list,
+        commentDailyScheduleLastRun: Date.now(),
+      });
+    }
+  },
+
+  async markCrossPostCommentedFromBg(serverId) {
+    const auth = await this.getTidienAuth();
+    if (!auth) return;
+    try {
+      await fetch(`${auth.base}/api/user-sync/posts/${serverId}/commented`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
+    } catch { /* best-effort */ }
   },
 
   resolvePostGroups(post, job, groupsMap) {
@@ -2182,6 +2237,78 @@ const GF_BG = {
     return data;
   },
 
+  // Đẩy các dòng Log/Lịch sử (activityHistory) chưa từng gửi lên server, theo license key đang
+  // active — mỗi user chỉ thấy log của chính mình (đa thiết bị), KHÔNG chia sẻ chéo như Comment.
+  // Bỏ qua entry đã kéo VỀ từ server (id bắt đầu "srv_") để tránh đẩy ngược lại vô ích.
+  async pushUnsyncedActivityToServer(auth, headers) {
+    const d = await chrome.storage.local.get(['activityHistory', 'activityLastPushedAt']);
+    const list = d.activityHistory || [];
+    const cursor = d.activityLastPushedAt || '';
+    const toPush = list.filter((e) => e.id && !String(e.id).startsWith('srv_') && (!cursor || e.at > cursor));
+    if (!toPush.length) return { pushed: 0 };
+    const batch = toPush.slice(0, 100);
+    const entries = batch.map((e) => ({
+      client_entry_id: e.id,
+      type: e.type || 'post',
+      ok: e.ok !== false,
+      snippet: e.snippet || '',
+      group_id: e.group_id ? String(e.group_id) : null,
+      group_name: e.group_name || null,
+      post_id: e.post_id ? String(e.post_id) : null,
+      url: e.url || null,
+      error: e.error || null,
+      occurred_at: e.at,
+    }));
+    await this.tidienPostJson(auth, '/api/user-sync/activity', { entries }, headers);
+    const newest = batch.reduce((max, e) => (e.at > max ? e.at : max), cursor);
+    await chrome.storage.local.set({ activityLastPushedAt: newest });
+    return { pushed: batch.length };
+  },
+
+  // Kéo về các dòng Log/Lịch sử của chính license key này từ server (đa thiết bị), merge vào
+  // activityHistory cục bộ theo id, không ghi đè entry đã có.
+  async pullActivityFromServer(auth, headers) {
+    const d = await chrome.storage.local.get(['activityHistory', 'activityLastPulledAt']);
+    const since = d.activityLastPulledAt || '';
+    const res = await fetch(`${auth.base}/api/user-sync/activity${since ? `?since=${encodeURIComponent(since)}` : ''}`, { headers });
+    if (!res.ok) return { pulled: 0 };
+    const rows = await res.json().catch(() => []);
+    if (!Array.isArray(rows) || !rows.length) return { pulled: 0 };
+
+    const list = d.activityHistory || [];
+    const existingIds = new Set(list.map((e) => e.id).filter(Boolean));
+    let added = 0;
+    let newestCreatedAt = since;
+    for (const r of rows) {
+      if (r.created_at && r.created_at > newestCreatedAt) newestCreatedAt = r.created_at;
+      const id = `srv_${r.id}`;
+      if (existingIds.has(id)) continue;
+      list.push({
+        id,
+        type: r.type,
+        ok: !!r.ok,
+        snippet: r.snippet,
+        group_id: r.group_id,
+        group_name: r.group_name,
+        post_id: r.post_id,
+        url: r.url,
+        error: r.error,
+        at: r.occurred_at,
+      });
+      existingIds.add(id);
+      added += 1;
+    }
+    if (added) {
+      list.sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+      const trimmed = list.slice(0, 300);
+      await chrome.storage.local.set({ activityHistory: trimmed, activityLastPulledAt: newestCreatedAt });
+      chrome.runtime.sendMessage({ type: 'GF_ACTIVITY_REFRESH', data: { total: trimmed.length } }).catch(() => {});
+    } else {
+      await chrome.storage.local.set({ activityLastPulledAt: newestCreatedAt });
+    }
+    return { pulled: added };
+  },
+
   /** Hỏi (status) → lấy 1 lô → cập nhật local → nghỉ → hỏi tiếp — trong 1 phiên, không song song */
   async pullCursorSession(auth, headers, {
     kind = 'posts',
@@ -2364,6 +2491,15 @@ const GF_BG = {
     meta.syncCount = (meta.syncCount || 0) + 1;
     await chrome.storage.local.set({ tidienSyncMeta: meta });
 
+    // Log/Lịch sử đồng bộ theo license key (đa thiết bị) — best-effort, không được phép làm hỏng
+    // luồng đồng bộ bài/comment chính ở trên nếu lỗi.
+    try {
+      await this.pushUnsyncedActivityToServer(auth, headers);
+      await this.pullActivityFromServer(auth, headers);
+    } catch (e) {
+      console.warn('[GroupFlow] activity log sync:', e.message);
+    }
+
     const payload = {
       posts: postsMerged,
       postsFetched,
@@ -2426,6 +2562,9 @@ async function ensureGroupFlowPeriodicAlarms() {
   if (!names.has('gf_image_schedule')) {
     chrome.alarms.create('gf_image_schedule', { periodInMinutes: 1 });
   }
+  if (!names.has('gf_comment_daily')) {
+    chrome.alarms.create('gf_comment_daily', { periodInMinutes: 1 });
+  }
 }
 
 console.log('[GroupFlow] service worker ready');
@@ -2480,6 +2619,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
   if (alarm.name === 'gf_image_schedule') {
     await GF_BG.tickGroupImageSchedule();
+  }
+  if (alarm.name === 'gf_comment_daily') {
+    await GF_BG.tickCommentDailySchedule().catch((e) => {
+      console.warn('[GroupFlow] comment daily schedule tick:', e.message);
+    });
   }
   if (alarm.name === 'gf_tidien_sync') {
     await GF_BG.syncFromTidien().catch((e) => {

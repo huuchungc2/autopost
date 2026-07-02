@@ -541,3 +541,9 @@ export async function ensureUserAccountsMergedIntoUsers() {
   await query('DROP TABLE user_accounts');
   console.log(`Migration 036 applied: merged ${migratedCount} user_accounts into users (role=group_user), dropped user_accounts`);
 }
+
+export async function ensureUserActivityLogTable() {
+  if (await tableExists('user_activity_log')) return;
+  if (!(await tableExists('users'))) return;
+  await runMigrationFile('037_user_activity_log.sql', 'Migration 037 applied: user_activity_log');
+}

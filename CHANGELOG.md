@@ -2,7 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+- **GroupFlow "Comment" — chỉ thấy bài của chính mình, không thấy bài đồng đội cần comment chéo**: `GET /api/user-sync/cross-posts` (`backend/src/routes/userSync.js`) vẫn JOIN bảng `user_accounts` — bảng này đã bị **xoá hẳn** từ migration `036` (gộp `user_accounts` vào `users`, `ensureUserAccountsMergedIntoUsers()`), nên mọi lần gọi endpoint này đều lỗi SQL (`ER_NO_SUCH_TABLE`) → 500. Extension nuốt lỗi này (`fetchCrossPostsFromServer()` trả `[]` khi `!res.ok`) nên không ai để ý — tab Comment âm thầm chỉ còn hiện bài của chính mình (local + server-của-mình), phần `crossItems` (bài đồng đội) luôn rỗng từ sau migration 036. Đổi JOIN sang bảng `users` đúng theo schema hiện tại.
+
 ### Added
+- **GroupFlow v1.0.160 — Log/Lịch sử đồng bộ theo license key, filter Tất cả/Của mình + lên lịch lặp lại hàng ngày cho Comment**:
+  - **Log đồng bộ đa thiết bị**: tab Log → Lịch sử (`activityHistory`) trước đây chỉ nằm cục bộ trong `chrome.storage.local`, đổi máy/trình duyệt là mất. Giờ đồng bộ 2 chiều theo license key (mỗi user chỉ thấy log của chính mình, KHÔNG chia sẻ cross-user — khác Comment) trong cùng chu kỳ `syncFromTidien()` đã có: bảng mới `user_activity_log` (migration `037` + `ensureUserActivityLogTable()`), route `POST/GET /api/user-sync/activity`, `appendHistory()` gắn `id` ổn định để đồng bộ idempotent, `pushUnsyncedActivityToServer()`/`pullActivityFromServer()` trong `background.js`.
+  - **Filter Tất cả/Của mình cho tab Comment**: sau khi fix bug cross-posts ở trên, tab Comment giờ trộn cả bài của mình lẫn đồng đội — thêm 2 nút chuyển nhanh, mặc định "Tất cả".
+  - **Lên lịch comment lặp lại hàng ngày**: bên cạnh kiểu "1 lần cụ thể" đã có (chọn ngày/giờ, tick 1 hoặc nhiều bài), thêm kiểu "Lặp lại hàng ngày trong khung giờ X–Y" — tự chạy tối đa 1 comment mỗi 3 phút trong khung giờ đó (giống cơ chế `tickGroupImageSchedule` đã có, tránh bắn hàng loạt cùng lúc), mỗi bài tối đa 1 lần/ngày. Nội dung: dùng draft riêng từng bài nếu có nhập, không thì fallback mẫu chung trong Settings — và **không** resolve spintax lúc đặt lịch (khác kiểu "1 lần") mà để `resolveJobComment()` random lại mỗi lần chạy, tránh đăng y hệt nội dung mỗi ngày trông như bot. Danh sách lịch đang lặp + nút Huỷ hiện ngay dưới tab Comment.
+
 - **Sidebar: nhóm menu có thể thu gọn/mở rộng**: click vào tiêu đề nhóm (vd "Quản lý", "GroupFlow") để ẩn/hiện các mục bên trong, trạng thái lưu vào `localStorage` (`autopost-sidebar-collapsed-groups`) nên giữ nguyên qua reload. Chỉ áp dụng khi sidebar đang ở chế độ mở rộng (không áp dụng cho rail thu nhỏ). Hoàn thiện nốt phần UI cho state/handler đã có sẵn từ đợt redesign UI trước (`Sidebar.jsx` + `components.css`).
 
 ### Changed

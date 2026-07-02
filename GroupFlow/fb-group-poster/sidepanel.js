@@ -14,6 +14,8 @@ const state = {
   radarGroupIds: new Set(),
   comments: [],
   commentDrafts: {},
+  commentFilter: 'all',
+  commentScheduleMode: 'once',
   profiles: null,
   activeActorId: null,
   manualMediaList: [],
@@ -3441,6 +3443,7 @@ async function loadComments() {
   } else {
     renderComments();
   }
+  renderDailyCommentSchedules();
   const startEl = $('#commentScheduleStart');
   if (startEl && !startEl.value) {
     const t = new Date(Date.now() + 30 * 60 * 1000);
@@ -3451,15 +3454,20 @@ async function loadComments() {
 
 function renderComments() {
   const box = $('#commentList');
-  if (!state.comments.length) {
-    box.innerHTML = emptyState('💬', 'Chưa có bài đã đăng — đăng bài qua GroupFlow trước');
+  const filtered = state.commentFilter === 'mine'
+    ? state.comments.filter((c) => c._source !== 'cross')
+    : state.comments;
+  if (!filtered.length) {
+    box.innerHTML = emptyState('💬', state.commentFilter === 'mine'
+      ? 'Bạn chưa có bài nào — đăng bài qua GroupFlow trước'
+      : 'Chưa có bài đã đăng — đăng bài qua GroupFlow trước');
     return;
   }
   const rawTemplates = ($('#commentTemplates')?.value?.trim() || GF.commentTemplates?.DEFAULT || '').split('\n').filter((s) => s.trim());
   const tplOptions = rawTemplates.length
     ? `<option value="">📋 Chọn mẫu…</option>${rawTemplates.map((t) => `<option value="${escAttr(t)}">${esc(t.slice(0, 55))}</option>`).join('')}`
     : '';
-  box.innerHTML = state.comments.map((c) => {
+  box.innerHTML = filtered.map((c) => {
     const draft = state.commentDrafts[c.id] || '';
     const validGroups = (c.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
     const groupInfo = validGroups.length === 1
@@ -3695,6 +3703,83 @@ async function scheduleSelectedComments() {
   await chrome.storage.local.set({ activityUpcoming: upcoming });
   alert(jobs.length === 1 ? 'Đã lên lịch 1 comment' : `Đã lên lịch ${jobs.length} comment (giãn cách tự động)`);
   loadState();
+}
+
+// Không resolve spintax ở đây (khác collectSelectedCommentJobs) — lịch lặp lại hàng ngày cần nội
+// dung random lại MỖI lần chạy (đỡ bị FB coi là spam do đăng y hệt mỗi ngày). Giữ nguyên draft thô
+// (có thể rỗng — background sẽ tự fallback mẫu Settings), resolve/spin thật sự diễn ra lúc chạy
+// trong resolveJobComment() (background.js).
+function collectSelectedCommentJobsRaw() {
+  const ids = [...document.querySelectorAll('[data-comment-id]:checked')].map((el) => el.dataset.commentId);
+  const jobs = [];
+  for (const id of ids) {
+    const c = state.comments.find((x) => x.id === id);
+    if (!c) continue;
+    const validGroups = (c.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
+    for (const g of validGroups) {
+      jobs.push({
+        post_queue_id: c.id,
+        group_id: g.group_id,
+        group_name: g.group_name,
+        post_id: g.post_id,
+        comment: state.commentDrafts[id] || '',
+        crossServerId: c._source === 'cross' ? c._serverId : null,
+        label: (c.noi_dung || g.group_name || 'Comment').slice(0, 60),
+      });
+    }
+  }
+  return jobs;
+}
+
+async function scheduleSelectedCommentsDaily() {
+  const jobs = collectSelectedCommentJobsRaw();
+  if (!jobs.length) return alert('Chọn ít nhất một bài có post_id hợp lệ');
+  const start = Number($('#commentScheduleDailyStart')?.value);
+  const end = Number($('#commentScheduleDailyEnd')?.value);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end > 24 || start >= end) {
+    return alert('Khung giờ không hợp lệ — giờ bắt đầu (0-23) phải nhỏ hơn giờ kết thúc (1-24)');
+  }
+  if (!window.confirm(`Lặp lại hàng ngày ${jobs.length} bài trong khung ${start}h–${end}h, mỗi bài 1 lần/ngày?`)) return;
+
+  const d = await chrome.storage.local.get('commentDailySchedules');
+  const list = d.commentDailySchedules || [];
+  const now = Date.now();
+  jobs.forEach((job, i) => {
+    list.push({
+      id: `cds_${now}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+      ...job,
+      dailyStart: start,
+      dailyEnd: end,
+      lastRunDate: null,
+      createdAt: now,
+    });
+  });
+  await chrome.storage.local.set({ commentDailySchedules: list });
+  alert(jobs.length === 1 ? 'Đã đặt lặp lại hàng ngày cho 1 bài' : `Đã đặt lặp lại hàng ngày cho ${jobs.length} bài`);
+  renderDailyCommentSchedules();
+}
+
+async function renderDailyCommentSchedules() {
+  const d = await chrome.storage.local.get('commentDailySchedules');
+  const list = d.commentDailySchedules || [];
+  const wrap = $('#commentDailyScheduleList');
+  const box = $('#commentDailyScheduleItems');
+  if (!wrap || !box) return;
+  wrap.classList.toggle('hidden', !list.length);
+  if (!list.length) { box.innerHTML = ''; return; }
+  box.innerHTML = list.map((s) => `
+    <div class="list-item">
+      <div>${esc((s.label || s.comment || 'Comment').slice(0, 70))}</div>
+      <div class="hint">${esc(s.group_name || s.group_id || '')} · ${s.dailyStart}h–${s.dailyEnd}h${s.lastRunDate ? ` · lần cuối ${esc(s.lastRunDate)}` : ' · chưa chạy lần nào'}</div>
+      <button type="button" class="btn ghost sm" data-cancel-daily-comment="${escAttr(s.id)}">Huỷ lặp lại</button>
+    </div>`).join('');
+}
+
+async function cancelDailyCommentSchedule(id) {
+  const d = await chrome.storage.local.get('commentDailySchedules');
+  const list = (d.commentDailySchedules || []).filter((s) => s.id !== id);
+  await chrome.storage.local.set({ commentDailySchedules: list });
+  renderDailyCommentSchedules();
 }
 
 function buildHistoryPostUrl(h) {
@@ -4618,7 +4703,29 @@ function bindEvents() {
   });
   $('#btnFillCommentTemplates')?.addEventListener('click', () => fillEmptyCommentDraftsFromTemplate());
   $('#btnRunAllComments').addEventListener('click', () => runAllComments());
-  $('#btnScheduleComments').addEventListener('click', () => scheduleSelectedComments());
+  $('#btnScheduleComments').addEventListener('click', () => {
+    if (state.commentScheduleMode === 'daily') scheduleSelectedCommentsDaily();
+    else scheduleSelectedComments();
+  });
+  $$('[data-comment-filter]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.commentFilter = btn.dataset.commentFilter;
+      $$('[data-comment-filter]').forEach((b) => b.classList.toggle('active', b === btn));
+      renderComments();
+    });
+  });
+  $$('[data-comment-schedule-mode]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.commentScheduleMode = btn.dataset.commentScheduleMode;
+      $$('[data-comment-schedule-mode]').forEach((b) => b.classList.toggle('active', b === btn));
+      $('#commentScheduleOnceFields')?.classList.toggle('hidden', state.commentScheduleMode !== 'once');
+      $('#commentScheduleDailyFields')?.classList.toggle('hidden', state.commentScheduleMode !== 'daily');
+    });
+  });
+  $('#commentDailyScheduleItems')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-cancel-daily-comment]');
+    if (btn) cancelDailyCommentSchedule(btn.dataset.cancelDailyComment);
+  });
 
   $('#btnRadarSave').addEventListener('click', async () => {
     const interval = Number($('#radarInterval').value) || 15;

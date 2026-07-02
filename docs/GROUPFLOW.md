@@ -75,6 +75,16 @@ Filter tab **Tất cả nhóm FB**. File: `groupMetaStore.js`, `groupParse.js`, 
 | 028 | `device_id` trên sync tables — sổ theo thiết bị extension |
 | 033–035 | `user_accounts`, `license_keys`, `user_posts` (self-serve, cho user tự đăng ký bằng license key) |
 | 036 | Gộp `user_accounts` vào `users` (role mới `group_user`) — `license_keys.user_id`/`user_posts.user_account_id` giờ FK thẳng tới `users(id)`, `user_accounts` đã bị xoá. `userAuth.js`/`licenseAuth.js` query `users` (điều kiện `role='group_user'`) |
+| 037 | `user_activity_log` — Log/Lịch sử (`activityHistory`) đồng bộ theo license key, đa thiết bị |
+
+### Comment chéo qua license key (`/api/user-sync/cross-posts`) — khác `/pending-comments` ở trên
+
+Đường dẫn **khác** với "Comment chéo team" (`/pending-comments`, `authenticateExtension`) mô tả ở dưới — đây là đường dùng cho `group_user` tự đăng ký bằng license key, gọi qua `authenticateLicenseKey` (`middleware/licenseAuth.js`), route `backend/src/routes/userSync.js`. Extension gọi trong `loadPostedPostsForComment()` (`sidepanel.js`): `fetchCrossPostsFromServer()` → `GET /api/user-sync/cross-posts` (bài của user KHÁC, `needs_comment=1`) trộn cùng `myServerItems`/`localPosts` (bài của chính mình) thành `state.comments`.
+
+- **Bug đã sửa:** endpoint này JOIN nhầm bảng `user_accounts` — bảng đã bị xoá từ migration 036 — nên lỗi SQL 500 mọi lúc, extension nuốt lỗi (`fetchCrossPostsFromServer()` trả `[]` khi request fail) nên tab Comment âm thầm chỉ còn hiện bài của chính mình từ sau migration 036. Đổi JOIN sang `users`.
+- **Filter Tất cả/Của mình:** 2 nút trong tab Comment, lọc `state.comments` theo `c._source !== 'cross'`.
+- **Lên lịch lặp lại hàng ngày:** ngoài kiểu "1 lần cụ thể" cũ (alarm `gf_cmt_*`, xem mục Comment chéo team bên dưới), thêm kiểu daily — lưu `commentDailySchedules` (`chrome.storage.local`), tick mỗi phút qua alarm `gf_comment_daily` → `GF_BG.tickCommentDailySchedule()` (chạy tối đa 1 job/3 phút toàn cục, mỗi bài 1 lần/ngày trong khung giờ, giống cơ chế `tickGroupImageSchedule`). Nội dung **không** resolve spintax lúc đặt lịch — để `resolveJobComment()` random lại mỗi lần chạy thật.
+- **Log đồng bộ theo license key:** `appendHistory()` gắn `id` ổn định; `pushUnsyncedActivityToServer()`/`pullActivityFromServer()` (`background.js`) chạy trong cùng chu kỳ `syncFromTidien()`, đẩy/kéo `POST|GET /api/user-sync/activity` — mỗi user chỉ thấy log của chính mình (không cross-user như Comment).
 
 ### Auth extension ↔ backend
 
