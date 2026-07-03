@@ -59,8 +59,14 @@ export function getEffectiveDriveOAuth2Config() {
   return { clientId, clientSecret, refreshToken };
 }
 
+/**
+ * Chỉ cần OAuth2 để coi là "đã cấu hình Drive" — KHÔNG bắt buộc Folder ID gốc,
+ * vì folder có thể được cấu hình riêng từng fanpage (google_drive_folder_id).
+ * Trước đây yêu cầu cả folder gốc khiến toàn bộ ảnh rơi về lưu local nếu admin
+ * chỉ đặt folder riêng cho từng fanpage mà bỏ trống folder gốc trong Cài đặt.
+ */
 export function isDriveConfiguredFromSettings() {
-  return !!(getEffectiveDriveOAuth2Config() && getEffectiveDriveFolderId());
+  return !!getEffectiveDriveOAuth2Config();
 }
 
 function maskClientId(clientId) {
@@ -74,7 +80,9 @@ export function getMediaStorageStatus() {
   const oauth2 = getEffectiveDriveOAuth2Config();
   const folderId = getEffectiveDriveFolderId();
   const mode = getEffectiveMediaStorage();
-  const driveReady = !!(oauth2 && folderId);
+  // driveReady chỉ cần OAuth2 — folder gốc là fallback tuỳ chọn, mỗi fanpage
+  // có thể tự cấu hình folder riêng (google_drive_folder_id) mà không cần folder gốc.
+  const driveReady = !!oauth2;
   const resolvedMode = mode === 'google_drive' || (!mode && driveReady)
     ? (driveReady ? 'google_drive' : 'local')
     : (mode || 'local');

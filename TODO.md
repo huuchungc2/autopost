@@ -1,6 +1,18 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-07-01
+> Cập nhật: 2026-07-03
+
+## Fix popup Modal lệch vị trí PC / không hiện trên mobile + touch scroll khó (2026-07-03)
+
+- [x] **`Modal.jsx` giờ dùng React Portal (`createPortal(..., document.body)`)**: trước đây render lồng tại chỗ gọi khiến `.card:hover` (transform) trên PC và `.post-card { overflow: hidden }` trên mobile (view lưới) phá vỡ `position: fixed` của overlay — popup lệch vị trí/kích thước (PC) hoặc gần như vô hình (mobile, bug WebKit cắt fixed lồng trong overflow:hidden). Portal loại bỏ hoàn toàn vì modal mount thẳng `document.body`. Đã build frontend xác nhận không lỗi.
+- [x] **Fix touch scroll khó ở hầu hết trang có bảng (nguyên nhân chính, riêng biệt với popup)**: `.table-wrapper`/`.table-wrap` đặt `touch-action: pan-x` — chặn hẳn vuốt dọc thành cuộn trang khi chạm bắt đầu trên vùng bảng, ảnh hưởng gần như mọi trang danh sách (bài viết, fanpage, user...) đúng như mô tả "tất cả UI". Đổi thành `touch-action: pan-x pan-y`. Đã build frontend xác nhận không lỗi.
+- [ ] **Cần Tony xác nhận trên thiết bị thật**: build lại frontend (`npm run build`) rồi deploy, test popup lỗi bài trên cả PC lẫn mobile + thử vuốt cuộn dọc ngay trên vùng bảng danh sách xem còn kẹt không.
+
+## Fix ảnh AI xuất sai folder Drive (rơi vào root My Drive) (2026-07-03)
+
+- [x] **Fix `uploadBufferToDrive()` tạo file thành công nhưng Drive API âm thầm bỏ qua `parents`**: xác nhận qua thực tế (Tony đã khai báo đúng cả folder cha + folder con, test "OK", nhưng ảnh vẫn xuất thẳng ra gốc "Drive của tôi", tên file `autopost-...`). Sửa: sau khi `files.create`, đọc lại `parents` thật trong response, nếu không khớp folder yêu cầu thì tự `files.update(addParents/removeParents)` sửa lại, throw lỗi rõ nếu vẫn thất bại (không còn âm thầm sai chỗ). `testDriveConnection()` giờ validate ID nhập vào đúng là 1 folder (`mimeType`), không phải file. Thêm script chẩn đoán `backend/scripts/check-drive-folders.js` (gọi thẳng Drive API kiểm tra `parents` thật của ảnh đã tạo).
+- [x] **Fix `isDriveConfiguredFromSettings()` bắt buộc Folder ID gốc trong Cài đặt mới bật chế độ Drive**: đã sửa kèm (không phải nguyên nhân chính vụ trên, nhưng là lỗ hổng thật riêng biệt) — chỉ cần OAuth2 để bật Drive, không cần Folder ID gốc nếu mọi fanpage đã có folder riêng. Xem `docs/GOOGLE_DRIVE.md`.
+- [ ] **Cần Tony xác nhận trên server thật**: restart backend, xuất thử ảnh cho 1-2 fanpage, kiểm tra Drive — ảnh phải vào đúng folder riêng, không còn rơi ra root.
 
 ## Gộp user_accounts vào users + fix GroupFlow license key (2026-07-01)
 

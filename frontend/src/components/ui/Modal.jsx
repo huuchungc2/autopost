@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 export default function Modal({
@@ -14,7 +15,11 @@ export default function Modal({
 
   const sizeClass = wide ? 'modal-wide' : size ? `modal-${size}` : '';
 
-  return (
+  // Portal ra document.body — modal hay được mở từ nút nằm trong .card/.table-wrapper
+  // (có transform lúc :hover), nếu render lồng tại chỗ thì transform của ancestor biến
+  // "position: fixed" của overlay thành fixed-theo-ancestor thay vì theo viewport thật,
+  // khiến popup lệch/co lại trong đúng khung ô đó thay vì nằm giữa màn hình.
+  return createPortal(
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className={`modal ${sizeClass}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
@@ -29,6 +34,7 @@ export default function Modal({
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

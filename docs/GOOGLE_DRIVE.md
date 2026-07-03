@@ -9,8 +9,9 @@ AutoPost lưu ảnh AI/upload lên **Google Drive** qua **OAuth2 User Authentica
 1. **Super admin** → Cài đặt → Google Drive: nhập Client ID, Client Secret, Refresh Token (lấy qua OAuth2 consent flow `GET /api/auth/drive` hoặc dán thủ công) + folder gốc (fallback).
 2. **Fanpage → Sửa**: nhập `Google Drive Folder ID` (subfolder riêng) → Kiểm tra folder → Lưu.
 3. Khi xuất ảnh AI hoặc upload ảnh bài viết:
-   - Có folder fanpage → upload vào folder đó.
-   - Không có → dùng folder gốc Cài đặt.
+   - Có folder fanpage → **bắt buộc** upload vào đúng folder đó (tự verify + tự gắn lại nếu Drive API không gắn đúng, báo lỗi rõ nếu vẫn thất bại — không âm thầm sai chỗ).
+   - Không có folder fanpage, có folder gốc Cài đặt → dùng folder gốc (cùng cơ chế bắt buộc + verify).
+   - Không có folder nào (cả riêng lẫn gốc) → fallback hợp lệ là root "Drive của tôi" — không phải lỗi.
 4. DB lưu `gdrive://FILE_ID`. Đăng Facebook: server tải từ Drive → Graph API.
 
 ## Lấy Refresh Token (OAuth2 consent flow)
@@ -69,3 +70,6 @@ Migration: `023_fb_pages_drive_folder.sql` (folder riêng fanpage), `029_app_set
 - API scope: `https://www.googleapis.com/auth/drive`.
 - Provider test (`/providers/:id/test-image`) dùng folder global (không gắn fanpage).
 - Refresh Token không tự hết hạn trừ khi user thu hồi quyền tại [myaccount.google.com/permissions](https://myaccount.google.com/permissions) — nếu thu hồi, phải chạy lại OAuth2 consent flow để lấy token mới.
+- **Folder ID gốc trong Cài đặt là fallback TUỲ CHỌN, không bắt buộc.** Chế độ Drive (`getMediaStorageMode()`) chỉ cần OAuth2 (Client ID/Secret/Refresh Token) để bật — không yêu cầu Folder ID gốc phải có giá trị. Nếu **mọi** fanpage đều đã có folder riêng, có thể để trống Folder ID gốc; ảnh của fanpage nào thiếu cả folder riêng lẫn folder gốc sẽ báo lỗi rõ ràng ngay khi xuất ảnh, thay vì âm thầm rơi về lưu local như trước bản sửa lỗi này.
+- **Ảnh rơi vào gốc "Drive của tôi" dù đã khai báo folder đúng**: Google Drive API có thể tạo file thành công nhưng bỏ qua `parents` một cách âm thầm (không lỗi) khi Folder ID không phải là folder thật (copy nhầm link 1 file) hoặc tài khoản OAuth2 thiếu quyền Editor trên đúng folder đó. `uploadBufferToDrive()` giờ tự phát hiện + tự sửa lại (`files.update` addParents) sau mỗi lần tạo file, và throw lỗi rõ ràng nếu vẫn không gắn được — không còn âm thầm để sai chỗ. `testDriveConnection()`/nút "Kiểm tra folder Drive" giờ cũng từ chối nếu ID nhập vào không phải `mimeType: application/vnd.google-apps.folder`.
+- **Debug nhanh**: chạy `node backend/scripts/check-drive-folders.js` trên server thật — mục cuối cùng của script gọi thẳng Drive API kiểm tra `parents` thật của các ảnh `gdrive://` gần nhất so với folder kỳ vọng của từng fanpage.
