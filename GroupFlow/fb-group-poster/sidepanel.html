@@ -375,10 +375,6 @@
           <button type="button" id="btnRefreshComments" class="btn ghost sm">Làm mới</button>
         </div>
         <p class="hint">Danh sách là các bài đã đăng qua GroupFlow — cả của bạn lẫn đồng đội (cần comment chéo). Nhập spintax <code>{nội dung 1|nội dung 2}</code> hoặc chọn mẫu từ dropdown — để trống cũng <strong>Chạy</strong>/<strong>Lên lịch</strong> được, tự random mẫu ở <strong>Settings → Comment mẫu</strong>. Bài chưa có lịch tự động được xếp lịch (cách nhau 15 phút, sau lịch muộn nhất hiện có). Giãn cách trong nhóm theo <strong>Settings → Giãn cách</strong>.</p>
-        <label class="select-all" id="commentSelectAllWrap" style="margin-bottom: 8px">
-          <input type="checkbox" id="commentSelectAll" />
-          <span>Chọn tất cả</span>
-        </label>
         <div class="post-filter-bar" style="flex-wrap: wrap; padding: 0 0 10px; border-bottom: none">
           <select id="commentFilterPerson" class="gf-select-sm">
             <option value="all">Người: Tất cả</option>
@@ -400,6 +396,10 @@
             <option value="done">Đã comment</option>
           </select>
         </div>
+        <label class="select-all" id="commentSelectAllWrap" style="margin-bottom: 8px">
+          <input type="checkbox" id="commentSelectAll" />
+          <span>Chọn tất cả</span>
+        </label>
         <div id="commentList" class="list"></div>
       </div>
     </section>

@@ -2189,7 +2189,28 @@ const GF_BG = {
     return res;
   },
 
+  // Chặn tại điểm CHẠY (không chỉ điểm LÊN LỊCH) — lớp bảo vệ thứ 2, độc lập với việc dedup lúc
+  // xếp lịch (runFlow1BackgroundSync()). Cần thiết vì: (1) job trùng lặp có thể đã lỡ được xếp lịch
+  // TRƯỚC khi bug dedup ở trên được vá — alarm cũ vẫn còn treo trong activityUpcoming, tới giờ vẫn
+  // nổ bình thường; (2) fire-and-forget bản chất của chrome.alarms — 1 khi đã lên lịch thì KHÔNG tự
+  // re-check lại trạng thái mới nhất trước khi chạy. Nếu post_queue_id+group_id này đã có trong
+  // commentedRecords (đã đăng comment thành công thật trước đó, kể cả bởi job khác) → bỏ qua êm,
+  // không đăng lại lên Facebook.
   async runComment(job) {
+    if (job.post_queue_id && job.group_id) {
+      const already = (await chrome.storage.local.get('commentedRecords')).commentedRecords || {};
+      if (already[String(job.post_queue_id)]?.[String(job.group_id)]) {
+        await this.appendHistory({
+          type: 'comment',
+          ok: true,
+          group_id: job.group_id,
+          group_name: job.group_name,
+          post_id: job.post_id,
+          snippet: '(bỏ qua — đã comment bài này rồi, job trùng lặp)',
+        });
+        return;
+      }
+    }
     const settings = await chrome.storage.local.get(['fbLang', 'fbUser', 'activeActorId']);
     const comment = await this.resolveJobComment(job);
     const runJob = { ...job, comment };
@@ -2555,6 +2576,40 @@ const GF_BG = {
     return { fetched, pending, rounds };
   },
 
+  // Dọn alarm comment trùng lặp (cùng recordId — tức cùng post_queue_id) đã lỡ tồn tại trong
+  // activityUpcoming TRƯỚC khi bug dedup ở runFlow1BackgroundSync() được vá — chỉ giữ lại job đến
+  // sớm nhất, huỷ hẳn (chrome.alarms + storage) các bản trùng còn lại. Tự chạy mỗi chu kỳ nền, rẻ
+  // vì activityUpcoming thường nhỏ — không cần cờ "đã dọn rồi" vì không tìm thấy trùng thì no-op.
+  async dedupeUpcomingCommentAlarms() {
+    const d = await chrome.storage.local.get('activityUpcoming');
+    const upcoming = d.activityUpcoming || [];
+    const earliestByRecord = new Map();
+    for (const u of upcoming) {
+      if (u.kind !== 'comment' || !u.recordId) continue;
+      const cur = earliestByRecord.get(u.recordId);
+      if (!cur || (u.when || 0) < (cur.when || 0)) earliestByRecord.set(u.recordId, u);
+    }
+    const keep = [];
+    const removed = [];
+    for (const u of upcoming) {
+      if (u.kind === 'comment' && u.recordId && earliestByRecord.get(u.recordId) !== u) {
+        removed.push(u);
+      } else {
+        keep.push(u);
+      }
+    }
+    if (!removed.length) return 0;
+    for (const u of removed) {
+      const name = u.alarmName || u.id;
+      if (!name) continue;
+      chrome.alarms.clear(name);
+      await chrome.storage.local.remove(`alarm_${name}`);
+    }
+    await chrome.storage.local.set({ activityUpcoming: keep });
+    console.warn('[GroupFlow] dedupe: removed', removed.length, 'duplicate comment alarms');
+    return removed.length;
+  },
+
   // Flow 1 (đồng bộ bài để đi comment) — v1.0.187. Gọi trong MỌI chu kỳ nền gf_tidien_sync (không
   // cần user mở tab Comment), thay thế hẳn nhánh posts/pull cũ (group_posts, đã gộp vào user_posts
   // — migration 039). Dùng CHUNG storage key crossPostsCache/crossPostsSyncMeta với
@@ -2569,8 +2624,9 @@ const GF_BG = {
   // KHÔNG dùng GF.scheduler (modules/scheduler.js chỉ dành cho sidepanel, chưa từng được đưa vào
   // build-sw-bundle.js nên service worker không thấy được module này).
   async runFlow1BackgroundSync(auth, headers) {
+    await this.dedupeUpcomingCommentAlarms();
     const d = await chrome.storage.local.get([
-      'crossPostsCache', 'crossPostsSyncMeta', 'commentedRecords', 'bgAutoScheduledCrossIds',
+      'crossPostsCache', 'crossPostsSyncMeta', 'commentedRecords',
       'activeActorId', 'securityLevel', 'activityUpcoming',
     ]);
     const cache = d.crossPostsCache || [];
@@ -2598,10 +2654,21 @@ const GF_BG = {
     const nowHour = new Date().getHours();
     if (nowHour >= 22 || nowHour < 7) return { fetched: rows.length, cached: merged.length, scheduled: 0 };
 
+    // BUG NGHIÊM TRỌNG đã vá: bản trước dùng `bgAutoScheduledCrossIds` — 1 storage key RIÊNG, tách
+    // biệt hoàn toàn với lịch mà autoScheduleUnscheduledComments() (sidepanel.js, chạy khi mở tab
+    // Comment) ghi vào `activityUpcoming`. Hậu quả: user mở tab Comment → sidepanel lên lịch bài X
+    // → vài phút sau chu kỳ nền chạy → hàm này KHÔNG thấy bài X đã có lịch (vì check sai storage
+    // key) → lên lịch THÊM 1 lần nữa cho đúng bài X → 2 job chạy gần nhau, đăng 2 comment trùng lặp
+    // lên cùng 1 bài. Giờ đọc thẳng `activityUpcoming`/`dailyFixedSchedules` — CHÍNH XÁC nguồn mà
+    // sidepanel.js dùng (loadCommentScheduleMap()) — để cả 2 nơi lên lịch luôn thấy chung 1 sự thật.
     const commentedRecords = d.commentedRecords || {};
-    const scheduledIds = new Set(d.bgAutoScheduledCrossIds || []);
-    const delays = await this.getSecurityDelays(d.securityLevel);
+    const dailyFixed = (await chrome.storage.local.get('dailyFixedSchedules')).dailyFixedSchedules || [];
     const upcoming = d.activityUpcoming || [];
+    const alreadyScheduledIds = new Set([
+      ...upcoming.filter((u) => u.kind === 'comment' && u.recordId).map((u) => String(u.recordId)),
+      ...dailyFixed.filter((e) => e.kind === 'comment' && e.payload?.post_queue_id).map((e) => String(e.payload.post_queue_id)),
+    ]);
+    const delays = await this.getSecurityDelays(d.securityLevel);
     const latestWhen = upcoming
       .filter((u) => u.kind === 'comment')
       .reduce((max, u) => Math.max(max, u.when || 0), 0);
@@ -2610,7 +2677,7 @@ const GF_BG = {
 
     for (const cp of merged) {
       const jobId = `cross_${cp.id}`;
-      if (scheduledIds.has(jobId) || commentedRecords[jobId]) continue;
+      if (alreadyScheduledIds.has(jobId) || commentedRecords[jobId]) continue;
       if (!cp.group_id || !cp.post_id || !/^\d+$/.test(String(cp.post_id))) continue;
       if (Number(cp.comment_count) >= Number(cp.comment_target || 1)) continue;
 
@@ -2638,7 +2705,7 @@ const GF_BG = {
         payload,
         label: `Comment → ${label}`,
       });
-      scheduledIds.add(jobId);
+      alreadyScheduledIds.add(jobId);
       scheduled += 1;
       cursorWhen += this.randBetween(delays.betweenComments) * 1000;
     }

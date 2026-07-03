@@ -3657,6 +3657,15 @@ function formatScheduleWhen(ms) {
   return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
 }
 
+// Cùng epoch `ms` như formatScheduleWhen() (tag hiển thị) nhưng ra định dạng cho input
+// datetime-local ("T" thay vì khoảng trắng) — dùng để đổ đúng GIỜ THẬT đang có vào panel sửa lịch,
+// xem chú thích ở renderComments().
+function scheduleWhenInputValue(ms) {
+  const t = new Date(ms);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`;
+}
+
 function commentScheduleTagHtml(c) {
   const info = state.commentScheduleMap[c.id];
   if (!info) {
@@ -3781,7 +3790,18 @@ function renderComments() {
     const commentedTag = isCommentDone(c) ? '<span class="tag ready">✓ Đã comment</span>' : '';
     const editorOpen = state.commentEditorOpenId === c.id;
     const scheduleOpen = state.commentScheduleOpenId === c.id;
-    const hasSchedule = Boolean(state.commentScheduleMap[c.id]);
+    const scheduleInfo = state.commentScheduleMap[c.id];
+    const hasSchedule = Boolean(scheduleInfo);
+    // BUG đã sửa: panel sửa lịch trước đây LUÔN đổ "bây giờ + 30 phút" (defaultWhen, tính chung 1
+    // lần cho cả trang) vào ô giờ — kể cả khi bài ĐÃ có lịch thật (tag hiện đúng giờ đã đặt, vd
+    // "🕒 18:31"), khiến bấm vào sửa lại thấy 1 giờ hoàn toàn khác không liên quan — không phải do
+    // giờ lưu sai, mà do form sửa chưa từng đọc lại giờ đã lưu. Giờ ưu tiên đổ đúng giờ hiện có
+    // (`scheduleInfo.when`) nếu là lịch 1 lần; lịch lặp hàng ngày thì đổ hôm nay + đúng timeOfDay.
+    const editWhen = scheduleInfo?.type === 'once'
+      ? scheduleWhenInputValue(scheduleInfo.when)
+      : scheduleInfo?.type === 'daily'
+        ? `${defaultScheduleWhenValue(0).slice(0, 10)}T${scheduleInfo.timeOfDay}`
+        : defaultWhen;
 
     return `
     <div class="list-item post-card comment-item">
@@ -3812,9 +3832,9 @@ function renderComments() {
       </div>`}
       ${!scheduleOpen ? '' : `
       <div class="comment-schedule-panel">
-        <input type="datetime-local" class="item-schedule-when" value="${escAttr(defaultWhen)}" />
+        <input type="datetime-local" class="item-schedule-when" value="${escAttr(editWhen)}" />
         <label class="switch-row" style="margin-top:6px">
-          <input type="checkbox" class="item-schedule-repeat-daily" />
+          <input type="checkbox" class="item-schedule-repeat-daily" ${scheduleInfo?.type === 'daily' ? 'checked' : ''} />
           <span>Lặp lại hàng ngày (đúng giờ này)</span>
         </label>
         <button type="button" class="btn primary sm" data-confirm-item-schedule="${escAttr(c.id)}" style="margin-top:8px">Xác nhận lên lịch</button>

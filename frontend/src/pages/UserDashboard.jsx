@@ -22,6 +22,8 @@ export default function UserDashboard() {
   const [newPw, setNewPw] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
+  const [postsPage, setPostsPage] = useState(1);
+  const [postsPagination, setPostsPagination] = useState({ page: 1, pages: 1, total: 0 });
 
   useEffect(() => {
     const token = localStorage.getItem('user_token');
@@ -31,14 +33,23 @@ export default function UserDashboard() {
       .catch(() => { localStorage.removeItem('user_token'); navigate('/user/login'); });
   }, [navigate]);
 
-  const loadDetail = () => {
-    api.get('/user-auth/me/detail', { headers: authHeaders() })
-      .then((r) => setDetail(r.data)).catch(() => {});
+  // Bài đã đăng phân trang (page/limit) — trước đây LIMIT 30 cứng, không có tham số trang, nên
+  // bài cũ hơn 30 dòng gần nhất theo created_at không bao giờ xem lại được, và khi backfill/re-sync
+  // khiến created_at không còn phản ánh đúng thứ tự thời gian thật thì bài mới nhất có thể bị đẩy
+  // khỏi top 30 luôn. Nhóm (`groups`) giữ nguyên không phân trang — số nhóm dùng thường ít.
+  const loadDetail = (page = 1) => {
+    api.get('/user-auth/me/detail', { headers: authHeaders(), params: { page, limit: 30 } })
+      .then((r) => {
+        setDetail(r.data);
+        setPostsPagination(r.data.pagination || { page: 1, pages: 1, total: 0 });
+      })
+      .catch(() => {});
   };
 
   useEffect(() => {
-    if (tab === 'posts' || tab === 'groups') loadDetail();
-  }, [tab]);
+    if (tab === 'posts') loadDetail(postsPage);
+    else if (tab === 'groups') loadDetail(1);
+  }, [tab, postsPage]);
 
   const handleCopy = (key) => {
     navigator.clipboard.writeText(key).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
@@ -203,6 +214,27 @@ export default function UserDashboard() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
+                )}
+                {postsPagination.pages > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '14px 16px' }}>
+                    <button
+                      type="button"
+                      disabled={postsPagination.page <= 1}
+                      onClick={() => setPostsPage(postsPagination.page - 1)}
+                      style={{ padding: '6px 14px', border: '1px solid var(--bg-border)', borderRadius: 8, background: 'none', cursor: postsPagination.page <= 1 ? 'not-allowed' : 'pointer', fontSize: 13, opacity: postsPagination.page <= 1 ? 0.5 : 1 }}
+                    >
+                      Trước
+                    </button>
+                    <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Trang {postsPagination.page}/{postsPagination.pages} ({postsPagination.total} bài)</span>
+                    <button
+                      type="button"
+                      disabled={postsPagination.page >= postsPagination.pages}
+                      onClick={() => setPostsPage(postsPagination.page + 1)}
+                      style={{ padding: '6px 14px', border: '1px solid var(--bg-border)', borderRadius: 8, background: 'none', cursor: postsPagination.page >= postsPagination.pages ? 'not-allowed' : 'pointer', fontSize: 13, opacity: postsPagination.page >= postsPagination.pages ? 0.5 : 1 }}
+                    >
+                      Sau
+                    </button>
                   </div>
                 )}
               </div>

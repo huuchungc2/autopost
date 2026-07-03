@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+- **GroupFlow v1.0.188 — BUG NGHIÊM TRỌNG: 1 bài bị comment lặp 2-3 lần** do `runFlow1BackgroundSync()` (v1.0.187, chạy nền) và `autoScheduleUnscheduledComments()` (sidepanel.js, chạy khi mở tab Comment) dùng 2 storage key khác nhau để check "đã lên lịch chưa" — không thấy lịch của nhau nên cả 2 cùng lên lịch cho cùng 1 bài, sinh 2 alarm độc lập cùng nổ gần nhau. Vá 3 lớp: (1) `runFlow1BackgroundSync()` đổi sang đọc thẳng `activityUpcoming`/`dailyFixedSchedules` — đúng nguồn sidepanel dùng; (2) `runComment()` check `commentedRecords` ngay đầu hàm, bỏ qua êm nếu bài đã comment xong (chặn cả alarm trùng đã lỡ tồn tại từ trước khi vá); (3) `dedupeUpcomingCommentAlarms()` mới — tự dọn alarm trùng đã lỡ lên lịch trước đó mỗi chu kỳ nền.
+- **GroupFlow v1.0.188 — panel sửa lịch comment luôn hiện "bây giờ + 30 phút" thay vì giờ thật đã đặt** (bug độc lập, không liên quan bug trùng lịch ở trên): `renderComments()` tính 1 giá trị giờ mặc định DÙNG CHUNG cho ô sửa lịch của mọi card, kể cả card đã có lịch thật — bấm vào sửa không đọc lại giờ đã lưu (`state.commentScheduleMap`), luôn đổ đè giờ mặc định. Thêm `scheduleWhenInputValue()`, ưu tiên đổ đúng giờ đã lưu nếu bài đã có lịch (lịch 1 lần đọc `when`, lịch lặp hàng ngày đọc `timeOfDay` + tick sẵn checkbox lặp lại).
+- Di chuyển checkbox "Chọn tất cả" tab Comment xuống dưới hàng filter (Người/Mẫu bình luận/Lịch/Bình luận) theo yêu cầu Tony.
+- **`tidien.xyz/user/dashboard` (self-serve dashboard cho `group_user`, khác hẳn trang admin `/groups`) — tab "Bài đã đăng" chưa từng có phân trang**: `GET /user-auth/me/detail` trả cứng `LIMIT 30`, không nhận tham số trang — bài ngoài top 30 (theo `created_at`) không có cách nào xem lại. Thêm `page`/`limit` + `pagination` trong response, đổi sort sang `COALESCE(posted_at, created_at) DESC` (đồng bộ với fix ở trang admin — bài NULL `posted_at` không bị đẩy xuống cuối); frontend (`UserDashboard.jsx`) thêm nút Trước/Sau.
+
 ### Added
 - **Website `/groups` (trang Group — Bài đã đăng) — checkbox chọn nhiều để xoá hàng loạt**: thêm checkbox "chọn tất cả trên trang" + từng dòng, nút **Xoá đã chọn (N)** — `POST /group-posts/bulk-delete` (`deleteGroupPosts()`, mirror đúng convention `bulk-delete` đã có ở `Posts.jsx`/fanpage). Admin/super_admin xoá được bất kỳ bài nào, user thường chỉ xoá bài của chính mình; xoá `user_posts` CASCADE luôn `user_post_comments` liên quan.
 

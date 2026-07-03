@@ -112,22 +112,31 @@ router.get('/me', requireUserAuth, asyncHandler(async (req, res) => {
   res.json({ user: rows[0], keys, stats: stats || { group_count: 0, post_count: 0, last_post_at: null } });
 }));
 
-// GET /api/user-auth/me/detail — groups + recent posts của chính user
+// GET /api/user-auth/me/detail — groups + recent posts của chính user (posts phân trang, groups
+// giữ nguyên không phân trang vì số nhóm dùng thường ít hơn nhiều so với số bài đăng)
 router.get('/me/detail', requireUserAuth, asyncHandler(async (req, res) => {
   const uid = req.userAccount.userId;
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 30));
+  const offset = (page - 1) * limit;
+
   const groups = await query(
     `SELECT group_id, group_name, COUNT(*) AS post_count, MAX(posted_at) AS last_posted_at
      FROM user_posts WHERE user_account_id = ?
      GROUP BY group_id, group_name ORDER BY last_posted_at DESC`,
     [uid]
   );
+  const [countRow] = await query('SELECT COUNT(*) AS total FROM user_posts WHERE user_account_id = ?', [uid]);
+  const total = Number(countRow?.total) || 0;
+  // COALESCE(posted_at, created_at) — bài nào lỡ có posted_at NULL vẫn sắp xếp đúng theo created_at
+  // thay vì bị đẩy xuống cuối (MySQL xếp NULL cuối cùng khi DESC), tương tự fix ở trang admin /groups.
   const posts = await query(
     `SELECT id, group_name, group_id, post_id, noi_dung, posted_at, needs_comment, created_at
      FROM user_posts WHERE user_account_id = ?
-     ORDER BY created_at DESC LIMIT 30`,
-    [uid]
+     ORDER BY COALESCE(posted_at, created_at) DESC LIMIT ? OFFSET ?`,
+    [uid, limit, offset]
   );
-  res.json({ groups, posts });
+  res.json({ groups, posts, pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 } });
 }));
 
 // PATCH /api/user-auth/me — đổi tên / mật khẩu

@@ -1,6 +1,25 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-07-03
+> Cập nhật: 2026-07-04
+
+## Fix phân trang tidien.xyz/user/dashboard (2026-07-04)
+
+Tony gửi screenshot `/user/dashboard` (self-serve, KHÁC trang admin `/groups` đã sửa hôm 2026-07-03) — tab "Bài đã đăng" không phân trang.
+
+- [x] **Xác nhận đúng trang khác**: `/user/dashboard` (`UserDashboard.jsx`) đọc `GET /user-auth/me/detail` — route hoàn toàn riêng, chưa từng đụng tới trước đây, khác `GET /group-posts` của trang admin.
+- [x] **Root cause**: route trả cứng `LIMIT 30`, không nhận `page`/`limit` — chưa từng có phân trang từ đầu (không phải bug regression, là tính năng thiếu).
+- [x] **Fix**: thêm `page`/`limit` + `pagination` vào response; đổi sort `created_at DESC` → `COALESCE(posted_at, created_at) DESC` (đồng bộ fix NULL-safe đã làm ở trang admin); frontend thêm nút Trước/Sau (tab "Nhóm" giữ nguyên không phân trang — số nhóm dùng thường ít).
+- [ ] **Cần Tony xác nhận**: restart backend, mở lại `/user/dashboard` → tab "Bài đã đăng" — kiểm tra bài mới nhất (hôm nay) có lên đầu danh sách không, nút Trước/Sau hoạt động đúng không.
+
+## Fix BUG NGHIÊM TRỌNG: 1 bài bị comment lặp nhiều lần (2026-07-04)
+
+Tony phát hiện ngay sau khi deploy v1.0.187 (Flow 1 chạy nền): cùng tài khoản comment 2-3 lần lên đúng 1 bài trong vài phút.
+
+- [x] **Root cause bug trùng lịch**: `runFlow1BackgroundSync()` (chạy nền) và `autoScheduleUnscheduledComments()` (chạy khi mở tab Comment) check "đã lên lịch chưa" bằng 2 storage key khác nhau — không thấy lịch của nhau, cả 2 cùng lên lịch cho cùng 1 bài.
+- [x] **Vá 3 lớp**: (1) đồng bộ nguồn check "đã lên lịch" giữa 2 nơi (`activityUpcoming`/`dailyFixedSchedules`); (2) `runComment()` tự kiểm tra `commentedRecords` trước khi đăng, bỏ qua nếu đã comment rồi — chặn cả alarm trùng đã lỡ tồn tại; (3) `dedupeUpcomingCommentAlarms()` — tự dọn alarm trùng cũ mỗi chu kỳ nền.
+- [x] **Root cause riêng bug "giờ khác nhau khi click vào sửa lịch"** (Tony hỏi lại, hoá ra KHÔNG phải hệ quả của bug trùng lịch ở trên mà là bug độc lập): `renderComments()` tính 1 giờ mặc định ("bây giờ+30p") dùng chung cho ô sửa lịch của MỌI card, kể cả card đã có lịch thật — chưa từng đọc lại giờ đã lưu. Đã vá: ưu tiên đổ đúng giờ đã lưu (`scheduleWhenInputValue()`) nếu bài đã có lịch.
+- [x] Di chuyển checkbox "Chọn tất cả" tab Comment xuống dưới hàng filter (Người/Mẫu bình luận/Lịch/Bình luận).
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension (v1.0.188), theo dõi Log → Lịch sử vài chu kỳ xem còn thấy 2 comment trùng giờ trên cùng 1 bài không; bấm vào tag lịch trên card xem giờ hiện ra trong ô sửa có khớp đúng giờ ghi trên tag không (giờ phải khớp 100%, không còn ra giờ "bây giờ+30p" ngẫu nhiên nữa).
 
 ## Fix trang /groups: bài hôm nay không hiện, phân trang, thêm xoá hàng loạt (2026-07-03)
 
