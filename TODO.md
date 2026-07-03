@@ -2,6 +2,16 @@
 
 > Cập nhật: 2026-07-03
 
+## Fix trang /groups: bài hôm nay không hiện, phân trang, thêm xoá hàng loạt (2026-07-03)
+
+Tony báo sau khi deploy đợt gộp bảng: bài đăng hôm nay không hiện trong danh sách, phân trang có vẻ không hoạt động, thiếu checkbox chọn nhiều để xoá.
+
+- [x] **Xoá hàng loạt**: checkbox "chọn tất cả trên trang" + từng dòng, nút "Xoá đã chọn (N)" — `POST /group-posts/bulk-delete` (mirror convention `bulk-delete` đã có ở fanpage `Posts.jsx`). Admin xoá bất kỳ bài nào, user thường chỉ xoá bài của mình.
+- [x] **Lỗi tải danh sách không còn bị nuốt im lặng** — trước chỉ `console.error`, trang hiện y hệt "trống" dù có thể đang lỗi thật (vd migration 039/039b chưa kịp chạy). Thêm toast báo lỗi.
+- [x] **Defensive fix cho khả năng bài mới rớt khỏi trang 1**: `ORDER BY posted_at DESC` + filter ngày đổi sang `COALESCE(posted_at, created_at)` — nếu có bài nào lỡ `posted_at` NULL sẽ không còn bị đẩy xuống tận trang cuối / bị filter ngày loại thẳng.
+- [ ] **Chưa xác nhận được root cause thật của "bài hôm nay không hiện"** — đã rà kỹ code (`listPublishedGroupPosts`, extension `pushPostToTidien`/`upsertUserPost`) không thấy bug rõ ràng nào ngoài khả năng NULL `posted_at` vừa vá phòng ngừa ở trên; không có DB thật để tái hiện. **Cần Tony**: sau khi deploy bản này, nếu bài hôm nay vẫn không hiện — báo lại kèm: mở DevTools → tab Network lúc load `/groups`, xem response của `GET /api/group-posts` (đặc biệt field `posted_at` của bài bị thiếu) hoặc lỗi cụ thể hiện trong toast mới.
+- [ ] **Phân trang**: code phân trang (nút Trước/Sau) đã có sẵn từ trước, không đổi gì thêm ở bản này — nếu vẫn thấy "không phân trang" sau khi deploy, khả năng cao là hệ quả của bug "bài hôm nay không hiện" (ít bài hiển thị hơn thực tế nên `pagination.total`/`pages` tính đúng theo view đã lọc sai, không phải phân trang tự nó hỏng). Theo dõi cùng lúc với mục trên.
+
 ## Định nghĩa lại 3 flow đồng bộ + gộp group_posts vào user_posts (2026-07-03)
 
 Theo yêu cầu Tony: thu gọn đồng bộ extension↔backend về đúng 3 luồng "thật sự cần thiết" (AI/skill/provider giữ nguyên local, không đụng backend).

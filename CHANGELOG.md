@@ -3,6 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- **Website `/groups` (trang Group — Bài đã đăng) — checkbox chọn nhiều để xoá hàng loạt**: thêm checkbox "chọn tất cả trên trang" + từng dòng, nút **Xoá đã chọn (N)** — `POST /group-posts/bulk-delete` (`deleteGroupPosts()`, mirror đúng convention `bulk-delete` đã có ở `Posts.jsx`/fanpage). Admin/super_admin xoá được bất kỳ bài nào, user thường chỉ xoá bài của chính mình; xoá `user_posts` CASCADE luôn `user_post_comments` liên quan.
+
+### Fixed
+- **Website `/groups` nuốt lỗi tải danh sách im lặng**: lỗi request (`GET /group-posts`) trước đây chỉ `console.error`, trang hiện y hệt trạng thái "Chưa có bài group nào" — không cách nào phân biệt được với trường hợp thật sự trống nếu backend lỗi (vd sau khi gộp bảng `group_posts`→`user_posts` mà migration chưa chạy kịp). Thêm toast báo lỗi rõ ràng.
+- **`listPublishedGroupPosts()` sắp xếp/lọc theo ngày có thể bỏ sót bài có `posted_at` NULL**: `ORDER BY posted_at DESC` đẩy bài NULL xuống tận trang cuối (MySQL xếp NULL sau cùng khi DESC) — dễ bị hiểu nhầm "bài mới không hiện ra"; filter `from_date`/`to_date` cũng loại thẳng các bài này. Đổi sang `ORDER BY COALESCE(posted_at, created_at) DESC` + áp dụng `COALESCE` tương tự cho 2 filter ngày, dùng `created_at` (luôn có giá trị) làm mốc dự phòng.
+
+### Added
 - **GroupFlow v1.0.187 — định nghĩa lại 3 flow đồng bộ "thật sự cần thiết" + gộp `group_posts` vào `user_posts`**: theo yêu cầu Tony — thu gọn toàn bộ đồng bộ extension↔backend về đúng 3 luồng (AI/skill/provider giữ nguyên local, không qua backend):
   - **Flow 1 (đồng bộ bài để đi comment)**: chuyển vào chu kỳ nền `gf_tidien_sync` thay vì chỉ chạy khi mở tab Comment (`runFlow1BackgroundSync()` — background.js, thay thế hẳn nhánh `posts/pull` chết). Đổi cờ boolean `needs_comment` (1 người comment là khoá bài cho tất cả) sang `comment_target`/`comment_count` — đếm nhiều người KHÁC NHAU (bảng join mới `user_post_comments`) tới khi đủ target (mặc định 5) mới khoá; ưu tiên bài `comment_count` thấp nhất; thêm `visible_after` — bài mới có độ trễ ngẫu nhiên 5–60 phút trước khi lộ diện trong `/cross-posts` (né dấu hiệu comment-ring, đúng ý "từ từ mọi người thấy bài").
   - **Flow 2 (đồng bộ sau khi đăng bài)**: `POST /group-posts/sync` và `POST /user-sync/posts` giờ dùng chung `upsertUserPost()` (groupPostService.js), khớp theo `(user_account_id, group_id, post_id)` — không còn tạo 2 dòng trùng cho cùng 1 bài thật khi cả 2 route đều được gọi (trước đây ghi vào 2 bảng khác nhau).

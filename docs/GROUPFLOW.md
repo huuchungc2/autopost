@@ -128,7 +128,7 @@ Gọi qua `authenticateLicenseKey` (`middleware/licenseAuth.js`), route `backend
 
 | Route | Trang |
 |-------|-------|
-| `/groups` | Bài group đã sync — lọc search/ngày/user, click xem chi tiết + comment |
+| `/groups` | Bài group đã sync — lọc search/ngày/user, click xem chi tiết + comment, checkbox chọn nhiều → **Xoá đã chọn** (`POST /group-posts/bulk-delete`, v1.0.187 — admin xoá được bất kỳ bài nào, user thường chỉ xoá bài của mình; xoá `user_posts` CASCADE luôn `user_post_comments`) |
 | `/groups/import` | Import Excel → draft (preview bảng) |
 | `/groups/drafts` | Quản lý draft chờ extension (pagination, prompt ảnh, pulled_at) |
 | `/settings` | **GroupFlow Extension** — API key, FB map, hướng dẫn cài |

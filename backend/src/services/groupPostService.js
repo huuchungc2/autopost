@@ -244,11 +244,11 @@ export async function listPublishedGroupPosts(filters = {}) {
     params.push(filters.posted_by);
   }
   if (filters.from_date) {
-    conditions.push('up.posted_at >= ?');
+    conditions.push('COALESCE(up.posted_at, up.created_at) >= ?');
     params.push(`${filters.from_date} 00:00:00`);
   }
   if (filters.to_date) {
-    conditions.push('up.posted_at < DATE_ADD(?, INTERVAL 1 DAY)');
+    conditions.push('COALESCE(up.posted_at, up.created_at) < DATE_ADD(?, INTERVAL 1 DAY)');
     params.push(filters.to_date);
   }
   if (filters.search) {
@@ -267,12 +267,16 @@ export async function listPublishedGroupPosts(filters = {}) {
   );
   const total = countRows[0]?.total || 0;
 
+  // COALESCE(posted_at, created_at) — bài nào lỡ có posted_at NULL (vd extension cũ chưa gửi kịp
+  // trường này, hoặc dữ liệu backfill thiếu) sẽ không bị MySQL đẩy tuột xuống cuối danh sách khi
+  // ORDER BY ... DESC (NULL luôn xếp cuối) — dễ bị hiểu nhầm "bài mới không hiện ra" nếu nó rơi
+  // sang tận trang cuối cùng thay vì trang 1.
   const rows = await query(
     `SELECT up.*, u.name AS poster_name
      FROM user_posts up
      JOIN users u ON u.id = up.user_account_id
      ${where}
-     ORDER BY up.posted_at DESC, up.id DESC
+     ORDER BY COALESCE(up.posted_at, up.created_at) DESC, up.id DESC
      LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );
@@ -297,6 +301,37 @@ export async function listPublishedGroupPosts(filters = {}) {
     })),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
   };
+}
+
+/** Website: xoá hàng loạt bài đã đăng (checkbox chọn nhiều trên trang /groups). Admin/super_admin
+ * xoá được bất kỳ bài nào; user thường chỉ xoá được bài của chính mình. Xoá user_posts sẽ CASCADE
+ * xoá luôn user_post_comments liên quan (FK ON DELETE CASCADE, migration 039). */
+export async function deleteGroupPosts(userId, userRole, ids) {
+  const list = [...new Set((Array.isArray(ids) ? ids : [ids]).map((id) => Number.parseInt(id, 10)).filter((n) => Number.isFinite(n) && n > 0))];
+  if (!list.length) {
+    const err = new Error('post_ids là bắt buộc');
+    err.status = 400;
+    throw err;
+  }
+  const isAdmin = ['super_admin', 'admin'].includes(userRole);
+  const errors = [];
+  let deleted_count = 0;
+
+  for (const id of list) {
+    try {
+      const sql = isAdmin
+        ? 'DELETE FROM user_posts WHERE id = ?'
+        : 'DELETE FROM user_posts WHERE id = ? AND user_account_id = ?';
+      const params = isAdmin ? [id] : [id, userId];
+      const result = await query(sql, params);
+      if (result.affectedRows) deleted_count += 1;
+      else errors.push({ id, error: 'Không tìm thấy bài hoặc không có quyền xoá' });
+    } catch (err) {
+      errors.push({ id, error: err.message || 'Không xoá được' });
+    }
+  }
+
+  return { deleted_count, errors };
 }
 
 export async function createGroupPostDrafts(userId, rows, options = {}) {

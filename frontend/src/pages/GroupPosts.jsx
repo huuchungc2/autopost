@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, ExternalLink, Search } from 'lucide-react';
+import { Upload, ExternalLink, Search, Trash2 } from 'lucide-react';
 import api from '../services/api';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
@@ -9,10 +9,12 @@ import Skeleton from '../components/ui/Skeleton';
 import GroupPostDetailModal from '../components/GroupPostDetailModal';
 import { formatDateTime } from '../utils/date';
 import { useAuth } from '../services/authContext';
+import { useToast } from '../context/ToastContext';
 
 export default function GroupPosts() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const isAdmin = ['super_admin', 'admin'].includes(user?.role);
   const [data, setData] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
@@ -23,6 +25,8 @@ export default function GroupPosts() {
   const [userId, setUserId] = useState('');
   const [users, setUsers] = useState([]);
   const [detailPost, setDetailPost] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -31,6 +35,9 @@ export default function GroupPosts() {
       .catch(() => setUsers([]));
   }, [isAdmin]);
 
+  // Trước đây lỗi tải bị nuốt im lặng (chỉ console.error) — trang hiện y hệt "chưa có bài group
+  // nào" dù thực ra request đang fail (vd backend lỗi/migration chưa chạy), không cách nào phân
+  // biệt được với trường hợp thật sự trống. Giờ báo lỗi rõ qua toast.
   const load = async (page = 1) => {
     setLoading(true);
     try {
@@ -44,6 +51,7 @@ export default function GroupPosts() {
       setPagination(res.data.pagination || { page: 1, pages: 1, total: 0 });
     } catch (err) {
       console.error(err);
+      showToast(err.response?.data?.error || 'Không tải được danh sách bài group', 'error');
     } finally {
       setLoading(false);
     }
@@ -51,6 +59,7 @@ export default function GroupPosts() {
 
   useEffect(() => {
     load(1);
+    setSelectedIds(new Set());
   }, [search, fromDate, toDate, userId, isAdmin]);
 
   const clearFilters = () => {
@@ -61,6 +70,44 @@ export default function GroupPosts() {
   };
 
   const hasFilters = search || fromDate || toDate || userId;
+
+  const selectedCount = selectedIds.size;
+  const allOnPageSelected = data.length > 0 && data.every((p) => selectedIds.has(p.id));
+
+  const toggleSelectAllOnPage = () => {
+    if (allOnPageSelected) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(data.map((p) => p.id)));
+  };
+
+  const toggleSelectOne = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    if (!window.confirm(`Xoá ${ids.length} bài đã chọn? Không thể hoàn tác.`)) return;
+    setBulkDeleting(true);
+    try {
+      const res = await api.post('/group-posts/bulk-delete', { post_ids: ids });
+      const skipped = res.data.errors?.length ? ` — ${res.data.errors.length} lỗi` : '';
+      showToast(`Đã xoá ${res.data.deleted_count} bài${skipped}`, 'success');
+      setSelectedIds(new Set());
+      load(pagination.page);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Xoá hàng loạt thất bại', 'error');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   return (
     <div className="page-shell">
@@ -114,6 +161,11 @@ export default function GroupPosts() {
           {hasFilters && (
             <Button variant="secondary" size="sm" onClick={clearFilters}>Xóa lọc</Button>
           )}
+          {selectedCount > 0 && (
+            <Button variant="destructive" size="sm" disabled={bulkDeleting} onClick={handleBulkDelete}>
+              <Trash2 size={16} /> Xoá đã chọn ({selectedCount})
+            </Button>
+          )}
         </div>
         <span className="text-muted">{pagination.total} bài</span>
       </div>
@@ -129,6 +181,14 @@ export default function GroupPosts() {
           <table className="data-table data-table-content-priority">
             <thead>
               <tr>
+                <th style={{ width: 36 }}>
+                  <input
+                    type="checkbox"
+                    checked={allOnPageSelected}
+                    onChange={toggleSelectAllOnPage}
+                    title="Chọn tất cả bài trên trang này"
+                  />
+                </th>
                 <th>Thời gian</th>
                 <th>Người đăng</th>
                 <th>Group</th>
@@ -147,6 +207,13 @@ export default function GroupPosts() {
                   tabIndex={0}
                   onKeyDown={(e) => e.key === 'Enter' && setDetailPost(row)}
                 >
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(row.id)}
+                      onChange={() => toggleSelectOne(row.id)}
+                    />
+                  </td>
                   <td>{row.posted_at ? formatDateTime(row.posted_at) : '—'}</td>
                   <td>{row.poster_name || row.posted_by}</td>
                   <td title={row.group_id}>

@@ -12,6 +12,7 @@ import {
   listPublishedGroupPosts,
   listGroupPostComments,
   getGroupPostsStats,
+  deleteGroupPosts,
   createGroupPostDrafts,
   listGroupPostDrafts,
   pullDraftsForExtension,
@@ -150,6 +151,12 @@ router.get('/', authenticate, asyncHandler(async (req, res) => {
     filters.user_id = req.query.user_id;
   }
   const result = await listPublishedGroupPosts(filters);
+  res.json(result);
+}));
+
+/** Website: xoá hàng loạt bài đã đăng — checkbox chọn nhiều trên trang /groups */
+router.post('/bulk-delete', authenticate, asyncHandler(async (req, res) => {
+  const result = await deleteGroupPosts(req.user.id, req.user.role, req.body.post_ids);
   res.json(result);
 }));
 
