@@ -250,19 +250,34 @@ export default function Settings() {
     setComposioForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  // BUG NGHIÊM TRỌNG đã sửa: 3 trường auth_config_id/user_id/connected_account_id trước đây LUÔN
+  // được gửi trong payload (kể cả khi rỗng) — khác hẳn composio_api_key vốn chỉ gửi khi có giá trị
+  // (để "để trống = giữ nguyên"). Backend (saveComposioSettings, appSettingsService.js) coi field
+  // rỗng là lệnh XOÁ hẳn key đó khỏi app_settings (DELETE). Nếu vì bất kỳ lý do gì composioForm bị
+  // rỗng lúc mở trang (vd load trước khi GET /settings trả về xong, hoặc F5 giữa chừng) rồi user
+  // bấm "Lưu vào database" — 3 giá trị đã lưu trước đó bị XOÁ SẠCH ngay lập tức, dù chỉ định lưu
+  // composio_facebook_toolkit_version/composio_auto_fallback thôi cũng dính theo. Đây rất có thể là
+  // nguyên nhân thật của "đã cấu hình rồi mà giờ báo chưa" — không phải backend quên, mà bị chính 1
+  // lần Lưu trước đó xoá mất. Giờ 3 trường này chỉ gửi khi có giá trị, giống hệt composio_api_key.
   const saveComposioSettings = async () => {
     if (!composioForm) return;
     setComposioSaving(true);
     try {
       const payload = {
-        composio_facebook_auth_config_id: composioForm.composio_facebook_auth_config_id,
-        composio_default_user_id: composioForm.composio_default_user_id,
-        composio_default_connected_account_id: composioForm.composio_default_connected_account_id,
         composio_facebook_toolkit_version: composioForm.composio_facebook_toolkit_version,
         composio_auto_fallback: composioForm.composio_auto_fallback,
       };
       if (composioForm.composio_api_key?.trim()) {
         payload.composio_api_key = composioForm.composio_api_key.trim();
+      }
+      if (composioForm.composio_facebook_auth_config_id?.trim()) {
+        payload.composio_facebook_auth_config_id = composioForm.composio_facebook_auth_config_id.trim();
+      }
+      if (composioForm.composio_default_user_id?.trim()) {
+        payload.composio_default_user_id = composioForm.composio_default_user_id.trim();
+      }
+      if (composioForm.composio_default_connected_account_id?.trim()) {
+        payload.composio_default_connected_account_id = composioForm.composio_default_connected_account_id.trim();
       }
       const response = await api.put('/settings/composio', payload);
       setSettings((prev) => ({

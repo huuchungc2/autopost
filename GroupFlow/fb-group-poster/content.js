@@ -102,7 +102,7 @@ if (!GF_CONTENT) GF_CONTENT = {
     if (!GP?.findAboutDocIdsInHtml) return;
     const docIds = GP.findAboutDocIdsInHtml(html);
     if (!Object.keys(docIds).length) return;
-    chrome.runtime.sendMessage({ type: 'GF_SAVE_GRAPHQL_DOC_IDS', docIds }).catch(() => {});
+    gfSafeSendMessage({ type: 'GF_SAVE_GRAPHQL_DOC_IDS', docIds });
   },
 
   findGroupNameInHtml(html, groupId) {
@@ -147,7 +147,7 @@ if (!GF_CONTENT) GF_CONTENT = {
         const groups = GF.groupParse?.parseJoinedGroupsFromText(text, { onJoinsPage: false }) || [];
         if (groups.length) {
           groups.forEach((g) => this.addCapturedGroupEntry(g));
-          chrome.runtime.sendMessage({ type: 'GF_APPLY_GROUP_META', groups }).catch(() => {});
+          gfSafeSendMessage({ type: 'GF_APPLY_GROUP_META', groups });
         }
       }
 
@@ -155,7 +155,7 @@ if (!GF_CONTENT) GF_CONTENT = {
       if (GP?.findAboutDocIdsInHtml) {
         const docIds = GP.findAboutDocIdsInHtml(text);
         if (Object.keys(docIds).length) {
-          chrome.runtime.sendMessage({ type: 'GF_SAVE_GRAPHQL_DOC_IDS', docIds }).catch(() => {});
+          gfSafeSendMessage({ type: 'GF_SAVE_GRAPHQL_DOC_IDS', docIds });
         }
       }
 
@@ -165,7 +165,7 @@ if (!GF_CONTENT) GF_CONTENT = {
         // Persist key mutation doc_ids so service worker can use them
         const KEY_MUTATIONS = ['useCometUFICreateCommentMutation', 'ComposerStoryCreateMutation'];
         if (KEY_MUTATIONS.includes(m[1])) {
-          chrome.runtime.sendMessage({ type: 'GF_SAVE_KEY_DOC_ID', name: m[1], docId: m[2] }).catch(() => {});
+          gfSafeSendMessage({ type: 'GF_SAVE_KEY_DOC_ID', name: m[1], docId: m[2] });
         }
       }
       // Only extract post_id from responses that contain story_create — searching
@@ -205,7 +205,7 @@ if (!GF_CONTENT) GF_CONTENT = {
       if (e.data.type === 'ingest') {
         this.ingestNetworkText(e.data.text);
       } else if (e.data.type === 'ingest-req' && (e.data.dyn || e.data.csr)) {
-        chrome.runtime.sendMessage({ type: 'GF_SAVE_COMET_TOKENS', dyn: e.data.dyn, csr: e.data.csr }).catch(() => {});
+        gfSafeSendMessage({ type: 'GF_SAVE_COMET_TOKENS', dyn: e.data.dyn, csr: e.data.csr });
       }
     });
 
@@ -1795,10 +1795,10 @@ if (!GF_CONTENT) GF_CONTENT = {
   },
 
   gfProgress(phase, snippet, group) {
-    chrome.runtime.sendMessage({
+    gfSafeSendMessage({
       type: 'GF_PROGRESS',
       data: { phase, snippet, group },
-    }).catch(() => {});
+    });
   },
 
   resolveClassicHtml({ text, variationDeltas, variationKey }) {
@@ -1956,6 +1956,23 @@ if (location.hostname.includes('facebook.com') && location.pathname.includes('/g
 const GF_BRIDGE_VERSION = globalThis.__gfBridgeVersion || 9;
 globalThis.__gfBridgeVersion = GF_BRIDGE_VERSION;
 
+// chrome.runtime.sendMessage() ném lỗi ĐỒNG BỘ ("Extension context invalidated") ngay tại lời gọi
+// — không phải reject bất đồng bộ — mỗi khi extension bị reload/update (qua chrome://extensions,
+// hoặc tự động update) trong lúc content script cũ vẫn còn sống trên tab FB đang mở. `.catch(() =>
+// {})` KHÔNG bắt được kiểu lỗi này (exception ném ra trước khi kịp trả về Promise để gắn .catch)
+// — đây là nguyên nhân "Uncaught Error: Extension context invalidated" xuất hiện trong Tiện ích →
+// Lỗi mỗi lần reload extension trong lúc dev/test. Không phải bug chức năng (tab FB cũ chỉ cần F5
+// lại là hết), nhưng gói hàm này lại 1 chỗ để mọi lời gọi trong content script đều an toàn — vừa
+// bớt rác trong log lỗi, vừa phòng trường hợp thật (extension tự auto-update trong lúc user đang
+// mở sẵn tab FB nền, không phải chỉ lúc dev).
+function gfSafeSendMessage(msg) {
+  try {
+    return chrome.runtime.sendMessage(msg).catch(() => undefined);
+  } catch {
+    return Promise.resolve(undefined);
+  }
+}
+
 function showGfRadarToast(count, snippet) {
   try {
     const id = 'gf-radar-toast';
@@ -2031,7 +2048,7 @@ function handleGfMessage(msg, sendResponse) {
         C.lang = msg.lang || 'vi';
         let postMsg = { ...msg };
         if (postMsg.mediaFromBg && postMsg.queuePostId) {
-          const pack = await chrome.runtime.sendMessage({
+          const pack = await gfSafeSendMessage({
             type: 'GF_GET_POST_MEDIA',
             postId: postMsg.queuePostId,
           });
@@ -2053,11 +2070,11 @@ function handleGfMessage(msg, sendResponse) {
           }
         }
         const result = await C.postToGroup(postMsg);
-        chrome.runtime.sendMessage({
+        gfSafeSendMessage({
           type: 'GF_LEARN_GROUP_META',
           groupId: msg.groupId,
           res: result,
-        }).catch(() => {});
+        });
         return sendResponse({ ok: true, ...result });
       }
       if (msg.type === 'GF_COMMENT') {
@@ -2077,7 +2094,7 @@ function handleGfMessage(msg, sendResponse) {
       }
       sendResponse({ error: `Message không hỗ trợ: ${msg.type}` });
     } catch (e) {
-      chrome.runtime.sendMessage({
+      gfSafeSendMessage({
         type: 'GF_PROGRESS',
         data: {
           phase: 'error',
@@ -2085,7 +2102,7 @@ function handleGfMessage(msg, sendResponse) {
           snippet: e.message,
           group: msg.groupName || msg.groupId,
         },
-      }).catch(() => {});
+      });
       sendResponse({ ok: false, error: e.message });
     }
   })();

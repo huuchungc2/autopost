@@ -2,6 +2,23 @@
 
 > Cập nhật: 2026-07-04
 
+## GroupFlow: fix "Extension context invalidated" trong content.js (2026-07-04)
+
+Tony gửi ảnh chụp `chrome://extensions` → Lỗi, trace `content.js:208` — "Uncaught Error: Extension context invalidated".
+
+- [x] **Root cause**: `chrome.runtime.sendMessage()` ném lỗi đồng bộ khi extension reload/update trong lúc content script cũ còn sống trên tab FB mở từ trước — pattern `.catch(() => {})` chỉ bắt reject bất đồng bộ, không bắt throw đồng bộ.
+- [x] **Fix**: thêm `gfSafeSendMessage()` (content.js, bọc try/catch + .catch()), thay toàn bộ 9 lời gọi trực tiếp trong file. Đã kiểm tra `gfPanelShell.js`/`pageNetworkHook.js`/các module khác — không có pattern tương tự cần sửa thêm.
+- [ ] **Cần Tony xác nhận**: reload extension (v1.0.190), F5 lại tab FB đang mở sẵn từ trước khi reload (để hết trạng thái context cũ), theo dõi vài lần reload extension tiếp theo xem còn thấy lỗi này trong Tiện ích → Lỗi không. Lưu ý: dù đã vá, tab FB **đang mở từ TRƯỚC KHI reload lần này** thì vẫn cần F5 1 lần — bản vá chỉ có tác dụng từ content script MỚI (sau F5) trở đi, không "chữa" được content script cũ đang chạy dở.
+
+## BUG MẤT DỮ LIỆU: Composio config bị xoá mỗi lần Lưu khi form trống (2026-07-04)
+
+Tony: "composio là tao cấu hình rồi mà tại sao giờ kêu là chưa hay vậy? thực tế mọi thứ có dưới database hết rồi mà" — sau khi mở tab "Facebook Token" mới (đã tách từ tổ chức lại /settings), thấy báo "Chưa Cấu Hình" dù đã từng điền + Lưu trước đó.
+
+- [x] **Root cause đã xác nhận qua hỏi lại Tony**: `saveComposioSettings()` (Settings.jsx) gửi 3 trường `composio_facebook_auth_config_id`/`composio_default_user_id`/`composio_default_connected_account_id` **LUÔN LUÔN** trong payload, khác `composio_api_key` (chỉ gửi khi có giá trị). Backend coi field rỗng = lệnh XOÁ hẳn key khỏi `app_settings`. Nếu form từng ở trạng thái rỗng lúc bấm Lưu (vd F5 giữa lúc `GET /settings` chưa kịp trả về) → xoá sạch cấu hình đã lưu trước đó, kể cả khi chỉ định đổi toolkit version/auto-fallback không liên quan.
+- [x] **Fix**: 3 trường này giờ chỉ gửi khi có giá trị (trim non-empty), giống hệt `composio_api_key` — không còn silent-wipe được nữa.
+- [ ] **QUAN TRỌNG — dữ liệu đã mất KHÔNG tự khôi phục**: cần Tony vào tab "Facebook Token" → điền lại đủ 4 trường (API Key, Auth Config ID, User ID, Connected Account ID) → Lưu vào database **1 lần nữa**. Sau lần này, bug đã vá nên sẽ không bị xoá lại nữa dù bấm Lưu nhiều lần hay form tạm trống lúc nào đó.
+- [ ] **Cần Tony xác nhận trên máy thật**: sau khi nhập lại + build frontend mới, thử bấm "Lưu vào database" vài lần liên tiếp (kể cả khi form đang trống 1 trường nào đó) — xác nhận 4 giá trị không bị xoá mất nữa.
+
 ## Website /settings: fix bug lưu Google Drive + tổ chức lại tab (2026-07-04)
 
 Tony gửi screenshot `tidien.xyz/settings` — báo "không thể lưu được chế độ google drive", xác nhận KHÔNG xoá phần API tidien trên website (chỉ xoá ở extension), và muốn tổ chức lại UI trang này.
