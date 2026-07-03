@@ -1916,7 +1916,7 @@ if (!GF_CONTENT) GF_CONTENT = {
     return { ok: true };
   },
 
-  scanFeedPosts(keywords, sinceTs) {
+  scanFeedPosts(keywords) {
     const matched = [];
     const articles = this.qsa('[role="article"]');
     articles.forEach((article) => {
@@ -1927,11 +1927,13 @@ if (!GF_CONTENT) GF_CONTENT = {
       const link = article.querySelector('a[href*="/posts/"], a[href*="permalink"]');
       const postId = link?.href?.match(/(\d{8,})/)?.[1] || '';
       const groupId = location.pathname.match(/\/groups\/(\d+)/)?.[1] || '';
+      const authorLink = article.querySelector('a[href*="/user/"], a[href*="profile.php?id="], a[href*="/groups/"][href*="/user/"]');
       matched.push({
         id: `lead-${groupId}-${postId}-${Date.now()}`,
         group_id: groupId,
         post_id: postId,
         post_url: link?.href || '',
+        author_name: authorLink?.innerText?.trim() || '',
         snippet: text.slice(0, 200),
         matched_keywords: kw,
         found_at: new Date().toISOString(),
@@ -1953,6 +1955,23 @@ if (location.hostname.includes('facebook.com') && location.pathname.includes('/g
 
 const GF_BRIDGE_VERSION = globalThis.__gfBridgeVersion || 9;
 globalThis.__gfBridgeVersion = GF_BRIDGE_VERSION;
+
+function showGfRadarToast(count, snippet) {
+  try {
+    const id = 'gf-radar-toast';
+    document.getElementById(id)?.remove();
+    const el = document.createElement('div');
+    el.id = id;
+    el.style.cssText = 'position:fixed;top:16px;right:16px;z-index:2147483647;background:#1877F2;'
+      + 'color:#fff;padding:12px 16px;border-radius:8px;font:14px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;'
+      + 'max-width:320px;box-shadow:0 4px 16px rgba(0,0,0,.25);cursor:pointer;';
+    el.innerHTML = `<strong>📡 Radar: ${count > 1 ? `${count} lead mới` : 'Lead mới'}</strong>`
+      + (snippet ? `<div style="margin-top:4px;opacity:.9">${String(snippet).slice(0, 100)}</div>` : '');
+    el.addEventListener('click', () => el.remove());
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 8000);
+  } catch (e) { /* trang FB có CSP chặn — bỏ qua, không chặn quét */ }
+}
 
 function handleGfMessage(msg, sendResponse) {
   (async () => {
@@ -2049,8 +2068,12 @@ function handleGfMessage(msg, sendResponse) {
       }
       if (msg.type === 'GF_SCAN_FEED') {
         const keywords = (msg.keywordsText || '').split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
-        const leads = C.scanFeedPosts(keywords, msg.since);
+        const leads = C.scanFeedPosts(keywords);
         return sendResponse({ leads });
+      }
+      if (msg.type === 'GF_RADAR_TOAST') {
+        showGfRadarToast(msg.count, msg.snippet);
+        return sendResponse({ ok: true });
       }
       sendResponse({ error: `Message không hỗ trợ: ${msg.type}` });
     } catch (e) {

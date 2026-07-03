@@ -547,3 +547,36 @@ export async function ensureUserActivityLogTable() {
   if (!(await tableExists('users'))) return;
   await runMigrationFile('037_user_activity_log.sql', 'Migration 037 applied: user_activity_log');
 }
+
+// updated_at bump tự động qua ON UPDATE CURRENT_TIMESTAMP — nền tảng cho cursor đồng bộ theo
+// "cái gì đã ĐỔI" (bài mới lẫn needs_comment vừa flip) thay vì chỉ "cái gì mới TẠO" (created_at cũ
+// không bắt được PATCH .../commented sau này) — xem GET /api/user-sync/my-posts và /cross-posts.
+export async function ensureUserPostsUpdatedAt() {
+  if (await columnExists('user_posts', 'updated_at')) return;
+  if (!(await tableExists('user_posts'))) return;
+  await runMigrationFile('038_user_posts_updated_at.sql', 'Migration 038 applied: user_posts.updated_at + cursor indexes');
+}
+
+// Gộp group_posts (hệ JWT cũ, nuôi trang web /groups) vào user_posts (hệ license-key) — 1 nguồn sự
+// thật duy nhất cho "bài đã đăng" thay vì 2 bảng song song. group_posts/group_post_comments không
+// bị xoá (rollback thủ công nếu cần) nhưng service không còn đọc/ghi 2 bảng đó sau bản này.
+//
+// Tách 2 file: 039 (schema — luôn an toàn chạy dù cài mới tinh chưa từng có group_posts, vì Flow
+// 1/2/3 cần đủ cột này bất kể có dữ liệu cũ để backfill hay không) và 039b (backfill dữ liệu thật
+// từ group_posts — CHỈ chạy khi bảng đó thực sự tồn tại, tránh lỗi "table doesn't exist" làm gãy
+// toàn bộ chuỗi migration phía sau trên deployment mới).
+export async function ensureUserPostsMergedGroupPosts() {
+  if (!(await tableExists('user_posts'))) return;
+  if (!(await columnExists('user_posts', 'fb_user_id'))) {
+    await runMigrationFile(
+      '039_user_posts_merge_group_posts.sql',
+      'Migration 039 applied: user_posts thêm fb_user_id/prompt_anh/comment_target/comment_count/visible_after + bảng user_post_comments'
+    );
+  }
+  if (await tableExists('group_posts')) {
+    await runMigrationFile(
+      '039b_user_posts_backfill_group_posts.sql',
+      'Migration 039b applied: backfill group_posts/group_post_comments vào user_posts/user_post_comments'
+    );
+  }
+}

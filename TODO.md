@@ -2,6 +2,32 @@
 
 > Cập nhật: 2026-07-03
 
+## Định nghĩa lại 3 flow đồng bộ + gộp group_posts vào user_posts (2026-07-03)
+
+Theo yêu cầu Tony: thu gọn đồng bộ extension↔backend về đúng 3 luồng "thật sự cần thiết" (AI/skill/provider giữ nguyên local, không đụng backend).
+
+- [x] **Flow 1 (đồng bộ bài để đi comment)**: chuyển vào chu kỳ nền `gf_tidien_sync` (`runFlow1BackgroundSync()` — background.js) thay vì chỉ chạy khi mở tab Comment — giải quyết đúng vấn đề "user ít mở tab thì cache mãi mãi = 0" đã phân tích qua ví dụ A/B/C/D. Đổi cờ boolean `needs_comment` sang `comment_target`/`comment_count` (bảng join `user_post_comments`) — nhiều người khác nhau cùng comment 1 bài thay vì 1 người là khoá lại cho tất cả; thêm `visible_after` (độ trễ 5–60 phút, hiệu ứng "từ từ"); ưu tiên bài `comment_count` thấp nhất.
+- [x] **Flow 2 (đồng bộ sau khi đăng bài)**: `POST /group-posts/sync` + `POST /user-sync/posts` dùng chung `upsertUserPost()`, khớp theo `(user_account_id, group_id, post_id)` — hết tạo 2 dòng trùng.
+- [x] **Flow 3 (đồng bộ sau khi comment)**: `PATCH .../commented` đổi sang bảng join + đếm lại; PATCH fail xếp hàng đợi retry cục bộ (`pendingCommentedSync`) thay vì nuốt lỗi im lặng.
+- [x] **Gộp bảng**: migration 039 + 039b — `group_posts`/`group_post_comments` gộp vào `user_posts`/`user_post_comments`. Không xoá bảng cũ (rollback thủ công nếu cần). `listPublishedGroupPosts()`/`getGroupPostsStats()`/`listGroupPostComments()` (trang web `/groups`) chuyển sang đọc bảng gộp, giữ nguyên response shape.
+- [x] **Dọn dead code**: xoá `GET /pending-comments`, `PATCH /group-posts/:id/commented`, `POST/GET /group-posts/posts/pull` (route + service). Đây chính là **#1 + #2** trong danh sách đề xuất cũ bên dưới — đã giải quyết trong đợt này.
+- [x] **So le giờ đồng bộ (jitter)** — mỗi máy tự bốc thăm độ trễ ban đầu cố định trước khi tạo alarm `gf_tidien_sync`, tránh dồn cục khi nhiều máy cùng khởi động 1 thời điểm.
+- [ ] **Cần Tony xác nhận trên server thật**: restart backend (migration 039/039b tự chạy, có backfill dữ liệu cũ nếu còn `group_posts`) — kiểm tra trang web `/groups` vẫn hiện đúng danh sách/comment/stats như trước; reload extension, đăng bài + comment chéo giữa ≥2 tài khoản license key, để 1 tài khoản KHÔNG mở tab Comment xem có tự nhận được bài để comment qua chu kỳ nền không (đúng kịch bản "C" trong ví dụ A/B/C/D).
+- [ ] **Chưa làm (đề xuất mở rộng, không thuộc phạm vi 3 flow lần này)**: rate limiting tầng Express (chưa có `express-rate-limit`), tăng `connectionLimit` pool MySQL (hiện `10`, dùng chung toàn hệ thống), AI proxy (`/ai/generate`, `/ai/text`, `/ai/image`) vẫn giữ 1 slot Node đồng bộ chờ LLM — cân nhắc hàng đợi nếu traffic AI tăng thật. Cả 3 việc này chỉ cần khi thực sự scale lớn, không phải fix cấp bách.
+
+## Đồng bộ thông minh my-posts/cross-posts — cursor + merge-cache + throttle (2026-07-03)
+
+- [x] **Root cause "bài đã tải rồi vẫn tải lại hoài"**: `GET /api/user-sync/my-posts` (tham số `since` có sẵn nhưng client chưa từng gửi) và `GET /api/user-sync/cross-posts` (chưa hề có `since`) luôn trả full 200/100 bài mới nhất mỗi lần gọi, không cursor, không throttle, không cache incremental phía client — tải lại gần như y hệt lần trước ở mọi thao tác (mở panel/tab, đăng bài, comment xong, Làm mới).
+- [x] **Fix**: migration `038` — `user_posts.updated_at` (`ON UPDATE CURRENT_TIMESTAMP`) + index `(user_account_id, updated_at)`/`(updated_at)`. 2 route trên nhận `?since=<updated_at cuối>`. Extension: `pullMyPostsFromServer()`/`fetchCrossPostsFromServer()` lưu cursor (`myPostsSyncMeta`/`crossPostsSyncMeta`) + merge-upsert (`mergeUserPostsById()`) thay vì ghi đè cache; throttle 30s giữa 2 lần gọi mạng thật, bấm "Làm mới" tay (`#btnRefreshComments`) mới bỏ throttle (`force: true`). GroupFlow bump `1.0.186`. Chi tiết: `docs/GROUPFLOW.md` đầu file.
+- [ ] **Cần Tony xác nhận**: restart backend (migration 038 tự chạy lúc khởi động), reload extension, test đăng bài + comment chéo giữa 2 tài khoản license key khác nhau — bài mới/trạng thái đã comment phải vẫn lan truyền đúng qua nhiều lần refresh, không còn tải lặp lại y hệt mỗi lần.
+- [ ] **Đề xuất mở rộng, chưa làm (nếu cần scale tới hàng nghìn user)**: rate limiting tầng Express (chưa có `express-rate-limit` nào trong repo), endpoint `status`-rẻ kiểu `sync/status` cho `user-sync/*` để hỏi "có gì mới không" trước khi full pull, tăng `connectionLimit` pool MySQL (hiện `10`, dùng chung toàn hệ thống) nếu tải tăng thật.
+
+## Fix GroupFlow tab Comment tự lên lịch + tự comment lặp lại vô hạn (2026-07-03)
+
+- [x] **Root cause**: bài đồng đội (cross) và bài của mình kéo về từ thiết bị khác (server) không có cách nào ghi nhớ CỤC BỘ đã comment xong — `isCommentDone()` chỉ tin vào 2 nguồn phụ thuộc mạng (`markPostedGroupCommented()` no-op vì bài không nằm trong `postQueue` cục bộ, và PATCH `/commented` best-effort im lặng nuốt lỗi khi fail). Hễ 1 trong 2 fail thì extension quên mất đã comment — mỗi lần refresh tab Comment, `autoScheduleUnscheduledComments()` tự lên lịch lại rồi tự chạy lại, spam comment trùng lặp vô hạn lên cùng 1 bài FB.
+- [x] **Fix**: thêm `commentedRecords` (`chrome.storage.local`) — nguồn-sự-thật cục bộ, ghi bởi `markCommentDoneLocal()` trong `runComment()` (background.js) ngay khi comment lên FB thành công, không phụ thuộc sync mạng nào. `isCommentDone()` (sidepanel.js) đọc nguồn này trước tiên. GroupFlow bump `1.0.185`. Xem `docs/GROUPFLOW.md` mục đầu file.
+- [ ] **Cần Tony xác nhận trên thiết bị thật**: reload extension, comment vài bài (cả bài của mình lẫn bài đồng đội nếu có), refresh panel nhiều lần xem có còn tự lên lịch/tự comment lại bài đã xong không. Lưu ý: các bài đã bị lặp lịch TRƯỚC bản vá này (`activityUpcoming`/`dailyFixedSchedules` cũ) không tự dọn — cần vào tab Log → Sắp tới / tag lịch trên card để hủy tay nếu còn sót.
+
 ## Fix popup Modal lệch vị trí PC / không hiện trên mobile + touch scroll khó (2026-07-03)
 
 - [x] **`Modal.jsx` giờ dùng React Portal (`createPortal(..., document.body)`)**: trước đây render lồng tại chỗ gọi khiến `.card:hover` (transform) trên PC và `.post-card { overflow: hidden }` trên mobile (view lưới) phá vỡ `position: fixed` của overlay — popup lệch vị trí/kích thước (PC) hoặc gần như vô hình (mobile, bug WebKit cắt fixed lồng trong overflow:hidden). Portal loại bỏ hoàn toàn vì modal mount thẳng `document.body`. Đã build frontend xác nhận không lỗi.
@@ -119,6 +145,15 @@ PRD: [`GroupFlow/fb-group-poster-PRD.md`](GroupFlow/fb-group-poster-PRD.md)
 
 ### Phase 4 — Radar Lead
 - [x] Tab Radar, `leadRadar.js`
+- [x] Picker chọn nhóm mục tiêu, dedup theo `radarSeenPostIds`, giới hạn nhóm/lượt quét, cảnh báo trong trang, mark đã xem/xóa/tìm kiếm/lọc/xuất CSV-JSON lead — v1.0.176 (xem CHANGELOG)
+- [x] Nút "Lên lịch" hết bắt buộc chọn nhóm trước (giống Dàn) — bỏ qua bài chưa có nhóm lúc chạy thay vì chặn lên lịch + nút "Tải file mẫu Excel" đúng cột `parseWorkbook()` cần — v1.0.177 (xem CHANGELOG)
+- [x] Tab Comment: đổi tên "Mẫu" → "Mẫu bình luận" (dropdown + tag), thêm filter Bình luận (Đã/Chưa comment/Tất cả) dùng chung cho bài của mình lẫn đồng đội, bỏ list lịch lặp lại riêng (dùng tag + nút Hủy lịch ngay trên bài) — v1.0.178 (xem CHANGELOG)
+- [x] Tag lịch trên card Tạo bài phản ánh đúng lịch lặp lại hàng ngày (bỏ list riêng `#postDailyScheduleList`) — v1.0.179 (xem CHANGELOG)
+- [x] Bài chưa có mẫu bình luận tự random 1 mẫu từ Settings ngay khi tải danh sách (`autoFillMissingCommentDrafts`) — v1.0.180 (xem CHANGELOG)
+- [x] Footer Tạo bài bỏ nút "Dàn" + ô ngày/giờ rời, hợp nhất còn 1 nút "Lên lịch đã chọn" giống footer Comment — v1.0.181 (xem CHANGELOG)
+- [x] Mẫu bình luận mặc định: 10 dòng × 5 câu spintax/dòng (đồng bộ `commentTemplates.js` + `background.js`) — v1.0.182 (xem CHANGELOG)
+- [x] Fix mẫu mặc định mới không hiện cho user đã lưu Cài đặt trước đó — tự nâng cấp giá trị storage khớp mẫu cũ (`migrateLegacyCommentTemplates`) — v1.0.183 (xem CHANGELOG)
+- [x] Fix auto-fill mẫu bình luận spin sẵn thành 1 câu cố định thay vì giữ nguyên cụm spintax để spin lại mỗi lần chạy — v1.0.184 (xem CHANGELOG)
 
 ### Website UI + draft sync
 - [x] `/groups`, `/groups/import`, `/groups/drafts`

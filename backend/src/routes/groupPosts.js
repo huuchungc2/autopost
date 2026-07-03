@@ -8,16 +8,13 @@ import {
   regenerateExtensionKey,
   updateExtensionFbProfile,
   syncGroupPost,
-  listPostsForComments,
   getExtensionSyncStatus,
-  recordComment,
   listPublishedGroupPosts,
   listGroupPostComments,
   getGroupPostsStats,
   createGroupPostDrafts,
   listGroupPostDrafts,
   pullDraftsForExtension,
-  pullPostsForExtension,
   updateGroupPostDraft,
   repullGroupPostDraft,
   deleteGroupPostDraft,
@@ -184,10 +181,10 @@ router.get('/drafts', authenticate, asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
-/** Extension: client gửi last_post_id / last_draft_id (ID lớn nhất đang giữ) */
+/** Extension: client gửi last_draft_id (ID lớn nhất đang giữ) — chỉ còn lo phần draft, phần "posts"
+ * (pending_posts_sync/total_posts) đã bỏ cùng nhánh /posts/pull chết, xem getExtensionSyncStatus(). */
 router.post('/sync/status', authenticateExtension, asyncHandler(async (req, res) => {
   const result = await getExtensionSyncStatus(req.user.id, {
-    lastPostId: req.body?.last_post_id,
     lastDraftId: req.body?.last_draft_id,
   });
   res.json(result);
@@ -195,24 +192,7 @@ router.post('/sync/status', authenticateExtension, asyncHandler(async (req, res)
 
 router.get('/sync/status', authenticateExtension, asyncHandler(async (req, res) => {
   const result = await getExtensionSyncStatus(req.user.id, {
-    lastPostId: req.query?.last_post_id,
     lastDraftId: req.query?.last_draft_id,
-  });
-  res.json(result);
-}));
-
-router.post('/posts/pull', authenticateExtension, asyncHandler(async (req, res) => {
-  const result = await pullPostsForExtension(req.user.id, {
-    limit: req.body?.limit ?? req.query?.limit,
-    afterPostId: req.body?.last_post_id ?? req.body?.after_post_id,
-  });
-  res.json(result);
-}));
-
-router.get('/posts/pull', authenticateExtension, asyncHandler(async (req, res) => {
-  const result = await pullPostsForExtension(req.user.id, {
-    limit: req.query.limit,
-    afterPostId: req.query.last_post_id ?? req.query.after_post_id,
   });
   res.json(result);
 }));
@@ -253,25 +233,9 @@ router.post('/sync', authenticateExtension, asyncHandler(async (req, res) => {
   res.status(result.updated ? 200 : 201).json(result);
 }));
 
-router.get('/pending-comments', authenticateExtension, asyncHandler(async (req, res) => {
-  const result = await listPostsForComments(req.user.id, {
-    page: req.query.page,
-    limit: req.query.limit,
-    group_id: req.query.group_id,
-    posted_by: req.query.posted_by,
-    since: req.query.since,
-    needs_comment: req.query.needs_comment,
-  });
-  res.json(result);
-}));
-
-router.patch('/:id/commented', authenticateExtension, asyncHandler(async (req, res) => {
-  const result = await recordComment(
-    req.user.id,
-    req.params.id,
-    req.body.commenter_fb_user_id || req.body.fb_user_id || req.extension?.fb_user_id
-  );
-  res.json(result);
-}));
+// GET /pending-comments + PATCH /:id/commented (hệ JWT cũ, group_posts/group_post_comments) đã bỏ
+// hẳn — thay bằng /api/user-sync/cross-posts + /api/user-sync/posts/:id/commented (license-key,
+// user_posts/user_post_comments sau khi gộp bảng). Không extension nào còn gọi 2 route này (đã xác
+// nhận tidienSync.js — client cũ gọi chúng — không còn được import ở đâu từ trước bản gộp).
 
 export default router;

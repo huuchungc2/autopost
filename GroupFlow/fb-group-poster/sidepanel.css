@@ -585,27 +585,6 @@ body {
   display: none;
 }
 
-.batch-schedule-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.batch-schedule-row input[type="date"],
-.batch-schedule-row input[type="time"] {
-  flex: 1 1 auto;
-  min-width: 0;
-  max-width: 9.5rem;
-  padding: 6px 8px;
-  font-size: 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border, #333);
-  background: var(--surface-2, #1e1e1e);
-  color: inherit;
-}
-
 .gf-edit-schedule {
   margin-top: 10px;
   padding: 10px 12px;
@@ -688,10 +667,8 @@ body {
 
 body:not(.gf-tab-create) #batchFooterGlobal,
 body:not(.gf-tab-create) #campaignStaggerPanel,
-body:not(.gf-tab-create) #postDailyScheduleList,
 body:not(.gf-tab-comment) #commentFooterGlobal,
-body:not(.gf-tab-comment) #commentStaggerPanel,
-body:not(.gf-tab-comment) #commentDailyScheduleList {
+body:not(.gf-tab-comment) #commentStaggerPanel {
   display: none;
 }
 
@@ -1258,6 +1235,10 @@ input:focus, textarea:focus, select:focus {
   padding: 10px;
   background: var(--surface);
   transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.list-item.lead-seen {
+  opacity: 0.6;
 }
 
 .list-pager {

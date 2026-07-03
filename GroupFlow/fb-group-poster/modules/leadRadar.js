@@ -4,7 +4,8 @@ GF.leadRadar = {
   async getConfig() {
     const d = await GF.storage.get([
       'radarActive', 'radarKeywords', 'radarGroupIds', 'radarInterval',
-      'radarInPage', 'radarPush', 'radarLeads', 'radarLastScan',
+      'radarInPage', 'radarPush', 'radarLeads', 'radarLastScanAt',
+      'radarMaxGroupsPerScan', 'radarScanCursor', 'radarSeenPostIds',
     ]);
     return {
       active: !!d.radarActive,
@@ -14,7 +15,10 @@ GF.leadRadar = {
       inPage: d.radarInPage !== false,
       push: d.radarPush !== false,
       leads: d.radarLeads || [],
-      lastScan: d.radarLastScan || {},
+      lastScanAt: d.radarLastScanAt || {},
+      maxGroupsPerScan: d.radarMaxGroupsPerScan || 10,
+      scanCursor: d.radarScanCursor || 0,
+      seenPostIds: d.radarSeenPostIds || [],
     };
   },
 
@@ -24,23 +28,6 @@ GF.leadRadar = {
 
   parseKeywords(text) {
     return text.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
-  },
-
-  matchLead(text, keywords) {
-    const lower = text.toLowerCase();
-    const excludes = keywords.filter((k) => k.startsWith('-')).map((k) => k.slice(1).toLowerCase());
-    const includes = keywords.filter((k) => !k.startsWith('-')).map((k) => k.toLowerCase());
-    if (excludes.some((ex) => ex && lower.includes(ex))) return null;
-    const matched = includes.filter((inc) => inc && lower.includes(inc));
-    if (!matched.length) return null;
-    return matched;
-  },
-
-  async addLead(lead) {
-    const cfg = await this.getConfig();
-    const leads = [lead, ...cfg.leads].slice(0, 500);
-    await this.saveConfig({ radarLeads: leads });
-    return leads;
   },
 
   async setAlarm(minutes) {

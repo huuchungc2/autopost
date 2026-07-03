@@ -175,4 +175,31 @@ GF.excel = {
     }
     throw new Error('Chỉ hỗ trợ .csv, .xlsx, .xls');
   },
+
+  /** File mẫu để user điền — đúng tên cột `parseWorkbook()` cần, sheet tên "Import". */
+  buildTemplateWorkbook() {
+    if (typeof XLSX === 'undefined') {
+      throw new Error('Thư viện XLSX chưa load — reload extension rồi thử lại');
+    }
+    const headers = Object.keys(this.HEADER_ALIASES);
+    const example = [
+      'Ví dụ nội dung bài viết — xóa dòng này trước khi import',
+      '',
+      '2026-07-10',
+      '08:30',
+      '1',
+      '',
+      '',
+    ];
+    const aoa = [headers, example];
+    const sheet = XLSX.utils.aoa_to_sheet(aoa);
+    sheet['!cols'] = headers.map((h) => ({ wch: Math.max(18, h.length + 4) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, sheet, 'Import');
+    return wb;
+  },
+
+  templateArrayBuffer() {
+    return XLSX.write(this.buildTemplateWorkbook(), { type: 'array', bookType: 'xlsx' });
+  },
 };

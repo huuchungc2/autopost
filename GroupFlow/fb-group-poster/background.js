@@ -1174,15 +1174,59 @@ const GF_BG = {
     if (changed) await chrome.storage.local.set({ dailyFixedSchedules: list });
   },
 
+  // Flow 3 (đồng bộ sau khi comment xong) — v1.0.187: KHÔNG còn best-effort-im-lặng thuần tuý. Trước
+  // bản này, PATCH fail (mất mạng, server bận, license key hết hạn giữa chừng…) là mất vĩnh viễn —
+  // server không bao giờ biết đã comment, comment_count không tăng, người khác vẫn bị gán vào đúng
+  // bài đó tưởng còn thiếu. commentedRecords (local, v1.0.185) chặn được vòng lặp tự-comment-lại
+  // TRÊN CHÍNH MÁY NÀY, nhưng không giúp SERVER và MÁY KHÁC biết — cần retry thật, không chỉ nuốt lỗi.
   async markCrossPostCommentedFromBg(serverId) {
+    if (!serverId) return;
     const auth = await this.getTidienAuth();
-    if (!auth) return;
+    if (!auth) {
+      await this.queuePendingCommentedSync(serverId);
+      return;
+    }
     try {
-      await fetch(`${auth.base}/api/user-sync/posts/${serverId}/commented`, {
+      const res = await fetch(`${auth.base}/api/user-sync/posts/${serverId}/commented`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${auth.token}` },
       });
-    } catch { /* best-effort */ }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch {
+      await this.queuePendingCommentedSync(serverId);
+    }
+  },
+
+  async queuePendingCommentedSync(serverId) {
+    const d = await chrome.storage.local.get('pendingCommentedSync');
+    const list = d.pendingCommentedSync || [];
+    const key = String(serverId);
+    if (!list.includes(key)) list.push(key);
+    await chrome.storage.local.set({ pendingCommentedSync: list.slice(-500) });
+  },
+
+  // Chạy trong mỗi chu kỳ gf_tidien_sync (cùng chỗ đẩy/kéo activity log) — thử lại các lượt PATCH
+  // .../commented đã fail trước đó, tới khi server xác nhận OK mới bỏ khỏi hàng đợi.
+  async flushPendingCommentedSync(auth, headers) {
+    const d = await chrome.storage.local.get('pendingCommentedSync');
+    const list = d.pendingCommentedSync || [];
+    if (!list.length) return { flushed: 0, remaining: 0 };
+    const remaining = [];
+    let flushed = 0;
+    for (const serverId of list) {
+      try {
+        const res = await fetch(`${auth.base}/api/user-sync/posts/${serverId}/commented`, {
+          method: 'PATCH',
+          headers,
+        });
+        if (res.ok) flushed += 1;
+        else remaining.push(serverId);
+      } catch {
+        remaining.push(serverId);
+      }
+    }
+    await chrome.storage.local.set({ pendingCommentedSync: remaining });
+    return { flushed, remaining: remaining.length };
   },
 
   resolvePostGroups(post, job, groupsMap) {
@@ -1280,10 +1324,19 @@ const GF_BG = {
     return null;
   },
 
-  COMMENT_TEMPLATE_DEFAULT: `{Hay quá|Đúng ý|Cảm ơn bạn chia sẻ}
-{Mình cũng cần|Để lưu lại|Hữu ích thật}
-{Ủng hộ bạn|Tuyệt vời|Like mạnh}
-{Cảm ơn thông tin|Bổ ích quá|Hay đó bạn}`,
+  // Giữ ĐỒNG BỘ với GF.commentTemplates.DEFAULT (modules/commentTemplates.js) — buộc phải trùng
+  // lặp vì modules/commentTemplates.js chưa từng được đưa vào build-sw-bundle.js nên service
+  // worker (chạy file này) không thấy được module đó, chỉ sidepanel (UI) mới load trực tiếp.
+  COMMENT_TEMPLATE_DEFAULT: `{Hay quá|Đúng ý ghê|Cảm ơn bạn chia sẻ|Thông tin hữu ích quá|Cảm ơn bạn nhé}
+{Mình cũng đang cần|Để mình lưu lại|Hữu ích thật sự|Đang tìm đúng cái này|Lưu lại xem sau}
+{Ủng hộ bạn|Tuyệt vời luôn|Like mạnh cho bạn|Ủng hộ nhiệt tình|Quá đỉnh}
+{Cảm ơn thông tin|Bổ ích quá|Hay đó bạn ơi|Thông tin quý giá|Cảm ơn đã chia sẻ nha}
+{Bài viết chất lượng|Nội dung hay quá|Đọc xong thấy hữu ích|Chia sẻ hay đó|Cảm ơn bạn đã đăng bài}
+{Đúng thứ mình đang tìm|Vừa đúng ý mình luôn|Tìm được rồi nè|May quá gặp đúng bài này|Đang cần đúng cái này}
+{Theo dõi bạn để cập nhật thêm|Follow trang luôn|Sẽ theo dõi thường xuyên|Lưu bài để xem lại|Đánh dấu bài này}
+{Chúc bạn thuận lợi|Chúc mọi việc suôn sẻ|Chúc bạn sớm thành công|Chúc bạn nhiều may mắn|Chúc bạn thật tốt}
+{Rất đáng tham khảo|Nên đọc bài này|Bạn nào cần thì xem thử|Đáng để tìm hiểu|Nên lưu lại tham khảo}
+{Chia sẻ hữu ích thế này hiếm lắm|Cảm ơn bạn đã dành thời gian chia sẻ|Bài chia sẻ tâm huyết|Rất chân thành cảm ơn|Cảm ơn bạn nhiều lắm}`,
 
   async resolveJobComment(job) {
     const c = String(job?.comment || '').trim();
@@ -1336,6 +1389,35 @@ const GF_BG = {
     const g = p.postedGroups.find((x) => String(x.group_id) === String(groupId));
     if (g) g.firstCommentOk = ok;
     await chrome.storage.local.set({ postQueue: queue });
+  },
+
+  // Ghi nhớ CỤC BỘ, độc lập với postQueue/server, rằng đã comment xong post_queue_id+group_id
+  // này — nguồn-sự-thật duy nhất không phụ thuộc round-trip mạng. Trước bản này, "đã comment hay
+  // chưa" của bài server/cross chỉ dựa vào markPostedGroupCommented() (chỉ tìm thấy entry nếu bài
+  // nằm trong postQueue cục bộ — bài kéo về từ server/đồng đội thì KHÔNG, nên luôn no-op) hoặc
+  // markCrossPostCommentedFromBg() (PATCH best-effort, nuốt lỗi khi fail). Hễ 1 trong 2 đường đó
+  // không ghi nhận được (401/mismatch license key, mất mạng, server down…) thì extension hoàn toàn
+  // không nhớ đã comment — mỗi lần refresh tab Comment, autoScheduleUnscheduledComments() lại coi
+  // bài là "chưa có lịch + chưa xong" rồi tự lên lịch lại, chạy lại, comment trùng lặp vô hạn. Ghi
+  // ngay tại đây (chạy trong runComment() ngay sau khi comment lên FB thành công, trước khi có bất
+  // kỳ sync mạng nào) đảm bảo isCommentDone() (sidepanel.js) luôn biết bài đã xong dù mọi sync khác
+  // đều fail. Cắt bớt (giữ 3000 postQueueId chạm gần nhất) tránh phình vô hạn.
+  async markCommentDoneLocal(postQueueId, groupId) {
+    if (!postQueueId || !groupId) return;
+    const d = await chrome.storage.local.get('commentedRecords');
+    const map = d.commentedRecords || {};
+    const key = String(postQueueId);
+    if (!map[key]) map[key] = {};
+    map[key][String(groupId)] = Date.now();
+    const keys = Object.keys(map);
+    if (keys.length > 3000) {
+      keys
+        .map((k) => ({ k, ts: Math.max(...Object.values(map[k])) }))
+        .sort((a, b) => a.ts - b.ts)
+        .slice(0, keys.length - 3000)
+        .forEach(({ k }) => delete map[k]);
+    }
+    await chrome.storage.local.set({ commentedRecords: map });
   },
 
   async maybeFirstComment(post, res, group, settings, job, postGroupResults) {
@@ -2126,6 +2208,8 @@ const GF_BG = {
       throw e;
     }
 
+    // Ghi cục bộ TRƯỚC — nguồn-sự-thật không phụ thuộc mạng, xem chú thích markCommentDoneLocal().
+    await this.markCommentDoneLocal(job.post_queue_id, job.group_id);
     await this.markPostedGroupCommented(job.post_queue_id, job.group_id, true);
     if (job.crossServerId) {
       await this.markCrossPostCommentedFromBg(job.crossServerId);
@@ -2471,12 +2555,121 @@ const GF_BG = {
     return { fetched, pending, rounds };
   },
 
+  // Flow 1 (đồng bộ bài để đi comment) — v1.0.187. Gọi trong MỌI chu kỳ nền gf_tidien_sync (không
+  // cần user mở tab Comment), thay thế hẳn nhánh posts/pull cũ (group_posts, đã gộp vào user_posts
+  // — migration 039). Dùng CHUNG storage key crossPostsCache/crossPostsSyncMeta với
+  // fetchCrossPostsFromServer() (sidepanel.js) — cursor theo updated_at, merge-upsert vào cache đã
+  // có (không ghi đè), để cả 2 nơi (nền lẫn khi mở panel) luôn thấy cùng 1 dữ liệu, không tải trùng.
+  //
+  // Sau khi cache mới, TỰ LÊN LỊCH comment cho bài chưa từng lên lịch — không cần soạn sẵn draft:
+  // comment để trống, resolveJobComment() (đã có sẵn, dùng chung với mọi luồng comment khác) tự
+  // random mẫu từ Settings lúc job chạy thật. Bỏ qua hoàn toàn trong khung giờ đêm (22:00–07:00) —
+  // không tự lên lịch giữa đêm, chu kỳ ban ngày kế tiếp sẽ nhặt lại đúng những bài này (cache không
+  // mất, chỉ tạm hoãn phần lên lịch). Dùng getSecurityDelays()/randBetween() sẵn có trên GF_BG —
+  // KHÔNG dùng GF.scheduler (modules/scheduler.js chỉ dành cho sidepanel, chưa từng được đưa vào
+  // build-sw-bundle.js nên service worker không thấy được module này).
+  async runFlow1BackgroundSync(auth, headers) {
+    const d = await chrome.storage.local.get([
+      'crossPostsCache', 'crossPostsSyncMeta', 'commentedRecords', 'bgAutoScheduledCrossIds',
+      'activeActorId', 'securityLevel', 'activityUpcoming',
+    ]);
+    const cache = d.crossPostsCache || [];
+    const meta = d.crossPostsSyncMeta || { lastAt: 0, cursor: null };
+
+    let rows = [];
+    try {
+      const qs = new URLSearchParams({ limit: '100' });
+      if (meta.cursor) qs.set('since', meta.cursor);
+      const res = await fetch(`${auth.base}/api/user-sync/cross-posts?${qs}`, { headers });
+      if (res.ok) rows = await res.json();
+    } catch { /* best-effort — giữ cache cũ nếu mạng lỗi */ }
+
+    const newestUpdatedAt = rows.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), meta.cursor || '');
+    const byId = new Map(cache.map((p) => [String(p.id), p]));
+    for (const row of Array.isArray(rows) ? rows : []) byId.set(String(row.id), row);
+    const merged = [...byId.values()]
+      .sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0))
+      .slice(0, 500);
+    await chrome.storage.local.set({
+      crossPostsCache: merged,
+      crossPostsSyncMeta: { lastAt: Date.now(), cursor: newestUpdatedAt || meta.cursor || null },
+    });
+
+    const nowHour = new Date().getHours();
+    if (nowHour >= 22 || nowHour < 7) return { fetched: rows.length, cached: merged.length, scheduled: 0 };
+
+    const commentedRecords = d.commentedRecords || {};
+    const scheduledIds = new Set(d.bgAutoScheduledCrossIds || []);
+    const delays = await this.getSecurityDelays(d.securityLevel);
+    const upcoming = d.activityUpcoming || [];
+    const latestWhen = upcoming
+      .filter((u) => u.kind === 'comment')
+      .reduce((max, u) => Math.max(max, u.when || 0), 0);
+    let cursorWhen = Math.max(latestWhen, Date.now()) + 60_000;
+    let scheduled = 0;
+
+    for (const cp of merged) {
+      const jobId = `cross_${cp.id}`;
+      if (scheduledIds.has(jobId) || commentedRecords[jobId]) continue;
+      if (!cp.group_id || !cp.post_id || !/^\d+$/.test(String(cp.post_id))) continue;
+      if (Number(cp.comment_count) >= Number(cp.comment_target || 1)) continue;
+
+      const alarmName = `gf_cmt_${jobId}_${cp.group_id}_${Date.now()}_bg`;
+      const label = (cp.noi_dung || cp.group_name || 'Comment').slice(0, 60);
+      const payload = {
+        post_queue_id: jobId,
+        group_id: cp.group_id,
+        group_name: cp.group_name,
+        post_id: cp.post_id,
+        comment: '',
+        crossServerId: cp.id,
+        actorId: d.activeActorId,
+        label,
+      };
+      chrome.alarms.create(alarmName, { when: cursorWhen });
+      await chrome.storage.local.set({ [`alarm_${alarmName}`]: { kind: 'comment', payload } });
+      upcoming.push({
+        id: alarmName,
+        alarmName,
+        kind: 'comment',
+        when: cursorWhen,
+        recordId: jobId,
+        snippet: '(tự random mẫu lúc chạy)',
+        payload,
+        label: `Comment → ${label}`,
+      });
+      scheduledIds.add(jobId);
+      scheduled += 1;
+      cursorWhen += this.randBetween(delays.betweenComments) * 1000;
+    }
+
+    if (scheduled) {
+      await chrome.storage.local.set({
+        activityUpcoming: upcoming,
+        bgAutoScheduledCrossIds: [...scheduledIds].slice(-2000),
+      });
+    }
+    return { fetched: rows.length, cached: merged.length, scheduled };
+  },
+
+  // So le giờ chạy (v1.0.187) — mỗi máy tự "bốc thăm" 1 độ trễ ban đầu cố định (0..mins phút), lưu
+  // lại dùng mãi (không random lại mỗi lần gọi hàm này). Không có bước này, `periodInMinutes` tính
+  // từ đúng lúc gọi create() — nhiều máy khởi động/kết nối lại cùng thời điểm (giờ hành chính, sau
+  // khi server phục hồi khiến hàng loạt máy re-schedule cùng lúc…) sẽ có alarm dồn cục cùng giây,
+  // 1000 request đổ về server cùng lúc thay vì rải đều suốt chu kỳ. Độ lệch riêng biệt lưu cố định
+  // theo máy đảm bảo dù "now" trùng nhau, giờ CHẠY THẬT vẫn tách rời nhau vĩnh viễn.
   async scheduleTidienSyncAlarm() {
-    const cfg = await chrome.storage.local.get(['tidienAutoSyncEnabled', 'tidienAutoSyncMinutes']);
+    const cfg = await chrome.storage.local.get(['tidienAutoSyncEnabled', 'tidienAutoSyncMinutes', 'tidienSyncJitterMin']);
     await chrome.alarms.clear('gf_tidien_sync');
     if (cfg.tidienAutoSyncEnabled === false) return;
     const mins = Math.max(5, Number(cfg.tidienAutoSyncMinutes) || 10);
-    chrome.alarms.create('gf_tidien_sync', { periodInMinutes: mins });
+
+    let jitterMin = Number(cfg.tidienSyncJitterMin);
+    if (!Number.isFinite(jitterMin) || jitterMin < 0) {
+      jitterMin = Math.random() * mins;
+      await chrome.storage.local.set({ tidienSyncJitterMin: jitterMin });
+    }
+    chrome.alarms.create('gf_tidien_sync', { delayInMinutes: Math.max(0.1, jitterMin), periodInMinutes: mins });
   },
 
   async syncFromTidien({ force = false, pullDrafts = true, scope = 'auto' } = {}) {
@@ -2513,7 +2706,6 @@ const GF_BG = {
     }
 
     const headers = { Authorization: `Bearer ${auth.token}` };
-    const syncPayload = this.buildSyncPayload(cfg);
     const maxRounds = force ? TIDIEN_SYNC.MAX_ROUNDS_FORCE : TIDIEN_SYNC.MAX_ROUNDS;
     const wantComments = scope === 'comments' || scope === 'all' || scope === 'auto';
     let shouldPullDrafts = pullDrafts && cfg.tidienAutoPullDrafts !== false
@@ -2521,15 +2713,14 @@ const GF_BG = {
         || (scope === 'auto' && (!meta.lastDraftsAt || (now - meta.lastDraftsAt) >= TIDIEN_SYNC.DRAFTS_INTERVAL_MS)));
 
     let postsFetched = 0;
-    let postsMerged = (cfg.tidienPendingComments || []).length;
+    let postsScheduled = 0;
+    let postsMerged = 0;
     let pendingPostsSync = 0;
-    let postRounds = 0;
     let draftsAdded = 0;
     let pendingDrafts = 0;
     let draftRounds = 0;
     let postsError;
     let draftError;
-    let skippedPosts = false;
     let skippedDrafts = false;
     let postsPushed = 0;
     let postsPushFailed = 0;
@@ -2540,30 +2731,20 @@ const GF_BG = {
       postsPushFailed = pushRes.failed || 0;
     }
 
+    // Flow 1 (đồng bộ bài để đi comment) — v1.0.187: thay thế hẳn nhánh posts/pull cũ (group_posts,
+    // đã gộp bảng — xem migration 039). Trước bản này, Flow 1 CHỈ chạy khi user tự mở/refresh tab
+    // Comment (fetchCrossPostsFromServer() trong sidepanel.js) — user nào ít mở tab đó thì cache
+    // luôn trống, không bao giờ được tự động gán bài để comment dù bài vẫn tồn tại trên server. Giờ
+    // chạy ngay trong chu kỳ nền này (không cần mở panel) — vừa giữ cache tươi cho UI, vừa tự lên
+    // lịch comment cho bài mới thấy được (dùng chung storage key crossPostsCache/crossPostsSyncMeta
+    // với sidepanel.js để 2 nơi luôn nhìn thấy cùng 1 dữ liệu).
     if (wantComments) {
       try {
-        const peek = await this.tidienPostJson(auth, '/api/group-posts/sync/status', {
-          last_post_id: syncPayload.last_post_id,
-          last_draft_id: syncPayload.last_draft_id,
-        }, headers);
-        meta.totalPosts = Number(peek.total_posts) || 0;
-        meta.serverMaxPostId = Number(peek.server_max_post_id) || 0;
-        meta.lastPostId = Number(peek.last_post_id) ?? syncPayload.last_post_id;
-        if (!force && (Number(peek.pending_posts_sync) || 0) === 0) {
-          skippedPosts = true;
-          pendingPostsSync = 0;
-        } else {
-          const res = await this.pullCursorSession(auth, headers, {
-            kind: 'posts',
-            maxRounds,
-          });
-          postsFetched = res.fetched;
-          pendingPostsSync = res.pending;
-          postRounds = res.rounds;
-          const after = await chrome.storage.local.get('tidienPendingComments');
-          postsMerged = (after.tidienPendingComments || []).length;
-          meta.lastCommentsAt = now;
-        }
+        const res = await this.runFlow1BackgroundSync(auth, headers);
+        postsFetched = res.fetched;
+        postsScheduled = res.scheduled;
+        postsMerged = res.cached;
+        meta.lastCommentsAt = now;
       } catch (e) {
         postsError = e.message;
       }
@@ -2608,17 +2789,24 @@ const GF_BG = {
       console.warn('[GroupFlow] activity log sync:', e.message);
     }
 
+    // Flow 3 retry — thử lại các lượt PATCH .../commented đã fail (best-effort, không chặn chu kỳ
+    // chính nếu lỗi tiếp).
+    try {
+      await this.flushPendingCommentedSync(auth, headers);
+    } catch (e) {
+      console.warn('[GroupFlow] flush pending commented sync:', e.message);
+    }
+
     const payload = {
       posts: postsMerged,
       postsFetched,
+      postsScheduled,
       postsPushed,
       postsPushFailed,
-      postRounds,
       pendingPostsSync,
       pendingDrafts,
       draftRounds,
       draftsAdded,
-      skippedPosts,
       skippedDrafts,
       at: now,
       postsError,
@@ -2630,33 +2818,83 @@ const GF_BG = {
 
   async runRadarScan() {
     const cfg = await chrome.storage.local.get([
-      'radarActive', 'radarKeywords', 'radarGroupIds', 'radarPush', 'radarLeads', 'extractedGroups',
+      'radarActive', 'radarKeywords', 'radarGroupIds', 'radarPush', 'radarInPage', 'radarLeads',
+      'extractedGroups', 'radarMaxGroupsPerScan', 'radarScanCursor', 'radarSeenPostIds', 'radarLastScanAt',
     ]);
     if (!cfg.radarActive) return;
-    const groups = (cfg.extractedGroups || []).filter((g) => (cfg.radarGroupIds || []).includes(g.id));
+    const targetIds = cfg.radarGroupIds || [];
+    const allGroups = (cfg.extractedGroups || []).filter((g) => targetIds.includes(g.id));
+    if (!allGroups.length) return;
+
+    // Giới hạn số nhóm quét mỗi lượt (tránh FB nghi ngờ do mở quá nhiều nhóm liên tiếp) — xoay vòng
+    // qua cursor để mỗi chu kỳ quét nhóm khác nhau thay vì luôn chỉ N nhóm đầu danh sách.
+    const maxPerScan = Math.max(1, Number(cfg.radarMaxGroupsPerScan) || 10);
+    const cursor = Number(cfg.radarScanCursor) || 0;
+    const start = cursor % allGroups.length;
+    const groups = [];
+    for (let i = 0; i < Math.min(maxPerScan, allGroups.length); i += 1) {
+      groups.push(allGroups[(start + i) % allGroups.length]);
+    }
+    const nextCursor = (start + groups.length) % allGroups.length;
+
     let leads = cfg.radarLeads || [];
+    const seenPostIds = new Set(cfg.radarSeenPostIds || []);
+    const lastScanAt = { ...(cfg.radarLastScanAt || {}) };
+    let newLeadsThisRun = [];
 
     for (const group of groups) {
-      const tab = await this.getFbTab();
-      await chrome.tabs.update(tab.id, { url: `https://www.facebook.com/groups/${group.id}` });
-      await this.delay(3500);
-      const res = await chrome.tabs.sendMessage(tab.id, {
-        type: 'GF_SCAN_FEED',
-        keywordsText: cfg.radarKeywords,
-      });
-      if (res?.leads?.length) {
-        leads = [...res.leads.map((l) => ({ ...l, group_name: group.name })), ...leads].slice(0, 500);
-        if (cfg.radarPush) {
-          chrome.notifications.create({
-            type: 'basic',
-            iconUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-            title: 'GroupFlow — Lead mới',
-            message: res.leads[0].snippet?.slice(0, 120) || 'Có lead mới',
-          });
+      try {
+        const tab = await this.getFbTab();
+        await chrome.tabs.update(tab.id, { url: `https://www.facebook.com/groups/${group.id}` });
+        await this.delay(3500);
+        const res = await chrome.tabs.sendMessage(tab.id, {
+          type: 'GF_SCAN_FEED',
+          keywordsText: cfg.radarKeywords,
+        });
+        lastScanAt[group.id] = new Date().toISOString();
+        const fresh = (res?.leads || []).filter((l) => {
+          const key = `${l.group_id}:${l.post_id || l.id}`;
+          if (seenPostIds.has(key)) return false;
+          seenPostIds.add(key);
+          return true;
+        });
+        if (fresh.length) {
+          const tagged = fresh.map((l) => ({ ...l, group_name: group.name }));
+          leads = [...tagged, ...leads].slice(0, 500);
+          newLeadsThisRun = [...newLeadsThisRun, ...tagged];
+          if (cfg.radarInPage !== false) {
+            chrome.tabs.sendMessage(tab.id, {
+              type: 'GF_RADAR_TOAST',
+              count: tagged.length,
+              snippet: tagged[0].snippet,
+            }).catch(() => {});
+          }
         }
+      } catch (e) {
+        console.warn('[GroupFlow] radar scan lỗi nhóm', group.id, e.message);
       }
     }
-    await chrome.storage.local.set({ radarLeads: leads });
+
+    // Giữ seen-ids gọn (không phình vô hạn) — chỉ cần đủ để chặn trùng giữa các lần quét gần nhau.
+    const seenList = [...seenPostIds].slice(-3000);
+
+    await chrome.storage.local.set({
+      radarLeads: leads,
+      radarSeenPostIds: seenList,
+      radarLastScanAt: lastScanAt,
+      radarScanCursor: nextCursor,
+    });
+
+    if (newLeadsThisRun.length && cfg.radarPush) {
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        title: 'GroupFlow — Lead mới',
+        message: newLeadsThisRun.length === 1
+          ? (newLeadsThisRun[0].snippet?.slice(0, 120) || 'Có lead mới')
+          : `${newLeadsThisRun.length} lead mới từ ${groups.length} nhóm vừa quét`,
+      });
+    }
     chrome.runtime.sendMessage({ type: 'GF_RADAR_UPDATED' }).catch(() => {});
   },
 };

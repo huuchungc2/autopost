@@ -81,7 +81,27 @@ function toMysqlDatetime(val) {
   return d.toISOString().slice(0, 19).replace('T', ' ');
 }
 
-export async function syncGroupPost(userId, body) {
+// Bài mới nên "từ từ" xuất hiện với người khác thay vì lộ diện ngay lập tức (đỡ giống comment-ring
+// bị FB soi, đúng tinh thần "từ từ mọi người thấy bài" — xem GET /cross-posts).
+const VISIBLE_AFTER_MIN_MINUTES = 5;
+const VISIBLE_AFTER_MAX_MINUTES = 60;
+const DEFAULT_COMMENT_TARGET = 5;
+
+function randomVisibleAfter(fromDate) {
+  const base = fromDate instanceof Date && !isNaN(fromDate.getTime()) ? fromDate : new Date();
+  const delayMin = VISIBLE_AFTER_MIN_MINUTES
+    + Math.random() * (VISIBLE_AFTER_MAX_MINUTES - VISIBLE_AFTER_MIN_MINUTES);
+  return new Date(base.getTime() + delayMin * 60_000);
+}
+
+// Flow 2 (đồng bộ sau khi đăng bài) — nguồn ghi DUY NHẤT cho user_posts, dùng chung bởi cả
+// POST /group-posts/sync (JWT/api_key/license_key qua authenticateExtension) lẫn
+// POST /user-sync/posts (license_key qua authenticateLicenseKey, routes/userSync.js) — trước bản
+// gộp bảng 2 route này ghi 2 bảng khác nhau (group_posts / user_posts) cho cùng 1 sự kiện "vừa đăng
+// bài", giờ khớp theo (user_account_id, group_id, post_id) — post_id (Facebook post id) mới là định
+// danh thật của 1 bài, post_queue_id chỉ là id nội bộ máy client nên KHÔNG dùng để so khớp (nếu
+// không sẽ tạo 2 dòng trùng cho cùng 1 bài thật khi 2 route trên đều được gọi).
+export async function upsertUserPost(userAccountId, post) {
   const {
     group_id,
     group_name,
@@ -92,35 +112,26 @@ export async function syncGroupPost(userId, body) {
     ngay_dang,
     gio_dang,
     posted_at,
-    posted_by,
-  } = body;
+    post_queue_id,
+  } = post;
+  const fbUserId = post.posted_by || post.fb_user_id;
 
-  if (!group_id || !post_id) {
-    const err = new Error('group_id và post_id là bắt buộc');
-    err.status = 400;
-    throw err;
-  }
-
-  const fbUserId = posted_by || body.fb_user_id;
-  if (!fbUserId) {
-    const err = new Error('posted_by (fb_user_id) là bắt buộc');
-    err.status = 400;
-    throw err;
-  }
+  if (!group_id || !post_id) return null;
 
   const existing = await query(
-    'SELECT id FROM group_posts WHERE group_id = ? AND post_id = ?',
-    [group_id, post_id]
+    'SELECT id FROM user_posts WHERE user_account_id = ? AND group_id = ? AND post_id = ?',
+    [userAccountId, group_id, post_id]
   );
-
   const storedUrl = fb_url || `https://www.facebook.com/groups/${group_id}/posts/${post_id}/`;
 
   if (existing[0]) {
     await query(
-      `UPDATE group_posts
-       SET noi_dung = ?, prompt_anh = ?, ngay_dang = ?, gio_dang = ?, posted_at = ?,
-           fb_user_id = ?, user_id = ?, group_name = COALESCE(?, group_name),
-           fb_url = COALESCE(fb_url, ?)
+      `UPDATE user_posts
+       SET noi_dung = COALESCE(?, noi_dung), prompt_anh = COALESCE(?, prompt_anh),
+           ngay_dang = COALESCE(?, ngay_dang), gio_dang = COALESCE(?, gio_dang),
+           posted_at = COALESCE(?, posted_at), fb_user_id = COALESCE(?, fb_user_id),
+           group_name = COALESCE(?, group_name), fb_url = COALESCE(fb_url, ?),
+           post_queue_id = COALESCE(NULLIF(?, ''), post_queue_id)
        WHERE id = ?`,
       [
         noi_dung || null,
@@ -128,101 +139,65 @@ export async function syncGroupPost(userId, body) {
         ngay_dang || null,
         gio_dang || null,
         toMysqlDatetime(posted_at),
-        fbUserId,
-        userId,
+        fbUserId || null,
         group_name || null,
         storedUrl,
+        post_queue_id || '',
         existing[0].id,
       ]
     );
-    return { success: true, id: String(existing[0].id), updated: true };
+    return { id: existing[0].id, updated: true };
   }
 
+  const postedAtDate = toMysqlDatetime(posted_at);
   const result = await query(
-    `INSERT INTO group_posts
-      (user_id, fb_user_id, group_id, group_name, post_id, fb_url, noi_dung, prompt_anh, ngay_dang, gio_dang, posted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO user_posts
+      (user_account_id, post_queue_id, group_id, group_name, post_id, fb_user_id, noi_dung, prompt_anh,
+       posted_at, ngay_dang, gio_dang, fb_url, comment_target, comment_count, visible_after)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
     [
-      userId,
-      fbUserId,
+      userAccountId,
+      post_queue_id || '',
       group_id,
       group_name || null,
       post_id,
-      storedUrl,
+      fbUserId || null,
       noi_dung || null,
       prompt_anh || null,
+      postedAtDate,
       ngay_dang || null,
       gio_dang || null,
-      toMysqlDatetime(posted_at),
+      storedUrl,
+      DEFAULT_COMMENT_TARGET,
+      toMysqlDatetime(randomVisibleAfter(postedAtDate ? new Date(postedAtDate) : new Date())),
     ]
   );
-
-  return { success: true, id: String(result.insertId), updated: false };
+  return { id: result.insertId, updated: false };
 }
 
-function buildPostsForCommentsWhere(userId, filters = {}) {
-  const conditions = [];
-  const params = [];
-
-  if (filters.group_id) {
-    conditions.push('gp.group_id = ?');
-    params.push(filters.group_id);
+export async function syncGroupPost(userId, body) {
+  if (!body.group_id || !body.post_id) {
+    const err = new Error('group_id và post_id là bắt buộc');
+    err.status = 400;
+    throw err;
   }
-  if (filters.posted_by) {
-    conditions.push('gp.fb_user_id = ?');
-    params.push(filters.posted_by);
+  if (!(body.posted_by || body.fb_user_id)) {
+    const err = new Error('posted_by (fb_user_id) là bắt buộc');
+    err.status = 400;
+    throw err;
   }
-  const needsComment = filters.needs_comment === '1'
-    || filters.needs_comment === 1
-    || filters.needs_comment === true
-    || filters.needs_comment === 'true';
-  if (needsComment) {
-    conditions.push(`NOT EXISTS (
-      SELECT 1 FROM group_post_comments gpc
-      WHERE gpc.group_post_id = gp.id AND gpc.commenter_user_id = ?
-    )`);
-    params.push(userId);
-  }
-  if (filters.since) {
-    const since = new Date(filters.since);
-    if (!Number.isNaN(since.getTime())) {
-      conditions.push('gp.posted_at > ?');
-      params.push(since);
-    }
-  }
-
-  return {
-    where: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '',
-    params,
-  };
+  const res = await upsertUserPost(userId, body);
+  return { success: true, id: String(res.id), updated: res.updated };
 }
 
-/** Extension: client gửi ID lớn nhất đang giữ — server trả còn bao nhiêu bài có id lớn hơn */
+/** Extension: client gửi ID draft lớn nhất đang giữ — server trả còn bao nhiêu draft mới hơn.
+ * (Phần "posts" cũ — pending_posts_sync/total_posts/pending_comments — đã bỏ cùng nhánh posts/pull
+ * chết; giữ field rỗng/an toàn trong response để extension bản cũ chưa cập nhật không lỗi, chỉ tự
+ * hiểu là "không còn gì cần pull" và ngưng gọi /posts/pull nữa.) */
 export async function getExtensionSyncStatus(userId, {
-  lastPostId = 0,
   lastDraftId = 0,
 } = {}) {
-  const afterPost = parseCursorId(lastPostId);
   const afterDraft = parseCursorId(lastDraftId);
-
-  const commentRows = await query(
-    `SELECT COUNT(*) AS pending_comments, MAX(gp.posted_at) AS newest_comment_post_at
-     FROM group_posts gp
-     WHERE NOT EXISTS (
-       SELECT 1 FROM group_post_comments gpc
-       WHERE gpc.group_post_id = gp.id AND gpc.commenter_user_id = ?
-     )`,
-    [userId]
-  );
-
-  const [postMaxRow] = await query('SELECT MAX(id) AS max_id, COUNT(*) AS total FROM group_posts');
-  const serverMaxPostId = Number(postMaxRow?.max_id) || 0;
-  const totalPosts = Number(postMaxRow?.total) || 0;
-
-  const syncRows = await query(
-    'SELECT COUNT(*) AS pending_posts_sync FROM group_posts gp WHERE gp.id > ?',
-    [afterPost]
-  );
 
   const [draftMaxRow] = await query(
     `SELECT MAX(d.id) AS max_id FROM group_post_drafts d WHERE ${draftEligibilitySql('d')}`,
@@ -237,134 +212,14 @@ export async function getExtensionSyncStatus(userId, {
   );
 
   return {
-    last_post_id: afterPost,
     last_draft_id: afterDraft,
-    server_max_post_id: serverMaxPostId,
     server_max_draft_id: serverMaxDraftId,
-    total_posts: totalPosts,
-    pending_posts_sync: Number(syncRows[0]?.pending_posts_sync) || 0,
     pending_drafts: Number(draftRows[0]?.pending_drafts) || 0,
-    up_to_date: afterPost >= serverMaxPostId,
-    pending_comments: Number(commentRows[0]?.pending_comments) || 0,
-    newest_comment_post_at: commentRows[0]?.newest_comment_post_at || null,
-  };
-}
-
-/** Extension: pull bài có id > after_post_id (cursor) */
-export async function pullPostsForExtension(userId, { limit: rawLimit, afterPostId = 0 } = {}) {
-  const afterPost = parseCursorId(afterPostId);
-  const limit = parseLimit(rawLimit, 20, 50);
-
-  const rows = await query(
-    `SELECT gp.id, gp.group_id, gp.group_name, gp.post_id, gp.noi_dung, gp.prompt_anh,
-            gp.fb_user_id AS posted_by, gp.posted_at, gp.ngay_dang, gp.gio_dang,
-            u.name AS poster_name,
-            (SELECT COUNT(*) FROM group_post_comments gpc
-             WHERE gpc.group_post_id = gp.id AND gpc.commenter_user_id = ?) AS my_comment_count
-     FROM group_posts gp
-     JOIN users u ON u.id = gp.user_id
-     WHERE gp.id > ?
-     ORDER BY gp.id ASC
-     LIMIT ?`,
-    [userId, afterPost, limit]
-  );
-
-  const remainRows = await query(
-    'SELECT COUNT(*) AS n FROM group_posts gp WHERE gp.id > ?',
-    [afterPost]
-  );
-  const pendingBefore = Number(remainRows[0]?.n) || 0;
-
-  return {
-    data: rows.map((r) => ({
-      id: String(r.id),
-      group_id: r.group_id,
-      group_name: r.group_name,
-      post_id: r.post_id,
-      noi_dung: r.noi_dung,
-      prompt_anh: r.prompt_anh,
-      posted_by: r.posted_by,
-      poster_name: r.poster_name,
-      posted_at: r.posted_at,
-      ngay_dang: r.ngay_dang,
-      gio_dang: r.gio_dang,
-      my_comment_count: Number(r.my_comment_count) || 0,
-    })),
-    synced_count: rows.length,
-    pending_remaining: Math.max(0, pendingBefore - rows.length),
-    after_post_id: afterPost,
-  };
-}
-
-export async function listPostsForComments(userId, filters = {}) {
-  const page = parsePage(filters.page);
-  const limit = parseLimit(filters.limit, 20, 50);
-  const offset = (page - 1) * limit;
-
-  const { where, params } = buildPostsForCommentsWhere(userId, filters);
-
-  const countRows = await query(
-    `SELECT COUNT(*) AS total FROM group_posts gp ${where}`,
-    params
-  );
-  const total = countRows[0]?.total || 0;
-
-  const rows = await query(
-    `SELECT gp.id, gp.group_id, gp.group_name, gp.post_id, gp.noi_dung, gp.prompt_anh,
-            gp.fb_user_id AS posted_by, gp.posted_at, gp.ngay_dang, gp.gio_dang,
-            u.name AS poster_name,
-            (SELECT COUNT(*) FROM group_post_comments gpc
-             WHERE gpc.group_post_id = gp.id AND gpc.commenter_user_id = ?) AS my_comment_count
-     FROM group_posts gp
-     JOIN users u ON u.id = gp.user_id
-     ${where}
-     ORDER BY gp.posted_at DESC, gp.id DESC
-     LIMIT ? OFFSET ?`,
-    [userId, ...params, limit, offset]
-  );
-
-  return {
-    data: rows.map((r) => ({
-      id: String(r.id),
-      group_id: r.group_id,
-      group_name: r.group_name,
-      post_id: r.post_id,
-      noi_dung: r.noi_dung,
-      prompt_anh: r.prompt_anh,
-      posted_by: r.posted_by,
-      poster_name: r.poster_name,
-      posted_at: r.posted_at,
-      ngay_dang: r.ngay_dang,
-      gio_dang: r.gio_dang,
-      my_comment_count: Number(r.my_comment_count) || 0,
-    })),
-    pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
-  };
-}
-
-export async function recordComment(userId, postRecordId, commenterFbUserId) {
-  const posts = await query('SELECT id FROM group_posts WHERE id = ?', [postRecordId]);
-  if (!posts[0]) {
-    const err = new Error('Bài đăng không tồn tại');
-    err.status = 404;
-    throw err;
-  }
-
-  await query(
-    `INSERT INTO group_post_comments (group_post_id, commenter_user_id, commenter_fb_user_id)
-     VALUES (?, ?, ?)`,
-    [postRecordId, userId, commenterFbUserId || null]
-  );
-
-  const countRows = await query(
-    `SELECT COUNT(*) AS cnt FROM group_post_comments
-     WHERE group_post_id = ? AND commenter_user_id = ?`,
-    [postRecordId, userId]
-  );
-
-  return {
-    success: true,
-    my_comment_count: Number(countRows[0]?.cnt) || 0,
+    // Legacy — extension bản cũ (< v1.0.187) còn đọc các field này để quyết định có gọi
+    // /posts/pull tiếp không; luôn báo "hết" để nhánh chết đó tự ngưng, không cần chờ user cập nhật.
+    total_posts: 0,
+    pending_posts_sync: 0,
+    up_to_date: true,
   };
 }
 
@@ -377,48 +232,47 @@ export async function listPublishedGroupPosts(filters = {}) {
   const params = [];
 
   if (filters.group_id) {
-    conditions.push('gp.group_id = ?');
+    conditions.push('up.group_id = ?');
     params.push(filters.group_id);
   }
   if (filters.user_id) {
-    conditions.push('gp.user_id = ?');
+    conditions.push('up.user_account_id = ?');
     params.push(filters.user_id);
   }
   if (filters.posted_by) {
-    conditions.push('gp.fb_user_id = ?');
+    conditions.push('up.fb_user_id = ?');
     params.push(filters.posted_by);
   }
   if (filters.from_date) {
-    conditions.push('gp.posted_at >= ?');
+    conditions.push('up.posted_at >= ?');
     params.push(`${filters.from_date} 00:00:00`);
   }
   if (filters.to_date) {
-    conditions.push('gp.posted_at < DATE_ADD(?, INTERVAL 1 DAY)');
+    conditions.push('up.posted_at < DATE_ADD(?, INTERVAL 1 DAY)');
     params.push(filters.to_date);
   }
   if (filters.search) {
     const term = `%${String(filters.search).trim()}%`;
-    conditions.push('(gp.noi_dung LIKE ? OR u.name LIKE ? OR gp.group_id LIKE ? OR gp.group_name LIKE ? OR gp.post_id LIKE ?)');
+    conditions.push('(up.noi_dung LIKE ? OR u.name LIKE ? OR up.group_id LIKE ? OR up.group_name LIKE ? OR up.post_id LIKE ?)');
     params.push(term, term, term, term, term);
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const countRows = await query(
-    `SELECT COUNT(*) AS total FROM group_posts gp
-     JOIN users u ON u.id = gp.user_id
+    `SELECT COUNT(*) AS total FROM user_posts up
+     JOIN users u ON u.id = up.user_account_id
      ${where}`,
     params
   );
   const total = countRows[0]?.total || 0;
 
   const rows = await query(
-    `SELECT gp.*, u.name AS poster_name,
-            (SELECT COUNT(*) FROM group_post_comments gpc WHERE gpc.group_post_id = gp.id) AS comment_count
-     FROM group_posts gp
-     JOIN users u ON u.id = gp.user_id
+    `SELECT up.*, u.name AS poster_name
+     FROM user_posts up
+     JOIN users u ON u.id = up.user_account_id
      ${where}
-     ORDER BY gp.posted_at DESC, gp.id DESC
+     ORDER BY up.posted_at DESC, up.id DESC
      LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );
@@ -433,11 +287,12 @@ export async function listPublishedGroupPosts(filters = {}) {
       prompt_anh: r.prompt_anh,
       posted_by: r.fb_user_id,
       poster_name: r.poster_name,
-      user_id: r.user_id,
+      user_id: r.user_account_id,
       posted_at: r.posted_at,
       ngay_dang: r.ngay_dang,
       gio_dang: r.gio_dang,
       comment_count: Number(r.comment_count) || 0,
+      comment_target: Number(r.comment_target) || 0,
       fb_url: r.fb_url || `https://www.facebook.com/groups/${r.group_id}/posts/${r.post_id}/`,
     })),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
@@ -647,7 +502,7 @@ export async function pullDraftsForExtension(userId, { limit: rawLimit, afterDra
 }
 
 export async function listGroupPostComments(postId) {
-  const posts = await query('SELECT id FROM group_posts WHERE id = ?', [postId]);
+  const posts = await query('SELECT id FROM user_posts WHERE id = ?', [postId]);
   if (!posts[0]) {
     const err = new Error('Bài đăng không tồn tại');
     err.status = 404;
@@ -655,12 +510,12 @@ export async function listGroupPostComments(postId) {
   }
 
   const rows = await query(
-    `SELECT gpc.id, gpc.commenter_user_id, gpc.commenter_fb_user_id, gpc.commented_at,
+    `SELECT upc.id, upc.commenter_user_id, upc.commenter_fb_user_id, upc.commented_at,
             u.name AS commenter_name
-     FROM group_post_comments gpc
-     JOIN users u ON u.id = gpc.commenter_user_id
-     WHERE gpc.group_post_id = ?
-     ORDER BY gpc.commented_at DESC`,
+     FROM user_post_comments upc
+     JOIN users u ON u.id = upc.commenter_user_id
+     WHERE upc.user_post_id = ?
+     ORDER BY upc.commented_at DESC`,
     [postId]
   );
 
@@ -676,12 +531,12 @@ export async function listGroupPostComments(postId) {
 }
 
 export async function getGroupPostsStats(userId) {
-  const [postsRow] = await query('SELECT COUNT(*) AS total FROM group_posts');
+  const [postsRow] = await query('SELECT COUNT(*) AS total FROM user_posts');
   const [weekRow] = await query(
-    `SELECT COUNT(*) AS total FROM group_posts
+    `SELECT COUNT(*) AS total FROM user_posts
      WHERE posted_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`
   );
-  const [commentsRow] = await query('SELECT COUNT(*) AS total FROM group_post_comments');
+  const [commentsRow] = await query('SELECT COUNT(*) AS total FROM user_post_comments');
   const [draftsRow] = await query(
     `SELECT COUNT(*) AS total FROM group_post_drafts d
      LEFT JOIN group_post_draft_pulls p ON p.draft_id = d.id AND p.user_id = ?

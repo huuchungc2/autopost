@@ -12,14 +12,19 @@ const state = {
   groupsSyncing: false,
   groupsDeepSyncing: false,
   radarGroupIds: new Set(),
+  radarLeads: [],
+  postScheduleMap: {},
+  leadFilterStatus: 'all',
   comments: [],
   commentDrafts: {},
   commentFilterPerson: 'all',
   commentFilterTemplate: 'all',
   commentFilterSchedule: 'all',
+  commentFilterStatus: 'all',
   commentEditorOpenId: null,
   commentScheduleOpenId: null,
   commentScheduleMap: {},
+  commentedRecords: {},
   serverMyPostsIndex: new Map(),
   postsPage: 0,
   commentsPage: 0,
@@ -50,6 +55,21 @@ const state = {
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
+
+// v1.0.185 — throttle tối thiểu giữa 2 lần gọi THẬT tới /api/user-sync/my-posts|cross-posts. Trước
+// bản này 2 endpoint được gọi lại từ ~5 điểm khác nhau (mở panel, mở tab Comment, sau khi đăng bài,
+// sau khi comment, bấm Làm mới) không hề có throttle — user bấm qua lại vài giây 1 lần vẫn kích
+// hoạt full request mỗi lần. Không áp dụng khi `force: true` (bấm nút Làm mới tay).
+const USER_SYNC_MIN_INTERVAL_MS = 30_000;
+
+// Merge theo `id` (upsert) — KHÔNG ghi đè toàn bộ cache như trước. Bài đã có trong cache giữ
+// nguyên trừ khi server trả bản mới hơn (đơn giản hoá: coi incoming luôn mới hơn vì chỉ có trong
+// `rows` khi `updated_at` > cursor đã gửi).
+function mergeUserPostsById(existing, incoming) {
+  const byId = new Map((existing || []).map((p) => [String(p.id), p]));
+  for (const row of incoming || []) byId.set(String(row.id), row);
+  return [...byId.values()];
+}
 
 function gfRuntimeAlive() {
   try {
@@ -342,6 +362,7 @@ async function loadState() {
   state.radarGroupIds = new Set(d.radarGroupIds || []);
   state.profiles = d.fbProfiles || null;
   state.activeActorId = d.activeActorId || d.fbUser?.id || null;
+  state.postScheduleMap = await loadPostScheduleMap();
   updateGroupsTabBadge();
   renderPosts();
   renderGroupsTab();
@@ -352,7 +373,6 @@ async function loadState() {
   await refreshJournalFromStorage();
   renderLeads(d.radarLeads || []);
   await loadPostedPostsForComment();
-  renderDailyFixedSchedules();
   const syncedAt = Number(d.groupsSyncedAt || 0);
   const GROUP_SYNC_STALE_MS = 5 * 60 * 1000;
   const needGroupSync = !state.groups.length
@@ -2369,57 +2389,44 @@ function normalizeGioForTimeInput(gio) {
   return `${String(Number(parts[0])).padStart(2, '0')}:${parts[1].slice(0, 2).padStart(2, '0')}`;
 }
 
-let scheduleFooterInternal = false;
-let scheduleFooterSaveTimer = null;
-
-/** Thanh dưới phản ánh lịch bài đang tick (1 bài hoặc nhiều bài cùng giờ). */
-function syncQueueScheduleFooterFromSelection() {
-  if (scheduleFooterInternal) return;
-  const dateEl = $('#queueScheduleDate');
-  const timeEl = $('#queueScheduleTime');
-  if (!dateEl || !timeEl) return;
-
-  const selected = getSelectedPosts();
-  if (!selected.length) return;
-
-  const ref = selected[0];
-  const allSame = selected.every(
-    (p) => p.ngay_dang === ref.ngay_dang && p.gio_dang === ref.gio_dang,
-  );
-  if (!allSame || !ref.ngay_dang || !ref.gio_dang) return;
-
-  dateEl.value = ref.ngay_dang;
-  timeEl.value = normalizeGioForTimeInput(ref.gio_dang);
-}
-
-function onQueueScheduleFooterChange() {
-  clearTimeout(scheduleFooterSaveTimer);
-  scheduleFooterSaveTimer = setTimeout(async () => {
-    const { ngay_dang, gio_dang } = readQueueScheduleFields();
-    if (!ngay_dang || !gio_dang) return;
-    const selected = getSelectedPosts();
-    if (!selected.length) return;
-    scheduleFooterInternal = true;
-    for (const post of selected) {
-      post.ngay_dang = ngay_dang;
-      post.gio_dang = gio_dang;
-    }
-    scheduleFooterInternal = false;
-    await savePostsQuiet();
-    try {
-      await commitPostSchedules(selected, { toast: true });
-    } catch (e) {
-      showToast(e.message || 'Không hẹn được', 'error', 5000);
-    }
-    scheduleRenderPosts();
-  }, 450);
-}
-
 function postScheduleTagHtml(p) {
+  const info = state.postScheduleMap[p.id];
+  if (info?.type === 'daily') {
+    return `<button type="button" class="tag tag-schedule tag-clickable" data-cancel-post-daily="${escAttr(p.id)}" title="Bấm để hủy lặp lại">🔁 ${esc(info.timeOfDay)} hàng ngày</button>`;
+  }
   if (p.ngay_dang && p.gio_dang) {
     return `<button type="button" class="tag tag-schedule tag-clickable" data-edit-schedule="${escAttr(p.id)}" title="Bấm sửa giờ đăng">Đăng: ${esc(p.ngay_dang)} ${esc(p.gio_dang)}</button>`;
   }
   return `<button type="button" class="tag tag-schedule tag-clickable tag-pending" data-edit-schedule="${escAttr(p.id)}" title="Hẹn giờ đăng">+ Hẹn giờ</button>`;
+}
+
+// Map lịch đăng theo post.id (1 lần trong activityUpcoming + lặp lại hàng ngày trong
+// dailyFixedSchedules) — dùng cho postScheduleTagHtml() để tag trên card phản ánh đúng cả 2 loại
+// lịch, giống hệt commentScheduleMap/commentScheduleTagHtml bên tab Comment. Trước bản này, bài
+// lên lịch qua "Dàn" + lặp lại hàng ngày không set ngay_dang/gio_dang nên tag vẫn hiện "+ Hẹn giờ"
+// như chưa có lịch — chỉ thấy lịch thật qua 1 list riêng (đã bỏ).
+async function loadPostScheduleMap() {
+  const d = await chrome.storage.local.get(['activityUpcoming', 'dailyFixedSchedules']);
+  const map = {};
+  (d.activityUpcoming || []).forEach((u) => {
+    if (u.kind !== 'post' || !u.postId) return;
+    if (!map[u.postId] || (map[u.postId].type === 'once' && u.when < map[u.postId].when)) {
+      map[u.postId] = { type: 'once', when: u.when, item: u };
+    }
+  });
+  (d.dailyFixedSchedules || []).forEach((e) => {
+    const postId = e.payload?.posts?.[0]?.id;
+    if (e.kind !== 'post' || !postId || map[postId]?.type === 'once') return;
+    map[postId] = { type: 'daily', timeOfDay: e.timeOfDay, item: e };
+  });
+  return map;
+}
+
+async function cancelPostDailySchedule(postId) {
+  const info = state.postScheduleMap[postId];
+  if (!info?.item) return;
+  if (!window.confirm('Hủy lịch lặp lại hàng ngày của bài này?')) return;
+  await cancelDailyFixedSchedule(info.item.id);
 }
 
 // "Đã comment" / "Chưa comment" — tra state.serverMyPostsIndex (needs_comment lấy từ
@@ -2441,25 +2448,26 @@ function commentStatusTagHtml(p) {
   return `<span class="tag pending">💬 Chưa comment</span>`;
 }
 
+// Bấm tag lịch trên 1 bài → tick riêng bài đó + mở khung Lên lịch (campaignStaggerPanel, dùng
+// chung với lên lịch hàng loạt) — prefill đúng giờ đang có của bài (nếu đã có), mặc định +5 phút
+// nếu chưa có. Xác nhận với đúng 1 bài đã tick = hẹn giờ riêng bài đó (giãn cách không có ý nghĩa
+// khi chỉ 1 bài).
 async function focusPostScheduleEdit(postId) {
   const post = state.posts.find((p) => p.id === postId);
   if (!post) return;
   state.posts.forEach((p) => { p.selected = p.id === postId; });
   await savePosts();
-  syncQueueScheduleFooterFromSelection();
-  if (!post.ngay_dang || !post.gio_dang) {
-    initQueueScheduleDefaults();
-    const footer = readQueueScheduleFields();
-    if (footer.ngay_dang && footer.gio_dang) {
-      post.ngay_dang = footer.ngay_dang;
-      post.gio_dang = footer.gio_dang;
-      await savePostsQuiet();
-    }
-  }
   updateBatchFooter();
   renderPosts();
-  $('#batchFooterGlobal')?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
-  window.setTimeout(() => $('#queueScheduleTime')?.focus(), 200);
+  const panel = $('#campaignStaggerPanel');
+  const startEl = $('#campaignStaggerStart');
+  if (startEl) {
+    startEl.value = (post.ngay_dang && post.gio_dang)
+      ? `${post.ngay_dang}T${normalizeGioForTimeInput(post.gio_dang)}`
+      : defaultScheduleWhenValue(5);
+  }
+  panel?.classList.remove('hidden');
+  panel?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
 }
 
 function updateBatchFooter() {
@@ -2468,14 +2476,13 @@ function updateBatchFooter() {
   const label = $('#batchFooterLabel');
   if (label) {
     if (!total) {
-      label.textContent = 'Tick bài → chọn ngày/giờ → Lên lịch';
+      label.textContent = 'Tick bài → Lên lịch';
     } else if (!selected) {
       label.textContent = `${total} bài — tick để hẹn lịch · đăng ngay: nút Đăng trên từng card`;
     } else {
-      label.textContent = `${selected}/${total} bài đã chọn — Lên lịch hoặc Dàn`;
+      label.textContent = `${selected}/${total} bài đã chọn — Lên lịch`;
     }
   }
-  syncQueueScheduleFooterFromSelection();
 }
 
 function getFilteredPosts() {
@@ -2613,6 +2620,12 @@ function renderPosts() {
       focusPostScheduleEdit(btn.dataset.editSchedule);
     });
   });
+  box.querySelectorAll('[data-cancel-post-daily]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cancelPostDailySchedule(btn.dataset.cancelPostDaily);
+    });
+  });
   box.querySelectorAll('[data-post-now]').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2658,6 +2671,7 @@ function renderGroupsTab() {
   renderCustomSetQuickBar();
   renderGroupLibrary();
   renderCustomSets();
+  renderRadarGroupPicker();
   syncCustomSetToolbarUI();
   const countEl = $('#groupCount');
   if (countEl) countEl.textContent = String(state.groups.length);
@@ -2959,16 +2973,6 @@ function getSelectedPosts() {
   return state.posts.filter((p) => p.selected === true);
 }
 
-function buildPostJob(sync = true) {
-  const posts = getSelectedPosts().map((p) => ensurePostGroups({ ...p }));
-  if (!posts.length) throw new Error('Chọn ít nhất 1 bài (tick checkbox)');
-  const missing = posts.filter((p) => !p.groupIds.length);
-  if (missing.length) {
-    throw new Error(`${missing.length} bài chưa có nhóm — sang tab Nhóm để gán`);
-  }
-  return { posts, sync };
-}
-
 function stripPostForJob(post) {
   const lite = { ...post };
   delete lite.imageBase64;
@@ -3007,69 +3011,6 @@ async function cancelPostScheduleAlarms(postId) {
     if (name) await gfSendMessage({ type: 'GF_CANCEL_ALARM', name }).catch(() => {});
   }
   return upcoming.filter((u) => !(u.kind === 'post' && u.postId === postId));
-}
-
-/** Đăng ký Chrome alarm + activityUpcoming cho một bài (gọi khi đổi giờ hoặc Lên lịch). */
-async function upsertSinglePostSchedule(post, settings, upcoming, seq = 0) {
-  if (!post.groupIds?.length) {
-    throw new Error('Chưa có nhóm — gán nhóm trước khi hẹn giờ');
-  }
-  const when = GF.scheduler.parseScheduleDate(post.ngay_dang, post.gio_dang);
-  if (!when) throw new Error('Ngày/giờ không hợp lệ');
-  if (when <= Date.now()) throw new Error('Giờ đăng phải trong tương lai');
-
-  if (postNeedsScheduledImage(post)) {
-    const imageWhen = GF.scheduler.parseScheduleDate(post.anh_ngay_dang, post.anh_gio_dang);
-    if (imageWhen) {
-      if (imageWhen >= when) throw new Error('Lịch xuất ảnh phải trước giờ đăng');
-      if (imageWhen < Date.now()) throw new Error('Lịch xuất ảnh phải trong tương lai');
-      await scheduleImageAlarm(post, imageWhen, upcoming);
-    }
-  }
-
-  const alarmName = `gf_job_${post.id}_${Date.now()}_${seq}`;
-  const payload = buildSchedulePostPayload([post], settings);
-  await gfScheduleAlarm({
-    name: alarmName,
-    when,
-    data: { kind: 'post', payload },
-  });
-  upcoming.push({
-    id: alarmName,
-    alarmName,
-    kind: 'post',
-    when,
-    postId: post.id,
-    snippet: post.noi_dung?.slice(0, 80) || '',
-    groupIds: [...post.groupIds],
-    payload,
-    label: `Đăng → ${formatGroupList(post.groupIds)}`,
-  });
-  return alarmName;
-}
-
-async function commitPostSchedules(posts, { toast = true } = {}) {
-  const settings = await GF.storage.getSettings();
-  let upcoming = (await chrome.storage.local.get('activityUpcoming')).activityUpcoming || [];
-  const ids = new Set(posts.map((p) => p.id));
-  for (const item of upcoming.filter((u) => u.kind === 'post' && ids.has(u.postId))) {
-    const name = item.alarmName || item.id;
-    if (name) await gfSendMessage({ type: 'GF_CANCEL_ALARM', name }).catch(() => {});
-  }
-  upcoming = upcoming.filter((u) => !(u.kind === 'post' && ids.has(u.postId)));
-  for (let i = 0; i < posts.length; i += 1) {
-    await upsertSinglePostSchedule(posts[i], settings, upcoming, i);
-  }
-  await chrome.storage.local.set({ activityUpcoming: upcoming });
-  if (toast) {
-    const n = posts.length;
-    showToast(
-      n === 1 ? 'Đã hẹn đăng — extension chạy đúng giờ (giữ Chrome mở)' : `Đã hẹn ${n} bài`,
-      'success',
-      4500,
-    );
-  }
-  return posts.length;
 }
 
 async function handleComposePostAction() {
@@ -3179,97 +3120,7 @@ function postAutoImageToggleHtml(p, hasMedia) {
     </label>`;
 }
 
-function readQueueScheduleFields() {
-  return {
-    ngay_dang: $('#queueScheduleDate')?.value || '',
-    gio_dang: $('#queueScheduleTime')?.value || '',
-  };
-}
-
-function readEditScheduleFields() {
-  return {
-    ngay_dang: $('#editScheduleDate')?.value || '',
-    gio_dang: $('#editScheduleTime')?.value || '',
-  };
-}
-
-function initQueueScheduleDefaults() {
-  const dateEl = $('#queueScheduleDate');
-  const timeEl = $('#queueScheduleTime');
-  if (!dateEl || !timeEl || dateEl.value) return;
-  const d = new Date(Date.now() + 60 * 60 * 1000);
-  const pad = (n) => String(n).padStart(2, '0');
-  dateEl.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  timeEl.value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-/**
- * Gán ngay_dang/gio_dang cho bài chưa có lịch: ưu tiên ô sửa bài, rồi thanh queue.
- */
-async function applyQueueScheduleToPosts(posts, { save = false, allowEditOverride = false } = {}) {
-  const footer = readQueueScheduleFields();
-  const missing = [];
-  for (const post of posts) {
-    if (allowEditOverride && state.editingQueuePostId === post.id) {
-      const edit = readEditScheduleFields();
-      if (edit.ngay_dang && edit.gio_dang) {
-        post.ngay_dang = edit.ngay_dang;
-        post.gio_dang = edit.gio_dang;
-        continue;
-      }
-    }
-    if (footer.ngay_dang && footer.gio_dang) {
-      post.ngay_dang = footer.ngay_dang;
-      post.gio_dang = footer.gio_dang;
-    } else if (!post.ngay_dang || !post.gio_dang) {
-      missing.push(post);
-    }
-  }
-  if (missing.length) {
-    throw new Error('Chọn ngày/giờ ở thanh dưới (hoặc Sửa bài để hẹn giờ riêng)');
-  }
-  if (save) await savePosts();
-  return posts;
-}
-
-async function schedulePost() {
-  try {
-  let posts;
-  try {
-    if (!getSelectedPosts().length && composerHasDraftText()) {
-      await saveComposePostToQueue({ selectOnly: true });
-    }
-    posts = buildPostJob(true).posts;
-  } catch (e) {
-    return alert(e.message);
-  }
-
-  try {
-    await applyQueueScheduleToPosts(posts, {
-      save: true,
-      allowEditOverride: Boolean(state.editingQueuePostId),
-    });
-  } catch (e) {
-    return alert(e.message);
-  }
-
-  for (const post of posts) {
-    const postWhen = GF.scheduler.parseScheduleDate(post.ngay_dang, post.gio_dang);
-    if (!postWhen || postWhen < Date.now()) {
-      alert(`Bài «${(post.noi_dung || '').slice(0, 40)}…» cần ngày/giờ đăng trong tương lai.`);
-      return;
-    }
-  }
-
-  const scheduled = await commitPostSchedules(posts, { toast: false });
-  alert(scheduled === 1 ? 'Đã lên lịch 1 bài' : `Đã lên lịch ${scheduled} bài`);
-  loadState();
-  } catch (e) {
-    alert(e.message || 'Lên lịch thất bại');
-  }
-}
-
-// "Dàn" không còn bắt buộc đã chọn nhóm trước — bài chưa gán nhóm vẫn lên lịch được, tới giờ
+// "Dàn"/"Lên lịch đã chọn" không còn bắt buộc đã chọn nhóm trước — bài chưa gán nhóm vẫn lên lịch được, tới giờ
 // chạy nếu vẫn chưa có nhóm thì runPostMatrix() tự bỏ qua đúng bài đó + báo lỗi trong Log (xem
 // background.js), không chặn cả job.
 function buildPostJobRelaxed() {
@@ -3295,6 +3146,7 @@ function toggleCampaignStaggerPanel() {
 async function refreshPostsOnly() {
   const d = await chrome.storage.local.get('postQueue');
   state.posts = mapPostsFromQueue(d.postQueue || []);
+  state.postScheduleMap = await loadPostScheduleMap();
   renderPosts();
   await refreshActivityFromStorage();
 }
@@ -3306,7 +3158,6 @@ async function confirmCampaignStagger() {
   } catch (e) {
     return alert(e.message);
   }
-  if (posts.length < 2) return alert('Chọn ít nhất 2 bài để lên lịch dàn');
 
   const input = $('#campaignStaggerStart')?.value;
   if (!input) return alert('Chọn giờ bắt đầu');
@@ -3320,8 +3171,12 @@ async function confirmCampaignStagger() {
   const repeatDaily = $('#campaignStaggerRepeatDaily')?.checked === true;
 
   const confirmMsg = repeatDaily
-    ? `Lặp lại hàng ngày ${posts.length} bài, cách nhau ${gapValue} ${gapUnitLabel(gapUnit)}?`
-    : `Lên lịch dàn ${posts.length} bài, cách nhau ${gapValue} ${gapUnitLabel(gapUnit)}?`;
+    ? (posts.length > 1
+      ? `Lặp lại hàng ngày ${posts.length} bài, cách nhau ${gapValue} ${gapUnitLabel(gapUnit)}?`
+      : 'Lặp lại hàng ngày bài này?')
+    : (posts.length > 1
+      ? `Lên lịch ${posts.length} bài, cách nhau ${gapValue} ${gapUnitLabel(gapUnit)}?`
+      : 'Lên lịch bài này?');
   if (!window.confirm(confirmMsg)) return;
 
   const settings = await GF.storage.getSettings();
@@ -3365,7 +3220,9 @@ async function confirmCampaignStagger() {
         snippet: post.noi_dung?.slice(0, 80) || '',
         groupIds: [...post.groupIds],
         payload,
-        label: `Dàn ${i + 1}/${posts.length} — ${post.groupIds?.length ? formatGroupList(post.groupIds) : 'chưa chọn nhóm'}`,
+        label: posts.length > 1
+          ? `Lịch ${i + 1}/${posts.length} — ${post.groupIds?.length ? formatGroupList(post.groupIds) : 'chưa chọn nhóm'}`
+          : `Đăng → ${post.groupIds?.length ? formatGroupList(post.groupIds) : 'chưa chọn nhóm'}`,
       });
     }
     await chrome.storage.local.set({ activityUpcoming: upcoming });
@@ -3373,7 +3230,7 @@ async function confirmCampaignStagger() {
 
   await savePosts();
   $('#campaignStaggerPanel')?.classList.add('hidden');
-  showToast(`Đã ${repeatDaily ? 'đặt lặp lại hàng ngày' : 'lên lịch dàn'} ${posts.length} bài`, 'success');
+  showToast(`Đã ${repeatDaily ? 'đặt lặp lại hàng ngày' : 'lên lịch'} ${posts.length} bài`, 'success');
   await refreshPostsOnly();
 }
 
@@ -3444,10 +3301,11 @@ async function rescheduleUpcoming(item) {
   loadState();
 }
 
-async function loadPostedPostsForComment() {
-  const d = await chrome.storage.local.get(['postQueue', 'serverMyPosts']);
+async function loadPostedPostsForComment({ force = false } = {}) {
+  const d = await chrome.storage.local.get(['postQueue', 'serverMyPosts', 'commentedRecords']);
   const queue = d.postQueue || [];
   const serverMyPosts = d.serverMyPosts || [];
+  state.commentedRecords = d.commentedRecords || {};
 
   const localPosts = queue
     .filter((p) => p.postStatus === 'posted'
@@ -3475,7 +3333,7 @@ async function loadPostedPostsForComment() {
       }],
     }));
 
-  const crossPosts = await fetchCrossPostsFromServer();
+  const crossPosts = await fetchCrossPostsFromServer({ force });
   const crossItems = crossPosts.map((cp) => ({
     id: `cross_${cp.id}`,
     _serverId: cp.id,
@@ -3495,15 +3353,16 @@ async function loadPostedPostsForComment() {
   }));
 
   state.comments = [...localPosts, ...myServerItems, ...crossItems];
+  await autoFillMissingCommentDrafts();
   state.commentScheduleMap = await loadCommentScheduleMap();
   await autoScheduleUnscheduledComments();
   state.commentScheduleMap = await loadCommentScheduleMap();
   populateCommentFilterPersonOptions();
-  // Badge chỉ đếm bài còn CẦN chú ý (bài của mình + bài đồng đội chưa comment) — không tính bài
-  // cross đã comment rồi, vì server giờ trả cả bài đã xong (không lọc mất như trước) nên đếm hết
-  // state.comments.length sẽ không còn phản ánh đúng "còn N việc cần làm" nữa.
+  // Badge chỉ đếm bài còn CẦN chú ý (chưa comment) — áp dụng chung cho cả bài của mình lẫn bài
+  // đồng đội qua isCommentDone(), không tính bài đã xong (server/postedGroups đều giữ bài đã xong
+  // trong danh sách thay vì lọc mất, nên đếm hết state.comments.length sẽ sai nghĩa "còn N việc").
   const badge = $('#commentBadge');
-  const pendingCount = state.comments.filter((c) => c._needsComment !== false).length;
+  const pendingCount = state.comments.filter((c) => !isCommentDone(c)).length;
   if (badge) badge.textContent = pendingCount ? String(pendingCount) : '';
   if ($('#tab-comment')?.classList.contains('active')) renderComments();
 }
@@ -3517,15 +3376,75 @@ async function loadCommentScheduleMap() {
   (d.activityUpcoming || []).forEach((u) => {
     if (u.kind !== 'comment' || !u.recordId) return;
     if (!map[u.recordId] || (map[u.recordId].type === 'once' && u.when < map[u.recordId].when)) {
-      map[u.recordId] = { type: 'once', when: u.when };
+      map[u.recordId] = { type: 'once', when: u.when, item: u };
     }
   });
   (d.dailyFixedSchedules || []).forEach((e) => {
     const postQueueId = e.payload?.post_queue_id;
     if (e.kind !== 'comment' || !postQueueId || map[postQueueId]?.type === 'once') return;
-    map[postQueueId] = { type: 'daily', timeOfDay: e.timeOfDay };
+    map[postQueueId] = { type: 'daily', timeOfDay: e.timeOfDay, item: e };
   });
   return map;
+}
+
+// Hủy lịch comment (1 lần hoặc lặp lại hàng ngày) ngay trên bài — thay cho list riêng đã bỏ, giữ
+// nguyên hành vi Hủy vốn có (cancelUpcoming cho 1 lần, cancelDailyFixedSchedule cho lặp lại).
+async function cancelCommentSchedule(postId) {
+  const info = state.commentScheduleMap[postId];
+  if (!info?.item) return;
+  if (!window.confirm('Hủy lịch comment bài này?')) return;
+  if (info.type === 'daily') {
+    await cancelDailyFixedSchedule(info.item.id);
+  } else {
+    await cancelUpcoming(info.item);
+  }
+  state.commentScheduleOpenId = null;
+  await loadComments();
+}
+
+// Bài đã được comment xong hay chưa — dùng chung cho tag "✓ Đã comment" và filter Bình luận, áp
+// dụng cho cả bài của mình (theo firstCommentOk từng nhóm, ghi bởi markPostedGroupCommented() —
+// background.js) lẫn bài đồng đội (theo needs_comment server trả về).
+//
+// v1.0.185 — ưu tiên state.commentedRecords (ghi cục bộ ngay khi comment lên FB thành công, xem
+// markCommentDoneLocal() trong background.js) TRƯỚC 2 nguồn còn lại. Trước bản này, bài
+// `_source: 'server'` (bài của mình kéo về từ thiết bị khác) không có trong postQueue cục bộ nên
+// markPostedGroupCommented() luôn no-op — và bài `_source: 'cross'` chỉ tin vào PATCH best-effort
+// (markCrossPostCommentedFromBg) im lặng nuốt lỗi khi fail (401 sai license key, mất mạng…). Cả 2
+// trường hợp khiến isCommentDone() luôn trả false dù đã comment xong thật — mỗi lần mở/làm mới tab
+// Comment, autoScheduleUnscheduledComments() lại coi là "chưa xong" rồi tự lên lịch + chạy lại,
+// comment trùng lặp lên cùng 1 bài FB vô hạn lần. commentedRecords không phụ thuộc network nào nên
+// luôn đúng ngay cả khi các nguồn kia fail.
+function isCommentDone(c) {
+  const validGroups = (c.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
+  if (validGroups.length > 0) {
+    const local = state.commentedRecords?.[c.id];
+    if (local && validGroups.every((g) => local[String(g.group_id)])) return true;
+  }
+  if (c._source === 'cross') return c._needsComment === false;
+  return validGroups.length > 0 && validGroups.every((g) => g.firstCommentOk === true);
+}
+
+// Bài chưa có mẫu bình luận (ô draft trống) thì tự random 1 dòng từ Settings → Comment mẫu ngay
+// khi tải danh sách — áp dụng cho MỌI bài (không chỉ bài sắp được auto-lên-lịch), để tag "📝 Có mẫu
+// bình luận" hiện đúng ngay cả khi user chưa tự tay soạn, và user thấy trước nội dung sẽ gửi (vẫn
+// sửa được — gõ đè vào ô mẫu như bình thường). state.commentDrafts không persist ra storage nên mỗi
+// lần mở panel có thể random ra dòng khác nếu vẫn chưa tự sửa/lên lịch — bài đã lên lịch thì nội
+// dung đã chốt cứng trong job (activityUpcoming/dailyFixedSchedules), không bị đổi bởi việc này.
+async function autoFillMissingCommentDrafts() {
+  const settings = await GF.storage.getSettings();
+  const templates = settings.commentTemplates || GF.commentTemplates?.DEFAULT || '';
+  if (!templates) return;
+  state.comments.forEach((c) => {
+    if (!state.commentDrafts[c.id]?.trim()) {
+      // Gán nguyên DÒNG mẫu thô (cả cụm spintax {a|b|c|d|e}), KHÔNG spin sẵn thành 1 câu cố định —
+      // giữ nguyên `{...}` để resolveJobComment() (background.js) tự spin MỚI mỗi lần chạy thật.
+      // Trước đây dùng resolve() spin ngay lúc gán → mất hết 5 lựa chọn, bài lặp lại hàng ngày sẽ
+      // luôn gửi y hệt 1 câu mãi mãi thay vì random lại mỗi lần.
+      const picked = GF.commentTemplates.pickLine(templates);
+      if (picked) state.commentDrafts[c.id] = picked;
+    }
+  });
 }
 
 // Bài/comment nào CHƯA có lịch (không có trong state.commentScheduleMap) — luôn tự động, không
@@ -3535,22 +3454,13 @@ async function loadCommentScheduleMap() {
 // lượt trước sẽ không bị đụng tới nữa. avoidNightTime() (trong scheduleCommentJobsOnce) tự tránh
 // khung 22:00–07:00 cho từng mốc.
 async function autoScheduleUnscheduledComments() {
-  const unscheduled = state.comments.filter((c) => !state.commentScheduleMap[c.id] && c._needsComment !== false);
+  const unscheduled = state.comments.filter((c) => !state.commentScheduleMap[c.id] && !isCommentDone(c));
   if (!unscheduled.length) return;
 
-  // Random mẫu ngay lúc auto-lên-lịch (không để trống chờ resolve lúc chạy) — vừa để card hiện
-  // đúng tag "📝 Có mẫu" thay vì "+ Nhập mẫu" gây hiểu lầm là chưa có nội dung, vừa để job mang
-  // sẵn nội dung cụ thể. Chỉ resolve 1 lần vì đây là lịch 1 lần cụ thể, không lặp lại — không phạm
-  // vào lý do giữ draft thô của lịch lặp lại hàng ngày (cần random LẠI mỗi ngày, xem
-  // buildRawJobsForOneComment()).
-  const settings = await GF.storage.getSettings();
-  const templates = settings.commentTemplates || GF.commentTemplates?.DEFAULT || '';
+  // Mẫu đã được autoFillMissingCommentDrafts() random sẵn (gọi trước hàm này trong
+  // loadPostedPostsForComment()) — chỉ còn gom job theo draft hiện có.
   const jobGroups = [];
   for (const c of unscheduled) {
-    if (!state.commentDrafts[c.id]?.trim() && templates) {
-      const picked = GF.commentTemplates.resolve('', templates);
-      if (picked) state.commentDrafts[c.id] = picked;
-    }
     const jobs = buildRawJobsForOneComment(c.id, { alertOnEmpty: false });
     if (jobs?.length) jobGroups.push(jobs);
   }
@@ -3639,15 +3549,14 @@ async function runTidienSyncNow() {
   }
 }
 
-async function loadComments() {
-  await loadPostedPostsForComment();
+async function loadComments({ force = false } = {}) {
+  await loadPostedPostsForComment({ force });
   if (!state.comments.length) {
     const box = $('#commentList');
     if (box) box.innerHTML = emptyState('💬', 'Chưa có bài đã đăng — đăng bài qua GroupFlow trước');
   } else {
     renderComments();
   }
-  renderDailyFixedSchedules();
 }
 
 function defaultScheduleWhenValue(minutesFromNow = 30) {
@@ -3719,33 +3628,25 @@ async function addDailyFixedSchedules(entries) {
   const list = d.dailyFixedSchedules || [];
   list.push(...entries);
   await chrome.storage.local.set({ dailyFixedSchedules: list });
-  renderDailyFixedSchedules();
+  await refreshScheduleTags();
 }
 
-async function renderDailyFixedSchedules() {
-  const d = await chrome.storage.local.get('dailyFixedSchedules');
-  const list = d.dailyFixedSchedules || [];
-  renderDailyFixedScheduleGroup(list.filter((s) => s.kind === 'comment'), $('#commentDailyScheduleList'), $('#commentDailyScheduleItems'));
-  renderDailyFixedScheduleGroup(list.filter((s) => s.kind === 'post'), $('#postDailyScheduleList'), $('#postDailyScheduleItems'));
-}
-
-function renderDailyFixedScheduleGroup(list, wrap, box) {
-  if (!wrap || !box) return;
-  wrap.classList.toggle('hidden', !list.length);
-  if (!list.length) { box.innerHTML = ''; return; }
-  box.innerHTML = list.map((s) => `
-    <div class="list-item">
-      <div>${esc((s.label || 'Lịch').slice(0, 70))}</div>
-      <div class="hint">${esc(s.timeOfDay)} hàng ngày${s.lastRunDate ? ` · lần cuối ${esc(s.lastRunDate)}` : ' · chưa chạy lần nào'}</div>
-      <button type="button" class="btn ghost sm" data-cancel-daily-fixed="${escAttr(s.id)}">Huỷ lặp lại</button>
-    </div>`).join('');
+// Lịch lặp lại hàng ngày (post lẫn comment) không còn list riêng nữa — hiện ngay trên tag của
+// từng bài trong danh sách tương ứng (postScheduleTagHtml / commentScheduleTagHtml), kèm nút Hủy
+// ngay trên tag/panel sửa lịch của đúng bài đó (cancelPostDailySchedule / cancelCommentSchedule).
+// Hàm này đồng bộ lại cả 2 map sau khi thêm/hủy 1 lịch lặp lại, dùng chung cho cả 2 tab.
+async function refreshScheduleTags() {
+  state.postScheduleMap = await loadPostScheduleMap();
+  state.commentScheduleMap = await loadCommentScheduleMap();
+  renderPosts();
+  renderComments();
 }
 
 async function cancelDailyFixedSchedule(id) {
   const d = await chrome.storage.local.get('dailyFixedSchedules');
   const list = (d.dailyFixedSchedules || []).filter((s) => s.id !== id);
   await chrome.storage.local.set({ dailyFixedSchedules: list });
-  renderDailyFixedSchedules();
+  await refreshScheduleTags();
 }
 
 // Format giống postScheduleTagHtml (ngay_dang + gio_dang) để tag lịch ở Comment và Tạo bài nhìn
@@ -3769,13 +3670,13 @@ function commentScheduleTagHtml(c) {
 
 function commentTemplateTagHtml(c, draft) {
   return draft
-    ? `<button type="button" class="tag ready tag-clickable" data-toggle-comment-editor="${escAttr(c.id)}" title="Bấm sửa mẫu">📝 Có mẫu</button>`
-    : `<button type="button" class="tag pending tag-clickable" data-toggle-comment-editor="${escAttr(c.id)}" title="Nhập mẫu comment">+ Nhập mẫu</button>`;
+    ? `<button type="button" class="tag ready tag-clickable" data-toggle-comment-editor="${escAttr(c.id)}" title="Bấm sửa mẫu bình luận">📝 Có mẫu bình luận</button>`
+    : `<button type="button" class="tag pending tag-clickable" data-toggle-comment-editor="${escAttr(c.id)}" title="Nhập mẫu bình luận">+ Nhập mẫu bình luận</button>`;
 }
 
-// 3 filter độc lập, kết hợp AND với nhau — Người (Tất cả/Của tôi/tên đồng đội), Mẫu (Có/Chưa có
-// mẫu), Lịch (Đã/Chưa lên lịch). Select thường (`gf-select-sm`), giống hệt "Nhóm:"/"Ảnh:" ở tab
-// Tạo bài — không dùng combobox gõ-tìm riêng nữa.
+// 4 filter độc lập, kết hợp AND với nhau — Người (Tất cả/Của tôi/tên đồng đội), Mẫu bình luận
+// (Có/Chưa có), Lịch (Đã/Chưa lên lịch), Bình luận (Đã/Chưa comment). Select thường
+// (`gf-select-sm`), giống hệt "Nhóm:"/"Ảnh:" ở tab Tạo bài — không dùng combobox gõ-tìm riêng nữa.
 function getFilteredComments() {
   let list = state.comments;
   const person = state.commentFilterPerson || 'all';
@@ -3791,6 +3692,9 @@ function getFilteredComments() {
   const sch = state.commentFilterSchedule || 'all';
   if (sch === 'has') list = list.filter((c) => Boolean(state.commentScheduleMap[c.id]));
   else if (sch === 'none') list = list.filter((c) => !state.commentScheduleMap[c.id]);
+  const status = state.commentFilterStatus || 'all';
+  if (status === 'done') list = list.filter((c) => isCommentDone(c));
+  else if (status === 'pending') list = list.filter((c) => !isCommentDone(c));
   return list;
 }
 
@@ -3831,6 +3735,11 @@ function bindCommentFilters() {
     state.commentsPage = 0;
     renderComments();
   });
+  $('#commentFilterStatus')?.addEventListener('change', (e) => {
+    state.commentFilterStatus = e.target.value;
+    state.commentsPage = 0;
+    renderComments();
+  });
 }
 
 function renderComments() {
@@ -3867,13 +3776,12 @@ function renderComments() {
       : '';
     const postedAt = c.lastPostedAt ? new Date(c.lastPostedAt).toLocaleString('vi') : '';
     const crossLabel = c._source === 'cross' ? `<span class="tag web">↔ ${esc(c._userLabel || 'cross')}</span>` : '';
-    // Server không lọc bỏ bài đã comment nữa (needs_comment=0 vẫn trả về) — hiện tag để biết đã
-    // xong, thay vì bài biến mất hẳn khỏi danh sách như trước.
-    const commentedTag = c._source === 'cross' && c._needsComment === false
-      ? '<span class="tag ready">✓ Đã comment</span>'
-      : '';
+    // Bài đã comment xong không bị lọc mất khỏi danh sách (dù của mình hay đồng đội) — chỉ gắn tag
+    // để biết trạng thái, dùng chung isCommentDone() cho cả 2 nguồn.
+    const commentedTag = isCommentDone(c) ? '<span class="tag ready">✓ Đã comment</span>' : '';
     const editorOpen = state.commentEditorOpenId === c.id;
     const scheduleOpen = state.commentScheduleOpenId === c.id;
+    const hasSchedule = Boolean(state.commentScheduleMap[c.id]);
 
     return `
     <div class="list-item post-card comment-item">
@@ -3910,6 +3818,7 @@ function renderComments() {
           <span>Lặp lại hàng ngày (đúng giờ này)</span>
         </label>
         <button type="button" class="btn primary sm" data-confirm-item-schedule="${escAttr(c.id)}" style="margin-top:8px">Xác nhận lên lịch</button>
+        ${hasSchedule ? `<button type="button" class="btn ghost sm accent" data-cancel-comment-schedule="${escAttr(c.id)}" style="margin-top:8px">🗑 Hủy lịch</button>` : ''}
       </div>`}
     </div>`;
   }).join('') + pagerHtml('comments', page, totalPages);
@@ -3955,6 +3864,9 @@ function renderComments() {
       const repeatDaily = panel.querySelector('.item-schedule-repeat-daily')?.checked === true;
       await scheduleOneComment(id, panel.querySelector('.item-schedule-when'), repeatDaily);
     });
+  });
+  box.querySelectorAll('[data-cancel-comment-schedule]').forEach((btn) => {
+    btn.addEventListener('click', () => cancelCommentSchedule(btn.dataset.cancelCommentSchedule));
   });
 
   box.querySelectorAll('[data-draft]').forEach((ta) => {
@@ -4586,20 +4498,133 @@ function renderActivity(upcoming, history) {
 }
 
 function renderLeads(leads) {
-  const newCount = leads.filter((l) => l.status === 'new').length;
-  $('#radarBadge').textContent = newCount ? String(newCount) : '';
-  $('#leadList').innerHTML = leads.length
-    ? leads.slice(0, 50).map((l) => `
-    <div class="list-item">
+  state.radarLeads = leads || [];
+  const newCount = state.radarLeads.filter((l) => l.status === 'new').length;
+  const badge = $('#radarBadge');
+  if (badge) badge.textContent = newCount ? String(newCount) : '';
+
+  const q = ($('#leadSearch')?.value || '').trim().toLowerCase();
+  const statusFilter = state.leadFilterStatus || 'all';
+  const filtered = state.radarLeads.filter((l) => {
+    if (statusFilter !== 'all' && (l.status || 'new') !== statusFilter) return false;
+    if (!q) return true;
+    return (l.author_name || '').toLowerCase().includes(q) || (l.snippet || '').toLowerCase().includes(q);
+  });
+
+  $('#leadList').innerHTML = filtered.length
+    ? filtered.slice(0, 50).map((l) => `
+    <div class="list-item ${l.status === 'seen' ? 'lead-seen' : ''}">
       <div class="post-meta">
         <span class="tag">${esc(l.group_name || l.group_id)}</span>
+        ${l.author_name ? `<span class="tag">${esc(l.author_name)}</span>` : ''}
         <span class="tag pending">${esc(l.found_at || '')}</span>
+        ${l.status === 'seen' ? '<span class="tag ready">Đã xem</span>' : ''}
       </div>
       <div class="post-body">${esc(l.snippet || '')}</div>
-      ${l.post_url ? `<a href="${l.post_url}" target="_blank" rel="noopener">Mở bài</a>` : ''}
+      <div class="post-actions">
+        ${l.post_url ? `<a href="${escAttr(l.post_url)}" target="_blank" rel="noopener" class="btn ghost sm">Mở bài</a>` : ''}
+        ${l.status !== 'seen' ? `<button type="button" class="btn ghost sm" data-lead-seen="${escAttr(l.id)}">✓ Đã xem</button>` : ''}
+        <button type="button" class="btn ghost sm accent" data-lead-delete="${escAttr(l.id)}">Xóa</button>
+      </div>
     </div>
   `).join('')
     : emptyState('◎', 'Chưa có lead — bật Radar và quét');
+
+  $('#leadList').querySelectorAll('[data-lead-seen]').forEach((btn) => {
+    btn.addEventListener('click', () => setLeadStatus(btn.dataset.leadSeen, 'seen'));
+  });
+  $('#leadList').querySelectorAll('[data-lead-delete]').forEach((btn) => {
+    btn.addEventListener('click', () => deleteLead(btn.dataset.leadDelete));
+  });
+}
+
+async function setLeadStatus(id, status) {
+  const leads = state.radarLeads.map((l) => (l.id === id ? { ...l, status } : l));
+  await chrome.storage.local.set({ radarLeads: leads });
+  renderLeads(leads);
+}
+
+async function deleteLead(id) {
+  const leads = state.radarLeads.filter((l) => l.id !== id);
+  await chrome.storage.local.set({ radarLeads: leads });
+  renderLeads(leads);
+}
+
+async function clearAllLeads() {
+  if (!state.radarLeads.length) return;
+  if (!window.confirm(`Xóa toàn bộ ${state.radarLeads.length} lead?`)) return;
+  await chrome.storage.local.set({ radarLeads: [] });
+  renderLeads([]);
+}
+
+function downloadTextFile(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function exportLeadsCsv() {
+  const rows = [['group_name', 'author_name', 'snippet', 'matched_keywords', 'post_url', 'found_at', 'status']];
+  state.radarLeads.forEach((l) => {
+    rows.push([
+      l.group_name || l.group_id || '',
+      l.author_name || '',
+      (l.snippet || '').replace(/\n/g, ' '),
+      (l.matched_keywords || []).join('|'),
+      l.post_url || '',
+      l.found_at || '',
+      l.status || 'new',
+    ]);
+  });
+  const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  downloadTextFile(`groupflow-leads-${Date.now()}.csv`, `﻿${csv}`, 'text/csv;charset=utf-8');
+}
+
+function exportLeadsJson() {
+  downloadTextFile(`groupflow-leads-${Date.now()}.json`, JSON.stringify(state.radarLeads, null, 2), 'application/json');
+}
+
+function filterGroupsForRadar(groups) {
+  const q = $('#radarGroupSearch')?.value || '';
+  return (groups || []).filter((g) => !q || groupMatchesSearch(g.name, q));
+}
+
+function renderRadarGroupPicker() {
+  const box = $('#radarGroupList');
+  if (!box) return;
+  const filtered = filterGroupsForRadar(state.groups);
+  const pickerIds = state.radarGroupIds;
+  const countEl = $('#radarGroupCount');
+  if (countEl) countEl.textContent = String(pickerIds.size);
+
+  box.innerHTML = filtered.length
+    ? filtered.map((g) => `
+    <label class="group-row ${pickerIds.has(String(g.id)) ? 'selected' : ''}">
+      <input type="checkbox" data-radar-picker-group="${g.id}" ${pickerIds.has(String(g.id)) ? 'checked' : ''} />
+      <span class="group-avatar">${esc(groupInitial(g.name))}</span>
+      <span class="group-info">
+        <span class="group-name">${esc(g.name)}</span>
+      </span>
+    </label>
+  `).join('')
+    : emptyState('◎', state.groups.length ? 'Không có nhóm khớp tìm kiếm' : 'Đang chờ đồng bộ nhóm từ Facebook…');
+
+  const selectAll = $('#radarSelectAllGroups');
+  if (selectAll) selectAll.checked = filtered.length > 0 && filtered.every((g) => pickerIds.has(String(g.id)));
+
+  box.querySelectorAll('[data-radar-picker-group]').forEach((cb) => {
+    cb.addEventListener('change', async () => {
+      const gid = String(cb.dataset.radarPickerGroup);
+      if (cb.checked) state.radarGroupIds.add(gid);
+      else state.radarGroupIds.delete(gid);
+      await GF.leadRadar.saveConfig({ radarGroupIds: [...state.radarGroupIds] });
+      renderRadarGroupPicker();
+    });
+  });
 }
 
 function updatePostingConfigSummary() {
@@ -4766,6 +4791,20 @@ async function showSyncLicenseStatus() {
 }
 
 
+// Mẫu bình luận đã lưu trong storage khớp y hệt 1 bản DEFAULT cũ (trước v1.0.182) → coi như user
+// chưa từng tự sửa, tự nâng cấp lên DEFAULT mới — nếu không, mẫu cũ sẽ mắc kẹt vĩnh viễn vì
+// getSettings() luôn ưu tiên giá trị đã lưu (dù đó chỉ là bản mặc định cũ được lưu tình cờ lúc bấm
+// Lưu Cài đặt cho mục khác) thay vì hằng số DEFAULT mới trong code.
+async function migrateLegacyCommentTemplates(saved) {
+  const trimmed = String(saved || '').trim();
+  if (!trimmed) return saved;
+  const legacy = GF.commentTemplates?.LEGACY_DEFAULTS || [];
+  if (!legacy.some((l) => l.trim() === trimmed)) return saved;
+  const upgraded = GF.commentTemplates.DEFAULT;
+  await GF.storage.saveSettings({ commentTemplates: upgraded });
+  return upgraded;
+}
+
 async function loadSettingsForm() {
   const s = await GF.storage.getSettings();
   $('#tidienBaseUrl').value = s.tidienBaseUrl;
@@ -4781,7 +4820,8 @@ async function loadSettingsForm() {
   if ($('#tidienAutoSyncEnabled')) $('#tidienAutoSyncEnabled').checked = s.tidienAutoSyncEnabled !== false;
   if ($('#tidienAutoSyncMinutes')) $('#tidienAutoSyncMinutes').value = String(s.tidienAutoSyncMinutes || 10);
   if ($('#commentTemplates')) {
-    $('#commentTemplates').value = s.commentTemplates || GF.commentTemplates?.DEFAULT || '';
+    const current = await migrateLegacyCommentTemplates(s.commentTemplates);
+    $('#commentTemplates').value = current || GF.commentTemplates?.DEFAULT || '';
   }
   updatePostModeUI();
   updateSecurityUI(s.securityLevel);
@@ -4792,6 +4832,9 @@ async function loadSettingsForm() {
   $('#radarKeywords').value = radar.keywords;
   $('#radarInterval').value = String(radar.interval);
   $('#radarPush').checked = radar.push;
+  if ($('#radarMaxGroupsPerScan')) $('#radarMaxGroupsPerScan').value = String(radar.maxGroupsPerScan);
+  if ($('#radarInPage')) $('#radarInPage').checked = radar.inPage;
+  renderRadarGroupPicker();
   $('#groupImageScheduleEnabled').checked = s.groupImageScheduleEnabled;
   $('#groupImageScheduleStart').value = String(s.groupImageScheduleStart);
   $('#groupImageScheduleEnd').value = String(s.groupImageScheduleEnd);
@@ -4912,6 +4955,15 @@ function bindEvents() {
     $('#manualPanel').classList.add('hidden');
     $('#excelPanel').classList.add('hidden');
     loadLocalSkillSelects();
+  });
+
+  $('#btnExportExcelTemplate')?.addEventListener('click', () => {
+    try {
+      const buf = GF.excel.templateArrayBuffer();
+      downloadTextFile('groupflow-import-template.xlsx', buf, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    } catch (err) {
+      alert(err.message);
+    }
   });
 
   $('#excelFile').addEventListener('change', async (e) => {
@@ -5163,11 +5215,6 @@ function bindEvents() {
   });
 
   $('#btnComposePostNow')?.addEventListener('click', handleComposePostAction);
-  $('#queueScheduleDate')?.addEventListener('change', onQueueScheduleFooterChange);
-  $('#queueScheduleTime')?.addEventListener('change', onQueueScheduleFooterChange);
-  $('#queueScheduleDate')?.addEventListener('input', onQueueScheduleFooterChange);
-  $('#queueScheduleTime')?.addEventListener('input', onQueueScheduleFooterChange);
-  $('#btnSchedule').addEventListener('click', schedulePost);
   $('#btnScheduleCampaign').addEventListener('click', toggleCampaignStaggerPanel);
   $('#btnConfirmCampaignStagger')?.addEventListener('click', confirmCampaignStagger);
   bindGapUnitDefaultReset('#campaignStaggerGapUnit', '#campaignStaggerGapValue');
@@ -5198,8 +5245,8 @@ function bindEvents() {
   });
   $('#btnRefreshComments').addEventListener('click', async () => {
     await syncLocalPostsToServer().catch(() => {});
-    await pullMyPostsFromServer().catch(() => {});
-    await loadComments();
+    await pullMyPostsFromServer({ force: true }).catch(() => {});
+    await loadComments({ force: true });
   });
   $('#btnRunAllComments').addEventListener('click', () => runAllComments());
   $('#btnScheduleComments').addEventListener('click', () => toggleCommentSchedulePanel());
@@ -5208,13 +5255,10 @@ function bindEvents() {
     document.querySelectorAll('#commentList [data-comment-id]').forEach((cb) => { cb.checked = e.target.checked; });
   });
   bindCommentFilters();
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-cancel-daily-fixed]');
-    if (btn) cancelDailyFixedSchedule(btn.dataset.cancelDailyFixed);
-  });
 
   $('#btnRadarSave').addEventListener('click', async () => {
     const interval = Number($('#radarInterval').value) || 15;
+    const maxGroupsPerScan = Number($('#radarMaxGroupsPerScan')?.value) || 10;
     const radarIds = state.radarGroupIds.size
       ? [...state.radarGroupIds]
       : [...new Set(state.posts.flatMap((p) => p.groupIds || []))];
@@ -5223,12 +5267,33 @@ function bindEvents() {
       radarKeywords: $('#radarKeywords').value,
       radarInterval: interval,
       radarPush: $('#radarPush').checked,
+      radarInPage: $('#radarInPage')?.checked !== false,
+      radarMaxGroupsPerScan: maxGroupsPerScan,
       radarGroupIds: radarIds,
     });
     state.radarGroupIds = new Set(radarIds);
+    renderRadarGroupPicker();
     await GF.leadRadar.setAlarm($('#radarActive').checked ? interval : 0);
     alert('Đã lưu radar');
   });
+  $('#radarGroupSearch')?.addEventListener('input', () => renderRadarGroupPicker());
+  $('#radarSelectAllGroups')?.addEventListener('change', async (e) => {
+    const filtered = filterGroupsForRadar(state.groups);
+    filtered.forEach((g) => {
+      if (e.target.checked) state.radarGroupIds.add(String(g.id));
+      else state.radarGroupIds.delete(String(g.id));
+    });
+    await GF.leadRadar.saveConfig({ radarGroupIds: [...state.radarGroupIds] });
+    renderRadarGroupPicker();
+  });
+  $('#leadSearch')?.addEventListener('input', () => renderLeads(state.radarLeads));
+  $('#leadFilterStatus')?.addEventListener('change', (e) => {
+    state.leadFilterStatus = e.target.value;
+    renderLeads(state.radarLeads);
+  });
+  $('#btnLeadExportCsv')?.addEventListener('click', () => exportLeadsCsv());
+  $('#btnLeadExportJson')?.addEventListener('click', () => exportLeadsJson());
+  $('#btnLeadClearAll')?.addEventListener('click', () => clearAllLeads());
   $('#btnRadarScan').addEventListener('click', () => gfSendMessage({ type: 'GF_RADAR_SCAN' }).catch(() => {}));
 
   $$('.activity-sub-tabs [data-sub]').forEach((btn) => {
@@ -5510,6 +5575,9 @@ function bindEvents() {
         updateJournalBadge(msg.data?.total || 1, true);
       }
     }
+    if (msg.type === 'GF_RADAR_UPDATED') {
+      chrome.storage.local.get('radarLeads').then((d) => renderLeads(d.radarLeads || []));
+    }
     if (msg.type === 'GF_ACTIVITY_REFRESH') {
       const posting = document.body.classList.contains('gf-posting-active');
       refreshActivityFromStorage({ forceHistorySub: posting });
@@ -5614,35 +5682,76 @@ async function syncLocalPostsToServer() {
   } catch { /* best-effort */ }
 }
 
-async function pullMyPostsFromServer() {
+// v1.0.185 — cursor theo `updated_at` (`myPostsSyncMeta.cursor`) + merge-upsert vào `serverMyPosts`
+// đã có, thay vì gọi `?limit=200` trần rồi GHI ĐÈ toàn bộ cache mỗi lần như trước (tải lại y hệt
+// 200 bài mới nhất dù phần lớn đã tải ở lần gọi trước — xem ghi chú đầu docs/GROUPFLOW.md). Lần đầu
+// (chưa có cursor) vẫn lấy đúng 200 bài mới nhất như hành vi cũ; các lần sau chỉ hỏi "cái gì ĐỔI kể
+// từ cursor" — rẻ hơn nhiều cho cả client lẫn server, và bắt được cả trạng thái `needs_comment` đổi
+// trên bài CŨ (điều `created_at`/không-cursor trước đây bỏ sót vĩnh viễn nếu bài rớt khỏi top-200).
+async function pullMyPostsFromServer({ force = false } = {}) {
   const { licenseKey } = await chrome.storage.local.get('licenseKey');
   if (!licenseKey) return;
+  const d = await chrome.storage.local.get(['serverMyPosts', 'myPostsSyncMeta']);
+  const meta = d.myPostsSyncMeta || { lastAt: 0, cursor: null };
+  const now = Date.now();
+  if (!force && meta.lastAt && (now - meta.lastAt) < USER_SYNC_MIN_INTERVAL_MS) return;
   try {
     const base = await getUserSyncBase();
-    const res = await fetch(`${base}/api/user-sync/my-posts?limit=200`, {
+    const qs = new URLSearchParams({ limit: '200' });
+    if (meta.cursor) qs.set('since', meta.cursor);
+    const res = await fetch(`${base}/api/user-sync/my-posts?${qs}`, {
       headers: { Authorization: `Bearer ${licenseKey}` },
     });
     if (!res.ok) return;
-    const serverPosts = await res.json();
-    if (Array.isArray(serverPosts)) {
-      await chrome.storage.local.set({ serverMyPosts: serverPosts });
-      state.serverMyPostsIndex = buildServerMyPostsIndex(serverPosts);
-      renderPosts();
-    }
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return;
+    const newestUpdatedAt = rows.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), meta.cursor || '');
+    const merged = mergeUserPostsById(d.serverMyPosts, rows)
+      .sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0))
+      .slice(0, 500);
+    await chrome.storage.local.set({
+      serverMyPosts: merged,
+      myPostsSyncMeta: { lastAt: now, cursor: newestUpdatedAt || meta.cursor || null },
+    });
+    state.serverMyPostsIndex = buildServerMyPostsIndex(merged);
+    renderPosts();
   } catch { /* best-effort */ }
 }
 
-async function fetchCrossPostsFromServer() {
+// v1.0.185 — cùng cơ chế cursor + merge-upsert như pullMyPostsFromServer(), nhưng thêm 1 điểm khác:
+// trước bản này bài cross KHÔNG hề được cache ra chrome.storage.local (chỉ sống trong biến trả về,
+// mất sạch giữa 2 lần gọi) — mỗi lần mở/làm mới tab Comment là fetch lại full `?limit=100` từ đầu,
+// không cursor nào để hỏi "có gì mới không". Giờ cache vào `crossPostsCache`, throttle không gọi
+// mạng nếu gọi lại trong vòng USER_SYNC_MIN_INTERVAL_MS (trừ `force`) — trả thẳng cache cũ, không
+// còn phải chờ round-trip mỗi lần chuyển tab qua lại.
+async function fetchCrossPostsFromServer({ force = false } = {}) {
   const { licenseKey } = await chrome.storage.local.get('licenseKey');
   if (!licenseKey) return [];
+  const d = await chrome.storage.local.get(['crossPostsCache', 'crossPostsSyncMeta']);
+  const cache = d.crossPostsCache || [];
+  const meta = d.crossPostsSyncMeta || { lastAt: 0, cursor: null };
+  const now = Date.now();
+  if (!force && meta.lastAt && (now - meta.lastAt) < USER_SYNC_MIN_INTERVAL_MS) return cache;
   try {
     const base = await getUserSyncBase();
-    const res = await fetch(`${base}/api/user-sync/cross-posts?limit=100`, {
+    const qs = new URLSearchParams({ limit: '100' });
+    if (meta.cursor) qs.set('since', meta.cursor);
+    const res = await fetch(`${base}/api/user-sync/cross-posts?${qs}`, {
       headers: { Authorization: `Bearer ${licenseKey}` },
     });
-    if (!res.ok) return [];
-    return await res.json();
-  } catch { return []; }
+    if (!res.ok) return cache;
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return cache;
+    const newestUpdatedAt = rows.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), meta.cursor || '');
+    const merged = mergeUserPostsById(cache, rows)
+      .sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0))
+      .slice(0, 500);
+    await chrome.storage.local.set({
+      crossPostsCache: merged,
+      crossPostsSyncMeta: { lastAt: now, cursor: newestUpdatedAt || meta.cursor || null },
+    });
+    return merged;
+  } catch { return cache; }
 }
 
 function renderLicenseBadge(licenseInfo) {
@@ -5718,7 +5827,6 @@ async function checkLicenseGate() {
 
 async function finishInit() {
   bindEvents();
-  initQueueScheduleDefaults();
   await loadSettingsForm();
   initManualPostSettingsForm(await GF.storage.getSettings());
   await loadState();

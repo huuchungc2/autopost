@@ -101,6 +101,7 @@
       </div>
 
       <div id="excelPanel" class="card hidden">
+        <button type="button" id="btnExportExcelTemplate" class="btn ghost sm">⬇ Tải file mẫu Excel</button>
         <label class="file-drop" for="excelFile">
           <span class="file-drop-icon">↑</span>
           <span class="file-drop-title">Chọn file Excel / CSV</span>
@@ -384,14 +385,19 @@
             <option value="mine">Của tôi</option>
           </select>
           <select id="commentFilterTemplate" class="gf-select-sm">
-            <option value="all">Mẫu: Tất cả</option>
-            <option value="has">Có mẫu</option>
-            <option value="none">Chưa có mẫu</option>
+            <option value="all">Mẫu bình luận: Tất cả</option>
+            <option value="has">Có mẫu bình luận</option>
+            <option value="none">Chưa có mẫu bình luận</option>
           </select>
           <select id="commentFilterSchedule" class="gf-select-sm">
             <option value="all">Lịch: Tất cả</option>
             <option value="has">Đã lên lịch</option>
             <option value="none">Chưa lên lịch</option>
+          </select>
+          <select id="commentFilterStatus" class="gf-select-sm">
+            <option value="all">Bình luận: Tất cả</option>
+            <option value="pending">Chưa comment</option>
+            <option value="done">Đã comment</option>
           </select>
         </div>
         <div id="commentList" class="list"></div>
@@ -417,13 +423,45 @@
           <option value="30">30 phút</option>
           <option value="60">60 phút</option>
         </select>
+        <label class="field-label">Số nhóm quét mỗi lượt <span class="field-hint">(tránh FB nghi ngờ)</span></label>
+        <input type="number" id="radarMaxGroupsPerScan" min="1" max="50" value="10" />
         <label class="switch-row">
           <input type="checkbox" id="radarPush" checked />
           <span>Thông báo desktop</span>
         </label>
+        <label class="switch-row">
+          <input type="checkbox" id="radarInPage" checked />
+          <span>Cảnh báo trong trang (khi đang lướt FB)</span>
+        </label>
         <div class="row">
           <button type="button" id="btnRadarScan" class="btn ghost">Quét ngay</button>
           <button type="button" id="btnRadarSave" class="btn primary">Lưu</button>
+        </div>
+      </div>
+
+      <details class="card" id="radarGroupPickerDetails">
+        <summary class="card-title-text">Nhóm mục tiêu (<span id="radarGroupCount">0</span> đã chọn)</summary>
+        <input type="text" id="radarGroupSearch" placeholder="Tìm nhóm…" class="gf-input" style="margin: 10px 0" />
+        <label class="switch-row">
+          <input type="checkbox" id="radarSelectAllGroups" />
+          <span>Chọn tất cả nhóm đang hiện</span>
+        </label>
+        <div id="radarGroupList" class="list"></div>
+      </details>
+
+      <div class="card">
+        <div class="row">
+          <input type="text" id="leadSearch" placeholder="Tìm theo tên/nội dung…" class="gf-input" />
+          <select id="leadFilterStatus">
+            <option value="all">Tất cả</option>
+            <option value="new">Mới</option>
+            <option value="seen">Đã xem</option>
+          </select>
+        </div>
+        <div class="row">
+          <button type="button" id="btnLeadExportCsv" class="btn ghost sm">Xuất CSV</button>
+          <button type="button" id="btnLeadExportJson" class="btn ghost sm">Xuất JSON</button>
+          <button type="button" id="btnLeadClearAll" class="btn ghost sm accent">Xóa tất cả</button>
         </div>
       </div>
       <div id="leadList" class="list"></div>
@@ -492,10 +530,10 @@
           <div class="help-block">
             <div class="help-block-title">C. Đăng ngay / Lên lịch</div>
             <ul class="help-bullets">
-              <li>Tick bài cần chạy → bấm <strong>Đăng ngay</strong> hoặc <strong>Lên lịch</strong>.</li>
+              <li>Đăng ngay 1 bài: nút <strong>Đăng</strong> trên từng card.</li>
               <li>Sau đăng OK: card <strong>✓ Đã đăng</strong> → <strong>Mở bài</strong> (comment tay) hoặc <strong>▶ Bot</strong>.</li>
               <li>Bật <strong>First comment</strong> (bước 3) để bot tự comment ngay sau đăng.</li>
-              <li>Nút <strong>Dàn</strong>: lên lịch nhiều bài theo khoảng cách phút (campaign).</li>
+              <li>Tick bài → nút <strong>Lên lịch đã chọn</strong>: hẹn giờ (1 bài hay nhiều bài giãn cách theo phút/giờ/ngày, tuỳ chọn lặp lại hàng ngày).</li>
               <li>Tab <strong>Log</strong>: xem lịch sử; tab <strong>Activity</strong>: quản lý job sắp chạy.</li>
             </ul>
           </div>
@@ -919,19 +957,10 @@
     <p class="hint">Không cần đã chọn nhóm — bài nào chưa có nhóm lúc tới giờ sẽ bị bỏ qua (báo trong Log), các bài khác vẫn chạy.</p>
     <button type="button" id="btnConfirmCampaignStagger" class="btn primary sm" style="margin-top: 4px">Xác nhận</button>
   </div>
-  <div id="postDailyScheduleList" class="hidden" style="margin: 0 12px 8px">
-    <label class="field-label">Đang lặp lại hàng ngày (giờ cố định)</label>
-    <div id="postDailyScheduleItems" class="list"></div>
-  </div>
 
   <footer class="footer footer-global" id="batchFooterGlobal" aria-label="Lên lịch hàng loạt">
-    <span class="batch-queue-label batch-queue-label-global" id="batchFooterLabel">Tick bài → chọn ngày/giờ → Lên lịch</span>
-    <div class="batch-schedule-row" title="Áp cho tất cả bài đã tick khi bấm Lên lịch">
-      <input type="date" id="queueScheduleDate" aria-label="Ngày đăng" />
-      <input type="time" id="queueScheduleTime" aria-label="Giờ đăng" />
-    </div>
-    <button type="button" id="btnScheduleCampaign" class="btn ghost sm" title="Lên lịch dàn các bài đã chọn">Dàn</button>
-    <button type="button" id="btnSchedule" class="btn ghost">Lên lịch</button>
+    <span class="batch-queue-label batch-queue-label-global" id="batchFooterLabel">Tick bài → Lên lịch</span>
+    <button type="button" id="btnScheduleCampaign" class="btn outline" title="Lên lịch các bài đã chọn">Lên lịch đã chọn</button>
   </footer>
 
   <div id="commentStaggerPanel" class="comment-schedule-panel hidden" style="margin: 0 12px 8px">
@@ -952,11 +981,6 @@
     </label>
     <button type="button" id="btnConfirmCommentSchedule" class="btn primary sm" style="margin-top: 8px">Xác nhận</button>
   </div>
-  <div id="commentDailyScheduleList" class="hidden" style="margin: 0 12px 8px">
-    <label class="field-label">Đang lặp lại hàng ngày (giờ cố định)</label>
-    <div id="commentDailyScheduleItems" class="list"></div>
-  </div>
-
   <footer class="footer footer-global" id="commentFooterGlobal" aria-label="Chạy hoặc lên lịch comment">
     <span class="batch-queue-label batch-queue-label-global">Tick bài → Chạy hoặc Lên lịch</span>
     <button type="button" id="btnRunAllComments" class="btn primary">Chạy đã chọn</button>
