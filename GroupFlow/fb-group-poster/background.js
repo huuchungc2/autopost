@@ -1034,13 +1034,11 @@ const GF_BG = {
 
   async getMediaSettings() {
     const s = await chrome.storage.local.get([
-      'routerApiKey', 'tidienBaseUrl', 'tidienToken', 'tidienApiKey', 'imageProviderId',
+      'routerApiKey', 'tidienBaseUrl', 'imageProviderId',
     ]);
     return {
       routerApiKey: s.routerApiKey || '',
       tidienBaseUrl: s.tidienBaseUrl || 'https://tidien.xyz',
-      tidienToken: s.tidienToken || '',
-      tidienApiKey: s.tidienApiKey || '',
       imageProviderId: s.imageProviderId ? Number(s.imageProviderId) : null,
     };
   },
@@ -1083,8 +1081,6 @@ const GF_BG = {
       'postQueue',
       'routerApiKey',
       'tidienBaseUrl',
-      'tidienToken',
-      'tidienApiKey',
       'imageProviderId',
     ]);
     if (!cfg.groupImageScheduleEnabled) return;
@@ -1106,8 +1102,6 @@ const GF_BG = {
       await PM.ensurePostMedia(candidate, {
         routerApiKey: cfg.routerApiKey,
         tidienBaseUrl: cfg.tidienBaseUrl || 'https://tidien.xyz',
-        tidienToken: cfg.tidienToken || '',
-        tidienApiKey: cfg.tidienApiKey || '',
         imageProviderId: cfg.imageProviderId ? Number(cfg.imageProviderId) : null,
       });
       await chrome.storage.local.set({ groupImageScheduleLastRun: Date.now() });
@@ -2158,21 +2152,11 @@ const GF_BG = {
       throw e;
     }
 
-    if (job.record_id) {
-      try {
-        const fbUser = settings.fbUser || await this.getFbUserFromCookie();
-        const base = (await chrome.storage.local.get('tidienBaseUrl')).tidienBaseUrl || 'https://tidien.xyz';
-        const key = await chrome.storage.local.get(['tidienApiKey', 'tidienToken']);
-        const token = key.tidienApiKey || key.tidienToken;
-        await fetch(`${base.replace(/\/$/, '')}/api/group-posts/${job.record_id}/commented`, {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ commenter_fb_user_id: fbUser?.id }),
-        });
-      } catch (e) {
-        console.warn('Sync commented failed', e);
-      }
-    }
+    // job.record_id trỏ tới PATCH /api/group-posts/:id/commented — route thuộc hệ JWT cũ
+    // (group_posts/group_post_comments) đã XOÁ HẲN khi gộp bảng (migration 039, xem groupPosts.js)
+    // — gọi vào đây giờ luôn 404. Bỏ hẳn nhánh này (không còn nơi nào tạo job có record_id nữa —
+    // hệ cross-comment hiện dùng job.crossServerId qua PATCH /api/user-sync/posts/:id/commented,
+    // xử lý trong runComment(), không phải runCommentOwn()).
 
     await this.markPostedGroupCommented(job.post_queue_id, job.group_id, true);
     await this.appendHistory({
@@ -2248,13 +2232,11 @@ const GF_BG = {
     });
   },
 
+  // License key là danh tính DUY NHẤT extension dùng để đồng bộ với server (không còn kiểu đăng
+  // nhập email/password cũ — tidienApiKey/tidienToken đã bỏ hẳn, xem docs/GROUPFLOW.md).
   async getTidienAuth() {
-    const cfg = await chrome.storage.local.get(['tidienBaseUrl', 'tidienApiKey', 'tidienToken', 'licenseKey']);
-    // licenseKey đi trước: đây là danh tính "đang hoạt động" qua màn kích hoạt. tidienApiKey/
-    // tidienToken là kiểu đăng nhập cũ (email/password) — nếu máy nào còn sót lại 2 giá trị này
-    // từ trước (vd lúc test), ưu tiên chúng trước licenseKey sẽ đẩy nhầm bài lên đúng tên tài
-    // khoản cũ thay vì tài khoản đang thật sự dùng, dù UI panel đang hiển thị đúng người khác.
-    const token = cfg.licenseKey || cfg.tidienApiKey || cfg.tidienToken;
+    const cfg = await chrome.storage.local.get(['tidienBaseUrl', 'licenseKey']);
+    const token = cfg.licenseKey;
     if (!token) return null;
     return {
       token,

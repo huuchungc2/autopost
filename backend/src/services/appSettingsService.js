@@ -83,12 +83,20 @@ export function getMediaStorageStatus() {
   // driveReady chỉ cần OAuth2 — folder gốc là fallback tuỳ chọn, mỗi fanpage
   // có thể tự cấu hình folder riêng (google_drive_folder_id) mà không cần folder gốc.
   const driveReady = !!oauth2;
-  const resolvedMode = mode === 'google_drive' || (!mode && driveReady)
-    ? (driveReady ? 'google_drive' : 'local')
-    : (mode || 'local');
+  // BUG đã sửa: logic cũ `mode === 'google_drive' || (!mode && driveReady) ? (driveReady ? ... :
+  // 'local') : ...` âm thầm ĐÈ lại lựa chọn 'google_drive' admin đã tường minh chọn về lại 'local'
+  // nếu driveReady=false NGAY LÚC TÍNH (vd đang nhập dở từng trường Client ID/Secret/Refresh Token
+  // một, hoặc lưu mode và credentials ở 2 bước khác nhau) — sau khi bấm "Lưu cấu hình Drive",
+  // Settings.jsx ghi thẳng `media_storage` trả về vào state dropdown, khiến dropdown "tự nhảy" về
+  // lại "VPS local" dù DB đã lưu đúng 'google_drive' — nhìn như "không lưu được chế độ Google
+  // Drive". Giờ: mode đã lưu tường minh ('google_drive' hoặc 'local') luôn được tôn trọng nguyên
+  // vẹn; chỉ tự đoán theo driveReady khi CHƯA từng lưu gì (cài đặt mới tinh, mode rỗng).
+  const resolvedMode = (mode === 'google_drive' || mode === 'local')
+    ? mode
+    : (driveReady ? 'google_drive' : 'local');
 
   return {
-    media_storage: resolvedMode === 'google_drive' ? 'google_drive' : 'local',
+    media_storage: resolvedMode,
     drive_configured: driveReady,
     folder_id: folderId || null,
     folder_id_source: getCachedSetting(KEYS.GOOGLE_DRIVE_FOLDER_ID)?.trim()

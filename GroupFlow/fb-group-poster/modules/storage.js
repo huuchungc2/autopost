@@ -9,7 +9,7 @@ GF.storage = {
   },
   async getSettings() {
     const d = await this.get([
-      'tidienBaseUrl', 'tidienToken', 'tidienApiKey', 'tidienUser',
+      'tidienBaseUrl',
       'textProviderId', 'imageProviderId',
       'routerApiKey', 'driveJson', 'driveFolderId',
       'maxGroups', 'securityLevel', 'avoidNight', 'fbLang', 'retryMissed', 'postMode', 'classicTextMode', 'classicFallbackOnFastFail',
@@ -24,9 +24,6 @@ GF.storage = {
     ]);
     return {
       tidienBaseUrl: d.tidienBaseUrl || 'https://tidien.xyz',
-      tidienToken: d.tidienToken || '',
-      tidienApiKey: d.tidienApiKey || '',
-      tidienUser: d.tidienUser || null,
       textProviderId: d.textProviderId ? Number(d.textProviderId) : null,
       imageProviderId: d.imageProviderId ? Number(d.imageProviderId) : null,
       routerApiKey: d.routerApiKey || '',

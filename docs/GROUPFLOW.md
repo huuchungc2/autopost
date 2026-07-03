@@ -1,5 +1,15 @@
 # GroupFlow — Chrome Extension FB Group
 
+**v1.0.189 — Bỏ hẳn auth tidien kiểu cũ (email/password + API key) + tổ chức lại tab Cài đặt (2026-07-04):** theo yêu cầu Tony ("api key tidien đâu cần thiết nữa thì bỏ đi" + tổ chức lại bố cục Cài đặt).
+
+**Dọn auth cũ:** field "tidien API Key" (paste thủ công, tab Cài đặt → Nâng cao) đã bỏ hẳn — đào sâu phát hiện đây là phần nổi của cả 1 cơ chế auth cũ đã chết gần hết:
+- `GF.tidienAuth.login()`/`testConnection()`/`saveFbProfile()` (modules/tidienAuth.js) — **zero caller** trong toàn bộ codebase (đã grep xác nhận), xoá hẳn. Chỉ còn `apiBase()`/`authHeader()` (vẫn dùng bởi `tidienSync.js` → `pullDraftsFromWebsite()`, tính năng "Tải từ website" đang sống) — `authHeader()` giờ chỉ dùng license key, bỏ fallback `tidienApiKey`/`tidienToken`.
+- `runCommentOwn()` (background.js) có 1 nhánh gọi `PATCH /api/group-posts/:id/commented` bằng token `tidienApiKey`/`tidienToken` — route này **đã bị xoá hẳn** từ đợt gộp bảng (migration 039, v1.0.187) nên nhánh này từ đó tới giờ luôn 404 âm thầm (bọc try/catch nên không lỗi ra ngoài, nhưng là dead weight gọi mạng vô ích mỗi lần). Xoá hẳn nhánh này.
+- `getTidienAuth()` (background.js), `getMediaSettings()`/`tickGroupImageSchedule()` (đọc token nhưng chưa từng dùng vì `postMedia.js` chỉ cần `routerApiKey`/`tidienBaseUrl`) — dọn theo, chỉ còn license key làm danh tính duy nhất.
+- `modules/storage.js` bỏ `tidienToken`/`tidienApiKey`/`tidienUser` khỏi danh sách settings.
+
+**Tổ chức lại tab Cài đặt:** nhãn tab điều hướng "Ảnh" đổi thành "Ảnh & Comment" (khớp đúng tiêu đề card đã có sẵn — trước đó lệch nhãn, card đã gồm cả mẫu comment chéo team nhưng nhãn tab chỉ ghi "Ảnh"). Di chuyển 2 mục từ tab "Nâng cao" sang đúng chỗ liên quan hơn: **"9Router API Key"** → tab **AI Provider** (đây là fallback key cho AI, không phải "nâng cao" chung chung); **"Lịch xuất ảnh ban đêm"** → tab **Ảnh & Comment** (cùng chủ đề ảnh, tách khỏi Nâng cao không có lý do rõ ràng trước đó). Tab "Nâng cao" giờ chỉ còn "Google Drive (legacy)" — đúng nghĩa "hiếm khi cần" thay vì là nơi chứa đồ tạp nham 3 chủ đề không liên quan.
+
 **v1.0.188 — Fix bug NGHIÊM TRỌNG: 1 bài bị comment lặp nhiều lần + panel sửa lịch hiện sai giờ (2026-07-04):** ngay sau khi triển khai `runFlow1BackgroundSync()` (v1.0.187, chạy nền), Tony phát hiện cùng 1 bài bị chính tài khoản mình comment 2-3 lần liên tiếp trong vài phút — kèm hiện tượng tag lịch trên card hiện 1 giờ nhưng bấm vào sửa lại ra giờ khác. Hoá ra là **2 bug độc lập**, cả 2 đều vá trong bản này:
 
 **Bug 1 — trùng lịch, đăng lặp comment.** Root cause: `runFlow1BackgroundSync()` (background.js) dùng `bgAutoScheduledCrossIds` — 1 storage key **RIÊNG**, hoàn toàn tách biệt với `activityUpcoming` mà `autoScheduleUnscheduledComments()` (sidepanel.js, chạy khi mở tab Comment) ghi vào — nên user mở tab Comment (sidepanel lên lịch bài X) rồi sau đó chu kỳ nền chạy (không thấy bài X đã có lịch vì check sai key) → lên lịch THÊM 1 lần nữa cho đúng bài X → 2 alarm độc lập cùng nổ gần nhau, đăng 2 comment trùng lặp lên cùng 1 bài. Vá theo 3 lớp:

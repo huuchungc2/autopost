@@ -31,6 +31,10 @@ function parseTimeInput(value) {
 }
 
 export default function Settings() {
+  // Trang gộp 5 mảng cấu hình không liên quan (tổng quan, extension/license key, Google Drive,
+  // Composio, lịch xuất ảnh) thành 1 chuỗi card cuộn dài ~700 dòng — tổ chức lại thành tab để dễ
+  // tìm đúng mục cần sửa thay vì cuộn qua hết mọi thứ mỗi lần.
+  const [settingsTab, setSettingsTab] = useState('overview');
   const [settings, setSettings] = useState(null);
   const [scheduleForm, setScheduleForm] = useState(null);
   const [scheduleSaving, setScheduleSaving] = useState(false);
@@ -351,7 +355,15 @@ export default function Settings() {
         description="Cấu hình hệ thống."
       />
 
-      {settings && (
+      <div className="tabs">
+        <button type="button" className={settingsTab === 'overview' ? 'tab active' : 'tab'} onClick={() => setSettingsTab('overview')}>Tổng quan</button>
+        <button type="button" className={settingsTab === 'extension' ? 'tab active' : 'tab'} onClick={() => setSettingsTab('extension')}>Extension</button>
+        <button type="button" className={settingsTab === 'drive' ? 'tab active' : 'tab'} onClick={() => setSettingsTab('drive')}>Lưu trữ ảnh (Drive)</button>
+        <button type="button" className={settingsTab === 'composio' ? 'tab active' : 'tab'} onClick={() => setSettingsTab('composio')}>Facebook Token</button>
+        <button type="button" className={settingsTab === 'schedule' ? 'tab active' : 'tab'} onClick={() => setSettingsTab('schedule')}>Lịch xuất ảnh</button>
+      </div>
+
+      {settingsTab === 'overview' && settings && (
         <div className="dashboard-grid">
           <div className="card card-stat">
             <h3>Lưu trữ ảnh</h3>
@@ -395,10 +407,10 @@ export default function Settings() {
         </div>
       )}
 
-      <GroupExtensionSettings />
+      {settingsTab === 'extension' && <GroupExtensionSettings />}
 
-      {driveStatus && mediaForm && (
-        <div className="card settings-media-storage" style={{ marginTop: 24 }}>
+      {settingsTab === 'drive' && driveStatus && mediaForm && (
+        <div className="card settings-media-storage">
           <div className="settings-section-header">
             <div>
               <h3>Google Drive — lưu &amp; đăng ảnh</h3>
@@ -514,8 +526,8 @@ export default function Settings() {
         </div>
       )}
 
-      {composioStatus && composioForm && (
-        <div className="card settings-composio" style={{ marginTop: 24 }}>
+      {settingsTab === 'composio' && composioStatus && composioForm && (
+        <div className="card settings-composio">
           <div className="settings-section-header">
             <div>
               <h3>Composio — token Facebook</h3>
@@ -629,8 +641,8 @@ export default function Settings() {
         </div>
       )}
 
-      {imageSchedule && scheduleForm && (
-        <div className="card settings-image-schedule" style={{ marginTop: 24 }}>
+      {settingsTab === 'schedule' && imageSchedule && scheduleForm && (
+        <div className="card settings-image-schedule">
           <div className="settings-section-header">
             <div>
               <h3>Lịch xuất ảnh AI</h3>

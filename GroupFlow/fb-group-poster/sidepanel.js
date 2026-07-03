@@ -4828,7 +4828,6 @@ async function migrateLegacyCommentTemplates(saved) {
 async function loadSettingsForm() {
   const s = await GF.storage.getSettings();
   $('#tidienBaseUrl').value = s.tidienBaseUrl;
-  $('#tidienApiKey').value = s.tidienApiKey;
   $('#routerApiKey').value = s.routerApiKey;
   $('#driveJson').value = s.driveJson;
   $('#driveFolderId').value = s.driveFolderId;
@@ -4876,7 +4875,6 @@ async function saveSettingsForm() {
   const securityLevel = getSelectedSecurityLevel();
   await GF.storage.saveSettings({
     tidienBaseUrl: $('#tidienBaseUrl').value.trim(),
-    tidienApiKey: $('#tidienApiKey').value.trim(),
     routerApiKey: $('#routerApiKey').value.trim(),
     driveJson: $('#driveJson').value.trim(),
     driveFolderId: $('#driveFolderId').value.trim(),

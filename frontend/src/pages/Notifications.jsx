@@ -7,7 +7,7 @@ import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 
 export default function Notifications() {
-  const { notifications, refresh } = useNotifications();
+  const { notifications, pagination, refresh } = useNotifications();
   const { showToast } = useToast();
 
   const markAllRead = async () => {
@@ -72,6 +72,17 @@ export default function Notifications() {
             </tbody>
           </table>
         </div>
+        {pagination.pages > 1 && (
+          <div className="pagination-row" style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Button variant="secondary" disabled={pagination.page <= 1} onClick={() => refresh(pagination.page - 1)}>
+              Trước
+            </Button>
+            <span>Trang {pagination.page}/{pagination.pages} ({pagination.total} thông báo)</span>
+            <Button variant="secondary" disabled={pagination.page >= pagination.pages} onClick={() => refresh(pagination.page + 1)}>
+              Sau
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

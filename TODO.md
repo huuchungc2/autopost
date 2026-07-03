@@ -2,6 +2,34 @@
 
 > Cập nhật: 2026-07-04
 
+## Website /settings: fix bug lưu Google Drive + tổ chức lại tab (2026-07-04)
+
+Tony gửi screenshot `tidien.xyz/settings` — báo "không thể lưu được chế độ google drive", xác nhận KHÔNG xoá phần API tidien trên website (chỉ xoá ở extension), và muốn tổ chức lại UI trang này.
+
+- [x] **Root cause bug Drive**: `getMediaStorageStatus()` âm thầm đè lựa chọn `media_storage='google_drive'` admin đã chọn về lại `'local'` nếu OAuth2 credentials chưa đủ 3 trường ngay lúc tính — không phải lỗi lưu thật, mà là hiển thị tự đảo ngược ngay sau khi lưu, khiến nhìn như save thất bại. `getMediaStorageMode()` (hàm quyết định runtime thật lúc lưu ảnh) không có bug này.
+- [x] **Fix**: mode đã lưu tường minh luôn được tôn trọng, chỉ tự đoán khi chưa từng cấu hình. Xem `docs/GOOGLE_DRIVE.md`.
+- [x] **Xác nhận**: KHÔNG đụng tới phần "tidien API"/license key trên website (`GroupExtensionSettings.jsx`) — chỉ đã xoá ở extension theo yêu cầu trước đó.
+- [x] **Tổ chức lại `/settings` thành 5 tab**: Tổng quan / Extension / Lưu trữ ảnh (Drive) / Facebook Token / Lịch xuất ảnh — dùng chung class `.tabs`/`.tab` đã có sẵn ở `Generate.jsx`.
+- [ ] **Cần Tony xác nhận trên máy thật**: restart backend, mở `/settings` — kiểm tra 5 tab hiển thị đúng nội dung, chọn "Google Drive" + điền đủ Client ID/Secret/Refresh Token + bấm Lưu → dropdown "Nơi lưu ảnh" phải giữ nguyên "Google Drive" (không tự nhảy về "VPS local" nữa). **Lưu ý: tôi chưa test được bằng trình duyệt thật (sandbox không có DB/server sống) — chỉ verify qua đọc code + `npm run build`, cần bạn xác nhận thực tế.**
+
+## GroupFlow: bỏ tidien API key + tổ chức lại tab Cài đặt (2026-07-04)
+
+Tony: "api key tidien đâu cần thiết nữa thì bỏ đi" + tổ chức lại bố cục trang Cài đặt cho hợp lý hơn.
+
+- [x] **Bỏ field "tidien API Key"**: đào sâu grep toàn bộ codebase trước khi xoá — phát hiện cơ chế auth cũ (email/password + API key thủ công) đã chết gần hết: `login()`/`testConnection()`/`saveFbProfile()` (`modules/tidienAuth.js`) zero-caller, `runCommentOwn()` có nhánh gọi route đã xoá ở migration 039 (luôn 404 âm thầm). Dọn sạch toàn bộ, license key là danh tính duy nhất còn lại.
+- [x] **Tổ chức lại tab Cài đặt** (chọn hướng "tổ chức lại bố cục" thay vì chỉ tinh chỉnh trực quan): nhãn tab "Ảnh" → "Ảnh & Comment" (khớp tiêu đề card); "9Router API Key" chuyển sang tab AI Provider; "Lịch xuất ảnh ban đêm" chuyển sang tab Ảnh & Comment. Tab Nâng cao giờ chỉ còn Google Drive (legacy).
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension (v1.0.189), mở Cài đặt kiểm tra: field tidien API Key đã biến mất, 9Router key nằm đúng ở tab AI, lịch xuất ảnh đêm nằm đúng ở tab Ảnh & Comment, Lưu cài đặt vẫn hoạt động bình thường (không có field nào bị mất giá trị do di chuyển).
+
+## Fix phân trang Nhật ký + Thông báo (2026-07-04)
+
+Tony báo tiếp: "Nhật ký" (`/activity`) và "Thông báo" (`/notifications`) cũng chưa phân trang, không thấy ngày hiện tại.
+
+- [x] **Root cause**: cả 2 route trả cứng `LIMIT 100`/`LIMIT 50`, không nhận tham số trang — giống hệt bug đã sửa ở `/user/dashboard`.
+- [x] **Fix**: đổi response sang `{ data, pagination }` cho cả 2 route; thêm `page`/`limit`. Cập nhật đồng bộ mọi nơi gọi API cũ (đã grep xác nhận không sót): `ActivityLog.jsx`, `useNotifications.js` (dùng bởi `Notifications.jsx`), `NotificationDropdown.jsx` (badge chuông header).
+- [x] **Bug suýt tự tạo ra khi sửa**: `useNotifications.js` có `window.addEventListener('notificationsUpdated', refresh)` — sau khi đổi `refresh` nhận tham số `page`, gọi trực tiếp qua addEventListener sẽ vô tình truyền `Event` object làm `page`. Đã bọc qua hàm rỗng `() => refresh()` trước khi đăng ký listener.
+- [ ] **Ô lọc ngày trống "dd/mm/yyyy" ở trang `/groups`**: giữ nguyên, chưa đổi — đây là input ngày rỗng chuẩn (trống = không lọc, hiện tất cả), không phải bug. Nếu Tony muốn nó tự điền sẵn ngày hôm nay làm mặc định, cần nói rõ để làm — hiện tại để trống là có chủ đích.
+- [ ] **Cần Tony xác nhận**: restart backend, mở "Nhật ký" và "Thông báo" — kiểm tra nút Trước/Sau hoạt động, badge chuông header vẫn đếm đúng số chưa đọc.
+
 ## Fix phân trang tidien.xyz/user/dashboard (2026-07-04)
 
 Tony gửi screenshot `/user/dashboard` (self-serve, KHÁC trang admin `/groups` đã sửa hôm 2026-07-03) — tab "Bài đã đăng" không phân trang.

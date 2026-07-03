@@ -596,7 +596,7 @@
         <nav class="settings-nav" aria-label="Mục cài đặt">
           <button type="button" class="settings-nav-btn settings-nav-back" data-settings-back="create" title="Quay tab Tạo bài">←</button>
           <button type="button" class="settings-nav-btn active" data-settings-pane="settings-posting">Đăng bài</button>
-          <button type="button" class="settings-nav-btn" data-settings-pane="settings-media">Ảnh</button>
+          <button type="button" class="settings-nav-btn" data-settings-pane="settings-media">Ảnh &amp; Comment</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-ai">AI</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-sync">Đồng bộ</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-advanced">Nâng cao</button>
@@ -751,14 +751,23 @@
             </div>
           </div>
         </details>
+
+        <div class="settings-block">
+          <h4 class="settings-block-title">API dự phòng</h4>
+          <label class="settings-inline-field">
+            <span class="settings-field-label">9Router API Key</span>
+            <input type="password" id="routerApiKey" />
+            <span class="field-hint">Chỉ khi chưa chọn provider</span>
+          </label>
+        </div>
       </div>
 
       <div class="card settings-card settings-pane-hidden" id="settings-media">
         <header class="settings-card-head">
           <span class="settings-card-icon" aria-hidden="true">🖼</span>
           <div class="settings-card-head-text">
-            <h3 class="settings-card-title">Ảnh &amp; comment</h3>
-            <p class="settings-card-desc">Lưu PNG khi generate và mẫu comment chéo team.</p>
+            <h3 class="settings-card-title">Ảnh &amp; Comment</h3>
+            <p class="settings-card-desc">Lưu ảnh khi generate, lịch xuất ảnh ban đêm, mẫu comment chéo team.</p>
           </div>
         </header>
 
@@ -795,6 +804,29 @@
           <h4 class="settings-block-title">Comment mẫu (chéo team)</h4>
           <p class="hint">Mỗi dòng một mẫu spintax <code>{a|b|c}</code>. Tab Comment: ô trống → tự random khi Chạy/Lên lịch. Bài chưa có lịch tự động được xếp lịch — cách nhau 15 phút, tránh khung 22:00–07:00.</p>
           <textarea id="commentTemplates" rows="4" placeholder="{Hay quá|Đúng ý}&#10;{Hữu ích|Ủng hộ bạn}"></textarea>
+        </div>
+
+        <div class="settings-block">
+          <h4 class="settings-block-title">Lịch xuất ảnh ban đêm (queue)</h4>
+          <p class="hint">Quét queue mỗi phút, xuất ảnh bài chưa có media trong khung giờ.</p>
+          <label class="switch-row">
+            <input type="checkbox" id="groupImageScheduleEnabled" />
+            <span>Bật lịch xuất ảnh ban đêm</span>
+          </label>
+          <div class="settings-field-grid settings-field-grid-3">
+            <label class="settings-field">
+              <span class="settings-field-label">Giờ bắt đầu</span>
+              <input type="number" id="groupImageScheduleStart" min="0" max="23" value="1" />
+            </label>
+            <label class="settings-field">
+              <span class="settings-field-label">Giờ kết thúc</span>
+              <input type="number" id="groupImageScheduleEnd" min="1" max="24" value="5" />
+            </label>
+            <label class="settings-field">
+              <span class="settings-field-label">Mỗi (phút)</span>
+              <input type="number" id="groupImageScheduleInterval" min="5" max="60" value="10" />
+            </label>
+          </div>
         </div>
       </div>
 
@@ -846,23 +878,11 @@
           <span class="settings-card-icon" aria-hidden="true">⚙</span>
           <div class="settings-card-head-text">
             <h3 class="settings-card-title">Nâng cao</h3>
-            <p class="settings-card-desc">API key dự phòng, Drive, lịch xuất ảnh ban đêm.</p>
+            <p class="settings-card-desc">Google Drive (legacy) — cấu hình ít dùng.</p>
           </div>
           <span class="settings-details-chevron" aria-hidden="true">▾</span>
         </summary>
         <div class="settings-details-card-body">
-          <div class="settings-block">
-            <h4 class="settings-block-title">API dự phòng</h4>
-            <label class="settings-inline-field">
-              <span class="settings-field-label">tidien API Key</span>
-              <input type="password" id="tidienApiKey" />
-            </label>
-            <label class="settings-inline-field">
-              <span class="settings-field-label">9Router API Key</span>
-              <input type="password" id="routerApiKey" />
-              <span class="field-hint">Chỉ khi chưa chọn provider</span>
-            </label>
-          </div>
           <div class="settings-block">
             <h4 class="settings-block-title">Google Drive (legacy)</h4>
             <label class="settings-inline-field">
@@ -873,28 +893,6 @@
               <span class="settings-field-label">Folder ID</span>
               <input type="text" id="driveFolderId" />
             </label>
-          </div>
-          <div class="settings-block">
-            <h4 class="settings-block-title">Lịch xuất ảnh (queue)</h4>
-            <p class="hint">Quét queue mỗi phút, xuất ảnh bài chưa có media trong khung giờ.</p>
-            <label class="switch-row">
-              <input type="checkbox" id="groupImageScheduleEnabled" />
-              <span>Bật lịch xuất ảnh ban đêm</span>
-            </label>
-            <div class="settings-field-grid settings-field-grid-3">
-              <label class="settings-field">
-                <span class="settings-field-label">Giờ bắt đầu</span>
-                <input type="number" id="groupImageScheduleStart" min="0" max="23" value="1" />
-              </label>
-              <label class="settings-field">
-                <span class="settings-field-label">Giờ kết thúc</span>
-                <input type="number" id="groupImageScheduleEnd" min="1" max="24" value="5" />
-              </label>
-              <label class="settings-field">
-                <span class="settings-field-label">Mỗi (phút)</span>
-                <input type="number" id="groupImageScheduleInterval" min="5" max="60" value="10" />
-              </label>
-            </div>
           </div>
         </div>
       </details>

@@ -10,7 +10,8 @@ export default function NotificationDropdown() {
   const navigate = useNavigate();
 
   const load = () => {
-    api.get('/notifications').then((res) => setItems(res.data)).catch(() => setItems([]));
+    // GET /notifications giờ trả { data, pagination } thay vì mảng phẳng (xem useNotifications.js)
+    api.get('/notifications').then((res) => setItems(res.data.data || [])).catch(() => setItems([]));
   };
 
   useEffect(() => {
