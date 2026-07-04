@@ -1127,8 +1127,20 @@ const GF_BG = {
   // có sẵn timeOfDay riêng (tính từ giờ bắt đầu + giãn cách user tự chọn lúc lên lịch — xem
   // sidepanel.js scheduleSelectedComments()/confirmCampaignStagger()), nên không cần random nữa —
   // mỗi tick (1 phút) chạy MỌI entry khớp đúng giờ:phút hiện tại và chưa chạy hôm nay.
+  //
+  // v1.0.192 — tách `pendingRunDate` (đánh dấu "đã NHẬN, đang chờ tới lượt chạy trong hàng đợi",
+  // set NGAY, đồng bộ) khỏi `lastRunDate` (đánh dấu "đã CHẠY XONG thật", chỉ set SAU khi
+  // runComment()/runPostMatrix() hoàn tất — markDailyScheduleDone()). Trước bản này chỉ có
+  // `lastRunDate`, set NGAY trước khi enqueue — nếu Chrome/máy tắt (hoặc service worker bị kill)
+  // đúng lúc job còn nằm trong hàng đợi (chưa kịp chạy thật), storage đã lỡ ghi "hôm nay xong" dù
+  // CHƯA hề đăng gì lên Facebook — hôm đó mất trắng, không cách nào phát hiện lại được, tick ngày
+  // mai chỉ chờ đúng `timeOfDay` mới chạy tiếp. Giờ: `pendingRunDate` vẫn chặn tick TRONG CÙNG
+  // PHIÊN (không enqueue trùng khi đang chờ tới lượt) y hệt trước, nhưng `recoverStalledDailySchedules()`
+  // (gọi lúc `chrome.runtime.onStartup` — phiên MỚI, nên "pending" từ phiên trước chắc chắn đã dở
+  // dang) xoá `pendingRunDate` không khớp `lastRunDate`, để tick kế tiếp coi là "chưa chạy" và chạy
+  // bù ngay — đúng yêu cầu "chưa chạy thì phải chạy lại khi mở máy".
   async tickDailyFixedSchedules() {
-    const d = await chrome.storage.local.get('dailyFixedSchedules');
+    const d = await chrome.storage.local.get(['dailyFixedSchedules', 'securityLevel']);
     const list = d.dailyFixedSchedules || [];
     if (!list.length) return;
 
@@ -1137,10 +1149,12 @@ const GF_BG = {
     const hhmm = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
     const today = now.toISOString().slice(0, 10);
     let changed = false;
+    const delays = await this.getSecurityDelays(d.securityLevel);
+    let dueCount = 0;
 
     for (let i = 0; i < list.length; i += 1) {
       const entry = list[i];
-      if (entry.lastRunDate === today) continue;
+      if (entry.lastRunDate === today || entry.pendingRunDate === today) continue;
       // So sánh chuỗi "HH:MM" (đã zero-pad) hoạt động đúng như so sánh giờ thật. Trước đây chỉ
       // khớp ĐÚNG phút hiện tại — service worker/trình duyệt tắt đúng lúc đó (máy tắt, Chrome
       // đóng) thì bị bỏ qua hẳn hôm đó, chỉ chạy lại vào đúng giờ này NGÀY MAI. Giờ bắt kịp: giờ
@@ -1151,28 +1165,67 @@ const GF_BG = {
       // Đánh dấu "đã nhận" NGAY (trước khi chạy thật) — tách phát hiện (nhanh) khỏi chạy thật (có
       // thể chờ lâu trong hàng đợi nếu đang bận việc khác). Nếu không, tick sau (1 phút, có thể
       // tới trước khi task này tới lượt chạy) sẽ phát hiện lại đúng entry này lần nữa → xếp hàng
-      // đợi trùng lặp.
-      list[i] = { ...entry, lastRunDate: today, lastRunAt: Date.now() };
+      // đợi trùng lặp. CHỈ đánh dấu pendingRunDate — lastRunDate chỉ set sau khi chạy xong thật.
+      list[i] = { ...entry, pendingRunDate: today };
+      const entryId = entry.id;
+      // Entry đầu tiên trong tick này: jitter nhỏ (0-20s) như cũ — chỉ để tránh bắn đúng giây y hệt
+      // mỗi ngày. Entry thứ 2 trở đi TRONG CÙNG TICK (2026-07-04 — vd nhiều lịch cùng bị lỡ dồn lại
+      // sau khi mở lại máy) dùng đúng betweenPosts/betweenComments theo securityLevel — tránh dồn
+      // cục nhiều tác vụ sát nhau, cùng lý do với retryMissedActivity().
+      const gapMs = dueCount === 0
+        ? Math.floor(Math.random() * 20) * 1000
+        : (entry.kind === 'post'
+          ? this.randBetween([delays.betweenPosts, delays.betweenPosts + 60]) * 1000
+          : this.randBetween(delays.betweenComments) * 1000);
+      dueCount += 1;
       this.enqueueTask(async () => {
-        // Jitter vài giây — tránh bắn đúng giây y hệt mỗi ngày (dễ bị soi hơn giờ:phút cố định do
-        // user tự chọn, vốn đã chấp nhận được).
-        await this.delay(Math.floor(Math.random() * 20) * 1000);
+        await this.delay(gapMs);
         try {
           if (entry.kind === 'post') await this.runPostMatrix(entry.payload);
           else if (entry.kind === 'comment') await this.runComment(entry.payload);
+          await this.markDailyScheduleDone(entryId, today);
         } catch (e) {
-          console.warn('[GroupFlow] daily fixed schedule failed:', entry.id, e.message);
+          console.warn('[GroupFlow] daily fixed schedule failed:', entryId, e.message);
         }
       });
     }
     if (changed) await chrome.storage.local.set({ dailyFixedSchedules: list });
   },
 
+  async markDailyScheduleDone(id, today) {
+    const d = await chrome.storage.local.get('dailyFixedSchedules');
+    const list = d.dailyFixedSchedules || [];
+    const idx = list.findIndex((e) => e.id === id);
+    if (idx === -1) return;
+    list[idx] = { ...list[idx], lastRunDate: today, lastRunAt: Date.now() };
+    await chrome.storage.local.set({ dailyFixedSchedules: list });
+  },
+
+  // Gọi CHỈ lúc chrome.runtime.onStartup — đây là phiên MỚI của service worker, nên bất kỳ entry
+  // nào còn "pendingRunDate" mà KHÔNG khớp "lastRunDate" chắc chắn là job của phiên TRƯỚC đã bị
+  // ngắt giữa chừng (máy/Chrome tắt trước khi runComment()/runPostMatrix() kịp chạy xong) — xoá
+  // pendingRunDate để tickDailyFixedSchedules() (gọi ngay sau, cùng trong onStartup) coi là "chưa
+  // chạy hôm nay" và chạy bù ngay, thay vì im lặng chờ tới đúng giờ hôm sau.
+  async recoverStalledDailySchedules() {
+    const d = await chrome.storage.local.get('dailyFixedSchedules');
+    const list = d.dailyFixedSchedules || [];
+    let changed = false;
+    const recovered = list.map((entry) => {
+      if (entry.pendingRunDate && entry.pendingRunDate !== entry.lastRunDate) {
+        changed = true;
+        return { ...entry, pendingRunDate: null };
+      }
+      return entry;
+    });
+    if (changed) await chrome.storage.local.set({ dailyFixedSchedules: recovered });
+  },
+
   // Flow 3 (đồng bộ sau khi comment xong) — v1.0.187: KHÔNG còn best-effort-im-lặng thuần tuý. Trước
   // bản này, PATCH fail (mất mạng, server bận, license key hết hạn giữa chừng…) là mất vĩnh viễn —
   // server không bao giờ biết đã comment, comment_count không tăng, người khác vẫn bị gán vào đúng
-  // bài đó tưởng còn thiếu. commentedRecords (local, v1.0.185) chặn được vòng lặp tự-comment-lại
-  // TRÊN CHÍNH MÁY NÀY, nhưng không giúp SERVER và MÁY KHÁC biết — cần retry thật, không chỉ nuốt lỗi.
+  // bài đó tưởng còn thiếu. `commentedRecords` (local, v1.0.185) chỉ dùng để hiện tag "✓ Đã comment"
+  // TRÊN CHÍNH MÁY NÀY (từ v1.0.194 không còn chặn tự-comment-lại nữa), không giúp SERVER và MÁY
+  // KHÁC biết — cần retry thật, không chỉ nuốt lỗi.
   async markCrossPostCommentedFromBg(serverId) {
     if (!serverId) return;
     const auth = await this.getTidienAuth();
@@ -2084,53 +2137,6 @@ const GF_BG = {
     return { ok: true, mode: 'classic' };
   },
 
-  async runCommentBatch(jobs, actorId) {
-    if (this.commentRunning) throw new Error('Đang chạy batch comment khác');
-    if (!jobs?.length) return { ok: true, done: 0 };
-    this.commentRunning = true;
-    const delays = await this.getSecurityDelays();
-    const settings = await chrome.storage.local.get(['activeActorId']);
-    const resolvedActor = actorId || settings.activeActorId;
-    let done = 0;
-    try {
-      for (let i = 0; i < jobs.length; i += 1) {
-        if (this.stopRequested) break;
-        const job = { ...jobs[i], actorId: jobs[i].actorId || resolvedActor };
-        chrome.runtime.sendMessage({
-          type: 'GF_PROGRESS',
-          data: {
-            phase: 'commenting',
-            done,
-            total: jobs.length,
-            snippet: job.comment?.slice(0, 50) || '',
-          },
-        }).catch(() => {});
-        await this.runComment(job);
-        done += 1;
-        if (i < jobs.length - 1 && !this.stopRequested) {
-          const waitSec = this.randBetween(delays.betweenComments);
-          chrome.runtime.sendMessage({
-            type: 'GF_PROGRESS',
-            data: {
-              phase: 'comment_wait',
-              done,
-              total: jobs.length,
-              snippet: `Chờ ${waitSec}s trước comment tiếp…`,
-            },
-          }).catch(() => {});
-          await this.delay(waitSec * 1000);
-        }
-      }
-    } finally {
-      this.commentRunning = false;
-      chrome.runtime.sendMessage({
-        type: 'GF_PROGRESS',
-        data: { phase: 'done', done, total: jobs.length },
-      }).catch(() => {});
-    }
-    return { ok: true, done };
-  },
-
   async runCommentOwn(job) {
     const settings = await chrome.storage.local.get(['fbLang', 'fbUser', 'activeActorId']);
     const comment = await this.resolveJobComment(job);
@@ -2173,28 +2179,16 @@ const GF_BG = {
     return res;
   },
 
-  // Chặn tại điểm CHẠY (không chỉ điểm LÊN LỊCH) — lớp bảo vệ thứ 2, độc lập với việc dedup lúc
-  // xếp lịch (runFlow1BackgroundSync()). Cần thiết vì: (1) job trùng lặp có thể đã lỡ được xếp lịch
-  // TRƯỚC khi bug dedup ở trên được vá — alarm cũ vẫn còn treo trong activityUpcoming, tới giờ vẫn
-  // nổ bình thường; (2) fire-and-forget bản chất của chrome.alarms — 1 khi đã lên lịch thì KHÔNG tự
-  // re-check lại trạng thái mới nhất trước khi chạy. Nếu post_queue_id+group_id này đã có trong
-  // commentedRecords (đã đăng comment thành công thật trước đó, kể cả bởi job khác) → bỏ qua êm,
-  // không đăng lại lên Facebook.
+  // v1.0.194 — BỎ HẲN lớp chặn "job trùng lặp" (đã comment rồi thì bỏ qua) từng có ở đây. Comment
+  // chéo dùng để ĐẨY BÀI — 1 bài được comment lại nhiều lần (kể cả bởi cùng 1 lịch "1 lần cụ thể"
+  // đã lỡ hẹn, kể cả job khác đã comment trước đó) là hành vi ĐÚNG MONG MUỐN, không phải job trùng
+  // lặp cần chặn. Trước bản này lớp chặn (dựa vào `commentedRecords`) chỉ áp cho lịch "1 lần cụ
+  // thể" chạy qua `runScheduledJob()` (không nơi gọi nào khác còn thiếu `allowRepeat:true`) — nghĩa
+  // là 1 lịch đã lên nhưng CHƯA CHẠY, nếu bài đó lỡ đã được comment bởi đường khác trước khi lịch
+  // này tới giờ, sẽ bị bỏ qua êm thay vì chạy thật — đúng thứ Tony yêu cầu sửa ("lịch đã lên mà
+  // chưa chạy thì vẫn phải chạy, dù trước đó đã comment rồi"). Tham số `opts`/`allowRepeat` không
+  // còn ý nghĩa gì (luôn chạy) nên đã bỏ khỏi chữ ký hàm — dọn theo ở mọi nơi gọi.
   async runComment(job) {
-    if (job.post_queue_id && job.group_id) {
-      const already = (await chrome.storage.local.get('commentedRecords')).commentedRecords || {};
-      if (already[String(job.post_queue_id)]?.[String(job.group_id)]) {
-        await this.appendHistory({
-          type: 'comment',
-          ok: true,
-          group_id: job.group_id,
-          group_name: job.group_name,
-          post_id: job.post_id,
-          snippet: '(bỏ qua — đã comment bài này rồi, job trùng lặp)',
-        });
-        return;
-      }
-    }
     const settings = await chrome.storage.local.get(['fbLang', 'fbUser', 'activeActorId']);
     const comment = await this.resolveJobComment(job);
     const runJob = { ...job, comment };
@@ -2605,6 +2599,18 @@ const GF_BG = {
   // mất, chỉ tạm hoãn phần lên lịch). Dùng getSecurityDelays()/randBetween() sẵn có trên GF_BG —
   // KHÔNG dùng GF.scheduler (modules/scheduler.js chỉ dành cho sidepanel, chưa từng được đưa vào
   // build-sw-bundle.js nên service worker không thấy được module này).
+  //
+  // v1.0.192 — 2 thay đổi:
+  // (1) Fix bug thật: nhánh lưu cuối hàm tham chiếu `scheduledIds` — biến KHÔNG hề tồn tại trong
+  // scope hàm này (tàn dư của cách làm cũ đã bỏ, xem chú thích `bgAutoScheduledCrossIds` bên dưới) —
+  // mỗi lần `scheduled > 0` là ném `ReferenceError`, khiến toàn bộ `activityUpcoming` mới KHÔNG được
+  // lưu (dù alarm + `alarm_${name}` đã tạo thật) — chu kỳ sau không thấy bài đã có lịch, tự tạo thêm
+  // alarm trùng cho đúng bài đó mỗi lần chạy. Xoá hẳn nhánh ghi `bgAutoScheduledCrossIds` (dead key).
+  // (2) Thêm quét `postQueue` (bài CỦA CHÍNH MÌNH đã đăng) — trước bản này chỉ cross-post (bài đồng
+  // đội) được tự lên lịch nền; bài của chính mình chỉ được lên lịch khi user tự mở tab Comment
+  // (`autoScheduleUnscheduledComments()`, sidepanel.js) — máy nào ít mở tab đó thì bài tự đăng xong
+  // không bao giờ được tự lên lịch comment. Dùng chung `alreadyScheduledIds`/`commentedRecords` nên
+  // không tạo lịch trùng với lịch tay ở sidepanel.
   async runFlow1BackgroundSync(auth, headers) {
     await this.dedupeUpcomingCommentAlarms();
     const d = await chrome.storage.local.get([
@@ -2643,6 +2649,9 @@ const GF_BG = {
     // key) → lên lịch THÊM 1 lần nữa cho đúng bài X → 2 job chạy gần nhau, đăng 2 comment trùng lặp
     // lên cùng 1 bài. Giờ đọc thẳng `activityUpcoming`/`dailyFixedSchedules` — CHÍNH XÁC nguồn mà
     // sidepanel.js dùng (loadCommentScheduleMap()) — để cả 2 nơi lên lịch luôn thấy chung 1 sự thật.
+    // v1.0.194 từng bỏ, ĐẢO NGƯỢC LẠI ở v1.0.196 — xem chú thích autoScheduleUnscheduledComments()
+    // (sidepanel.js): auto-lên-lịch chỉ dành cho bài CHƯA TỪNG comment, không phải cơ chế tự-đẩy-lại
+    // vô thời hạn sau mỗi lần chạy xong.
     const commentedRecords = d.commentedRecords || {};
     const dailyFixed = (await chrome.storage.local.get('dailyFixedSchedules')).dailyFixedSchedules || [];
     const upcoming = d.activityUpcoming || [];
@@ -2692,11 +2701,51 @@ const GF_BG = {
       cursorWhen += this.randBetween(delays.betweenComments) * 1000;
     }
 
+    // v1.0.192 — bài CỦA CHÍNH MÌNH (postQueue, đã đăng xong lên ít nhất 1 nhóm), xem chú thích đầu
+    // hàm. 1 post có thể có nhiều postedGroups — mỗi group còn thiếu comment (chưa có trong
+    // commentedRecords) được xếp riêng 1 alarm, nối tiếp nhau bằng cùng độ trễ betweenComments.
+    const queue = (await chrome.storage.local.get('postQueue')).postQueue || [];
+    for (const post of queue) {
+      if (post.postStatus !== 'posted') continue;
+      const jobId = String(post.id);
+      if (alreadyScheduledIds.has(jobId)) continue;
+      const validGroups = (post.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
+      if (!validGroups.length) continue;
+      const pendingGroups = validGroups.filter((g) => !commentedRecords[jobId]?.[String(g.group_id)]);
+      if (!pendingGroups.length) continue;
+
+      const label = (post.noi_dung || pendingGroups[0].group_name || 'Comment').slice(0, 60);
+      for (const g of pendingGroups) {
+        const alarmName = `gf_cmt_${jobId}_${g.group_id}_${Date.now()}_bg`;
+        const payload = {
+          post_queue_id: jobId,
+          group_id: g.group_id,
+          group_name: g.group_name,
+          post_id: g.post_id,
+          comment: '',
+          actorId: d.activeActorId,
+          label,
+        };
+        chrome.alarms.create(alarmName, { when: cursorWhen });
+        await chrome.storage.local.set({ [`alarm_${alarmName}`]: { kind: 'comment', payload } });
+        upcoming.push({
+          id: alarmName,
+          alarmName,
+          kind: 'comment',
+          when: cursorWhen,
+          recordId: jobId,
+          snippet: '(tự random mẫu lúc chạy)',
+          payload,
+          label: `Comment → ${label}`,
+        });
+        cursorWhen += this.randBetween(delays.betweenComments) * 1000;
+      }
+      alreadyScheduledIds.add(jobId);
+      scheduled += 1;
+    }
+
     if (scheduled) {
-      await chrome.storage.local.set({
-        activityUpcoming: upcoming,
-        bgAutoScheduledCrossIds: [...scheduledIds].slice(-2000),
-      });
+      await chrome.storage.local.set({ activityUpcoming: upcoming });
     }
     return { fetched: rows.length, cached: merged.length, scheduled };
   },
@@ -2946,6 +2995,54 @@ const GF_BG = {
     }
     chrome.runtime.sendMessage({ type: 'GF_RADAR_UPDATED' }).catch(() => {});
   },
+
+  // v1.0.192 — tách ra từ nhánh gf_retry_missed trong chrome.alarms.onAlarm để dùng lại được ở
+  // chrome.runtime.onStartup (chạy NGAY lúc mở lại Chrome/máy, không chờ alarm 1 phút tự nổ) — xem
+  // "Fix lịch chưa chạy phải chạy lại khi mở máy" trong docs/GROUPFLOW.md. Quét activityUpcoming
+  // (lịch "1 lần cụ thể" — post lẫn comment) có `when <= now` mà vẫn còn tồn tại trong mảng (item
+  // chỉ bị xoá SAU KHI chạy xong không lỗi — removeUpcomingByAlarmName() trong runScheduledJob())
+  // — tín hiệu "chưa chạy" đáng tin cậy, không như dailyFixedSchedules (xem markDailyScheduleDone()).
+  //
+  // Giãn cách giữa CÁC TÁC VỤ QUÁ HẠN chạy bù cùng lượt (2026-07-04) — Tony hỏi: nếu vừa có lịch
+  // đăng bài vừa có lịch comment cùng quá hạn (máy tắt qua giờ hẹn của cả 2) thì xử lý sao, giãn
+  // cách bao nhiêu? Trước bản này KHÔNG có giãn cách nào giữa các tác vụ chạy bù — vòng lặp chỉ
+  // đảm bảo TUẦN TỰ (không chồng), nhưng job sau chạy NGAY khi job trước xong (có thể chỉ cách vài
+  // giây) — khác hẳn tốc độ "tự nhiên" lúc máy chạy liên tục (mỗi job cách nhau nhiều phút/giờ theo
+  // đúng lịch gốc), dồn cục nhiều hành động sát nhau ngay lúc mở máy dễ bị soi hơn. Giờ dùng lại
+  // đúng betweenPosts/betweenComments (getSecurityDelays() theo securityLevel đã cấu hình — không
+  // tạo hằng số riêng) làm khoảng chờ TRƯỚC mỗi tác vụ chạy bù thứ 2 trở đi trong cùng lượt (tác vụ
+  // đầu tiên chạy ngay, không chờ — chỉ tác vụ dồn cục phía sau mới cần giãn).
+  async retryMissedActivity() {
+    await this.reconcileQueueSchedules().catch((e) => {
+      console.warn('[GroupFlow] reconcile schedules:', e.message);
+    });
+    const d = await chrome.storage.local.get(['activityUpcoming', 'retryMissed', 'securityLevel']);
+    if (d.retryMissed === false) return;
+    const now = Date.now();
+    const due = [];
+    const remaining = [];
+    for (const item of d.activityUpcoming || []) {
+      (item.when <= now ? due : remaining).push(item);
+    }
+    if (!due.length) return;
+
+    const delays = await this.getSecurityDelays(d.securityLevel);
+    for (let i = 0; i < due.length; i += 1) {
+      const item = due[i];
+      if (i > 0) {
+        const gapSec = item.kind === 'post'
+          ? this.randBetween([delays.betweenPosts, delays.betweenPosts + 60])
+          : this.randBetween(delays.betweenComments);
+        await this.delay(gapSec * 1000);
+      }
+      const ok = await this.runScheduledJob(
+        { kind: item.kind, payload: item.payload },
+        { alarmName: item.alarmName || item.id },
+      );
+      if (!ok) remaining.push(item);
+    }
+    await chrome.storage.local.set({ activityUpcoming: remaining });
+  },
 };
 
 async function ensureGroupFlowPeriodicAlarms() {
@@ -2961,6 +3058,17 @@ async function ensureGroupFlowPeriodicAlarms() {
     chrome.alarms.create('gf_comment_daily', { periodInMinutes: 1 });
   }
 }
+
+// v1.0.195 — Tony hỏi "có cách nào không cho máy ngủ khi đang chạy không?" (lịch đăng bài/comment
+// cần chạy không người trông, máy tự sleep giữa chừng thì mọi tác vụ dừng hẳn tới khi user tự đánh
+// thức lại). `chrome.power.requestKeepAwake('system')` chặn Windows tự vào chế độ NGỦ (sleep/suspend)
+// do idle timeout — dùng mức 'system' (không phải 'display') vì chỉ cần MÁY không ngủ để service
+// worker/alarm còn chạy, không cần ép màn hình luôn sáng (tốn điện, gây khó chịu vô ích). Gọi ở top
+// level — chạy lại mỗi khi service worker (re)start (kể cả sau khi bị idle-unload rồi có
+// alarm/message đánh thức lại) nên luôn tự tái khẳng định, không cần release/renew thủ công. KHÔNG
+// chặn được sleep do user chủ động bấm Sleep/đóng nắp laptop — chỉ chặn sleep tự động do không thao
+// tác (idle timer của Windows).
+chrome.power.requestKeepAwake('system');
 
 console.log('[GroupFlow] service worker ready');
 ensureGroupFlowPeriodicAlarms().catch(() => {});
@@ -2991,25 +3099,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     return;
   }
   if (alarm.name === 'gf_retry_missed') {
-    await GF_BG.reconcileQueueSchedules().catch((e) => {
-      console.warn('[GroupFlow] reconcile schedules:', e.message);
+    await GF_BG.retryMissedActivity().catch((e) => {
+      console.warn('[GroupFlow] retry missed activity:', e.message);
     });
-    const d = await chrome.storage.local.get(['activityUpcoming', 'retryMissed']);
-    if (d.retryMissed === false) return;
-    const now = Date.now();
-    const remaining = [];
-    for (const item of d.activityUpcoming || []) {
-      if (item.when <= now) {
-        const ok = await GF_BG.runScheduledJob(
-          { kind: item.kind, payload: item.payload },
-          { alarmName: item.alarmName || item.id },
-        );
-        if (!ok) remaining.push(item);
-      } else {
-        remaining.push(item);
-      }
-    }
-    await chrome.storage.local.set({ activityUpcoming: remaining });
     return;
   }
   if (alarm.name === 'gf_image_schedule') {
@@ -3200,11 +3292,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         return;
       }
-      if (msg.type === 'GF_RUN_COMMENT_BATCH') {
-        const res = await GF_BG.enqueueTask(() => GF_BG.runCommentBatch(msg.payload?.jobs, msg.payload?.actorId));
-        sendResponse(res);
-        return;
-      }
       if (msg.type === 'GF_RADAR_SCAN') {
         await GF_BG.runRadarScan();
         sendResponse({ ok: true });
@@ -3323,8 +3410,29 @@ chrome.runtime.onInstalled.addListener(() => {
   }, 20_000);
 });
 
-chrome.runtime.onStartup.addListener(() => {
-  ensureGroupFlowPeriodicAlarms().catch(() => {});
-  GF_BG.scheduleTidienSyncAlarm().catch(() => {});
-  GF_BG.prefetchGroups().catch(() => {});
+// v1.0.192 — "mở máy" (mở lại Chrome/máy tính sau khi tắt hẳn) giờ chủ động chạy bù NGAY, tuần tự
+// (await từng bước, không bắn song song) thay vì chỉ đảm bảo alarm định kỳ tồn tại rồi ngồi chờ
+// tick tiếp theo (có thể trễ vài phút tuỳ Chrome quyết định đánh thức service worker lúc nào):
+// (1) reconcile + chạy bù lịch "1 lần cụ thể" quá hạn (activityUpcoming — post lẫn comment);
+// (2) phục hồi + chạy bù lịch "Lặp lại hàng ngày" bị ngắt giữa chừng ở phiên trước (xem
+// recoverStalledDailySchedules()/markDailyScheduleDone()); (3) đồng bộ + tự lên lịch comment cho
+// bài (của mình lẫn đồng đội) chưa từng có lịch (runFlow1BackgroundSync(), qua syncFromTidien()).
+// Việc CHẠY THẬT (runComment()/runPostMatrix()) vẫn luôn đi qua enqueueTask() dùng chung — nhiều
+// nguồn gọi vào (onStartup, alarm định kỳ, user bấm tay) không bao giờ chạy chồng lên nhau.
+chrome.runtime.onStartup.addListener(async () => {
+  await ensureGroupFlowPeriodicAlarms().catch(() => {});
+  await GF_BG.scheduleTidienSyncAlarm().catch(() => {});
+  await GF_BG.prefetchGroups().catch(() => {});
+  await GF_BG.retryMissedActivity().catch((e) => {
+    console.warn('[GroupFlow] onStartup retry missed activity:', e.message);
+  });
+  await GF_BG.recoverStalledDailySchedules().catch((e) => {
+    console.warn('[GroupFlow] onStartup recover stalled daily schedules:', e.message);
+  });
+  await GF_BG.tickDailyFixedSchedules().catch((e) => {
+    console.warn('[GroupFlow] onStartup daily fixed schedule tick:', e.message);
+  });
+  await GF_BG.syncFromTidien({ scope: 'comments' }).catch((e) => {
+    console.warn('[GroupFlow] onStartup comment sync:', e.message);
+  });
 });

@@ -544,7 +544,7 @@
         <p class="section-eyebrow">3) Comment chéo team</p>
         <ul class="help-bullets">
           <li>Tab <strong>Comment</strong> → bấm <strong>Làm mới</strong> để tải danh sách cần comment.</li>
-          <li>Bấm <strong>AI</strong> để generate comment (dùng Text Provider) → <strong>Chạy đã chọn</strong> hoặc <strong>Lên lịch</strong>.</li>
+          <li>Bấm <strong>AI</strong> để generate comment (dùng Text Provider) → tick bài rồi <strong>Lên lịch đã chọn</strong> (bài chưa có lịch cũng tự động được xếp lịch khi tải danh sách).</li>
         </ul>
       </div>
 
@@ -979,10 +979,9 @@
     </label>
     <button type="button" id="btnConfirmCommentSchedule" class="btn primary sm" style="margin-top: 8px">Xác nhận</button>
   </div>
-  <footer class="footer footer-global" id="commentFooterGlobal" aria-label="Chạy hoặc lên lịch comment">
-    <span class="batch-queue-label batch-queue-label-global">Tick bài → Chạy hoặc Lên lịch</span>
-    <button type="button" id="btnRunAllComments" class="btn primary">Chạy đã chọn</button>
-    <button type="button" id="btnScheduleComments" class="btn outline">Lên lịch đã chọn</button>
+  <footer class="footer footer-global" id="commentFooterGlobal" aria-label="Lên lịch comment">
+    <span class="batch-queue-label batch-queue-label-global">Tick bài → Lên lịch</span>
+    <button type="button" id="btnScheduleComments" class="btn primary">Lên lịch đã chọn</button>
   </footer>
 
   <script src="lib/quill.js"></script>

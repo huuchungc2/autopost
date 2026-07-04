@@ -2,6 +2,92 @@
 
 > Cập nhật: 2026-07-04
 
+## GroupFlow: hiện giờ comment lần cuối trên tag "✓ Đã comment" (2026-07-04)
+
+Tony hỏi: "vậy bài đó mày có biết là comment lần cuối là lúc nào không?" rồi yêu cầu hiện ra UI.
+
+- [x] Thêm `lastCommentedAtLabel(c)` (`sidepanel.js`) — đọc `state.commentedRecords[c.id]`, lấy mốc mới nhất trong số các nhóm, format qua `formatScheduleWhen()`.
+- [x] Hiện ngay trên tag "✓ Đã comment" trong `renderComments()`: `✓ Đã comment · 2026-07-04 15:49`.
+- [x] Cập nhật `docs/GROUPFLOW.md`, `CHANGELOG.md`.
+- [x] Bump `manifest.json` → v1.0.197.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, comment 1 bài (▶ Chạy) → xác nhận tag hiện đúng giờ vừa comment.
+
+## GroupFlow: đảo ngược 1 phần v1.0.194 — auto-lên-lịch comment chỉ cho bài chưa từng comment (2026-07-04)
+
+Tony test thật trên máy sau khi v1.0.194 lên: "hình như mày comment xong là mày không biết mày đi set lịch lại đéo mẹ kì cục vậy? bài mới chạy comment xong thì mày auto set lịch lại làm gì vậy trời ạ. comment xong rồi thì thôi chứ" — kèm ảnh chụp 1 bài "✓ Đã comment" đã bị tự set lịch mới ("🕒 2026-07-04 15:49") ngay sau khi comment xong.
+
+- [x] **Root cause**: lịch "1 lần cụ thể" chạy xong bị xoá khỏi `activityUpcoming` (đúng thiết kế) → v1.0.194 đã bỏ hết điều kiện chặn theo trạng thái "đã comment" khỏi auto-lên-lịch → lượt tick tiếp theo (nền hoặc mở lại tab Comment) thấy bài "chưa có lịch" là set lại ngay (+15 phút), tạo cảm giác "vừa chạy xong lại bị set lịch lại liền".
+- [x] **Fix**: khôi phục lại điều kiện `!isCommentDone(c)` trong `autoScheduleUnscheduledComments()` (`sidepanel.js`), và check `commentedRecords[jobId]` (cross-post) + lọc `pendingGroups` theo `commentedRecords` (bài của chính mình) trong `runFlow1BackgroundSync()` (`background.js`) — về đúng như trước v1.0.194. Auto-lên-lịch giờ chỉ là "mồi lần đầu" cho bài chưa từng comment; đẩy thêm bài đã comment phải chủ động (tự tay "+ Lên lịch"/"▶ Chạy", hoặc "Lặp lại hàng ngày").
+- [x] **Giữ nguyên phần đúng của v1.0.194**: `runComment()` (`background.js`) vẫn không chặn "job trùng lặp" lúc CHẠY THẬT — 1 lịch đã tồn tại (tự động lần đầu hay tự tay) vẫn phải chạy khi tới giờ dù trước đó lỡ đã comment bởi đường khác. Không revert phần này.
+- [x] Cập nhật `docs/GROUPFLOW.md` (sửa lại các đoạn vừa viết cho v1.0.194 mô tả sai hành vi mới), `CHANGELOG.md`.
+- [x] Bump `manifest.json` → v1.0.196.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension. Test — comment xong 1 bài (▶ Chạy tay hoặc lịch chạy tới), làm mới tab Comment → xác nhận bài đó **không** tự có lịch mới nữa (chỉ hiện "+ Lên lịch", không phải "🕒 ..."). Test 2 — 1 bài mới, chưa từng comment lần nào, chưa có lịch → xác nhận vẫn tự động được set lịch như bình thường.
+
+## GroupFlow: chặn máy tự ngủ khi đang chạy lịch (2026-07-04)
+
+Tony hỏi: "vậy có cách nào không cho mày ngủ khi làm chạy không?" — sau khi xác nhận lịch đăng bài/comment chạy bù được cả khi máy tắt/mở lại (`retryMissedActivity()`), câu hỏi tiếp theo là làm sao TRÁNH việc máy tự ngủ giữa chừng ngay từ đầu.
+
+- [x] Thêm quyền `power` vào `manifest.json`.
+- [x] Gọi `chrome.power.requestKeepAwake('system')` ở top-level `background.js` (chạy lại mỗi khi service worker (re)start) — chặn Windows tự sleep do idle timeout, không ép sáng màn hình.
+- [x] Cập nhật `docs/GROUPFLOW.md`, `CHANGELOG.md`.
+- [x] Bump `manifest.json` → v1.0.195.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, để máy idle qua đúng thời gian Windows cấu hình tự sleep — xác nhận máy KHÔNG tự ngủ nữa khi Chrome/CocCoc + extension đang mở (dù không thao tác gì). Lưu ý: nếu Tony chủ động bấm Sleep hoặc đóng nắp laptop, máy vẫn ngủ bình thường — đây là giới hạn đã biết, không phải bug.
+
+## GroupFlow: bỏ chặn "đã comment rồi" khỏi mọi luồng tự-lên-lịch/tự-chạy comment (2026-07-04)
+
+Tony phản bác thiết kế cũ: "tại sao mày cứ cho là bài đã comment rôi thì không được lên lịch nhỉ? 1 bài có thể comment nhiều lần tùy thích mà" — sau khi hỏi lại để chốt rule cụ thể, Tony trả lời: "local có 10 bài chưa có lịch thì phải tự auto set lịch không quan tâm đã comment hay chưa. nếu lịch đã lên mà chưa chạy (trước đó đã có comment rồi) cũng phải chạy."
+
+- [x] **Rule 1 — auto-lên-lịch không quan tâm đã comment hay chưa**: bỏ điều kiện `!isCommentDone(c)` khỏi `autoScheduleUnscheduledComments()` (`sidepanel.js`) — tiêu chí duy nhất giờ là "chưa có lịch nào đang chờ". Bỏ tương tự ở `runFlow1BackgroundSync()` (`background.js`): xóa check `commentedRecords[jobId]` cho cross-post, xóa lọc `pendingGroups` theo `commentedRecords` cho bài của chính mình (`postQueue`) — chỉ còn `alreadyScheduledIds` (tránh xếp trùng lịch) chặn cả 2 vòng.
+- [x] **Rule 2 — lịch đã lên mà chưa chạy thì vẫn phải chạy dù đã comment trước đó**: đây chính là lớp chặn "giữ nguyên cho `runScheduledJob()`" mà v1.0.191 cố tình để lại (coi là đúng rủi ro "2 alarm trùng nổ gần nhau"). Xóa hẳn lớp chặn "job trùng lặp" trong `runComment()` (`background.js`) — không còn phân biệt theo `opts.allowRepeat` nữa vì mọi nơi gọi đều cần chạy thật; xóa tham số `allowRepeat` khỏi 2 nơi gọi còn truyền dư (`tickDailyFixedSchedules()`, handler `GF_RUN_COMMENT`).
+- [x] Giữ nguyên `isCommentDone()`/tag "✓ Đã comment"/filter "Bình luận" — vẫn hiển thị đúng trạng thái, chỉ không còn dùng để chặn lên lịch/chạy.
+- [x] Cập nhật `docs/GROUPFLOW.md` (sửa lại các đoạn lịch sử v1.0.185/v1.0.188/v1.0.191/v1.0.169 mô tả sai hành vi mới, thêm mục "Đảo ngược ở v1.0.194"), `CHANGELOG.md`.
+- [x] Bump `manifest.json` → v1.0.194.
+- [ ] **Cần Tony xác nhận trên máy thật (v1.0.194)**: reload extension. Test — 1 bài đã "✓ Đã comment" nhưng chưa có lịch (bấm "Làm mới" tab Comment) → xác nhận tự động được xếp lịch mới (+15 phút) thay vì phải tự bấm "+ Lên lịch". Test 2 — đặt lịch "1 lần cụ thể" cho 1 bài, sau đó comment tay bài đó bằng "▶ Chạy" TRƯỚC khi lịch tới giờ, đợi lịch tới giờ → xác nhận lịch vẫn chạy thật (đăng thêm 1 comment nữa), không bị bỏ qua êm. **Sandbox không test được bằng FB/Chrome thật — chỉ verify qua đọc code + `node --check`.**
+
+## GroupFlow: bỏ nút "Chạy đã chọn" ở tab Comment (2026-07-04)
+
+Tony: "bỏ nút chạy đã chọn chỉ có nút lên lịch đã chọn, sắp xếp UI lại" — đẩy hàng loạt comment thật lên Facebook ngay lập tức (không giãn cách xem trước như lên lịch) dễ bấm nhầm; chỉ giữ đường lên lịch cho hành động hàng loạt.
+
+- [x] Bỏ nút `#btnRunAllComments` ("Chạy đã chọn") khỏi footer hàng loạt tab Comment (`sidepanel.html`) — chỉ còn `#btnScheduleComments` ("Lên lịch đã chọn"), đổi nhãn `batch-queue-label` thành "Tick bài → Lên lịch" giống footer Tạo bài.
+- [x] Xóa code không còn nơi gọi: `runAllComments()`/`collectSelectedCommentJobsRaw()`/`estimateCommentBatchMinutes()`/`confirmNightAction()` (`sidepanel.js`), handler `GF_RUN_COMMENT_BATCH` + `runCommentBatch()` (`background.js`). Nút "▶ Chạy" từng bài riêng lẻ (`runComment()`) không đổi.
+- [x] Cập nhật `docs/GROUPFLOW.md` (mục "Comment chéo team", "Lên lịch giãn cách") + hướng dẫn trong `sidepanel.html` (tab Hướng dẫn) khớp UI mới.
+- [x] **Trả lời câu hỏi "bài chưa lên lịch sao không tự động gán lịch?"**: đọc `autoScheduleUnscheduledComments()` xác nhận tính năng auto-lên-lịch chạy đúng như thiết kế mỗi lần tải/làm mới tab Comment — 2 lý do 1 bài KHÔNG được tự lên lịch: (1) bài đã "✓ Đã comment" bị loại có chủ đích (không cần lên lịch comment cho bài xong rồi — nút "+ Lên lịch" trên card đó chỉ để đặt lịch đẩy lại thủ công); (2) bài chưa có nhóm nào với post_id FB hợp lệ (đang chờ đồng bộ) bị `buildRawJobsForOneComment()` bỏ qua ÂM THẦM — không có cách nào biết vì sao. Đã thêm toast báo riêng số bài rơi vào case (2) thay vì im lặng mãi mãi.
+- [x] Bump `manifest.json` → v1.0.193.
+
+## GroupFlow: tự lên lịch comment cho bài chưa có lịch + chạy bù khi mở lại máy (2026-07-04)
+
+Tony: "bài nào chưa set lịch ở local thì tự động set lịch theo rule, nếu bài đó set lịch rồi mà chưa chạy cho thì phải chạy lại khi mở máy, chú ý là phải chạy tuần tự theo hệ thống không được chạy 1 lần nhiều tác vụ." Đã hỏi lại và chốt phạm vi: chỉ lịch comment, "mở máy" = mở lại Chrome/máy tính sau khi tắt hẳn, giữ nguyên rule xếp lịch cũ.
+
+- [x] **Auto-schedule mở rộng sang bài của chính mình**: `runFlow1BackgroundSync()` (background.js) trước chỉ tự lên lịch comment nền cho bài đồng đội (cross-post) — bài của chính mình chỉ được lên lịch khi user tự mở tab Comment. Giờ quét thêm `postQueue`, dùng chung `alreadyScheduledIds`/`commentedRecords` nên không trùng lịch tay.
+- [x] **Chạy bù lịch "1 lần cụ thể" quá hạn ngay khi mở lại Chrome**: tách logic từ nhánh `gf_retry_missed` (alarm mỗi phút) ra `retryMissedActivity()`, gọi thêm từ `chrome.runtime.onStartup` — không chờ alarm tự nổ.
+- [x] **Fix lỗ hổng thật: lịch "Lặp lại hàng ngày" đánh dấu "xong" TRƯỚC khi chạy thật** — `tickDailyFixedSchedules()` set `lastRunDate = today` ngay khi phát hiện, trước khi job (trong hàng đợi, có delay vài giây) thực sự chạy — Chrome/máy tắt đúng lúc đó thì mất cả ngày, không cách nào phát hiện lại. Tách `pendingRunDate` (đánh dấu "đã nhận") khỏi `lastRunDate` (đánh dấu "chạy xong thật", set sau khi `runComment()` hoàn tất — `markDailyScheduleDone()`). Thêm `recoverStalledDailySchedules()`, gọi lúc `onStartup` — xoá `pendingRunDate` không khớp `lastRunDate` của phiên trước để chạy bù ngay.
+- [x] **Fix bug thật phát hiện thêm khi sửa (không phải yêu cầu gốc, nhưng đúng chỗ đang sửa)**: `runFlow1BackgroundSync()` ghi `bgAutoScheduledCrossIds: [...scheduledIds]` với `scheduledIds` không tồn tại trong scope — ném `ReferenceError` mỗi khi tự xếp lịch được ≥1 bài mới, khiến `activityUpcoming` không lưu được dù alarm đã tạo thật. Xoá dòng ghi key chết này.
+- [x] **Đảm bảo chạy tuần tự**: mọi hành động chạy thật vẫn qua `enqueueTask()` (hàng đợi promise-chain dùng chung toàn extension — đã có sẵn từ trước). `chrome.runtime.onStartup` đổi sang `await` tuần tự từng bước (không bắn song song) để tránh race đọc-sửa-ghi storage giữa các bước catch-up.
+- [x] **Câu hỏi thêm của Tony sau khi dò kịch bản cụ thể**: "1 bài đã comment, lên lịch 10h30, tắt máy, mở lại lúc 2h30 chiều — có biết chưa chạy để đưa vào hàng đợi không?" → có (qua `retryMissedActivity()`), nhưng hỏi tiếp: nếu vừa có lịch đăng bài vừa có lịch comment cùng quá hạn thì tuần tự thế nào, giãn cách bao nhiêu? Phát hiện thêm 1 lỗ hổng: trước đó có TUẦN TỰ (không chồng) nhưng KHÔNG có giãn cách — job sau chạy ngay khi job trước xong. Đã sửa: thêm giãn cách `betweenPosts`/`betweenComments` (theo `securityLevel`, dùng lại `getSecurityDelays()` có sẵn) giữa các tác vụ chạy bù thứ 2 trở đi trong cùng lượt, ở cả `retryMissedActivity()` (lịch 1 lần) và `tickDailyFixedSchedules()` (lịch lặp hàng ngày, khi nhiều entry cùng quá hạn 1 tick) — tác vụ đầu tiên chạy ngay, các tác vụ dồn cục phía sau mới cần giãn.
+- [x] Bump `manifest.json` → v1.0.192.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension (v1.0.192). Test 1 — đăng 1 bài mới lên nhóm, KHÔNG mở tab Comment, chờ 1 chu kỳ `gf_tidien_sync` (hoặc bấm "↻ Đồng bộ ngay") — xác nhận bài tự có lịch comment dù chưa từng mở tab Comment. Test 2 — đặt 1 lịch "Lặp lại hàng ngày", tắt hẳn Chrome đúng lúc gần tới giờ chạy hôm đó (mô phỏng bị ngắt giữa chừng), mở lại Chrome sau giờ đó — xác nhận job chạy bù ngay thay vì im lặng chờ đúng giờ hôm sau. Test 3 — đặt 1 lịch "1 lần cụ thể" trong quá khứ gần (bằng cách sửa giờ hệ thống hoặc chờ), tắt Chrome trước giờ chạy, mở lại — xác nhận chạy bù ngay lúc mở máy. Test 4 — đặt cả lịch đăng bài lẫn lịch comment cùng quá hạn (2 lịch trở lên), mở lại Chrome — xác nhận job thứ 2 trở đi chờ vài phút (theo `securityLevel`) trước khi chạy, không bắn sát nhau. **Sandbox không test được bằng FB/Chrome thật — chỉ verify qua đọc code + `node --check`.**
+
+## GroupFlow: fix lịch "Lặp lại hàng ngày" (đẩy bài) chỉ chạy đúng 1 lần rồi tự tắt (2026-07-04)
+
+Tony hỏi: "trong comment extension tại cái nào đã comment rồi lại không được comment nữa? khi chạy comment thì vẫn chạy, mục đích việc comment này là đẩy bài mà, với lại khi load comment về tại sao không set lịch ta?" — đào code xác nhận đây là bug thật (không phải hiểu nhầm thiết kế), Tony chọn hướng "cho phép đẩy bài lặp lại".
+
+- [x] **Root cause**: `runComment(job)` (background.js) chặn "job trùng lặp" dựa vào `commentedRecords` (đã đăng thành công trước đó thì bỏ qua êm) — lớp này đúng cho lịch "1 lần cụ thể" nhưng vô tình chặn luôn lịch **"Lặp lại hàng ngày"** (`dailyFixedSchedules`, kind:`'comment'`) vốn dùng CHUNG hàm này mỗi ngày: ngày 1 chạy thật (ghi `commentedRecords`) → từ ngày 2 trở đi bị chính lớp chặn coi là trùng lặp, âm thầm không đăng nữa — tự triệt tiêu đúng mục đích "đẩy bài" của tính năng. Nút "▶ Chạy"/"Chạy đã chọn" tay lên bài đã comment cũng bị nuốt tương tự (toast báo thành công giả).
+- [x] **Fix**: `runComment(job, opts)` thêm `opts.allowRepeat` — bỏ chặn khi hành động là CHỦ ĐỘNG (lịch lặp hàng ngày qua `tickDailyFixedSchedules()`, "▶ Chạy" qua `GF_RUN_COMMENT`, "Chạy đã chọn" qua `runCommentBatch()`). Giữ nguyên chặn cho lịch "1 lần cụ thể" tự động (`runScheduledJob()`, qua `activityUpcoming`/alarm `gf_cmt_*`) — đúng rủi ro gốc (2 alarm trùng nổ gần nhau, bug v1.0.188) mà lớp chặn sinh ra để giải quyết, không đổi. An toàn trùng-ngày của lịch lặp hàng ngày vẫn do `entry.lastRunDate === today` (đánh dấu trước khi chạy) đảm nhiệm, không phụ thuộc lớp chặn này.
+- [x] Thêm `window.confirm` khi bấm "▶ Chạy"/"Chạy đã chọn" lên bài đã có tag "✓ Đã comment" — giờ hành động này SẼ đăng lại thật lên Facebook (không còn bị nuốt êm), cần xác nhận để tránh trùng ngoài ý muốn do bấm nhầm.
+- [x] Bump `manifest.json` → v1.0.191.
+- [ ] **Trả lời câu hỏi phụ "load comment về sao không set lịch"**: thực ra ĐÃ tự động từ trước (`autoScheduleUnscheduledComments()`, luôn bật, chạy mỗi lần tải/làm mới tab Comment) — chỉ bỏ qua bài đã có lịch hoặc đã "xong". Không cần sửa gì thêm trừ khi Tony thấy 1 bài cụ thể KHÔNG được lên lịch dù rõ ràng chưa có lịch nào — cần case cụ thể để soi tiếp.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension (v1.0.191), đặt 1 lịch "Lặp lại hàng ngày" cho 1 bài, theo dõi 2-3 ngày liên tiếp xem có đăng comment lại đúng giờ mỗi ngày không (trước đây chỉ ngày đầu chạy). Thử bấm "▶ Chạy" tay lên bài đã có tag "✓ Đã comment" — xác nhận có hộp thoại xác nhận + đăng comment thật lần nữa (không còn báo thành công giả). **Sandbox không test được bằng FB thật — chỉ verify qua đọc code + `node --check`.**
+
+## Website /settings: nút "Lấy Refresh Token" cho Google Drive OAuth2 (2026-07-04)
+
+Tony yêu cầu thêm nút bấm để tự lấy Refresh Token thay vì phải chạy script/OAuth Playground thủ công.
+
+- [x] Backend: `GET /api/drive/auth` (super_admin) — đọc Client ID/Secret từ `app_settings`, tự detect redirect URI từ request (`req.protocol` + `req.get('host')`, cần `app.set('trust proxy', 1)` để đọc đúng `https` sau nginx), tạo Google OAuth URL (`access_type=offline`, `prompt=consent`), lưu `redirectUri` kèm `state` tạm trong RAM (10 phút) để callback dùng lại đúng URI đã tạo auth URL.
+- [x] Backend: `GET /api/drive/callback` — đổi `code` lấy `refresh_token` bằng đúng `redirectUri` đã lưu theo `state`, lưu vào `app_settings.google_drive_refresh_token`, redirect về `{origin}/settings?driveAuth=success` (hoặc `?driveAuth=error&message=...`).
+- [x] Frontend (`Settings.jsx`): nút "Lấy Refresh Token" cạnh ô Refresh Token (mở tab mới tới Google, theo đúng pattern nút "Kết nối Composio" đã có) — chỉ bật khi đã có Client ID + Secret (mới nhập hoặc đã lưu, field mới `has_client_credentials`). Đọc query `driveAuth` lúc mount để hiện toast + tự chuyển sang tab Drive, dọn query khỏi URL sau khi đọc.
+- [ ] **Cần Tony xác nhận trên máy thật**: vào Google Cloud Console → Credentials → OAuth Client ID → thêm Authorized redirect URI đúng domain đang chạy (vd. `https://tidien.xyz/api/drive/callback`). Mỗi lần đổi domain thì cập nhật lại URI này trên GCP là xong, không cần sửa code (route tự detect domain qua request, không còn phụ thuộc `PUBLIC_BASE_URL`).
+- [ ] **Cần Tony xác nhận trên máy thật**: bấm "Lấy Refresh Token" → tab Google mở ra → đăng nhập + cấp quyền `drive` → quay lại tab Settings thấy toast "✅ Đã lấy Refresh Token thành công" và badge "Drive đã cấu hình". **Sandbox không test được bằng trình duyệt/OAuth thật — chỉ verify qua đọc code + `npm run build`.**
+
 ## GroupFlow: fix "Extension context invalidated" trong content.js (2026-07-04)
 
 Tony gửi ảnh chụp `chrome://extensions` → Lỗi, trace `content.js:208` — "Uncaught Error: Extension context invalidated".

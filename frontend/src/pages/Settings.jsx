@@ -46,6 +46,7 @@ export default function Settings() {
   const [mediaForm, setMediaForm] = useState(null);
   const [mediaSaving, setMediaSaving] = useState(false);
   const [mediaTesting, setMediaTesting] = useState(false);
+  const [driveAuthLoading, setDriveAuthLoading] = useState(false);
   const [composioForm, setComposioForm] = useState(null);
   const [composioSaving, setComposioSaving] = useState(false);
   const [composioLinking, setComposioLinking] = useState(false);
@@ -76,6 +77,23 @@ export default function Settings() {
         });
       }
     }).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const driveAuth = params.get('driveAuth');
+    if (!driveAuth) return;
+    setSettingsTab('drive');
+    if (driveAuth === 'success') {
+      showToast('✅ Đã lấy Refresh Token thành công', 'success');
+    } else if (driveAuth === 'error') {
+      showToast(params.get('message') || 'Lấy Refresh Token thất bại', 'error');
+    }
+    params.delete('driveAuth');
+    params.delete('message');
+    const query = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (query ? `?${query}` : ''));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -243,6 +261,30 @@ export default function Settings() {
       showToast(err.response?.data?.error || 'Kiểm tra Drive thất bại', 'error');
     } finally {
       setMediaTesting(false);
+    }
+  };
+
+  const canGetDriveRefreshToken = useMemo(() => {
+    if (!mediaForm || !driveStatus) return false;
+    const hasNewClientCredentials = !!(
+      mediaForm.google_drive_client_id?.trim() && mediaForm.google_drive_client_secret?.trim()
+    );
+    return hasNewClientCredentials || driveStatus.has_client_credentials;
+  }, [mediaForm, driveStatus]);
+
+  const getDriveRefreshToken = async () => {
+    setDriveAuthLoading(true);
+    try {
+      const response = await api.get('/drive/auth');
+      const url = response.data?.auth_url;
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+        showToast('Đã mở tab Google — đăng nhập và cấp quyền xong sẽ tự quay lại đây', 'success');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Không lấy được link xác thực Google', 'error');
+    } finally {
+      setDriveAuthLoading(false);
     }
   };
 
@@ -500,19 +542,41 @@ export default function Settings() {
               </div>
               <label style={{ display: 'block', marginTop: 12 }}>
                 Refresh Token
-                <input
-                  type="password"
-                  placeholder={driveStatus.has_stored_credentials ? 'Để trống để giữ nguyên' : '1//0g...'}
-                  value={mediaForm.google_drive_refresh_token}
-                  onChange={(e) => handleMediaChange('google_drive_refresh_token', e.target.value)}
-                />
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="password"
+                    style={{ flex: 1 }}
+                    placeholder={driveStatus.has_stored_credentials ? 'Để trống để giữ nguyên' : '1//0g...'}
+                    value={mediaForm.google_drive_refresh_token}
+                    onChange={(e) => handleMediaChange('google_drive_refresh_token', e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={getDriveRefreshToken}
+                    disabled={driveAuthLoading || !canGetDriveRefreshToken}
+                  >
+                    {driveAuthLoading ? 'Đang mở...' : 'Lấy Refresh Token'}
+                  </Button>
+                </div>
               </label>
+              {driveStatus.has_stored_credentials ? (
+                <p className="field-hint" style={{ marginTop: 4, color: 'var(--color-success, #16a34a)' }}>
+                  ✅ Đã có Refresh Token
+                </p>
+              ) : !canGetDriveRefreshToken && (
+                <p className="field-hint" style={{ marginTop: 4 }}>
+                  Điền và <strong>Lưu cấu hình Drive</strong> Client ID + Client Secret trước khi bấm "Lấy Refresh Token".
+                </p>
+              )}
 
               <p className="field-hint" style={{ marginTop: 8 }}>
-                1) Google Cloud Console → Credentials → OAuth 2.0 Client ID (Desktop app) → copy Client ID &amp; Secret.
-                2) Dùng OAuth Playground hoặc script lấy Refresh Token với scope <code>https://www.googleapis.com/auth/drive</code>.
+                1) Google Cloud Console → Credentials → OAuth 2.0 Client ID (Web application) → copy Client ID &amp; Secret,
+                {' '}thêm Authorized redirect URI đúng domain đang chạy (vd. <code>https://tidien.xyz/api/drive/callback</code>).
+                2) Điền Client ID/Secret ở đây → <strong>Lưu cấu hình Drive</strong> → bấm <strong>Lấy Refresh Token</strong>
+                {' '}(mở tab Google, đăng nhập + cấp quyền — token tự lưu vào server khi xong) — hoặc dán thủ công nếu đã có sẵn.
                 3) Copy Folder ID từ URL Drive (<code>drive.google.com/.../folders/<strong>ID_Ở_ĐÂY</strong></code>).
-                4) Điền đủ 3 trường + Folder ID → <strong>Kiểm tra kết nối</strong> → Lưu.
+                4) Điền đủ Folder ID → <strong>Kiểm tra kết nối</strong> → Lưu.
                 {' '}Mỗi fanpage có thể gán folder riêng tại <strong>Fanpage → Sửa</strong>.
               </p>
 

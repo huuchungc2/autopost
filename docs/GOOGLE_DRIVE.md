@@ -6,7 +6,7 @@ AutoPost lưu ảnh AI/upload lên **Google Drive** qua **OAuth2 User Authentica
 
 ## Luồng
 
-1. **Super admin** → Cài đặt → Google Drive: nhập Client ID, Client Secret, Refresh Token (lấy qua OAuth2 consent flow `GET /api/auth/drive` hoặc dán thủ công) + folder gốc (fallback).
+1. **Super admin** → Cài đặt → Google Drive: nhập Client ID, Client Secret, Refresh Token (bấm nút "Lấy Refresh Token" — OAuth2 consent flow `GET /api/drive/auth` — hoặc dán thủ công) + folder gốc (fallback).
 2. **Fanpage → Sửa**: nhập `Google Drive Folder ID` (subfolder riêng) → Kiểm tra folder → Lưu.
 3. Khi xuất ảnh AI hoặc upload ảnh bài viết:
    - Có folder fanpage → **bắt buộc** upload vào đúng folder đó (tự verify + tự gắn lại nếu Drive API không gắn đúng, báo lỗi rõ nếu vẫn thất bại — không âm thầm sai chỗ).
@@ -16,11 +16,13 @@ AutoPost lưu ảnh AI/upload lên **Google Drive** qua **OAuth2 User Authentica
 
 ## Lấy Refresh Token (OAuth2 consent flow)
 
-1. Google Cloud Console → Credentials → tạo **OAuth 2.0 Client ID** (Web application) → thêm Authorized redirect URI: `{PUBLIC_BASE_URL}/api/auth/drive/callback`.
+1. Google Cloud Console → Credentials → tạo **OAuth 2.0 Client ID** (Web application) → thêm Authorized redirect URI đúng domain đang chạy, vd. `https://tidien.xyz/api/drive/callback` (đổi domain thì cập nhật lại URI này trên GCP, không cần sửa code — redirect URI được backend tự detect từ request, không dùng `PUBLIC_BASE_URL`).
 2. Cài đặt → Google Drive → điền Client ID + Client Secret → **Lưu cấu hình Drive**.
-3. Gọi `GET /api/auth/drive` (super_admin) → nhận `auth_url` → mở trong trình duyệt, đăng nhập + cấp quyền `drive`.
-4. Google redirect về `/api/auth/drive/callback` → backend tự lấy `refresh_token` và lưu vào `app_settings`.
+3. Bấm nút **"Lấy Refresh Token"** cạnh ô Refresh Token → mở tab mới tới Google (`GET /api/drive/auth`, super_admin, tự tạo `auth_url` với redirect URI = `{protocol}://{host}/api/drive/callback` của chính request đó) → đăng nhập + cấp quyền `drive`.
+4. Google redirect về `/api/drive/callback` → backend đổi `code` lấy `refresh_token` (bằng đúng redirect URI đã dùng ở bước 3, lưu tạm theo `state` trong RAM 10 phút) → lưu vào `app_settings` → redirect về `/settings?driveAuth=success` (trang Settings tự hiện toast "✅ Đã lấy Refresh Token thành công" và chuyển sang tab Drive).
 5. (Hoặc) dán Refresh Token thủ công lấy từ OAuth Playground / script riêng — cùng scope `https://www.googleapis.com/auth/drive`.
+
+Chạy sau nginx (SSL termination) cần `app.set('trust proxy', 1)` (đã bật trong `app.js`) để `req.protocol` đọc đúng `https` từ header `X-Forwarded-Proto` — nếu không, redirect URI tự detect sẽ sai thành `http://` và Google sẽ từ chối (redirect_uri_mismatch).
 
 ## DB / config
 
@@ -42,7 +44,7 @@ Migration: `023_fb_pages_drive_folder.sql` (folder riêng fanpage), `029_app_set
 | `backend/src/services/pageDriveService.js` | Resolve folder: page → global |
 | `backend/src/services/googleDriveService.js` | Khởi tạo `google.auth.OAuth2` + upload/download Drive |
 | `backend/src/services/appSettingsService.js` | Đọc/ghi OAuth2 config trong `app_settings` (cache RAM) |
-| `backend/src/routes/driveAuth.js` | OAuth2 consent flow (`GET /api/auth/drive`, `/callback`) |
+| `backend/src/routes/driveAuth.js` | OAuth2 consent flow (`GET /api/drive/auth`, `/api/drive/callback`) |
 | `backend/src/services/mediaStorage.js` | `storeImageBuffer({ pageId })` |
 | `backend/src/services/postImageCore.js` | Truyền `post.page_id` khi generate |
 | `backend/src/routes/pages.js` | CRUD folder fanpage + `POST /:id/drive-folder/test` |
@@ -74,3 +76,4 @@ Migration: `023_fb_pages_drive_folder.sql` (folder riêng fanpage), `029_app_set
 - **Ảnh rơi vào gốc "Drive của tôi" dù đã khai báo folder đúng**: Google Drive API có thể tạo file thành công nhưng bỏ qua `parents` một cách âm thầm (không lỗi) khi Folder ID không phải là folder thật (copy nhầm link 1 file) hoặc tài khoản OAuth2 thiếu quyền Editor trên đúng folder đó. `uploadBufferToDrive()` giờ tự phát hiện + tự sửa lại (`files.update` addParents) sau mỗi lần tạo file, và throw lỗi rõ ràng nếu vẫn không gắn được — không còn âm thầm để sai chỗ. `testDriveConnection()`/nút "Kiểm tra folder Drive" giờ cũng từ chối nếu ID nhập vào không phải `mimeType: application/vnd.google-apps.folder`.
 - **Debug nhanh**: chạy `node backend/scripts/check-drive-folders.js` trên server thật — mục cuối cùng của script gọi thẳng Drive API kiểm tra `parents` thật của các ảnh `gdrive://` gần nhất so với folder kỳ vọng của từng fanpage.
 - **Fix "không lưu được chế độ Google Drive" (2026-07-04)**: `getMediaStorageStatus()` (`appSettingsService.js`) trước đây âm thầm đè lựa chọn `media_storage = 'google_drive'` admin đã tường minh chọn về lại `'local'` nếu `driveReady` (OAuth2 đủ 3 trường) = false NGAY LÚC TÍNH — thường xảy ra khi lưu mode + credentials cùng lúc mà 1 trường tạm thời chưa hợp lệ, hoặc lưu 2 bước riêng. Settings.jsx ghi thẳng giá trị trả về vào state dropdown sau khi lưu, nên dropdown "Nơi lưu ảnh" tự nhảy về lại "VPS local" ngay sau khi bấm Lưu dù DB có thể đã lưu đúng — nhìn như save thất bại. Đã sửa: mode đã lưu tường minh (`'google_drive'` hoặc `'local'`) luôn được tôn trọng nguyên vẹn, chỉ tự đoán theo `driveReady` khi mode chưa từng được lưu (cài mới, trống). Lưu ý: `getMediaStorageMode()` (`mediaStorage.js`, hàm quyết định runtime thật lúc lưu ảnh) chưa bao giờ có bug này — chỉ ảnh hưởng hiển thị trạng thái ở trang Cài đặt.
+- **Thêm nút "Lấy Refresh Token" (2026-07-04)**: `routes/driveAuth.js` đổi từ `/api/auth/drive` (redirect URI cứng theo `PUBLIC_BASE_URL`) sang `/api/drive/auth` + `/api/drive/callback`, tự tính redirect URI từ chính request đến (`req.protocol` + `req.get('host')`) — không còn phụ thuộc biến môi trường, chạy đúng ngay cả khi domain đổi mà không cần sửa code hay redeploy, **miễn là** Authorized redirect URI trên Google Cloud Console được cập nhật khớp domain. Yêu cầu `app.set('trust proxy', 1)` (đã bật trong `app.js`) để đọc đúng `https` sau nginx. `redirectUri` dùng lúc tạo `auth_url` được lưu kèm `state` (RAM, hết hạn 10 phút) để bước đổi `code` lấy `refresh_token` dùng lại đúng URI đó — Google từ chối nếu 2 bước lệch URI.

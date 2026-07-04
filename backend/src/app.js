@@ -34,6 +34,9 @@ import { getDbCharsetInfo } from './db.js';
 dotenv.config();
 
 const app = express();
+// Cần để req.protocol đọc đúng https khi chạy sau nginx reverse proxy (X-Forwarded-Proto) —
+// dùng để tự detect redirect URI cho Google Drive OAuth2 (routes/driveAuth.js).
+app.set('trust proxy', 1);
 const port = process.env.PORT || 3001;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,7 +75,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/group-posts', groupPostsRoutes);
-app.use('/api/auth/drive', driveAuthRoutes);
+app.use('/api/drive', driveAuthRoutes);
 app.use('/api/user-auth', userAuthRoutes);
 app.use('/api/user-sync', userSyncRoutes);
 

@@ -107,6 +107,12 @@ export function getMediaStorageStatus() {
       && getCachedSetting(KEYS.GOOGLE_DRIVE_CLIENT_SECRET)?.trim()
       && getCachedSetting(KEYS.GOOGLE_DRIVE_REFRESH_TOKEN)?.trim()
     ),
+    // Chỉ Client ID + Secret (chưa cần Refresh Token) — dùng để bật nút "Lấy Refresh Token"
+    // trước khi refresh token tồn tại.
+    has_client_credentials: !!(
+      getCachedSetting(KEYS.GOOGLE_DRIVE_CLIENT_ID)?.trim()
+      && getCachedSetting(KEYS.GOOGLE_DRIVE_CLIENT_SECRET)?.trim()
+    ),
     client_id_preview: maskClientId(getCachedSetting(KEYS.GOOGLE_DRIVE_CLIENT_ID)),
   };
 }

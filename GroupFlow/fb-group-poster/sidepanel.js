@@ -320,6 +320,16 @@ function showTab(name) {
     });
     refreshJournalFromStorage();
   }
+  if (name === 'comment') {
+    // Trước bản này chỉ load lại danh sách + chạy autoScheduleUnscheduledComments() lúc mở panel
+    // lần đầu, bấm "Làm mới" tay, hoặc có event tidien sync — CHUYỂN TAB đơn thuần (bấm nút Comment
+    // trên thanh tab) không hề gọi lại, nên bài mới phát sinh trong lúc panel đang mở (đăng bài mới,
+    // đồng đội đăng bài...) hiển thị đúng nhưng CHƯA được tự lên lịch cho tới khi user vô tình bấm
+    // Làm mới hoặc đóng mở lại panel — trông như tính năng "tự động lên lịch" không chạy. Gọi lại ở
+    // đây (không force — vẫn tôn trọng throttle 30s của fetchCrossPostsFromServer/pullMyPostsFromServer)
+    // để mỗi lần vào tab Comment đều tự chạy autoScheduleUnscheduledComments() với dữ liệu mới nhất.
+    loadPostedPostsForComment();
+  }
 }
 
 function gotoGroupsTab(postId) {
@@ -3425,6 +3435,21 @@ function isCommentDone(c) {
   return validGroups.length > 0 && validGroups.every((g) => g.firstCommentOk === true);
 }
 
+// Giờ comment GẦN NHẤT (lấy mốc mới nhất trong số các nhóm của bài, nếu nhiều nhóm comment lệch
+// giờ nhau) — đọc từ `state.commentedRecords` (ghi bởi markCommentDoneLocal(), background.js,
+// NGAY lúc comment thành công — xem isCommentDone()). Chỉ để HIỂN THỊ cho user biết, không dùng để
+// quyết định gì. Trả '' nếu chưa từng comment, hoặc record đã bị dọn khỏi cache (giữ tối đa 3000
+// bài gần nhất — xem markCommentDoneLocal()) — trường hợp đó tag "✓ Đã comment" vẫn đúng nhờ
+// isCommentDone() còn 2 nguồn dự phòng khác (firstCommentOk/_needsComment), chỉ riêng GIỜ cụ thể là
+// mất, không có cách khôi phục lại (background không lưu giờ ở đâu khác).
+function lastCommentedAtLabel(c) {
+  const rec = state.commentedRecords?.[c.id];
+  if (!rec) return '';
+  const times = Object.values(rec).filter((t) => Number.isFinite(t));
+  if (!times.length) return '';
+  return formatScheduleWhen(Math.max(...times));
+}
+
 // Bài chưa có mẫu bình luận (ô draft trống) thì tự random 1 dòng từ Settings → Comment mẫu ngay
 // khi tải danh sách — áp dụng cho MỌI bài (không chỉ bài sắp được auto-lên-lịch), để tag "📝 Có mẫu
 // bình luận" hiện đúng ngay cả khi user chưa tự tay soạn, và user thấy trước nội dung sẽ gửi (vẫn
@@ -3453,18 +3478,38 @@ async function autoFillMissingCommentDrafts() {
 // lại nhiều lần (mỗi lần tab Comment tải/làm mới) vì chỉ nhắm bài CHƯA có lịch — bài đã lên lịch ở
 // lượt trước sẽ không bị đụng tới nữa. avoidNightTime() (trong scheduleCommentJobsOnce) tự tránh
 // khung 22:00–07:00 cho từng mốc.
+//
+// v1.0.194 đã bỏ điều kiện `!isCommentDone(c)` ở đây rồi ĐẢO NGƯỢC LẠI ở v1.0.196 — Tony test thật
+// thấy bài VỪA comment xong bị tự set lịch mới gần như ngay lập tức (do lịch "1 lần cụ thể" chạy
+// xong bị xoá khỏi local → tick tự-lên-lịch kế tiếp lại thấy "chưa có lịch" → set lại liền), phản
+// hồi "comment xong rồi thì thôi chứ" — auto-lên-lịch chỉ dành cho bài CHƯA TỪNG comment lần nào
+// (lần đầu), không phải cơ chế tự-đẩy-lại-vô-thời-hạn sau mỗi lần chạy xong. Muốn đẩy thêm bài đã
+// comment thì phải chủ động — tự tay "+ Lên lịch"/"▶ Chạy", hoặc set "Lặp lại hàng ngày". Lưu ý:
+// việc này KHÔNG ảnh hưởng phần đã sửa đúng ở v1.0.194 — 1 lịch ĐÃ được tạo ra (dù tự-lên-lịch lần
+// đầu hay tự tay) vẫn phải chạy thật khi tới giờ dù trước đó lỡ đã comment bởi đường khác
+// (`runComment()` không còn chặn "job trùng lặp" — giữ nguyên, không đổi).
 async function autoScheduleUnscheduledComments() {
   const unscheduled = state.comments.filter((c) => !state.commentScheduleMap[c.id] && !isCommentDone(c));
   if (!unscheduled.length) return;
 
   // Mẫu đã được autoFillMissingCommentDrafts() random sẵn (gọi trước hàm này trong
-  // loadPostedPostsForComment()) — chỉ còn gom job theo draft hiện có.
+  // loadPostedPostsForComment()) — chỉ còn gom job theo draft hiện có. Bài không có nhóm nào với
+  // post_id FB hợp lệ (còn đang chờ đồng bộ/permalink chưa parse được) bị buildRawJobsForOneComment()
+  // trả về rỗng — không thể lên lịch được (chưa biết comment vào bài nào) nên tự động BỎ QUA thay vì
+  // báo lỗi (alertOnEmpty:false); đếm riêng để báo cho user biết thay vì im lặng mãi mãi.
   const jobGroups = [];
+  let skippedNoPostId = 0;
   for (const c of unscheduled) {
     const jobs = buildRawJobsForOneComment(c.id, { alertOnEmpty: false });
     if (jobs?.length) jobGroups.push(jobs);
+    else skippedNoPostId += 1;
   }
-  if (!jobGroups.length) return;
+  if (!jobGroups.length) {
+    if (skippedNoPostId > 0) {
+      showToast(`${skippedNoPostId} bài chưa lên lịch được — thiếu post_id FB hợp lệ (đang chờ đồng bộ)`, 'warn');
+    }
+    return;
+  }
 
   const upcoming = (await chrome.storage.local.get('activityUpcoming')).activityUpcoming || [];
   const latestWhen = upcoming
@@ -3476,7 +3521,8 @@ async function autoScheduleUnscheduledComments() {
     anchor += 15 * 60 * 1000;
     await scheduleCommentJobsOnce(jobs, anchor);
   }
-  showToast(`Đã tự động lên lịch ${jobGroups.length} bài chưa có lịch (cách nhau 15 phút)`, 'success');
+  const skippedNote = skippedNoPostId > 0 ? ` (${skippedNoPostId} bài khác thiếu post_id FB hợp lệ, chưa lên lịch được)` : '';
+  showToast(`Đã tự động lên lịch ${jobGroups.length} bài chưa có lịch (cách nhau 15 phút)${skippedNote}`, 'success');
 }
 
 async function triggerTidienAutoSync({ silent = false, force = false, scope = 'comments' } = {}) {
@@ -3787,7 +3833,10 @@ function renderComments() {
     const crossLabel = c._source === 'cross' ? `<span class="tag web">↔ ${esc(c._userLabel || 'cross')}</span>` : '';
     // Bài đã comment xong không bị lọc mất khỏi danh sách (dù của mình hay đồng đội) — chỉ gắn tag
     // để biết trạng thái, dùng chung isCommentDone() cho cả 2 nguồn.
-    const commentedTag = isCommentDone(c) ? '<span class="tag ready">✓ Đã comment</span>' : '';
+    const lastCommentedAt = lastCommentedAtLabel(c);
+    const commentedTag = isCommentDone(c)
+      ? `<span class="tag ready" title="Lần comment gần nhất">✓ Đã comment${lastCommentedAt ? ` · ${esc(lastCommentedAt)}` : ''}</span>`
+      : '';
     const editorOpen = state.commentEditorOpenId === c.id;
     const scheduleOpen = state.commentScheduleOpenId === c.id;
     const scheduleInfo = state.commentScheduleMap[c.id];
@@ -3930,6 +3979,10 @@ function renderComments() {
 async function runComment(id) {
   const c = state.comments.find((x) => x.id === id);
   if (!c) return;
+  // background.js runComment() không còn chặn "job trùng lặp" nữa ở bất kỳ đường nào (v1.0.194 —
+  // đẩy bài lặp lại là mục đích chính đáng) nên bấm vào bài đã "✓ Đã comment" SẼ đăng comment thật
+  // lần nữa. Xác nhận lại 1 lần ở đây chỉ để tránh đăng trùng ngoài ý muốn do bấm nhầm tay.
+  if (isCommentDone(c) && !window.confirm('Bài này đã comment rồi — vẫn chạy để đẩy bài thêm 1 lần nữa?')) return;
   const settings = await GF.storage.getSettings();
   if (settings.avoidNight !== false && GF.scheduler.isNightBlocked()) {
     if (!window.confirm('Đang trong khung 22:00–07:00. Vẫn comment?')) return;
@@ -3997,16 +4050,6 @@ function buildRawJobsForOneComment(id, { alertOnEmpty = true } = {}) {
   }));
 }
 
-function collectSelectedCommentJobsRaw() {
-  const ids = [...document.querySelectorAll('[data-comment-id]:checked')].map((el) => el.dataset.commentId);
-  const jobs = [];
-  for (const id of ids) {
-    const itemJobs = buildRawJobsForOneComment(id, { alertOnEmpty: false });
-    if (itemJobs) jobs.push(...itemJobs);
-  }
-  return jobs;
-}
-
 // Gom job theo TỪNG bài đã tick (giữ nguyên nhóm của cùng 1 bài đi chung 1 phần tử) — dùng cho
 // giãn cách hàng loạt, mỗi bài (không phải mỗi nhóm) được gán 1 mốc thời gian riêng.
 function collectSelectedCommentJobGroups() {
@@ -4017,42 +4060,6 @@ function collectSelectedCommentJobGroups() {
     if (jobs?.length) groups.push(jobs);
   }
   return groups;
-}
-
-function estimateCommentBatchMinutes(jobCount, delays) {
-  if (jobCount <= 1) return 0;
-  const mid = (delays.betweenComments[0] + delays.betweenComments[1]) / 2;
-  return Math.round((mid * (jobCount - 1)) / 60);
-}
-
-async function confirmNightAction() {
-  const settings = await GF.storage.getSettings();
-  if (settings.avoidNight === false) return true;
-  if (!GF.scheduler.isNightBlocked()) return true;
-  return window.confirm('Đang trong khung 22:00–07:00 (tránh ban đêm). Vẫn tiếp tục?');
-}
-
-async function runAllComments() {
-  const jobs = collectSelectedCommentJobsRaw();
-  if (!jobs.length) return alert('Chọn ít nhất một bài có post_id hợp lệ');
-  if (!(await confirmNightAction())) return;
-  const settings = await GF.storage.getSettings();
-  const delays = await GF.scheduler.getDelays(settings.securityLevel);
-  const estMin = estimateCommentBatchMinutes(jobs.length, delays);
-  const estNote = estMin > 0 ? ` Tổng giãn cách ~${estMin} phút.` : '';
-  if (!window.confirm(`Chạy ${jobs.length} comment với delay ngẫu nhiên giữa mỗi bài?${estNote}`)) return;
-  try {
-    await gfSendMessage({
-      type: 'GF_RUN_COMMENT_BATCH',
-      payload: {
-        jobs,
-        actorId: state.activeActorId || settings.activeActorId,
-      },
-    });
-    await loadComments();
-  } catch (e) {
-    alert(e.message);
-  }
 }
 
 // Đăng ký alarm gf_cmt_* cho từng job trong 1 bài (nhiều nhóm), bắt đầu từ startWhen, giãn cách
@@ -5266,7 +5273,6 @@ function bindEvents() {
     await pullMyPostsFromServer({ force: true }).catch(() => {});
     await loadComments({ force: true });
   });
-  $('#btnRunAllComments').addEventListener('click', () => runAllComments());
   $('#btnScheduleComments').addEventListener('click', () => toggleCommentSchedulePanel());
   $('#btnConfirmCommentSchedule')?.addEventListener('click', () => scheduleSelectedComments());
   $('#commentSelectAll')?.addEventListener('change', (e) => {
