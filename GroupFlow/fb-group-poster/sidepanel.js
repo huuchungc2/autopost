@@ -17,7 +17,9 @@ const state = {
   leadFilterStatus: 'all',
   comments: [],
   commentDrafts: {},
+  commentSubTab: 'mine',
   commentFilterPerson: 'all',
+  commentPersonOptions: [],
   commentFilterTemplate: 'all',
   commentFilterSchedule: 'all',
   commentFilterStatus: 'all',
@@ -51,6 +53,7 @@ const state = {
   postSearch: '',
   postFilterGroup: 'all',
   postFilterImage: 'all',
+  postedGroupsOpenIds: new Set(),
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -298,7 +301,7 @@ function showTab(name) {
   $(`#tab-${name}`)?.classList.add('active');
   document.body.classList.remove(
     'gf-tab-create', 'gf-tab-groups', 'gf-tab-comment', 'gf-tab-radar',
-    'gf-tab-activity', 'gf-tab-help', 'gf-tab-skills', 'gf-tab-settings',
+    'gf-tab-activity', 'gf-tab-help', 'gf-tab-settings',
   );
   document.body.classList.add(`gf-tab-${name}`);
   if (name === 'groups') {
@@ -306,10 +309,6 @@ function showTab(name) {
   }
   if (name === 'create') {
     updatePostingConfigSummary();
-  }
-  if (name === 'skills') {
-    loadLocalSkillSelects();
-    renderLocalSkillList();
   }
   if (name === 'settings') {
     showSettingsPane('settings-posting');
@@ -321,13 +320,10 @@ function showTab(name) {
     refreshJournalFromStorage();
   }
   if (name === 'comment') {
-    // Trước bản này chỉ load lại danh sách + chạy autoScheduleUnscheduledComments() lúc mở panel
-    // lần đầu, bấm "Làm mới" tay, hoặc có event tidien sync — CHUYỂN TAB đơn thuần (bấm nút Comment
-    // trên thanh tab) không hề gọi lại, nên bài mới phát sinh trong lúc panel đang mở (đăng bài mới,
-    // đồng đội đăng bài...) hiển thị đúng nhưng CHƯA được tự lên lịch cho tới khi user vô tình bấm
-    // Làm mới hoặc đóng mở lại panel — trông như tính năng "tự động lên lịch" không chạy. Gọi lại ở
-    // đây (không force — vẫn tôn trọng throttle 30s của fetchCrossPostsFromServer/pullMyPostsFromServer)
-    // để mỗi lần vào tab Comment đều tự chạy autoScheduleUnscheduledComments() với dữ liệu mới nhất.
+    // Tải lại danh sách mỗi lần chuyển vào tab Comment (không force — vẫn tôn trọng throttle 30s của
+    // fetchCrossPostsFromServer/pullMyPostsFromServer) để bài mới phát sinh trong lúc panel đang mở
+    // (đăng bài mới, đồng đội đăng bài...) hiện đúng. Không còn tự lên lịch gì ở đây (v1.0.202 — bỏ
+    // hẳn auto-schedule, lên lịch giờ hoàn toàn do user chủ động).
     loadPostedPostsForComment();
   }
 }
@@ -2192,15 +2188,26 @@ function inlineCustomSetsRowHtml(postId) {
   if (!state.customGroupSets.length) {
     return '<p class="hint inline-set-hint">Chưa có bộ custom — tab <strong>Nhóm</strong> → tick nhóm → Lưu bộ</p>';
   }
+  const post = state.posts.find((p) => p.id === postId);
+  const postGroupIds = new Set((post?.groupIds || []).map(String));
   return `
     <p class="hint inline-set-label">Bộ custom — gán nhanh:</p>
     <div class="inline-custom-set-bar">
-      ${state.customGroupSets.map((s) => `
-        <button type="button" class="custom-set-chip" data-inline-apply-set="${escAttr(s.id)}" data-inline-post="${escAttr(postId)}" title="${escAttr(formatGroupList(s.groupIds))}">
-          <span class="custom-set-chip-name">${esc(s.name)}</span>
-          <span class="custom-set-chip-count">${s.groupIds.length}</span>
-        </button>
-      `).join('')}
+      ${state.customGroupSets.map((s) => {
+        // "applied" = mọi nhóm của bộ này đang có trong bài — cho gỡ nguyên bộ bằng 1 nút X thay vì
+        // phải mò untick từng nhóm trong danh sách "24 nhóm" bên dưới.
+        const applied = s.groupIds.length > 0 && s.groupIds.every((id) => postGroupIds.has(String(id)));
+        return `
+        <span class="custom-set-chip-wrap${applied ? ' applied' : ''}">
+          <button type="button" class="custom-set-chip${applied ? ' applied' : ''}" data-inline-apply-set="${escAttr(s.id)}" data-inline-post="${escAttr(postId)}" title="${escAttr(formatGroupList(s.groupIds))}">
+            <span class="custom-set-chip-name">${esc(s.name)}</span>
+            <span class="custom-set-chip-count">${s.groupIds.length}</span>
+          </button>
+          ${applied ? `<button type="button" class="custom-set-chip-remove" data-inline-remove-set="${escAttr(s.id)}" data-inline-post="${escAttr(postId)}" title="Gỡ bộ「${escAttr(s.name)}」khỏi bài">✕</button>` : ''}
+          <button type="button" class="custom-set-chip-delete" data-inline-delete-set="${escAttr(s.id)}" title="Xóa hẳn bộ「${escAttr(s.name)}」khỏi hệ thống">🗑</button>
+        </span>
+      `;
+      }).join('')}
     </div>
   `;
 }
@@ -2602,11 +2609,31 @@ function renderPosts() {
       await applyCustomSetToPost(btn.dataset.inlinePost, btn.dataset.inlineApplySet);
     });
   });
+  box.querySelectorAll('[data-inline-remove-set]').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await removeCustomSetFromPost(btn.dataset.inlinePost, btn.dataset.inlineRemoveSet);
+    });
+  });
+  box.querySelectorAll('[data-inline-delete-set]').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await deleteCustomSetFromInline(btn.dataset.inlineDeleteSet);
+    });
+  });
   box.querySelectorAll('[data-toggle-groups]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.toggleGroups;
       state.inlineGroupPickerPostId = state.inlineGroupPickerPostId === id ? null : id;
       state.inlineGroupSearch = '';
+      renderPosts();
+    });
+  });
+  box.querySelectorAll('[data-toggle-posted-groups]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.togglePostedGroups;
+      if (state.postedGroupsOpenIds.has(id)) state.postedGroupsOpenIds.delete(id);
+      else state.postedGroupsOpenIds.add(id);
       renderPosts();
     });
   });
@@ -2724,17 +2751,61 @@ function renderCustomSetQuickBar() {
   });
 }
 
+// GHÉP (không THAY THẾ) nhóm của bộ vào groupIds hiện có của bài — 1 bài chọn nhiều bộ phải cộng
+// dồn được (Tony: "1 bài tao chọn 1 hoặc vài custom... đổi mỗi custom lại xóa custom đã định nghĩa
+// trước đó"). Trước bản này `post.groupIds = set.groupIds...` GHI ĐÈ toàn bộ — áp bộ thứ 2 xóa sạch
+// nhóm của bộ thứ nhất đã gán trước đó dù người dùng không hề đụng tới bộ đó.
 async function applyCustomSetToPost(postId, setId) {
   const post = state.posts.find((p) => p.id === postId);
   const set = state.customGroupSets.find((s) => s.id === setId);
   if (!post || !set) return;
   const max = getMaxGroupsPerPost();
   ensurePostGroups(post);
-  post.groupIds = set.groupIds.slice(0, max).map(String);
+  const existing = post.groupIds.map(String);
+  const existingIds = new Set(existing);
+  const toAdd = set.groupIds.map(String).filter((id) => !existingIds.has(id));
+  const room = Math.max(0, max - existing.length);
+  const added = toAdd.slice(0, room);
+  post.groupIds = [...existing, ...added];
   await savePosts();
   state.inlineGroupPickerPostId = postId;
   renderPosts();
-  showToast(`Đã gán bộ「${set.name}」→ ${post.groupIds.length} nhóm`, 'success');
+  const skipped = toAdd.length - added.length;
+  if (!added.length && !skipped) {
+    showToast(`Bộ「${set.name}」đã có đủ trong bài`, 'info');
+  } else if (skipped > 0) {
+    showToast(`Đã thêm ${added.length} nhóm từ bộ「${set.name}」— bỏ qua ${skipped} vì đã đủ tối đa ${max} nhóm/bài`, 'info');
+  } else {
+    showToast(`Đã thêm ${added.length} nhóm từ bộ「${set.name}」→ ${post.groupIds.length}/${max} nhóm`, 'success');
+  }
+}
+
+async function removeCustomSetFromPost(postId, setId) {
+  const post = state.posts.find((p) => p.id === postId);
+  const set = state.customGroupSets.find((s) => s.id === setId);
+  if (!post || !set) return;
+  ensurePostGroups(post);
+  const removeIds = new Set(set.groupIds.map(String));
+  post.groupIds = post.groupIds.filter((id) => !removeIds.has(String(id)));
+  await savePosts();
+  state.inlineGroupPickerPostId = postId;
+  renderPosts();
+  showToast(`Đã gỡ bộ「${set.name}」khỏi bài`, 'success');
+}
+
+// Xóa hẳn 1 bộ custom (định nghĩa dùng chung toàn hệ thống, không riêng bài nào) ngay từ khung
+// Chọn nhóm trên card — trước bản này chỉ xóa được qua tab Nhóm → Bộ custom, phải chuyển tab.
+// Không đụng tới post.groupIds của bất kỳ bài nào đã gán từ bộ này trước đó (chỉ xóa định nghĩa).
+async function deleteCustomSetFromInline(setId) {
+  const set = state.customGroupSets.find((s) => s.id === setId);
+  if (!set) return;
+  if (!window.confirm(`Xóa hẳn bộ「${set.name}」khỏi hệ thống? (nhóm đã gán cho bài từ trước vẫn giữ nguyên)`)) return;
+  if (state.editingCustomSetId === setId) cancelEditCustomSet();
+  state.customGroupSets = await GF.groupSets.remove(setId);
+  await saveGroupsData();
+  renderPosts();
+  renderGroupsTab();
+  showToast(`Đã xóa bộ「${set.name}」`, 'info');
 }
 
 async function applyCustomSetToPosts(setId) {
@@ -3157,6 +3228,9 @@ async function refreshPostsOnly() {
   const d = await chrome.storage.local.get('postQueue');
   state.posts = mapPostsFromQueue(d.postQueue || []);
   state.postScheduleMap = await loadPostScheduleMap();
+  // postQueue trong storage đã bị stripForQueue() bóc media ra khỏi payload (media thật nằm ở
+  // postMediaStore) — không hydrate lại thì card render ảnh vỡ ngay sau khi vừa lên lịch xong.
+  await hydrateCachedMediaInPosts();
   renderPosts();
   await refreshActivityFromStorage();
 }
@@ -3192,10 +3266,20 @@ async function confirmCampaignStagger() {
   const settings = await GF.storage.getSettings();
   const campaignLabel = posts[0]?.campaignName || 'Campaign';
 
+  // posts[] ở đây là bản clone ({ ...p }) từ buildPostJobRelaxed(), không phải object trong
+  // state.posts — set field trực tiếp lên post/entry.post không phản ánh vào state.posts nên
+  // savePosts() lưu lại bản cũ (chưa có ngay_dang/gio_dang) và tag trên card vẫn hiện "+ Hẹn giờ".
+  // Phải đồng bộ ngược lại state.posts theo id.
+  const syncToStatePost = (id, fields) => {
+    const statePost = state.posts.find((sp) => sp.id === id);
+    if (statePost) Object.assign(statePost, fields);
+  };
+
   if (repeatDaily) {
     const now = Date.now();
     const entries = posts.map((post, i) => {
       if (!post.campaignName) post.campaignName = campaignLabel;
+      syncToStatePost(post.id, { campaignName: post.campaignName });
       return {
         id: `dfs_${now}_${i}_${Math.random().toString(36).slice(2, 6)}`,
         kind: 'post',
@@ -3217,6 +3301,11 @@ async function confirmCampaignStagger() {
       post.ngay_dang = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
       post.gio_dang = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
       if (!post.campaignName) post.campaignName = campaignLabel;
+      syncToStatePost(post.id, {
+        ngay_dang: post.ngay_dang,
+        gio_dang: post.gio_dang,
+        campaignName: post.campaignName,
+      });
 
       const alarmName = `gf_job_${post.id}_camp_${Date.now()}_${i}`;
       const payload = buildSchedulePostPayload([post], settings);
@@ -3365,8 +3454,6 @@ async function loadPostedPostsForComment({ force = false } = {}) {
   state.comments = [...localPosts, ...myServerItems, ...crossItems];
   await autoFillMissingCommentDrafts();
   state.commentScheduleMap = await loadCommentScheduleMap();
-  await autoScheduleUnscheduledComments();
-  state.commentScheduleMap = await loadCommentScheduleMap();
   populateCommentFilterPersonOptions();
   // Badge chỉ đếm bài còn CẦN chú ý (chưa comment) — áp dụng chung cho cả bài của mình lẫn bài
   // đồng đội qua isCommentDone(), không tính bài đã xong (server/postedGroups đều giữ bài đã xong
@@ -3470,59 +3557,6 @@ async function autoFillMissingCommentDrafts() {
       if (picked) state.commentDrafts[c.id] = picked;
     }
   });
-}
-
-// Bài/comment nào CHƯA có lịch (không có trong state.commentScheduleMap) — luôn tự động, không
-// cần bật/tắt gì — được xếp vào cuối hàng đợi "1 lần cụ thể", cách nhau 15 phút, bắt đầu sau thời
-// điểm lên lịch (comment) muộn nhất hiện có, hoặc từ bây giờ nếu chưa có lịch nào. An toàn khi gọi
-// lại nhiều lần (mỗi lần tab Comment tải/làm mới) vì chỉ nhắm bài CHƯA có lịch — bài đã lên lịch ở
-// lượt trước sẽ không bị đụng tới nữa. avoidNightTime() (trong scheduleCommentJobsOnce) tự tránh
-// khung 22:00–07:00 cho từng mốc.
-//
-// v1.0.194 đã bỏ điều kiện `!isCommentDone(c)` ở đây rồi ĐẢO NGƯỢC LẠI ở v1.0.196 — Tony test thật
-// thấy bài VỪA comment xong bị tự set lịch mới gần như ngay lập tức (do lịch "1 lần cụ thể" chạy
-// xong bị xoá khỏi local → tick tự-lên-lịch kế tiếp lại thấy "chưa có lịch" → set lại liền), phản
-// hồi "comment xong rồi thì thôi chứ" — auto-lên-lịch chỉ dành cho bài CHƯA TỪNG comment lần nào
-// (lần đầu), không phải cơ chế tự-đẩy-lại-vô-thời-hạn sau mỗi lần chạy xong. Muốn đẩy thêm bài đã
-// comment thì phải chủ động — tự tay "+ Lên lịch"/"▶ Chạy", hoặc set "Lặp lại hàng ngày". Lưu ý:
-// việc này KHÔNG ảnh hưởng phần đã sửa đúng ở v1.0.194 — 1 lịch ĐÃ được tạo ra (dù tự-lên-lịch lần
-// đầu hay tự tay) vẫn phải chạy thật khi tới giờ dù trước đó lỡ đã comment bởi đường khác
-// (`runComment()` không còn chặn "job trùng lặp" — giữ nguyên, không đổi).
-async function autoScheduleUnscheduledComments() {
-  const unscheduled = state.comments.filter((c) => !state.commentScheduleMap[c.id] && !isCommentDone(c));
-  if (!unscheduled.length) return;
-
-  // Mẫu đã được autoFillMissingCommentDrafts() random sẵn (gọi trước hàm này trong
-  // loadPostedPostsForComment()) — chỉ còn gom job theo draft hiện có. Bài không có nhóm nào với
-  // post_id FB hợp lệ (còn đang chờ đồng bộ/permalink chưa parse được) bị buildRawJobsForOneComment()
-  // trả về rỗng — không thể lên lịch được (chưa biết comment vào bài nào) nên tự động BỎ QUA thay vì
-  // báo lỗi (alertOnEmpty:false); đếm riêng để báo cho user biết thay vì im lặng mãi mãi.
-  const jobGroups = [];
-  let skippedNoPostId = 0;
-  for (const c of unscheduled) {
-    const jobs = buildRawJobsForOneComment(c.id, { alertOnEmpty: false });
-    if (jobs?.length) jobGroups.push(jobs);
-    else skippedNoPostId += 1;
-  }
-  if (!jobGroups.length) {
-    if (skippedNoPostId > 0) {
-      showToast(`${skippedNoPostId} bài chưa lên lịch được — thiếu post_id FB hợp lệ (đang chờ đồng bộ)`, 'warn');
-    }
-    return;
-  }
-
-  const upcoming = (await chrome.storage.local.get('activityUpcoming')).activityUpcoming || [];
-  const latestWhen = upcoming
-    .filter((u) => u.kind === 'comment')
-    .reduce((max, u) => Math.max(max, u.when || 0), 0);
-  let anchor = Math.max(latestWhen, Date.now());
-
-  for (const jobs of jobGroups) {
-    anchor += 15 * 60 * 1000;
-    await scheduleCommentJobsOnce(jobs, anchor);
-  }
-  const skippedNote = skippedNoPostId > 0 ? ` (${skippedNoPostId} bài khác thiếu post_id FB hợp lệ, chưa lên lịch được)` : '';
-  showToast(`Đã tự động lên lịch ${jobGroups.length} bài chưa có lịch (cách nhau 15 phút)${skippedNote}`, 'success');
 }
 
 async function triggerTidienAutoSync({ silent = false, force = false, scope = 'comments' } = {}) {
@@ -3729,17 +3763,20 @@ function commentTemplateTagHtml(c, draft) {
     : `<button type="button" class="tag pending tag-clickable" data-toggle-comment-editor="${escAttr(c.id)}" title="Nhập mẫu bình luận">+ Nhập mẫu bình luận</button>`;
 }
 
-// 4 filter độc lập, kết hợp AND với nhau — Người (Tất cả/Của tôi/tên đồng đội), Mẫu bình luận
-// (Có/Chưa có), Lịch (Đã/Chưa lên lịch), Bình luận (Đã/Chưa comment). Select thường
-// (`gf-select-sm`), giống hệt "Nhóm:"/"Ảnh:" ở tab Tạo bài — không dùng combobox gõ-tìm riêng nữa.
+// v1.0.202 — Tony chốt tách hẳn Comment thành 2 tab con: "Của tôi" (bài chính mình) / "Đồng đội"
+// (bài người khác, comment chéo) — thay vì gộp chung + filter "Người: Tất cả/Của tôi/tên" như
+// trước. Sub-tab quyết định NGUỒN (state.commentSubTab, xem bindCommentSubTabs()); filter "Người"
+// giờ chỉ còn ý nghĩa trong tab Đồng đội (thu hẹp xuống 1 đồng đội cụ thể), tab Của tôi không có
+// filter này nữa (ẩn hẳn control, xem #commentPersonFilterWrap). 3 filter còn lại (Mẫu bình luận/
+// Lịch/Bình luận) áp dụng chung cho cả 2 tab.
 function getFilteredComments() {
-  let list = state.comments;
+  let list = state.comments.filter((c) => (
+    state.commentSubTab === 'team' ? c._source === 'cross' : c._source !== 'cross'
+  ));
   const person = state.commentFilterPerson || 'all';
-  if (person === 'mine') {
-    list = list.filter((c) => c._source !== 'cross');
-  } else if (person.startsWith('user:')) {
+  if (state.commentSubTab === 'team' && person.startsWith('user:')) {
     const name = person.slice(5);
-    list = list.filter((c) => c._source === 'cross' && c._userLabel === name);
+    list = list.filter((c) => c._userLabel === name);
   }
   const tpl = state.commentFilterTemplate || 'all';
   if (tpl === 'has') list = list.filter((c) => (state.commentDrafts[c.id] || '').trim());
@@ -3753,30 +3790,69 @@ function getFilteredComments() {
   return list;
 }
 
-// Option "Người" động theo danh sách đồng đội đang có bài (_userLabel) — giữ lựa chọn hiện tại
-// nếu vẫn còn hợp lệ, về lại "Tất cả" nếu người đó không còn bài nào trong danh sách nữa.
-function populateCommentFilterPersonOptions() {
-  const sel = $('#commentFilterPerson');
-  if (!sel) return;
-  const names = new Set();
-  state.comments.forEach((c) => {
-    if (c._source === 'cross' && c._userLabel) names.add(c._userLabel);
+function commentSubTabHasPersonFilter() {
+  return state.commentSubTab === 'team';
+}
+
+// Chuyển tab con "Của tôi"/"Đồng đội" — ẩn/hiện control "Người" (chỉ có ý nghĩa ở tab Đồng đội) và
+// render lại danh sách theo đúng nguồn đã chọn.
+function setCommentSubTab(sub) {
+  state.commentSubTab = sub === 'team' ? 'team' : 'mine';
+  $$('.comment-sub-tabs [data-comment-sub]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.commentSub === state.commentSubTab);
   });
-  const sortedNames = [...names].sort((a, b) => a.localeCompare(b));
-  const current = state.commentFilterPerson || 'all';
-  sel.innerHTML = [
-    '<option value="all">Người: Tất cả</option>',
-    '<option value="mine">Của tôi</option>',
-    ...sortedNames.map((n) => `<option value="user:${escAttr(n)}">${esc(n)}</option>`),
-  ].join('');
-  const validValues = new Set(['all', 'mine', ...sortedNames.map((n) => `user:${n}`)]);
-  sel.value = validValues.has(current) ? current : 'all';
-  state.commentFilterPerson = sel.value;
+  $('#commentPersonFilterWrap')?.classList.toggle('hidden', !commentSubTabHasPersonFilter());
+  state.commentsPage = 0;
+  renderComments();
+}
+
+function bindCommentSubTabs() {
+  $$('.comment-sub-tabs [data-comment-sub]').forEach((btn) => {
+    btn.addEventListener('click', () => setCommentSubTab(btn.dataset.commentSub));
+  });
+  $('#commentPersonFilterWrap')?.classList.toggle('hidden', !commentSubTabHasPersonFilter());
+}
+
+// Danh sách tên đồng đội (kèm số bài đang có trong danh sách đã tải) cho filter "Người" ở tab Đồng
+// đội — gõ được để lọc gợi ý (input + datalist, xem resolveCommentFilterPersonInput()). Không còn
+// pseudo-option "Tất cả"/"Của tôi" như bản trước v1.0.202 — 2 khái niệm đó giờ là 2 tab con riêng,
+// để trống ô input = xem hết đồng đội (mặc định), không cần chọn "Tất cả" nữa.
+function populateCommentFilterPersonOptions() {
+  const input = $('#commentFilterPerson');
+  const list = $('#commentFilterPersonList');
+  if (!input || !list) return;
+  const counts = new Map();
+  state.comments.forEach((c) => {
+    if (c._source === 'cross' && c._userLabel) counts.set(c._userLabel, (counts.get(c._userLabel) || 0) + 1);
+  });
+  const sortedNames = [...counts.keys()].sort((a, b) => a.localeCompare(b));
+  state.commentPersonOptions = sortedNames.map((n) => ({ value: `user:${n}`, label: `${n} (${counts.get(n)})`, name: n }));
+  list.innerHTML = state.commentPersonOptions.map((o) => `<option value="${escAttr(o.label)}"></option>`).join('');
+  const validValues = new Set(['all', ...state.commentPersonOptions.map((o) => o.value)]);
+  if (!validValues.has(state.commentFilterPerson || 'all')) state.commentFilterPerson = 'all';
+  const active = state.commentPersonOptions.find((o) => o.value === state.commentFilterPerson);
+  input.value = active ? active.label : '';
+}
+
+// Gõ tự do vào input — khớp chính xác (không phân biệt hoa/thường) thì áp filter ngay; khớp DUY
+// NHẤT 1 người theo chuỗi con (đang gõ dở) cũng áp luôn cho mượt; để trống = xem hết đồng đội; các
+// trường hợp mơ hồ khác (gõ dở, chưa rõ ai) — giữ nguyên filter đang áp, không tự ý đổi bộ lọc.
+function resolveCommentFilterPersonInput(raw) {
+  const q = (raw || '').trim().toLowerCase();
+  const options = state.commentPersonOptions || [];
+  if (!q) return 'all';
+  const exact = options.find((o) => o.label.toLowerCase() === q);
+  if (exact) return exact.value;
+  const matches = options.filter((o) => o.name.toLowerCase().includes(q));
+  if (matches.length === 1) return matches[0].value;
+  return null;
 }
 
 function bindCommentFilters() {
-  $('#commentFilterPerson')?.addEventListener('change', (e) => {
-    state.commentFilterPerson = e.target.value;
+  $('#commentFilterPerson')?.addEventListener('input', (e) => {
+    const resolved = resolveCommentFilterPersonInput(e.target.value);
+    if (resolved === null) return;
+    state.commentFilterPerson = resolved;
     state.commentsPage = 0;
     renderComments();
   });
@@ -3801,9 +3877,15 @@ function renderComments() {
   const box = $('#commentList');
   const filtered = getFilteredComments();
   if (!filtered.length) {
-    box.innerHTML = emptyState('💬', state.comments.length
+    // So với state.comments.length (tổng cả 2 tab) thay vì chỉ trong tab hiện tại — tab "Của tôi"
+    // rỗng trong khi tab "Đồng đội" có bài (hay ngược lại) trước đây báo nhầm "Không có bài khớp bộ
+    // lọc" (ngụ ý có bài nhưng bị ẩn), đúng ra phải là "chưa có bài" cho đúng tab đang xem.
+    const subTabHasAny = state.comments.some((c) => (
+      state.commentSubTab === 'team' ? c._source === 'cross' : c._source !== 'cross'
+    ));
+    box.innerHTML = emptyState('💬', subTabHasAny
       ? 'Không có bài khớp bộ lọc'
-      : 'Chưa có bài đã đăng — đăng bài qua GroupFlow trước');
+      : (state.commentSubTab === 'team' ? 'Chưa có bài của đồng đội để comment chéo' : 'Chưa có bài đã đăng — đăng bài qua GroupFlow trước'));
     return;
   }
   const rawTemplates = ($('#commentTemplates')?.value?.trim() || GF.commentTemplates?.DEFAULT || '').split('\n').filter((s) => s.trim());
@@ -3829,7 +3911,12 @@ function renderComments() {
           : '';
       }).join('')
       : '';
-    const postedAt = c.lastPostedAt ? new Date(c.lastPostedAt).toLocaleString('vi') : '';
+    // v1.0.198 — Tony tưởng đây là 1 phần của lịch lặp lại hàng ngày (nằm ngay cạnh tag "🔁 …
+    // hàng ngày" nên nhìn như "chạy xong tự sửa lại lịch") — thật ra đây chỉ là NGÀY BÀI GỐC được
+    // đăng lên Facebook (c.lastPostedAt), cố định từ lúc đăng bài, không đổi theo lịch comment.
+    // Đổi format cho gọn (dùng chung formatScheduleWhen() — "YYYY-MM-DD HH:MM", bỏ giây) + thêm
+    // tiền tố/tooltip để tách rõ khỏi tag lịch ngay cạnh nó.
+    const postedAt = c.lastPostedAt ? formatScheduleWhen(new Date(c.lastPostedAt).getTime()) : '';
     const crossLabel = c._source === 'cross' ? `<span class="tag web">↔ ${esc(c._userLabel || 'cross')}</span>` : '';
     // Bài đã comment xong không bị lọc mất khỏi danh sách (dù của mình hay đồng đội) — chỉ gắn tag
     // để biết trạng thái, dùng chung isCommentDone() cho cả 2 nguồn.
@@ -3866,7 +3953,7 @@ function renderComments() {
         <span class="tag">${groupInfo}</span>
         ${commentTemplateTagHtml(c, draft)}
         ${commentScheduleTagHtml(c)}
-        ${postedAt ? `<span class="tag">${esc(postedAt)}</span>` : ''}
+        ${postedAt ? `<span class="tag" title="Bài gốc đăng lên Facebook lúc này — không đổi theo lịch comment">📌 Đăng ${esc(postedAt)}</span>` : ''}
       </div>
       <div class="row post-actions comment-item-actions">
         <button type="button" class="btn primary sm" data-run-comment="${escAttr(c.id)}">▶ Chạy</button>
@@ -4229,6 +4316,14 @@ function buildPostedGroupUrl(g) {
 function renderPostedGroupsBlock(p) {
   const groups = p.postedGroups || [];
   if (!groups.length) return '';
+  const open = state.postedGroupsOpenIds.has(p.id);
+  if (!open) {
+    return `
+      <button type="button" class="btn ghost sm posted-groups-toggle" data-toggle-posted-groups="${escAttr(p.id)}">
+        Bài đã đăng (${groups.length} nhóm) ▾
+      </button>
+    `;
+  }
   const defaultCmt = String(p.firstComment || '').trim();
   const rows = groups.map((g) => {
     const url = buildPostedGroupUrl(g);
@@ -4253,7 +4348,10 @@ function renderPostedGroupsBlock(p) {
   }).join('');
   return `
     <div class="posted-groups-block">
-      <p class="field-label">Bài đã đăng</p>
+      <div class="posted-groups-head">
+        <p class="field-label">Bài đã đăng</p>
+        <button type="button" class="btn ghost sm" data-toggle-posted-groups="${escAttr(p.id)}">Thu gọn ▴</button>
+      </div>
       <p class="hint">Mở FB comment tay, hoặc nhập text → <strong>▶ Bot</strong> (chạy nền).</p>
       ${rows}
     </div>
@@ -4454,6 +4552,14 @@ async function refreshActivityFromStorage({ preferHistory = false, forceHistoryS
   }
 }
 
+// v1.0.199 — lịch COMMENT (payload = {group_id, group_name, ...} đơn, không phải mảng groupIds như
+// lịch ĐĂNG BÀI) luôn rơi vào formatGroupList(undefined) → hiện "Chưa có nhóm" dù nhóm thật đã có
+// sẵn trong payload — chỉ là đọc sai field. Tách riêng nhánh comment, đọc đúng group_name/group_id.
+function upcomingGroupLabel(u) {
+  if (u.kind === 'comment') return u.payload?.group_name || u.payload?.group_id || 'Chưa có nhóm';
+  return formatGroupList(u.groupIds || u.payload?.posts?.[0]?.groupIds);
+}
+
 function renderActivity(upcoming, history) {
   state._lastActivityUpcoming = upcoming;
   state._lastActivityHistory = history;
@@ -4465,7 +4571,7 @@ function renderActivity(upcoming, history) {
       <span class="tag ${u.kind === 'generate_image' ? 'pending' : 'ready'}">${kindLabel}</span>
       <strong>${new Date(u.when).toLocaleString()}</strong>
       <div class="post-body">${esc(u.label || u.snippet || u.kind)}</div>
-      <div class="hint">${esc(formatGroupList(u.groupIds || u.payload?.posts?.[0]?.groupIds))}</div>
+      <div class="hint">${esc(upcomingGroupLabel(u))}</div>
       <div class="post-actions">
         <button type="button" class="btn ghost sm" data-reschedule="${idx}">Sửa giờ</button>
         <button type="button" class="btn ghost sm" data-cancel-upcoming="${idx}">Hủy</button>
@@ -4761,6 +4867,7 @@ function showSettingsPane(paneId) {
     'settings-posting',
     'settings-media',
     'settings-ai',
+    'settings-skills',
     'settings-sync',
     'settings-advanced',
   ];
@@ -4773,6 +4880,10 @@ function showSettingsPane(paneId) {
       el.open = true;
     }
   });
+  if (id === 'settings-skills') {
+    loadLocalSkillSelects();
+    renderLocalSkillList();
+  }
   const body = document.querySelector('.settings-shell-body');
   if (body) body.scrollTop = 0;
 }
@@ -5279,6 +5390,7 @@ function bindEvents() {
     document.querySelectorAll('#commentList [data-comment-id]').forEach((cb) => { cb.checked = e.target.checked; });
   });
   bindCommentFilters();
+  bindCommentSubTabs();
 
   $('#btnRadarSave').addEventListener('click', async () => {
     const interval = Number($('#radarInterval').value) || 15;
@@ -5395,7 +5507,12 @@ function bindEvents() {
     if (!file) return;
     try {
       const text = await file.text();
-      await GF.localSkills.importFromJson(text);
+      const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+      if (ext === '.md' || ext === '.markdown' || ext === '.txt') {
+        await GF.localSkills.importFromPromptFile(text, file.name);
+      } else {
+        await GF.localSkills.importFromJson(text);
+      }
       await loadLocalSkillSelects();
       renderLocalSkillList();
       alert(`Đã import skill từ ${file.name}`);

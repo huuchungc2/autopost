@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './services/authContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -20,7 +20,6 @@ import Websites from './pages/Websites';
 import WebsiteForm from './pages/WebsiteForm';
 import WebsiteBlogPosts from './pages/WebsiteBlogPosts';
 import WebsiteBlogPostEditor from './pages/WebsiteBlogPostEditor';
-import Skills from './pages/Skills';
 import Providers from './pages/Providers';
 import UserManagement from './pages/UserManagement';
 import ActivityLog from './pages/ActivityLog';
@@ -65,7 +64,7 @@ function App() {
             <Route path="websites/:id/edit" element={<WebsiteForm />} />
             <Route path="website-posts" element={<WebsiteBlogPosts />} />
             <Route path="website-posts/:id/edit" element={<WebsiteBlogPostEditor />} />
-            <Route path="skills" element={<Skills />} />
+            <Route path="skills" element={<Navigate to="/settings?tab=skills" replace />} />
             <Route path="providers" element={<Providers />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="activity" element={<ActivityLog />} />

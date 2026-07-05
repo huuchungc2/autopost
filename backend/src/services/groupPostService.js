@@ -84,7 +84,7 @@ function toMysqlDatetime(val) {
 // Bài mới nên "từ từ" xuất hiện với người khác thay vì lộ diện ngay lập tức (đỡ giống comment-ring
 // bị FB soi, đúng tinh thần "từ từ mọi người thấy bài" — xem GET /cross-posts).
 const VISIBLE_AFTER_MIN_MINUTES = 5;
-const VISIBLE_AFTER_MAX_MINUTES = 60;
+export const VISIBLE_AFTER_MAX_MINUTES = 60;
 const DEFAULT_COMMENT_TARGET = 5;
 
 function randomVisibleAfter(fromDate) {

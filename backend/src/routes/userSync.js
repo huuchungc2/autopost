@@ -2,7 +2,7 @@ import express from 'express';
 import { query } from '../db.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { authenticateLicenseKey } from '../middleware/licenseAuth.js';
-import { upsertUserPost } from '../services/groupPostService.js';
+import { upsertUserPost, VISIBLE_AFTER_MAX_MINUTES } from '../services/groupPostService.js';
 
 const router = express.Router();
 
@@ -58,21 +58,39 @@ router.get('/my-posts', authenticateLicenseKey, asyncHandler(async (req, res) =>
   res.json(rows);
 }));
 
-// GET /api/user-sync/cross-posts — Flow 1 (đồng bộ bài để đi comment). v1.0.187 — 3 thay đổi so
-// với bản chỉ-có-cursor (v1.0.185/186):
-//   1. `comment_count < comment_target` + `NOT EXISTS (chính tôi đã comment)` thay cho cờ boolean
-//      `needs_comment` — bài mở cho tới khi ĐỦ N người khác nhau vào comment, không phải chỉ 1
-//      người là khoá lại cho tất cả (xem chú thích comment_target/comment_count, migration 039).
-//   2. `visible_after <= NOW()` — bài mới có độ trễ ngẫu nhiên trước khi lộ diện (né dấu hiệu
+// GET /api/user-sync/cross-posts — Flow 1 (đồng bộ bài để đi comment).
+//
+// v1.0.201 — Tony chốt rõ: "1 bài ai thích comment bao nhiêu là tùy chứ mắc gì đặt comment target
+// thiết kế này để làm gì, không giới hạn". Bỏ hẳn điều kiện `comment_count < comment_target` khỏi
+// WHERE — không còn khoá bài lại sau khi đủ N người khác nhau comment. Điều kiện duy nhất còn lại
+// quyết định "còn cần comment không" là `NOT EXISTS (chính tôi đã comment)` — tức 1 bài chỉ ẩn khỏi
+// cross-posts của MỘT NGƯỜI sau khi CHÍNH người đó đã comment rồi, không còn đóng lại cho TẤT CẢ
+// mọi người chỉ vì đã đủ target. Giữ nguyên cột `comment_target`/`comment_count` trong DB (thông
+// tin thống kê "đã có bao nhiêu người comment", vô hại) — chỉ bỏ vai trò GATE của nó, không xoá
+// cột/migration (tránh thay đổi schema không cần thiết cho 1 quyết định hành vi).
+//   1. `visible_after <= NOW()` — bài mới có độ trễ ngẫu nhiên trước khi lộ diện (né dấu hiệu
 //      comment-ring, tạo hiệu ứng "từ từ" đúng nghĩa sản phẩm), xem upsertUserPost().
-//   3. Ưu tiên `comment_count ASC` (bài đang thiếu người) trước `posted_at`/`updated_at` — tránh
-//      dồn hết lượt comment vào bài mới nhất của người đăng nhiều, bỏ quên bài của người đăng ít.
+//   2. Ưu tiên `comment_count ASC` (bài đang có ít người comment nhất) trước `posted_at`/`updated_at`
+//      — chỉ để dàn đều lượt comment, không phải để khoá bài — tránh dồn hết vào bài mới nhất của
+//      người đăng nhiều, bỏ quên bài của người đăng ít.
 router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
-  const since = req.query.since ? new Date(req.query.since) : null;
+  const requestedSince = req.query.since ? new Date(req.query.since) : null;
+  // Bug đã gặp thật: client (fetchCrossPostsFromServer(), sidepanel.js) đẩy cursor `since` = MAX
+  // updated_at của các bài ĐÃ THẤY (visible) trong lượt gọi trước — nhưng `visible_after` (độ trễ
+  // ngẫu nhiên 5-60', xem randomVisibleAfter() ở trên) không đồng bộ với updated_at. Nếu 1 bài A
+  // (updated_at sớm hơn) có độ trễ dài hơn 1 bài B (updated_at trễ hơn A) đăng SAU nó nhưng có độ
+  // trễ ngắn hơn, B lộ diện trước và đẩy cursor vượt qua A trước khi A kịp lộ diện — A bị cursor
+  // "since > updated_at" loại vĩnh viễn ở mọi lần gọi sau, dù visible_after của A rồi cũng qua NOW().
+  // Chặn floor của since ở NOW() - VISIBLE_AFTER_MAX_MINUTES: mọi bài update trong cửa sổ này luôn
+  // được quét lại (an toàn, dư vài phần tử không đáng kể) — bài cũ hơn cửa sổ này thì visible_after
+  // của nó chắc chắn đã ngã ngũ (tối đa 60' sau updated_at) nên bỏ qua vẫn đúng.
+  const safetyFloor = new Date(Date.now() - VISIBLE_AFTER_MAX_MINUTES * 60_000);
+  const since = requestedSince
+    ? new Date(Math.min(requestedSince.getTime(), safetyFloor.getTime()))
+    : null;
   const myId = req.userAccount.id;
   const baseWhere = `up.user_account_id != ?
-    AND up.comment_count < up.comment_target
     AND up.visible_after <= NOW()
     AND NOT EXISTS (
       SELECT 1 FROM user_post_comments upc
@@ -81,7 +99,7 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
   const selectFields = `up.id, up.post_queue_id, up.group_id, up.group_name,
                 up.post_id, up.noi_dung, up.posted_at, up.updated_at,
                 up.comment_count, up.comment_target,
-                IF(up.comment_count < up.comment_target, 1, 0) AS needs_comment,
+                1 AS needs_comment,
                 u.name AS user_name, u.email AS user_email`;
   const rows = since
     ? await query(

@@ -82,6 +82,14 @@ GF.localSkills = {
     return this.list();
   },
 
+  async importFromPromptFile(text, filename) {
+    const content = String(text || '').trim();
+    if (!content) throw new Error('File rỗng — không có nội dung prompt');
+    const name = String(filename || 'Skill').replace(/\.[^.]+$/, '').trim() || 'Skill';
+    await this.upsert({ name, skill_type: 'text', system_prompt: content });
+    return this.list();
+  },
+
   exportJson() {
     return this.list().then((skills) => JSON.stringify(
       skills.map(({ id, name, description, skill_type, system_prompt }) => ({

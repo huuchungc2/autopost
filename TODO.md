@@ -1,6 +1,161 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-07-04
+> Cập nhật: 2026-07-05
+
+## GroupFlow: đăng trùng 1 bài vào 1 nhóm (Nhanh + Cổ điển) (2026-07-05)
+
+Tony báo: "1 bài đăng vào 1 nhóm 2 lần nhanh và cổ điển" — đăng Nhanh (GraphQL) có thể đã thành công thật trên FB nhưng response bị rớt, code tưởng lỗi nên tự fallback Cổ điển đăng thêm 1 lần.
+
+- [x] `fetchWithRetry()`/`graphqlRequest()` (`modules/fbSessionBg.js`) đánh dấu `e.ambiguousDelivery = true` cho lỗi mạng (fetch tự ném lỗi) và HTTP 5xx sau khi hết lượt retry — 2 trường hợp không thể khẳng định FB đã xử lý request hay chưa.
+- [x] `postGroupItem()` (`background.js`) gặp lỗi `ambiguousDelivery` thì KHÔNG tự fallback Cổ điển — báo lỗi rõ yêu cầu tự kiểm tra nhóm trước khi đăng lại. Lỗi GraphQL rõ ràng (field_exception, không có quyền...) vẫn fallback Cổ điển như cũ vì FB chắc chắn đã từ chối.
+- [x] Chạy lại `node build-sw-bundle.js` để cập nhật `modules/swBundle.js` (service worker chạy bundle này qua `importScripts`, không phải file nguồn `fbSessionBg.js` trực tiếp — sửa xong PHẢI rebuild, nếu không extension vẫn chạy code cũ).
+- [x] Bump `manifest.json` → v1.0.211, cập nhật `CHANGELOG.md`/`docs/GROUPFLOW.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, chạy vài lượt đăng — nếu gặp lại tình huống Nhanh "lỗi" mơ hồ (mất mạng/5xx), phải thấy bài đó dừng lại + báo lỗi rõ trong Log ("Không rõ Nhanh đã đăng thành công hay chưa...") thay vì tự động đăng Cổ điển; đối chiếu nhóm đó trên FB xem có đúng 1 bài hay bị trùng từ trước khi fix.
+
+## Backend: bài "đồng đội" bị cursor đồng bộ bỏ sót vĩnh viễn (2026-07-05)
+
+Tony hỏi "như này là sao?" trước tab Comment → Đồng đội trống, xác nhận đồng đội ĐÃ đăng bài nhưng không thấy hiện.
+
+- [x] Root cause: cursor `since=updated_at` (`GET /api/user-sync/cross-posts`, `userSync.js`) không tương quan với `visible_after` (độ trễ ngẫu nhiên 5-60' trước khi lộ diện) — bài có độ trễ dài hơn 1 bài đăng sau nó nhưng độ trễ ngắn hơn bị cursor vượt qua trước khi kịp lộ diện, loại vĩnh viễn khỏi các lần đồng bộ sau.
+- [x] Export `VISIBLE_AFTER_MAX_MINUTES` từ `groupPostService.js`; `userSync.js` chặn floor của `since` client gửi lên ở `NOW() - VISIBLE_AFTER_MAX_MINUTES` — không cần đổi gì phía extension.
+- [ ] **Cần Tony xác nhận trên máy thật**: nhờ 1 tài khoản khác đăng bài qua GroupFlow, đợi vài phút, mở tab Comment → Đồng đội → Làm mới → bài đó phải hiện ra (kể cả khi trước đó đã có 1 bài khác "lộ diện" sớm hơn và đẩy cursor đi).
+
+## GroupFlow: gán bộ custom thứ 2 không còn xóa sạch bộ thứ nhất (2026-07-05)
+
+Tony phản hồi: "1 bài tao chọn 1 hoặc vài custom... đổi mỗi custom lại xóa custom tao đã định nghĩa trước đó" — bấm chip bộ B sau khi đã áp bộ A vào 1 bài xóa sạch nhóm của bộ A.
+
+- [x] `applyCustomSetToPost()` (`sidepanel.js`) đổi từ GHI ĐÈ (`post.groupIds = set.groupIds`) sang GHÉP — giữ `groupIds` hiện có, chỉ thêm nhóm mới từ bộ vừa bấm, dedupe + tôn trọng max nhóm/bài (báo riêng qua toast nếu có nhóm bị bỏ qua vì đã đủ tối đa).
+- [x] Bump `manifest.json` → v1.0.210, cập nhật `CHANGELOG.md`/`docs/GROUPFLOW.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: 1 bài, bấm bộ A → có nhóm bộ A; bấm tiếp bộ B → bài có CẢ nhóm bộ A lẫn bộ B (không mất bộ A); bấm ✕ trên bộ A → chỉ mất nhóm bộ A, bộ B vẫn còn.
+
+## GroupFlow: nút 🗑 xóa hẳn "bộ custom" ngay trong khung Chọn nhóm (2026-07-05)
+
+Tiếp theo v1.0.207 (nút ✕ gỡ bộ khỏi 1 bài), Tony phản hồi "phải cho xóa nhóm" — xác nhận muốn xóa hẳn định nghĩa bộ custom ngay tại khung Chọn nhóm trên card, không phải chuyển sang tab Nhóm.
+
+- [x] Thêm nút 🗑 trên mỗi chip trong `inlineCustomSetsRowHtml()` (`sidepanel.js`), luôn hiện (không cần applied).
+- [x] `deleteCustomSetFromInline()` — confirm rồi `GF.groupSets.remove()` (dùng chung logic với tab Nhóm), không đụng `groupIds` bài đã gán từ trước.
+- [x] CSS `.custom-set-chip-delete` (`sidepanel.css`).
+- [x] Bump `manifest.json` → v1.0.209, cập nhật `CHANGELOG.md`/`docs/GROUPFLOW.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: mở khung Chọn nhóm 1 bài → bấm 🗑 trên 1 chip bộ → confirm → bộ biến mất khỏi cả khung này lẫn tab Nhóm → Bộ custom; nhóm đã gán cho bài từ bộ đó trước đây vẫn còn nguyên trên bài.
+
+## GroupFlow: thu gọn khối "Bài đã đăng" trên card (2026-07-05)
+
+Tony hỏi "mở cái này ra làm sao tắt" — khối "Bài đã đăng" (list nhóm đã đăng + Comment bot) trước đây luôn hiện đầy đủ, không có nút đóng.
+
+- [x] `state.postedGroupsOpenIds` (Set, `sidepanel.js`) — mặc định thu gọn, chỉ hiện nút "Bài đã đăng (N nhóm) ▾".
+- [x] `renderPostedGroupsBlock()` render nút "Thu gọn ▴" khi đang mở, toggle qua `data-toggle-posted-groups`.
+- [x] CSS `.posted-groups-head`/`.posted-groups-toggle` (`sidepanel.css`).
+- [x] Bump `manifest.json` → v1.0.208, cập nhật `CHANGELOG.md`/`docs/GROUPFLOW.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: card có bài đã đăng → mặc định chỉ thấy nút "Bài đã đăng (N nhóm) ▾", bấm vào → mở đầy đủ list nhóm + Comment bot, bấm "Thu gọn ▴" → đóng lại.
+
+## GroupFlow: nút X gỡ nguyên "bộ custom" khỏi 1 bài (2026-07-05)
+
+Tony phản hồi: nhóm đã gán qua "bộ" (custom set) trong khung chọn nhóm inline không có cách gỡ nguyên cụm — muốn gỡ phải mò untick từng nhóm trong danh sách "24 nhóm".
+
+- [x] `inlineCustomSetsRowHtml()` (`sidepanel.js`) tính `applied` = mọi nhóm của bộ đã có trong `post.groupIds` — chip chuyển màu xanh + hiện thêm nút ✕ (`data-inline-remove-set`) khi applied.
+- [x] `removeCustomSetFromPost()` (`sidepanel.js`) gỡ đúng các nhóm thuộc bộ đó ra khỏi bài, giữ nguyên nhóm khác đã tick thủ công.
+- [x] CSS `.custom-set-chip-wrap`/`.custom-set-chip.applied`/`.custom-set-chip-remove` (`sidepanel.css`).
+- [x] Bump `manifest.json` → v1.0.207, cập nhật `CHANGELOG.md`/`docs/GROUPFLOW.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: bấm 1 chip bộ để gán → chip chuyển xanh + hiện ✕ → bấm ✕ → nhóm của bộ đó bị bỏ tick, nhóm khác đã tick tay trước đó (ngoài bộ) vẫn giữ nguyên.
+
+## GroupFlow: fix "Hẹn giờ" không set giờ + ảnh vỡ sau khi xác nhận (2026-07-05)
+
+Tony báo: tick "Hẹn giờ" 1 bài, chọn giờ bắt đầu, bấm Xác nhận — tag trên card vẫn hiện "+ Hẹn giờ" như chưa lên lịch, và ảnh trong card không hiển thị nữa.
+
+- [x] `confirmCampaignStagger()` (`sidepanel.js`) set `ngay_dang`/`gio_dang`/`campaignName` lên bản clone (`{ ...p }`) thay vì object thật trong `state.posts` → không lưu được. Thêm `syncToStatePost()` ghi ngược đúng object theo `id`.
+- [x] `refreshPostsOnly()` (`sidepanel.js`) nạp lại `postQueue` từ storage (đã bị `stripForQueue()` bóc media) nhưng thiếu bước hydrate lại → card render ảnh vỡ. Thêm `await hydrateCachedMediaInPosts()` trước `renderPosts()`.
+- [x] Bump `manifest.json` → v1.0.206, cập nhật `CHANGELOG.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: tick 1 bài → Hẹn giờ → chọn giờ → Xác nhận → tag đổi thành "Đăng: ..." ngay, ảnh vẫn hiển thị đúng trong card; thử cả trường hợp nhiều bài tick cùng lúc (giãn cách).
+
+## GroupFlow: import skill nhận thêm .md/.txt (2026-07-05)
+
+Tony báo ô import skill trong Cài đặt chỉ nhận file JSON — cần nhận cả `.md` (giống website).
+
+- [x] `GF.localSkills.importFromPromptFile()` (`modules/localSkills.js`) — đọc `.md`/`.markdown`/`.txt` nguyên văn làm `system_prompt`, tên skill lấy theo tên file.
+- [x] Handler `#skillImportFile` (`sidepanel.js`) rẽ nhánh theo đuôi file: `.json` → `importFromJson()` (hàng loạt), `.md`/`.markdown`/`.txt` → `importFromPromptFile()` (1 skill).
+- [x] Cập nhật `accept` + hint trên input (`sidepanel.html`).
+- [x] Bump `manifest.json` → v1.0.205, cập nhật `CHANGELOG.md`/`docs/GROUPFLOW.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: import 1 file `.md` thật → tạo đúng 1 skill tên theo file, nội dung đầy đủ; import `.json` mảng nhiều skill vẫn hoạt động như cũ.
+
+## GroupFlow: gộp tab Skill vào Cài đặt + sắp lại thứ tự nav (2026-07-05)
+
+Đồng bộ với thay đổi website ở mục dưới — Tony muốn tab Skill của extension cũng vào trong Cài đặt. Sau đó phản hồi thêm "comment, cài đặt để sau cùng khổ quá" → sắp lại thứ tự nav theo tần suất dùng: Tạo bài → Comment → Cài đặt → Nhóm → Radar → Log → Hướng dẫn.
+
+- [x] Xoá tab nav rời `data-tab="skills"` (`sidepanel.html`), chuyển nội dung (import/export JSON, form tạo/sửa skill, danh sách skill) thành pane `#settings-skills` mới trong `settings-shell`, thêm nút "Skill" vào `settings-nav` (giữa "AI" và "Đồng bộ").
+- [x] `sidepanel.js`: bỏ nhánh `if (name === 'skills')` trong `showTab()`; `showSettingsPane()` giờ tự `loadLocalSkillSelects()`/`renderLocalSkillList()` khi mở pane `settings-skills`.
+- [x] Sắp lại `#tabBar`: Tạo bài → **Comment** → **Cài đặt** → Nhóm → Radar → Log → Hướng dẫn; bỏ CSS `.tabs button.tab-settings` (thu hẹp riêng, không còn cần vì Cài đặt giờ là tab ngang hàng, không phải icon phụ cuối hàng).
+- [x] Cập nhật hint trong tab Tạo bài/Hướng dẫn còn nhắc "tab Skill" riêng.
+- [x] Bump `manifest.json` → v1.0.204.
+- [x] Cập nhật `CHANGELOG.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: mở panel → thứ tự nav đúng Tạo bài/Comment/Cài đặt/Nhóm/Radar/Log/Hướng dẫn, sub-tab "Skill" trong Cài đặt tạo/sửa/import/export skill hoạt động đúng, dropdown "Skill viết bài"/"Skill ảnh" ở tab Tạo bài vẫn load đúng danh sách.
+
+## Website: gộp "Skill AI" vào trang Cài đặt (2026-07-05)
+
+Tony muốn đưa menu Skill AI vào trong Cài đặt thay vì để riêng ở sidebar.
+
+- [x] Chuyển `pages/Skills.jsx` thành `components/SkillsPanel.jsx` (bỏ `page-shell`/`PageHeader`, giữ nguyên logic CRUD + upload prompt).
+- [x] Thêm tab "Skill AI" trong `Settings.jsx`, đọc query `?tab=` để mở đúng tab (kể cả từ link cũ).
+- [x] Route `/skills` chuyển thành redirect sang `/settings?tab=skills`; cập nhật 2 link "tạo skill" trong `PageForm.jsx`/`WebsiteForm.jsx`.
+- [x] Bỏ mục "Skill AI" khỏi nhóm "Hệ thống" (`navConfig.js`).
+- [x] Cập nhật `CHANGELOG.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: mở `/settings` → tab "Skill AI" hoạt động đúng (tạo/sửa/xoá/upload file), link cũ `/skills` tự chuyển sang tab đúng.
+
+## GroupFlow: tách tab Comment thành "Của tôi"/"Đồng đội" + bỏ hẳn auto-schedule (2026-07-04)
+
+Tony chốt thiết kế lại tab Comment: 2 tab con, tab "Của tôi" bỏ filter "Người"; tab "Đồng đội" hiện hết mọi người kèm tổng số bài; bỏ hẳn cơ chế tự động lên lịch vì "mang tính áp đặt, để lịch user tự set".
+
+- [x] Thêm 2 tab con "Của tôi"/"Đồng đội" (`.comment-sub-tabs`, `setCommentSubTab()`) — lọc `state.comments` theo `_source` trước khi áp các filter khác.
+- [x] Tab "Của tôi": ẩn hẳn filter "Người" (`#commentPersonFilterWrap`). Tab "Đồng đội": filter "Người" bỏ 2 pseudo-option "Tất cả"/"Của tôi", chỉ còn danh sách tên đồng đội kèm `(N)` bài.
+- [x] Xoá hẳn `autoScheduleUnscheduledComments()` (`sidepanel.js`) và điểm gọi.
+- [x] Xoá hẳn 2 vòng lặp tự-lên-lịch trong `runFlow1BackgroundSync()` (`background.js`) — giữ lại phần fetch/cache cross-posts (vẫn cần cho tab Đồng đội).
+- [x] Dọn field `scheduled`/`postsScheduled` không còn dùng ở `syncFromTidien()`.
+- [x] Cập nhật `docs/GROUPFLOW.md`, `CHANGELOG.md`.
+- [x] Bump `manifest.json` → v1.0.202.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, kiểm tra 2 tab hiện đúng dữ liệu (Của tôi/Đồng đội), filter Người chỉ còn ở tab Đồng đội, và bài chưa có lịch KHÔNG còn tự động được xếp lịch nữa (phải tự bấm "+ Lên lịch"/"Lên lịch đã chọn").
+
+## Bỏ giới hạn "comment_target" khi comment chéo (2026-07-04)
+
+Tony hỏi "comment target là gì, ai đặt số này" rồi chốt: "1 bài ai thích comment bao nhiêu là tùy chứ mắc gì đặt comment target — không giới hạn".
+
+- [x] Trả lời: `comment_target` là hằng số cứng (`DEFAULT_COMMENT_TARGET = 5`, `groupPostService.js`) từ v1.0.187, chưa từng expose ra Settings/UI, không phải yêu cầu sản phẩm nào trước đó.
+- [x] Bỏ điều kiện `comment_count < comment_target` khỏi WHERE của `GET /api/user-sync/cross-posts` (`userSync.js`) — bài chỉ ẩn khỏi cross-posts của người ĐÃ COMMENT nó, không còn đóng lại cho tất cả khi đủ target.
+- [x] Bỏ check tương ứng ở `runFlow1BackgroundSync()` (`background.js`, GroupFlow) để đồng bộ hành vi 2 bên.
+- [x] Rà frontend (`GroupPosts.jsx`, `GroupPostDetailModal.jsx`) — chỉ hiện `comment_count` làm thống kê, không hiện "X/Y" nên không cần sửa gì thêm.
+- [x] Cập nhật `docs/GROUPFLOW.md`, `CHANGELOG.md`.
+- [x] Bump `manifest.json` → v1.0.201 (GroupFlow, do sửa `background.js`).
+- [ ] **Cần Tony xác nhận**: reload extension + restart backend, kiểm tra 1 bài đã có ≥5 người comment trước đây giờ có xuất hiện lại trong cross-posts của người chưa từng comment nó không.
+
+## GroupFlow: fix tag "Chưa có nhóm" sai trên lịch comment ở Sắp tới + giải thích lệch số Sắp tới vs badge Comment (2026-07-04)
+
+Tony gửi ảnh Log → Sắp tới có 3 lịch comment nhưng tab Comment chỉ hiện 2 bài + badge "2", hỏi tại sao lệch.
+
+- [x] **Xác nhận không phải đếm sai**: `reconcileQueueSchedules()` (`background.js`) chỉ đối chiếu lịch cho `kind:'post'`, không có nhánh nào cho `kind:'comment'` — lịch comment tạo từ 1 bài đang có trong `state.comments`, nếu bài đó sau đó rớt khỏi danh sách (vd cross-post đã đủ người comment ở chỗ khác) thì lịch đã tạo vẫn còn nguyên trong `activityUpcoming` (tự chạy đúng giờ vì payload tự chứa đủ thông tin) — "Sắp tới" và badge Comment đơn giản là đếm 2 nguồn dữ liệu khác nhau, có thể lệch mà không phải lỗi.
+- [x] **Fix bug thật phát hiện thêm**: mọi dòng lịch comment ở "Sắp tới" hiện cứng "Chưa có nhóm" dù có nhóm thật — `renderActivity()` đọc sai field (`groupIds`/`payload.posts[0].groupIds`, đúng cho lịch đăng bài) thay vì `payload.group_name`/`payload.group_id` (đúng cho lịch comment). Thêm `upcomingGroupLabel(u)` tách nhánh riêng.
+- [x] Cập nhật `docs/GROUPFLOW.md`, `CHANGELOG.md`.
+- [x] Bump `manifest.json` → v1.0.200.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, xem tab Log → Sắp tới các dòng Comment đã hiện đúng tên nhóm chưa (không còn "Chưa có nhóm").
+
+## GroupFlow: filter "Người" gõ-tìm + hiện số bài, fix dropdown "Mẫu bình luận" cắt chữ, làm rõ tag "📌 Đăng …" (2026-07-04)
+
+Tony gửi 3 ảnh 2 tài khoản khác nhau, hỏi có phải bug phân quyền (dropdown "Người" khác nhau giữa 2 máy), báo dropdown "Mẫu bình luận" nhìn lỗi ("check box gì kìa"), yêu cầu filter Người gõ-tìm được + hiện tổng số bài từng người, và thắc mắc sao chạy comment xong lịch lặp hàng ngày lại "tự sửa vô lý".
+
+- [x] **Rà lại "bug phân quyền"**: xác nhận KHÔNG có — dropdown "Người" build từ dữ liệu cross-posts đã tải về máy đó (`state.comments`), không phải roster toàn hệ thống; backend không phân biệt role/plan. 2 máy khác nhau chỉ vì tập bài "còn mở để comment chéo" của mỗi tài khoản khác nhau tại thời điểm đó.
+- [x] Fix CSS `.post-filter-bar .gf-select-sm { max-width: 110px }` cắt chữ "Mẫu bình luận: Tất cả" — thêm rule riêng cho `#tab-comment` (min-width 150px, chia 2/hàng).
+- [x] Đổi `#commentFilterPerson` từ `<select>` sang `<input list> + <datalist>` — gõ-tìm được, mỗi tên hiện `(N)` = số bài đang có trong danh sách đã tải.
+- [x] Thêm tiền tố `📌 Đăng` + tooltip cho tag `c.lastPostedAt` (ngày đăng bài gốc) để không còn nhìn giống 1 phần của tag lịch lặp hàng ngày ngay cạnh nó — làm rõ đây không phải bug "lịch tự sửa".
+- [x] Cập nhật `docs/GROUPFLOW.md`, `CHANGELOG.md`.
+- [x] Bump `manifest.json` → v1.0.199.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, mở tab Comment — gõ vài ký tự tên đồng đội vào ô "Người" xem có tự lọc đúng người không, số `(N)` có hợp lý không; xem dropdown "Mẫu bình luận" đã hiện đủ chữ chưa; xem tag "📌 Đăng …" cạnh lịch lặp hàng ngày đã rõ ràng hơn chưa.
+
+## GroupFlow: fix 1 lịch comment "1 lần cụ thể" chạy 2 lần (2 comment cùng phút) (2026-07-04)
+
+Tony gửi ảnh Log thấy 2 dòng comment liên tiếp cùng phút (`15:17 04-07`) trên cùng 1 bài, nội dung khác nhau — hỏi tại sao "chạy liên tục 2 comment".
+
+- [x] **Root cause**: alarm thật (`gf_cmt_*`/`gf_job_*`, `chrome.alarms`) và `retryMissedActivity()` (chạy bù mỗi phút qua `gf_retry_missed`) độc lập nhau, cùng có thể chạy 1 job — `chrome.alarms` không đảm bảo bắn đúng giờ nên `retryMissedActivity()` dễ "nhận nhầm" job chưa thật sự lỡ hẹn, chạy nó trước, rồi alarm thật vẫn tự bắn sau đó (payload `alarm_<tên>` chưa bị dọn) → chạy lại lần 2.
+- [x] **Fix**: `GF_BG._claimedAlarms` (Set trong bộ nhớ, check-and-claim đồng bộ) ở cả `chrome.alarms.onAlarm` lẫn `retryMissedActivity()`; `retryMissedActivity()` tự `chrome.alarms.clear()` + xoá `alarm_<tên>` khi chạy bù thành công.
+- [x] Cập nhật `docs/GROUPFLOW.md`, `CHANGELOG.md`.
+- [x] Bump `manifest.json` → v1.0.198.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, lên lịch vài comment "1 lần cụ thể" (đặc biệt lúc máy vừa mở lại/service worker vừa restart — điều kiện dễ trigger race nhất), theo dõi Log vài ngày xem còn thấy 2 dòng comment trùng phút trên cùng 1 bài không.
 
 ## GroupFlow: hiện giờ comment lần cuối trên tag "✓ Đã comment" (2026-07-04)
 

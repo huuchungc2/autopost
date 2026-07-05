@@ -355,6 +355,14 @@ const S = globalThis.GF.fbSessionBg = {
     }
   },
 
+  // Bug thật đã gặp: 1 bài đăng "Nhanh" (GraphQL nền) đã ĐƯỢC FB TẠO THẬT phía server, nhưng
+  // response bị rớt trước khi về tới đây (mất mạng, service worker bị Chrome tạm ngưng giữa
+  // request, 5xx tạm thời...) — createGroupPost() không đọc được kết quả nên coi là lỗi, rồi
+  // postGroupItem() (background.js) tự fallback Cổ điển → ĐĂNG TRÙNG THẬT vào cùng 1 nhóm (Fast đã
+  // đăng xong, Cổ điển đăng thêm 1 lần nữa). Khác với lỗi GraphQL rõ ràng (vd field_exception —
+  // FB trả lỗi kèm response, chắc chắn CHƯA tạo bài, fallback Cổ điển an toàn), 2 trường hợp dưới
+  // đây KHÔNG THỂ khẳng định FB đã xử lý request hay chưa — đánh dấu `ambiguousDelivery = true` để
+  // postGroupItem() KHÔNG tự ý fallback Cổ điển cho các lỗi này (xem chú thích ở đó).
   async fetchWithRetry(url, options = {}, retries = 3) {
     for (let i = 0; i < retries; i += 1) {
       try {
@@ -370,11 +378,18 @@ const S = globalThis.GF.fbSessionBg = {
         }
         return res;
       } catch (e) {
-        if (i === retries - 1) throw e;
+        // Fetch tự ném lỗi (mất mạng, connection reset, SW bị Chrome unload giữa chừng...) —
+        // request có thể đã tới FB và được xử lý xong trước khi phản hồi bị rớt, không thể biết.
+        if (i === retries - 1) {
+          e.ambiguousDelivery = true;
+          throw e;
+        }
         await new Promise((r) => setTimeout(r, 2000));
       }
     }
-    throw new Error('Fetch thất bại sau nhiều lần thử');
+    const err = new Error('Fetch thất bại sau nhiều lần thử');
+    err.ambiguousDelivery = true;
+    throw err;
   },
 
   async graphqlRequest(session, friendlyName, docId, variables, opts = {}) {
@@ -386,12 +401,20 @@ const S = globalThis.GF.fbSessionBg = {
       headers: this.graphqlHeaders(session, friendlyName, referer),
       body,
     });
+    if (!res.ok) {
+      // 5xx từ chính hạ tầng FB (không phải lỗi GraphQL nghiệp vụ trả kèm response) — request có
+      // thể đã được nhận trước khi lỗi hạ tầng xảy ra, không chắc chắn CHƯA tạo bài.
+      const err = new Error(`GraphQL HTTP ${res.status}`);
+      if (res.status >= 500) err.ambiguousDelivery = true;
+      throw err;
+    }
     const text = await res.text();
-    if (!res.ok) throw new Error(`GraphQL HTTP ${res.status}`);
     const chunks = this.parseAllGraphqlJson(text);
     for (const j of chunks) {
       for (const gqlErr of j?.errors || []) {
         if (gqlErr?.severity === 'WARNING') continue;
+        // Lỗi GraphQL nghiệp vụ trả kèm response rõ ràng (vd field_exception) — FB CHẮC CHẮN đã
+        // xử lý và từ chối request này, không tạo bài. KHÔNG đánh dấu ambiguousDelivery.
         throw new Error(gqlErr?.message || 'GraphQL lỗi');
       }
     }

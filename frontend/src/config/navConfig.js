@@ -7,7 +7,6 @@ import {
   Globe,
   Newspaper,
   Upload,
-  Wand2,
   Cpu,
   Users,
   History,
@@ -58,7 +57,6 @@ export const navGroups = [
     id: 'system',
     label: 'Hệ thống',
     items: [
-      { to: '/skills', label: 'Skill AI', icon: Wand2, roles: ['super_admin', 'admin'] },
       { to: '/providers', label: 'AI Provider', icon: Cpu, roles: ['super_admin', 'admin'] },
       { to: '/users', label: 'Người dùng', icon: Users, roles: ['super_admin', 'admin'] },
       { to: '/activity', label: 'Nhật ký', icon: History, roles: ['super_admin'] },

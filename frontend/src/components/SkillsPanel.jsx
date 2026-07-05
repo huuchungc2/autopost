@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Upload, PenLine } from 'lucide-react';
 import api from '../services/api';
-import PageHeader from '../components/ui/PageHeader';
-import Button from '../components/ui/Button';
+import Button from './ui/Button';
 import { skillTypeLabel, SKILL_TYPE_HINTS } from '../config/vi';
 
 const initialForm = {
@@ -50,7 +49,7 @@ function readPromptFile(file) {
   });
 }
 
-export default function Skills() {
+export default function SkillsPanel() {
   const [skills, setSkills] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
@@ -161,11 +160,10 @@ export default function Skills() {
   };
 
   return (
-    <div className="page-shell">
-      <PageHeader
-        title="Skill AI"
-        description={<>System prompt cho AI — gắn vào fanpage ở <Link to="/pages">Fanpage</Link> để dùng khi tạo bài / auto đăng bài.</>}
-      />
+    <div className="skills-panel">
+      <p className="field-hint" style={{ marginBottom: 16 }}>
+        System prompt cho AI — gắn vào fanpage ở <Link to="/pages">Fanpage</Link> để dùng khi tạo bài / auto đăng bài.
+      </p>
 
       <div className="card form-card skill-form-card">
         <h2>{editingId ? 'Sửa Skill' : 'Tạo Skill mới'}</h2>

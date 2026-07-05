@@ -630,7 +630,7 @@ export default function PageForm() {
             <span className="field-label">Skill AI — prompt viết bài / mô tả ảnh</span>
             <p className="field-hint">Skill quyết định phong cách nội dung khi AI generate. Có thể chọn nhiều loại.</p>
             {skills.length === 0 ? (
-              <span className="text-muted">Chưa có skill — <Link to="/skills">tạo tại Skill AI</Link></span>
+              <span className="text-muted">Chưa có skill — <Link to="/settings?tab=skills">tạo tại Skill AI</Link></span>
             ) : (
               <>
                 {renderSkillGroup('text', skillsByType.text)}

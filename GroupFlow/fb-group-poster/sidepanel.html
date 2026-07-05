@@ -58,15 +58,19 @@
       <span class="tab-icon" aria-hidden="true">✎</span>
       <span class="tab-label">Tạo bài</span>
     </button>
-    <button type="button" data-tab="groups" role="tab">
-      <span class="tab-icon" aria-hidden="true">◎</span>
-      <span class="tab-label">Nhóm</span>
-      <span class="badge" id="groupsTabBadge"></span>
-    </button>
     <button type="button" data-tab="comment" role="tab">
       <span class="tab-icon" aria-hidden="true">◉</span>
       <span class="tab-label">Comment</span>
       <span class="badge" id="commentBadge"></span>
+    </button>
+    <button type="button" data-tab="settings" role="tab" title="Cài đặt">
+      <span class="tab-icon" aria-hidden="true">⚙</span>
+      <span class="tab-label">Cài đặt</span>
+    </button>
+    <button type="button" data-tab="groups" role="tab">
+      <span class="tab-icon" aria-hidden="true">◎</span>
+      <span class="tab-label">Nhóm</span>
+      <span class="badge" id="groupsTabBadge"></span>
     </button>
     <button type="button" data-tab="radar" role="tab">
       <span class="tab-icon" aria-hidden="true">◎</span>
@@ -80,14 +84,6 @@
     <button type="button" data-tab="help" role="tab" title="Hướng dẫn">
       <span class="tab-icon" aria-hidden="true">?</span>
       <span class="tab-label">Hướng dẫn</span>
-    </button>
-    <button type="button" data-tab="skills" role="tab" title="Skill local">
-      <span class="tab-icon" aria-hidden="true">◇</span>
-      <span class="tab-label">Skill</span>
-    </button>
-    <button type="button" data-tab="settings" class="tab-settings" role="tab" title="Cài đặt">
-      <span class="tab-icon" aria-hidden="true">⚙</span>
-      <span class="tab-label">Cài đặt</span>
     </button>
   </nav>
 
@@ -112,7 +108,7 @@
       </div>
 
       <div id="aiPanel" class="card hidden">
-        <p class="hint">Viết bài từ chủ đề — skill + provider local (tab Skill / Cài đặt).</p>
+        <p class="hint">Viết bài từ chủ đề — skill + provider local (tab Cài đặt).</p>
         <label class="field-label">Chủ đề bài viết</label>
         <input type="text" id="aiTopic" placeholder="VD: Lợi ích uống nước ấm buổi sáng" />
         <label class="field-label">Skill viết bài</label>
@@ -374,12 +370,16 @@
           </div>
           <button type="button" id="btnRefreshComments" class="btn ghost sm">Làm mới</button>
         </div>
-        <p class="hint">Danh sách là các bài đã đăng qua GroupFlow — cả của bạn lẫn đồng đội (cần comment chéo). Nhập spintax <code>{nội dung 1|nội dung 2}</code> hoặc chọn mẫu từ dropdown — để trống cũng <strong>Chạy</strong>/<strong>Lên lịch</strong> được, tự random mẫu ở <strong>Settings → Comment mẫu</strong>. Bài chưa có lịch tự động được xếp lịch (cách nhau 15 phút, sau lịch muộn nhất hiện có). Giãn cách trong nhóm theo <strong>Settings → Giãn cách</strong>.</p>
+        <p class="hint">Danh sách là các bài đã đăng qua GroupFlow. Nhập spintax <code>{nội dung 1|nội dung 2}</code> hoặc chọn mẫu từ dropdown — để trống cũng <strong>Chạy</strong>/<strong>Lên lịch</strong> được, tự random mẫu ở <strong>Settings → Comment mẫu</strong>. Lên lịch (1 lần hoặc lặp lại hàng ngày) hoàn toàn do bạn tự chọn — không có gì tự động cả. Giãn cách trong nhóm theo <strong>Settings → Giãn cách</strong>.</p>
+        <div class="segmented comment-sub-tabs">
+          <button type="button" data-comment-sub="mine" class="segmented-btn active">Của tôi</button>
+          <button type="button" data-comment-sub="team" class="segmented-btn">Đồng đội</button>
+        </div>
         <div class="post-filter-bar" style="flex-wrap: wrap; padding: 0 0 10px; border-bottom: none">
-          <select id="commentFilterPerson" class="gf-select-sm">
-            <option value="all">Người: Tất cả</option>
-            <option value="mine">Của tôi</option>
-          </select>
+          <div id="commentPersonFilterWrap" class="hidden" style="display:contents">
+            <input type="text" id="commentFilterPerson" class="gf-select-sm" list="commentFilterPersonList" placeholder="Tìm tên đồng đội…" autocomplete="off" />
+            <datalist id="commentFilterPersonList"></datalist>
+          </div>
           <select id="commentFilterTemplate" class="gf-select-sm">
             <option value="all">Mẫu bình luận: Tất cả</option>
             <option value="has">Có mẫu bình luận</option>
@@ -501,7 +501,7 @@
         <ol class="help-steps">
           <li><strong>Load unpacked</strong> thư mục <code>GroupFlow/fb-group-poster</code> (không chọn <code>ref-group-posting</code>).</li>
           <li>Tab <strong>Cài đặt</strong> → khai báo <strong>AI Provider local</strong> + chọn thư mục lưu ảnh.</li>
-          <li>Tab <strong>Skill</strong> → import skill JSON (tuỳ chọn).</li>
+          <li>Tab <strong>Cài đặt → Skill</strong> → import skill JSON (tuỳ chọn).</li>
           <li>Đăng nhập tidien chỉ khi cần <strong>Tải web</strong> / sync.</li>
         </ol>
         <p class="hint">
@@ -560,36 +560,6 @@
       </div>
     </section>
 
-    <!-- SKILL LOCAL -->
-    <section id="tab-skills" class="tab-panel">
-      <div class="card">
-        <p class="section-eyebrow">Skill local — chỉ trên extension</p>
-        <p class="hint">Import JSON hoặc tạo skill tại đây. Dùng cho tab <strong>AI viết</strong> — không đồng bộ website.</p>
-        <label class="file-drop file-drop-sm" for="skillImportFile">
-          <span class="file-drop-icon">↑</span>
-          <span class="file-drop-title">Import skill JSON</span>
-          <span class="file-drop-hint">name · skill_type · system_prompt</span>
-        </label>
-        <input type="file" id="skillImportFile" accept=".json,application/json" class="sr-only" />
-        <div class="row" style="margin: 8px 0">
-          <button type="button" id="btnExportSkills" class="btn ghost sm">Xuất JSON</button>
-        </div>
-        <label class="field-label">Tạo / sửa skill</label>
-        <input type="text" id="skillFormName" placeholder="Tên skill" />
-        <select id="skillFormType">
-          <option value="text">Viết bài (text)</option>
-          <option value="image">Prompt ảnh (image)</option>
-        </select>
-        <textarea id="skillFormPrompt" rows="4" placeholder="System prompt…"></textarea>
-        <input type="hidden" id="skillFormEditId" value="" />
-        <div class="row">
-          <button type="button" id="btnSaveSkill" class="btn primary sm">Lưu skill</button>
-          <button type="button" id="btnCancelSkill" class="btn ghost sm hidden">Huỷ sửa</button>
-        </div>
-        <div id="localSkillList" class="list scroll-sm" style="margin-top:12px"></div>
-      </div>
-    </section>
-
     <!-- SETTINGS -->
     <section id="tab-settings" class="tab-panel settings-shell">
       <div class="settings-shell-header">
@@ -598,6 +568,7 @@
           <button type="button" class="settings-nav-btn active" data-settings-pane="settings-posting">Đăng bài</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-media">Ảnh &amp; Comment</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-ai">AI</button>
+          <button type="button" class="settings-nav-btn" data-settings-pane="settings-skills">Skill</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-sync">Đồng bộ</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-advanced">Nâng cao</button>
         </nav>
@@ -759,6 +730,44 @@
             <input type="password" id="routerApiKey" />
             <span class="field-hint">Chỉ khi chưa chọn provider</span>
           </label>
+        </div>
+      </div>
+
+      <div class="card settings-card settings-pane-hidden" id="settings-skills">
+        <header class="settings-card-head">
+          <span class="settings-card-icon" aria-hidden="true">◇</span>
+          <div class="settings-card-head-text">
+            <h3 class="settings-card-title">Skill</h3>
+            <p class="settings-card-desc">Skill local — chỉ trên extension. Dùng cho tab <strong>Tạo bài → AI viết</strong> — không đồng bộ website.</p>
+          </div>
+        </header>
+
+        <div class="settings-block">
+          <label class="file-drop file-drop-sm" for="skillImportFile">
+            <span class="file-drop-icon">↑</span>
+            <span class="file-drop-title">Import skill</span>
+            <span class="file-drop-hint">.json (nhiều skill: name · skill_type · system_prompt) hoặc .md/.txt (1 skill, tên lấy theo tên file)</span>
+          </label>
+          <input type="file" id="skillImportFile" accept=".json,.md,.markdown,.txt,application/json,text/markdown,text/plain" class="sr-only" />
+          <div class="row" style="margin: 8px 0">
+            <button type="button" id="btnExportSkills" class="btn ghost sm">Xuất JSON</button>
+          </div>
+        </div>
+
+        <div class="settings-block">
+          <h4 class="settings-block-title">Tạo / sửa skill</h4>
+          <input type="text" id="skillFormName" placeholder="Tên skill" />
+          <select id="skillFormType">
+            <option value="text">Viết bài (text)</option>
+            <option value="image">Prompt ảnh (image)</option>
+          </select>
+          <textarea id="skillFormPrompt" rows="4" placeholder="System prompt…"></textarea>
+          <input type="hidden" id="skillFormEditId" value="" />
+          <div class="row">
+            <button type="button" id="btnSaveSkill" class="btn primary sm">Lưu skill</button>
+            <button type="button" id="btnCancelSkill" class="btn ghost sm hidden">Huỷ sửa</button>
+          </div>
+          <div id="localSkillList" class="list scroll-sm" style="margin-top:12px"></div>
         </div>
       </div>
 

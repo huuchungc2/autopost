@@ -155,7 +155,7 @@ export default function WebsiteForm() {
                 ))}
               </select>
               {!textSkills.length && (
-                <span className="field-hint field-hint--warn">Chưa có skill text — <Link to="/skills">tạo trước</Link></span>
+                <span className="field-hint field-hint--warn">Chưa có skill text — <Link to="/settings?tab=skills">tạo trước</Link></span>
               )}
             </label>
             <label style={{ marginTop: 8 }}>

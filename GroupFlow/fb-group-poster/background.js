@@ -64,6 +64,18 @@ const GF_BG = {
   _taskQueue: Promise.resolve(),
   _queueLength: 0,
 
+  // v1.0.198 — chặn 1 job lịch "1 lần cụ thể" chạy 2 LẦN: chrome.alarms một-lần (gf_cmt_*/gf_job_*)
+  // và gf_retry_missed (quét activityUpcoming mỗi phút, coi bất kỳ item nào when<=now là "lỡ hẹn")
+  // trước đây hoàn toàn ĐỘC LẬP nhau — không bên nào biết bên kia đã/đang xử lý cùng 1 alarmName.
+  // chrome.alarms không đảm bảo bắn ĐÚNG giờ (có thể trễ), nên rất dễ xảy ra: gf_retry_missed quét
+  // thấy when đã qua (vì trễ vài giây/chục giây), chạy job đó qua nhánh "lỡ hẹn" — trong khi alarm
+  // thật vẫn còn tồn tại trong Chrome và sẽ tự bắn sau đó, đọc lại đúng payload alarm_<tên> (chưa bị
+  // xoá) rồi chạy lại lần 2 → 2 comment với nội dung random khác nhau (đúng hiện tượng Tony báo,
+  // 2 dòng Log cùng phút). Set trong bộ nhớ, đồng bộ (không await trước khi check-and-claim) nên
+  // 2 lần gọi listener/tick không thể cùng lọt qua — mất khi service worker restart, nhưng chỉ cần
+  // sống trong đúng 1 phiên là đủ chặn race này.
+  _claimedAlarms: new Set(),
+
   enqueueTask(taskFn) {
     this._queueLength += 1;
     const run = async () => {
@@ -1324,8 +1336,19 @@ const GF_BG = {
     if (this.stopRequested) throw new Error('Đã dừng đăng');
     // Nhanh (GraphQL nền, không mở tab) thử trước — giống hệt cách comment đã làm
     // (commentOnPostBgOrClassic). Video chưa hỗ trợ upload qua GraphQL nền nên bỏ qua thẳng
-    // sang Cổ điển. Mọi lỗi Nhanh (session hết hạn, FB từ chối, không rõ kết quả...) đều fallback
-    // Cổ điển — 2 cơ chế độc lập nhau nên lỗi bên Nhanh không có nghĩa Cổ điển cũng lỗi.
+    // sang Cổ điển. Lỗi Nhanh RÕ RÀNG (session hết hạn, FB từ chối kèm response — field_exception,
+    // không có quyền...) mới fallback Cổ điển — 2 cơ chế độc lập nhau nên lỗi rõ bên Nhanh không có
+    // nghĩa Cổ điển cũng lỗi.
+    //
+    // Bug thật đã gặp: request Nhanh ĐƯỢC FB TẠO BÀI THẬT phía server nhưng response bị rớt trước
+    // khi về tới đây (mất mạng, service worker bị Chrome tạm ngưng giữa request, 5xx tạm thời của
+    // hạ tầng FB...) — graphqlRequest()/fetchWithRetry() (fbSessionBg.js) không thể phân biệt "FB
+    // chưa xử lý" với "FB xử lý rồi nhưng mất phản hồi", nên đánh dấu `e.ambiguousDelivery = true`
+    // cho đúng 2 trường hợp này. Nếu tự fallback Cổ điển như mọi lỗi khác → ĐĂNG TRÙNG THẬT vào
+    // cùng 1 nhóm (Nhanh đã đăng xong, Cổ điển đăng thêm 1 lần nữa) — không lộ ra ngay vì Nhanh
+    // "trông như lỗi" nên không ai để ý bài đã lên. Với lỗi ambiguousDelivery: KHÔNG fallback Cổ
+    // điển, báo lỗi rõ để user tự mở nhóm kiểm tra trước khi đăng lại tay — thà bỏ lỡ 1 lượt đăng
+    // còn hơn đăng trùng nhìn như spam (rủi ro nhóm/tài khoản bị FB gắn cờ).
     const FP = globalThis.GF?.fbPostBg;
     const isVideo = payload.mediaType === 'video' || Boolean(payload.videoBase64);
     if (FP && !isVideo && payload.groupId) {
@@ -1341,6 +1364,11 @@ const GF_BG = {
         });
         if (res?.postId) return res;
       } catch (e) {
+        if (e.ambiguousDelivery) {
+          throw new Error(
+            `Không rõ Nhanh đã đăng thành công hay chưa (mất phản hồi từ FB) — mở nhóm kiểm tra trước khi đăng lại, tránh đăng trùng. Chi tiết: ${e.message}`,
+          );
+        }
         console.warn('[GroupFlow] fast post failed, fallback Classic:', e.message);
       }
       if (this.stopRequested) throw new Error('Đã dừng đăng');
@@ -2592,31 +2620,14 @@ const GF_BG = {
   // fetchCrossPostsFromServer() (sidepanel.js) — cursor theo updated_at, merge-upsert vào cache đã
   // có (không ghi đè), để cả 2 nơi (nền lẫn khi mở panel) luôn thấy cùng 1 dữ liệu, không tải trùng.
   //
-  // Sau khi cache mới, TỰ LÊN LỊCH comment cho bài chưa từng lên lịch — không cần soạn sẵn draft:
-  // comment để trống, resolveJobComment() (đã có sẵn, dùng chung với mọi luồng comment khác) tự
-  // random mẫu từ Settings lúc job chạy thật. Bỏ qua hoàn toàn trong khung giờ đêm (22:00–07:00) —
-  // không tự lên lịch giữa đêm, chu kỳ ban ngày kế tiếp sẽ nhặt lại đúng những bài này (cache không
-  // mất, chỉ tạm hoãn phần lên lịch). Dùng getSecurityDelays()/randBetween() sẵn có trên GF_BG —
-  // KHÔNG dùng GF.scheduler (modules/scheduler.js chỉ dành cho sidepanel, chưa từng được đưa vào
-  // build-sw-bundle.js nên service worker không thấy được module này).
-  //
-  // v1.0.192 — 2 thay đổi:
-  // (1) Fix bug thật: nhánh lưu cuối hàm tham chiếu `scheduledIds` — biến KHÔNG hề tồn tại trong
-  // scope hàm này (tàn dư của cách làm cũ đã bỏ, xem chú thích `bgAutoScheduledCrossIds` bên dưới) —
-  // mỗi lần `scheduled > 0` là ném `ReferenceError`, khiến toàn bộ `activityUpcoming` mới KHÔNG được
-  // lưu (dù alarm + `alarm_${name}` đã tạo thật) — chu kỳ sau không thấy bài đã có lịch, tự tạo thêm
-  // alarm trùng cho đúng bài đó mỗi lần chạy. Xoá hẳn nhánh ghi `bgAutoScheduledCrossIds` (dead key).
-  // (2) Thêm quét `postQueue` (bài CỦA CHÍNH MÌNH đã đăng) — trước bản này chỉ cross-post (bài đồng
-  // đội) được tự lên lịch nền; bài của chính mình chỉ được lên lịch khi user tự mở tab Comment
-  // (`autoScheduleUnscheduledComments()`, sidepanel.js) — máy nào ít mở tab đó thì bài tự đăng xong
-  // không bao giờ được tự lên lịch comment. Dùng chung `alreadyScheduledIds`/`commentedRecords` nên
-  // không tạo lịch trùng với lịch tay ở sidepanel.
+  // v1.0.202 — BỎ HẲN phần tự động lên lịch từng có ở đây (v1.0.192-196): Tony chốt "bỏ cơ chế set
+  // auto lịch luôn vì chức năng này mang tính áp đặt, để lịch user tự set" — hàm này giờ CHỈ còn
+  // đồng bộ cache cross-posts (để tab Comment → Đồng đội luôn có dữ liệu mới khi mở lên), không tự
+  // tạo bất kỳ activityUpcoming/alarm nào nữa. Lên lịch (1 lần hay lặp lại hàng ngày) giờ hoàn toàn
+  // do user chủ động bấm "+ Lên lịch"/"Lên lịch đã chọn".
   async runFlow1BackgroundSync(auth, headers) {
     await this.dedupeUpcomingCommentAlarms();
-    const d = await chrome.storage.local.get([
-      'crossPostsCache', 'crossPostsSyncMeta', 'commentedRecords',
-      'activeActorId', 'securityLevel', 'activityUpcoming',
-    ]);
+    const d = await chrome.storage.local.get(['crossPostsCache', 'crossPostsSyncMeta']);
     const cache = d.crossPostsCache || [];
     const meta = d.crossPostsSyncMeta || { lastAt: 0, cursor: null };
 
@@ -2639,115 +2650,7 @@ const GF_BG = {
       crossPostsSyncMeta: { lastAt: Date.now(), cursor: newestUpdatedAt || meta.cursor || null },
     });
 
-    const nowHour = new Date().getHours();
-    if (nowHour >= 22 || nowHour < 7) return { fetched: rows.length, cached: merged.length, scheduled: 0 };
-
-    // BUG NGHIÊM TRỌNG đã vá: bản trước dùng `bgAutoScheduledCrossIds` — 1 storage key RIÊNG, tách
-    // biệt hoàn toàn với lịch mà autoScheduleUnscheduledComments() (sidepanel.js, chạy khi mở tab
-    // Comment) ghi vào `activityUpcoming`. Hậu quả: user mở tab Comment → sidepanel lên lịch bài X
-    // → vài phút sau chu kỳ nền chạy → hàm này KHÔNG thấy bài X đã có lịch (vì check sai storage
-    // key) → lên lịch THÊM 1 lần nữa cho đúng bài X → 2 job chạy gần nhau, đăng 2 comment trùng lặp
-    // lên cùng 1 bài. Giờ đọc thẳng `activityUpcoming`/`dailyFixedSchedules` — CHÍNH XÁC nguồn mà
-    // sidepanel.js dùng (loadCommentScheduleMap()) — để cả 2 nơi lên lịch luôn thấy chung 1 sự thật.
-    // v1.0.194 từng bỏ, ĐẢO NGƯỢC LẠI ở v1.0.196 — xem chú thích autoScheduleUnscheduledComments()
-    // (sidepanel.js): auto-lên-lịch chỉ dành cho bài CHƯA TỪNG comment, không phải cơ chế tự-đẩy-lại
-    // vô thời hạn sau mỗi lần chạy xong.
-    const commentedRecords = d.commentedRecords || {};
-    const dailyFixed = (await chrome.storage.local.get('dailyFixedSchedules')).dailyFixedSchedules || [];
-    const upcoming = d.activityUpcoming || [];
-    const alreadyScheduledIds = new Set([
-      ...upcoming.filter((u) => u.kind === 'comment' && u.recordId).map((u) => String(u.recordId)),
-      ...dailyFixed.filter((e) => e.kind === 'comment' && e.payload?.post_queue_id).map((e) => String(e.payload.post_queue_id)),
-    ]);
-    const delays = await this.getSecurityDelays(d.securityLevel);
-    const latestWhen = upcoming
-      .filter((u) => u.kind === 'comment')
-      .reduce((max, u) => Math.max(max, u.when || 0), 0);
-    let cursorWhen = Math.max(latestWhen, Date.now()) + 60_000;
-    let scheduled = 0;
-
-    for (const cp of merged) {
-      const jobId = `cross_${cp.id}`;
-      if (alreadyScheduledIds.has(jobId) || commentedRecords[jobId]) continue;
-      if (!cp.group_id || !cp.post_id || !/^\d+$/.test(String(cp.post_id))) continue;
-      if (Number(cp.comment_count) >= Number(cp.comment_target || 1)) continue;
-
-      const alarmName = `gf_cmt_${jobId}_${cp.group_id}_${Date.now()}_bg`;
-      const label = (cp.noi_dung || cp.group_name || 'Comment').slice(0, 60);
-      const payload = {
-        post_queue_id: jobId,
-        group_id: cp.group_id,
-        group_name: cp.group_name,
-        post_id: cp.post_id,
-        comment: '',
-        crossServerId: cp.id,
-        actorId: d.activeActorId,
-        label,
-      };
-      chrome.alarms.create(alarmName, { when: cursorWhen });
-      await chrome.storage.local.set({ [`alarm_${alarmName}`]: { kind: 'comment', payload } });
-      upcoming.push({
-        id: alarmName,
-        alarmName,
-        kind: 'comment',
-        when: cursorWhen,
-        recordId: jobId,
-        snippet: '(tự random mẫu lúc chạy)',
-        payload,
-        label: `Comment → ${label}`,
-      });
-      alreadyScheduledIds.add(jobId);
-      scheduled += 1;
-      cursorWhen += this.randBetween(delays.betweenComments) * 1000;
-    }
-
-    // v1.0.192 — bài CỦA CHÍNH MÌNH (postQueue, đã đăng xong lên ít nhất 1 nhóm), xem chú thích đầu
-    // hàm. 1 post có thể có nhiều postedGroups — mỗi group còn thiếu comment (chưa có trong
-    // commentedRecords) được xếp riêng 1 alarm, nối tiếp nhau bằng cùng độ trễ betweenComments.
-    const queue = (await chrome.storage.local.get('postQueue')).postQueue || [];
-    for (const post of queue) {
-      if (post.postStatus !== 'posted') continue;
-      const jobId = String(post.id);
-      if (alreadyScheduledIds.has(jobId)) continue;
-      const validGroups = (post.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
-      if (!validGroups.length) continue;
-      const pendingGroups = validGroups.filter((g) => !commentedRecords[jobId]?.[String(g.group_id)]);
-      if (!pendingGroups.length) continue;
-
-      const label = (post.noi_dung || pendingGroups[0].group_name || 'Comment').slice(0, 60);
-      for (const g of pendingGroups) {
-        const alarmName = `gf_cmt_${jobId}_${g.group_id}_${Date.now()}_bg`;
-        const payload = {
-          post_queue_id: jobId,
-          group_id: g.group_id,
-          group_name: g.group_name,
-          post_id: g.post_id,
-          comment: '',
-          actorId: d.activeActorId,
-          label,
-        };
-        chrome.alarms.create(alarmName, { when: cursorWhen });
-        await chrome.storage.local.set({ [`alarm_${alarmName}`]: { kind: 'comment', payload } });
-        upcoming.push({
-          id: alarmName,
-          alarmName,
-          kind: 'comment',
-          when: cursorWhen,
-          recordId: jobId,
-          snippet: '(tự random mẫu lúc chạy)',
-          payload,
-          label: `Comment → ${label}`,
-        });
-        cursorWhen += this.randBetween(delays.betweenComments) * 1000;
-      }
-      alreadyScheduledIds.add(jobId);
-      scheduled += 1;
-    }
-
-    if (scheduled) {
-      await chrome.storage.local.set({ activityUpcoming: upcoming });
-    }
-    return { fetched: rows.length, cached: merged.length, scheduled };
+    return { fetched: rows.length, cached: merged.length };
   },
 
   // So le giờ chạy (v1.0.187) — mỗi máy tự "bốc thăm" 1 độ trễ ban đầu cố định (0..mins phút), lưu
@@ -2811,7 +2714,6 @@ const GF_BG = {
         || (scope === 'auto' && (!meta.lastDraftsAt || (now - meta.lastDraftsAt) >= TIDIEN_SYNC.DRAFTS_INTERVAL_MS)));
 
     let postsFetched = 0;
-    let postsScheduled = 0;
     let postsMerged = 0;
     let pendingPostsSync = 0;
     let draftsAdded = 0;
@@ -2840,7 +2742,6 @@ const GF_BG = {
       try {
         const res = await this.runFlow1BackgroundSync(auth, headers);
         postsFetched = res.fetched;
-        postsScheduled = res.scheduled;
         postsMerged = res.cached;
         meta.lastCommentsAt = now;
       } catch (e) {
@@ -2898,7 +2799,6 @@ const GF_BG = {
     const payload = {
       posts: postsMerged,
       postsFetched,
-      postsScheduled,
       postsPushed,
       postsPushFailed,
       pendingPostsSync,
@@ -3029,6 +2929,14 @@ const GF_BG = {
     const delays = await this.getSecurityDelays(d.securityLevel);
     for (let i = 0; i < due.length; i += 1) {
       const item = due[i];
+      const alarmName = item.alarmName || item.id;
+      // Alarm thật (gf_cmt_*/gf_job_*) đã tự bắn và đang/vừa xử lý đúng entry này — không giành chạy
+      // lại, chỉ giữ trong activityUpcoming (sẽ tự bị removeUpcomingByAlarmName() dọn khi job xong).
+      if (this._claimedAlarms.has(alarmName)) {
+        remaining.push(item);
+        continue;
+      }
+      this._claimedAlarms.add(alarmName);
       if (i > 0) {
         const gapSec = item.kind === 'post'
           ? this.randBetween([delays.betweenPosts, delays.betweenPosts + 60])
@@ -3037,9 +2945,18 @@ const GF_BG = {
       }
       const ok = await this.runScheduledJob(
         { kind: item.kind, payload: item.payload },
-        { alarmName: item.alarmName || item.id },
+        { alarmName },
       );
-      if (!ok) remaining.push(item);
+      if (ok) {
+        // Chạy bù xong rồi — dọn luôn alarm thật + payload của nó, nếu không chrome.alarms vẫn sẽ tự
+        // bắn sau đó (chrome.alarms không tự huỷ chỉ vì ta đã xử lý payload theo đường khác) và đọc
+        // lại đúng alarm_<tên> (nếu còn) để chạy job này LẦN NỮA — chính là nguyên nhân "2 comment".
+        await chrome.alarms.clear(alarmName).catch(() => {});
+        await chrome.storage.local.remove(`alarm_${alarmName}`);
+      } else {
+        this._claimedAlarms.delete(alarmName);
+        remaining.push(item);
+      }
     }
     await chrome.storage.local.set({ activityUpcoming: remaining });
   },
@@ -3088,6 +3005,10 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     return;
   }
   if (alarm.name.startsWith('gf_job_') || alarm.name.startsWith('gf_cmt_')) {
+    // Đã bị gf_retry_missed "nhận" trước (xem retryMissedActivity) — payload alarm_<tên> đã bị xoá
+    // ở đó rồi nên bên dưới cũng sẽ thấy !data, nhưng check claim trước để khỏi tốn 1 lượt storage.get.
+    if (GF_BG._claimedAlarms.has(alarm.name)) return;
+    GF_BG._claimedAlarms.add(alarm.name);
     const data = (await chrome.storage.local.get(`alarm_${alarm.name}`))[`alarm_${alarm.name}`];
     if (!data) {
       console.warn('[GroupFlow] alarm fired but payload missing:', alarm.name);
@@ -3095,7 +3016,10 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     }
     const ok = await GF_BG.runScheduledJob(data, { alarmName: alarm.name });
     await chrome.storage.local.remove(`alarm_${alarm.name}`);
-    if (!ok) console.warn('[GroupFlow] post/comment alarm will retry via activityUpcoming:', alarm.name);
+    if (!ok) {
+      console.warn('[GroupFlow] post/comment alarm will retry via activityUpcoming:', alarm.name);
+      GF_BG._claimedAlarms.delete(alarm.name);
+    }
     return;
   }
   if (alarm.name === 'gf_retry_missed') {

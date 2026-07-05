@@ -8,6 +8,7 @@ import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 import { invalidateMediaStorageCache } from '../hooks/useMediaStorage';
 import GroupExtensionSettings from '../components/GroupExtensionSettings';
+import SkillsPanel from '../components/SkillsPanel';
 
 const defaultScheduleForm = (schedule) => ({
   enabled: schedule?.enabled ?? false,
@@ -77,6 +78,13 @@ export default function Settings() {
         });
       }
     }).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    const validTabs = ['overview', 'extension', 'skills', 'drive', 'composio', 'schedule'];
+    if (tab && validTabs.includes(tab)) setSettingsTab(tab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -415,6 +423,7 @@ export default function Settings() {
       <div className="tabs">
         <button type="button" className={settingsTab === 'overview' ? 'tab active' : 'tab'} onClick={() => setSettingsTab('overview')}>Tổng quan</button>
         <button type="button" className={settingsTab === 'extension' ? 'tab active' : 'tab'} onClick={() => setSettingsTab('extension')}>Extension</button>
+        <button type="button" className={settingsTab === 'skills' ? 'tab active' : 'tab'} onClick={() => setSettingsTab('skills')}>Skill AI</button>
         <button type="button" className={settingsTab === 'drive' ? 'tab active' : 'tab'} onClick={() => setSettingsTab('drive')}>Lưu trữ ảnh (Drive)</button>
         <button type="button" className={settingsTab === 'composio' ? 'tab active' : 'tab'} onClick={() => setSettingsTab('composio')}>Facebook Token</button>
         <button type="button" className={settingsTab === 'schedule' ? 'tab active' : 'tab'} onClick={() => setSettingsTab('schedule')}>Lịch xuất ảnh</button>
@@ -465,6 +474,8 @@ export default function Settings() {
       )}
 
       {settingsTab === 'extension' && <GroupExtensionSettings />}
+
+      {settingsTab === 'skills' && <SkillsPanel />}
 
       {settingsTab === 'drive' && driveStatus && mediaForm && (
         <div className="card settings-media-storage">
