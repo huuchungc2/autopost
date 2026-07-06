@@ -2722,6 +2722,13 @@ const DOC_TYPING_STOP = '6911603175550464';
 // ngắn hạn rồi phải check lại — xem getPostAccess().
 const PENDING_ACCESS_TTL_MS = 20 * 60 * 1000;
 const POST_ACCESS_CACHE_KEY = 'gf_post_access_cache';
+// v1.0.222 — bug ở buildPermalink() (dùng route `/permalink/` thay vì `/posts/` thật) khiến
+// checkPostCommentable() gần như LUÔN fail-open ("ok") bất kể bài thật có xem được hay không —
+// nghĩa là mọi entry 'ok' ghi TRƯỚC bản vá này đều không đáng tin, mà 'ok' lại cache vĩnh viễn nên
+// sẽ không bao giờ tự check lại. Bump schema để tự xoá sạch cache cũ đúng 1 lần khi lên bản này —
+// xem readPostAccessCache().
+const POST_ACCESS_CACHE_SCHEMA = 2;
+const POST_ACCESS_CACHE_SCHEMA_KEY = 'gf_post_access_cache_schema';
 
 const FC = globalThis.GF.fbCommentBg = {
   sleep(ms) {
@@ -2754,7 +2761,16 @@ const FC = globalThis.GF.fbCommentBg = {
       const uid = session?.actorId || session?.uid;
       return `https://www.facebook.com/${uid}/posts/${postId}/`;
     }
-    return `https://www.facebook.com/groups/${groupId}/permalink/${postId}/`;
+    // v1.0.222 — TỪNG dùng `/groups/{gid}/permalink/{pid}/` (route rút gọn/redirect của FB, khác
+    // hẳn trang thật `/groups/{gid}/posts/{pid}/` mà "Mở bài" mở ra — xem 043c139). Route permalink
+    // rất có thể trả về HTML rút gọn không chứa marker lỗi ("Bạn hiện không xem được nội dung
+    // này"...) LẪN marker OK (story_title/story_token/likeAction) — khiến checkPostCommentable()
+    // luôn rơi vào nhánh "fail open" (coi là commentable) bất kể bài thật có xem được hay không.
+    // Tony xác nhận thật bằng ảnh chụp: bài được cache đánh dấu "✓ Có thể comment" nhưng mở
+    // `/posts/{pid}/` bằng tay lại thấy "Bạn hiện không xem được nội dung này". Đổi sang đúng URL
+    // thật, khớp với `buildPostedGroupUrl()`/`buildHistoryPostUrl()` (sidepanel.js) và
+    // `buildGroupPostUrl()` (background.js).
+    return `https://www.facebook.com/groups/${groupId}/posts/${postId}/`;
   },
 
   async checkPostCommentable({ groupId, postId, session, isTimeline }) {
@@ -2822,7 +2838,11 @@ const FC = globalThis.GF.fbCommentBg = {
   },
 
   async readPostAccessCache() {
-    const d = await chrome.storage.local.get(POST_ACCESS_CACHE_KEY);
+    const d = await chrome.storage.local.get([POST_ACCESS_CACHE_KEY, POST_ACCESS_CACHE_SCHEMA_KEY]);
+    if (d[POST_ACCESS_CACHE_SCHEMA_KEY] !== POST_ACCESS_CACHE_SCHEMA) {
+      await chrome.storage.local.set({ [POST_ACCESS_CACHE_KEY]: {}, [POST_ACCESS_CACHE_SCHEMA_KEY]: POST_ACCESS_CACHE_SCHEMA });
+      return {};
+    }
     return d[POST_ACCESS_CACHE_KEY] || {};
   },
 

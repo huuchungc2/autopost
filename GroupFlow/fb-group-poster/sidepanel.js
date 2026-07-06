@@ -3467,11 +3467,13 @@ async function loadPostedPostsForComment({ force = false } = {}) {
   await autoFillMissingCommentDrafts();
   state.commentScheduleMap = await loadCommentScheduleMap();
   populateCommentFilterPersonOptions();
-  // Badge chỉ đếm bài còn CẦN chú ý (chưa comment) — áp dụng chung cho cả bài của mình lẫn bài
-  // đồng đội qua isCommentDone(), không tính bài đã xong (server/postedGroups đều giữ bài đã xong
-  // trong danh sách thay vì lọc mất, nên đếm hết state.comments.length sẽ sai nghĩa "còn N việc").
+  // Badge chỉ đếm bài còn CẦN chú ý (chưa comment VÀ còn làm được — không tính bài đã biết chắc
+  // chờ duyệt/đã xóa, cùng luật ẩn với isCommentActionable() dùng cho list) — áp dụng chung cho cả
+  // bài của mình lẫn bài đồng đội qua isCommentDone(), không tính bài đã xong (server/postedGroups
+  // đều giữ bài đã xong trong danh sách thay vì lọc mất, nên đếm hết state.comments.length sẽ sai
+  // nghĩa "còn N việc").
   const badge = $('#commentBadge');
-  const pendingCount = state.comments.filter((c) => !isCommentDone(c)).length;
+  const pendingCount = state.comments.filter((c) => !isCommentDone(c) && isCommentActionable(c)).length;
   if (badge) badge.textContent = pendingCount ? String(pendingCount) : '';
   if ($('#tab-comment')?.classList.contains('active')) renderComments();
 }
@@ -3541,6 +3543,25 @@ function splitGroupsByAccess(groups) {
     }
   });
   return { ready, blocked };
+}
+
+// v1.0.223 — Tony: list Comment (của tôi + đồng đội) chỉ nên hiện bài CÒN LÀM ĐƯỢC GÌ đó.
+// v1.0.224 — Tony làm rõ lại, CHẶT hơn bản đầu: "check được cái nào thì hiển thị cái đó thôi,
+// không nên load hết" — bản v1.0.223 coi bài CHƯA từng check vẫn là "còn khả năng" nên vẫn hiện
+// (gần như mọi bài, vì cron quét rất chậm — 2 bài/3 phút), khiến list nhìn như chưa lọc gì. Giờ
+// ĐẢO ngược điều kiện: chỉ hiện bài đã có cache XÁC NHẬN `canComment: true` còn hạn (hoặc đã
+// comment rồi) — bài chưa check/đang chờ duyệt/đã xóa đều ẩn cho tới khi có kết quả OK thật. Đánh
+// đổi: ngay sau khi mở tab lần đầu, list có thể trống/ít do cron chưa kịp check — bù lại bằng
+// GF_WARM_POST_ACCESS (gfSendMessage lúc mở tab Comment, xem bindEvents()) bắn 1 lượt check batch
+// lớn hơn ngay lập tức thay vì chỉ trông chờ tick nền.
+function isCommentActionable(c) {
+  if (isCommentDone(c)) return true;
+  const validGroups = (c.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
+  if (!validGroups.length) return false;
+  return validGroups.some((g) => {
+    const entry = state.postAccessCache[String(g.post_id)];
+    return isPostAccessFresh(entry) && entry.canComment === true;
+  });
 }
 
 // Tag trạng thái "có comment được không" trên card Comment — đọc thẳng state.postAccessCache
@@ -3850,6 +3871,7 @@ function getFilteredComments() {
   const status = state.commentFilterStatus || 'all';
   if (status === 'done') list = list.filter((c) => isCommentDone(c));
   else if (status === 'pending') list = list.filter((c) => !isCommentDone(c));
+  list = list.filter(isCommentActionable);
   return list;
 }
 
@@ -5076,9 +5098,17 @@ async function loadSettingsForm() {
   await showSyncLicenseStatus();
 }
 
+// Audit đồng bộ 2026-07-06 — trước đây bấm "Lưu" LUÔN bắn `GF_TIDIEN_SYNC force:true scope:'all'`
+// dù đổi field hoàn toàn không liên quan (vd `maxGroups`, `avoidNight`, `imageSaveMode`...) — force
+// bỏ qua hẳn cooldown 90s VÀ kích hoạt luôn vòng lặp pull draft tối đa ~40 lượt (xem
+// _syncFromTidienImpl(), background.js), tốn kém hẳn so với 1 lần lưu settings bình thường. Chỉ
+// force sync thật khi 1 trong các field ẢNH HƯỞNG TỚI ĐỒNG BỘ thật sự đổi so với trước.
+const TIDIEN_SYNC_RELEVANT_KEYS = ['tidienBaseUrl', 'tidienAutoSyncEnabled', 'tidienAutoPullDrafts', 'tidienAutoSyncMinutes'];
+
 async function saveSettingsForm() {
+  const prev = await GF.storage.getSettings();
   const securityLevel = getSelectedSecurityLevel();
-  await GF.storage.saveSettings({
+  const next = {
     tidienBaseUrl: $('#tidienBaseUrl').value.trim(),
     routerApiKey: $('#routerApiKey').value.trim(),
     driveJson: $('#driveJson').value.trim(),
@@ -5102,9 +5132,13 @@ async function saveSettingsForm() {
     imageSaveSubfolder: $('#imageSaveSubfolder').value.trim() || 'GroupFlow',
     imageSaveMode: $('#imageSaveMode').value || 'downloads',
     imageSaveAskEachTime: $('#imageSaveAskEachTime').checked,
-  });
+  };
+  await GF.storage.saveSettings(next);
   alert('Đã lưu');
-  await gfSendMessage({ type: 'GF_TIDIEN_SYNC', force: true, scope: 'all' }).catch(() => {});
+  const tidienRelevantChanged = TIDIEN_SYNC_RELEVANT_KEYS.some((k) => prev[k] !== next[k]);
+  if (tidienRelevantChanged) {
+    await gfSendMessage({ type: 'GF_TIDIEN_SYNC', force: true, scope: 'all' }).catch(() => {});
+  }
   try {
     await gfSendMessage({ type: 'GF_SCHEDULE_TIDIEN_SYNC' });
   } catch { /* ignore */ }
@@ -5131,7 +5165,18 @@ function bindEvents() {
       const tab = btn.dataset.tab;
       if (!tab) return;
       showTab(tab);
-      if (tab === 'comment') loadComments();
+      if (tab === 'comment') {
+        loadComments();
+        // v1.0.224 — list giờ chỉ hiện bài đã check OK/đã comment (isCommentActionable()), nên tốc
+        // độ hiện bài phụ thuộc trực tiếp cron nền (mặc định 3 phút/2 bài — quá chậm nếu mới mở tab
+        // lần đầu, queue còn nhiều bài chưa check). Tranh thủ bắn 1 lượt check batch lớn hơn ngay
+        // lúc mở tab, rồi tự tải lại list sau vài giây để thấy kết quả — không bắt user ngồi đợi
+        // cron tự chạy hoặc tự bấm F5.
+        gfSendMessage({ type: 'GF_WARM_POST_ACCESS' }).catch(() => {});
+        setTimeout(() => {
+          if ($('#tab-comment')?.classList.contains('active')) loadComments();
+        }, 6000);
+      }
     });
   });
 
@@ -5466,10 +5511,24 @@ function bindEvents() {
       btn.textContent = 'AI';
     }
   });
-  $('#btnRefreshComments').addEventListener('click', async () => {
-    await syncLocalPostsToServer().catch(() => {});
-    await pullMyPostsFromServer({ force: true }).catch(() => {});
-    await loadComments({ force: true });
+  $('#btnRefreshComments').addEventListener('click', async (e) => {
+    // Audit đồng bộ 2026-07-06 — trước đây không có disabled-guard nào, khác hẳn
+    // runTidienSyncNow() (nút "↻ Đồng bộ ngay" ở Cài đặt) đã tự chặn bấm dồn dập. `force: true` ở
+    // đây bỏ qua hẳn throttle 30s (USER_SYNC_MIN_INTERVAL_MS) — bấm nhanh nhiều lần bắn ra nhiều
+    // request `force` chồng lên nhau, không request nào bị chặn.
+    const btn = e.currentTarget;
+    if (btn.disabled) return;
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Đang tải…';
+    try {
+      await syncLocalPostsToServer().catch(() => {});
+      await pullMyPostsFromServer({ force: true }).catch(() => {});
+      await loadComments({ force: true });
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
   });
   $('#btnScheduleComments').addEventListener('click', () => toggleCommentSchedulePanel());
   $('#btnConfirmCommentSchedule')?.addEventListener('click', () => scheduleSelectedComments());
@@ -5880,14 +5939,25 @@ async function getUserSyncBase() {
   return (s?.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
 }
 
+// v1.0.222-ext (audit đồng bộ 2026-07-06) — hàm này chạy VÔ ĐIỀU KIỆN mỗi lần mở panel
+// (finishInit()/DOMContentLoaded) và trước đây gửi lại TOÀN BỘ bài `posted` trong postQueue mỗi
+// lần gọi, không chỉ bài mới — postQueue tích luỹ càng lâu càng dài, nghĩa là mảng gửi lên (và số
+// query server phải chạy, xem POST /api/user-sync/posts) lớn dần vô hạn theo lịch sử, dù chỉ mở
+// panel bình thường không đổi gì. `pushUnsyncedPostsFromQueue()` (background.js) đã tự đánh dấu
+// `g.tidienSynced` sau khi đẩy thành công qua đường khác (POST /group-posts/sync) — dùng lại ĐÚNG
+// cờ đó ở đây để 2 đường không xung đột, chỉ gửi item thật sự CHƯA sync, và tự đánh dấu sau khi
+// server xác nhận nhận (res.ok) — thất bại (mất mạng, server lỗi) thì KHÔNG đánh dấu, lần mở panel
+// sau tự thử lại đúng những item đó, không mất/không gửi trùng.
 async function syncLocalPostsToServer() {
   const { licenseKey, postQueue } = await chrome.storage.local.get(['licenseKey', 'postQueue']);
   if (!licenseKey) return;
   const queue = postQueue || [];
   const posts = [];
+  const touched = [];
   for (const item of queue) {
     if (item.postStatus !== 'posted') continue;
     for (const g of (item.postedGroups || [])) {
+      if (g.tidienSynced) continue;
       if (!g.post_id || !/^\d+$/.test(String(g.post_id))) continue;
       posts.push({
         post_queue_id: item.id || '',
@@ -5897,17 +5967,23 @@ async function syncLocalPostsToServer() {
         noi_dung: item.noi_dung || '',
         posted_at: g.posted_at || item.lastPostedAt || null,
       });
+      touched.push(g);
     }
   }
   if (!posts.length) return;
   try {
     const base = await getUserSyncBase();
-    await fetch(`${base}/api/user-sync/posts`, {
+    const res = await fetch(`${base}/api/user-sync/posts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${licenseKey}` },
       body: JSON.stringify({ posts }),
     });
-  } catch { /* best-effort */ }
+    if (res.ok) {
+      const now = new Date().toISOString();
+      touched.forEach((g) => { g.tidienSynced = true; g.tidienSyncedAt = now; });
+      await chrome.storage.local.set({ postQueue: queue });
+    }
+  } catch { /* best-effort — chưa đánh dấu synced, lần mở panel sau tự gửi lại */ }
 }
 
 // v1.0.185 — cursor theo `updated_at` (`myPostsSyncMeta.cursor`) + merge-upsert vào `serverMyPosts`

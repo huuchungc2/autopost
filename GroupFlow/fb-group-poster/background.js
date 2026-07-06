@@ -3007,7 +3007,14 @@ const GF_BG = {
   // thật). Nhờ vậy khi user bấm ▶ Chạy hay tới giờ lịch, phần lớn bài ĐÃ có sẵn cache — khỏi phải
   // chờ fetch ngay lúc đó, và UI (sidepanel đọc thẳng `gf_post_access_cache`) có thể hiện tag
   // trạng thái mà không cần tự gọi kiểm tra.
-  async warmPostAccessCache() {
+  // v1.0.224 — Tony: list Comment giờ CHỈ hiện bài đã CHECK XONG với kết quả OK (hoặc đã comment
+  // rồi — xem isCommentActionable(), sidepanel.js), không còn hiện luôn bài "chưa check" như bản
+  // trước. Nghĩa là tốc độ cron quét quyết định trực tiếp tốc độ bài "hiện ra" trong list — batch
+  // mặc định 2 bài/3 phút quá chậm với queue vài chục bài (phải đợi cả tiếng mới thấy hết). Thêm
+  // `batchSize` để lượt quét THỦ CÔNG (bấm vào tab Comment — xem `GF_WARM_POST_ACCESS`,
+  // chrome.runtime.onMessage bên dưới) check nhiều hơn hẳn 1 lượt so với tick nền định kỳ (vẫn giữ
+  // 2 để tránh dồn dập khi chạy im lặng không ai để ý).
+  async warmPostAccessCache({ batchSize = 2 } = {}) {
     const FC = globalThis.GF?.fbCommentBg;
     const S = globalThis.GF?.fbSessionBg;
     if (!FC || !S) return;
@@ -3036,7 +3043,7 @@ const GF_BG = {
       console.warn('[GroupFlow] warmPostAccessCache: không lấy được session:', e.message);
       return;
     }
-    const batch = stale.slice(0, 2);
+    const batch = stale.slice(0, batchSize);
     for (const t of batch) {
       try {
         await FC.getPostAccess({ groupId: t.groupId, postId: t.postId, session, isTimeline: false });
@@ -3079,6 +3086,10 @@ chrome.power.requestKeepAwake('system');
 console.log('[GroupFlow] service worker ready');
 ensureGroupFlowPeriodicAlarms().catch(() => {});
 GF_BG.reconcileQueueSchedules().catch(() => {});
+// v1.0.222 — dọn ngay lúc khởi động (không đợi tới lần checkPostAccess/comment đầu tiên) cache
+// 'gf_post_access_cache' cũ ghi sai do bug buildPermalink() (route /permalink/ khiến check luôn
+// fail-open "ok") — readPostAccessCache() tự xoá nếu schema cũ, xem fbCommentBg.js.
+globalThis.GF?.fbCommentBg?.readPostAccessCache().catch(() => {});
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'radar_scan') {
@@ -3160,6 +3171,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
 
+      if (msg.type === 'GF_WARM_POST_ACCESS') {
+        // v1.0.224 — sidepanel gọi khi mở/chuyển vào tab Comment, tranh thủ check thêm ngay (batch
+        // lớn hơn tick nền 3 phút/2 bài) thay vì bắt user ngồi đợi cron — không await lâu (không
+        // block UI): bắn đi rồi trả lời ngay, panel tự loadComments() lại sau vài giây để thấy kết
+        // quả (xem bindEvents(), sidepanel.js).
+        GF_BG.warmPostAccessCache({ batchSize: 6 }).catch((e) => {
+          console.warn('[GroupFlow] manual warm post access:', e.message);
+        });
+        sendResponse({ ok: true });
+        return;
+      }
       if (msg.type === 'GF_COMMENT_OWN_POST') {
         const settings = await chrome.storage.local.get(['activeActorId']);
         await GF_BG.enqueueTask(() => GF_BG.runCommentOwn({

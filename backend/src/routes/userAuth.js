@@ -6,6 +6,7 @@ import { query } from '../db.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { authenticate } from '../middleware/auth.js';
 import { usernameFromEmail } from '../services/userUsernameService.js';
+import { licenseValidateLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'replace_with_strong_secret';
@@ -159,8 +160,10 @@ router.patch('/me', requireUserAuth, asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// POST /api/user-auth/validate-key  (gọi từ extension — public)
-router.post('/validate-key', asyncHandler(async (req, res) => {
+// POST /api/user-auth/validate-key  (gọi từ extension — public, không qua auth nào, nên đây là bề
+// mặt dò/brute-force license key duy nhất không cần biết trước gì cả — giới hạn chặt hơn hẳn các
+// route đã có key hợp lệ, xem middleware/rateLimit.js)
+router.post('/validate-key', licenseValidateLimiter, asyncHandler(async (req, res) => {
   const { key } = req.body;
   if (!key) return res.status(400).json({ valid: false, error: 'Thiếu key' });
 

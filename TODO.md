@@ -404,14 +404,30 @@ Theo yêu cầu Tony: thu gọn đồng bộ extension↔backend về đúng 3 l
 - [x] **Dọn dead code**: xoá `GET /pending-comments`, `PATCH /group-posts/:id/commented`, `POST/GET /group-posts/posts/pull` (route + service). Đây chính là **#1 + #2** trong danh sách đề xuất cũ bên dưới — đã giải quyết trong đợt này.
 - [x] **So le giờ đồng bộ (jitter)** — mỗi máy tự bốc thăm độ trễ ban đầu cố định trước khi tạo alarm `gf_tidien_sync`, tránh dồn cục khi nhiều máy cùng khởi động 1 thời điểm.
 - [ ] **Cần Tony xác nhận trên server thật**: restart backend (migration 039/039b tự chạy, có backfill dữ liệu cũ nếu còn `group_posts`) — kiểm tra trang web `/groups` vẫn hiện đúng danh sách/comment/stats như trước; reload extension, đăng bài + comment chéo giữa ≥2 tài khoản license key, để 1 tài khoản KHÔNG mở tab Comment xem có tự nhận được bài để comment qua chu kỳ nền không (đúng kịch bản "C" trong ví dụ A/B/C/D).
-- [ ] **Chưa làm (đề xuất mở rộng, không thuộc phạm vi 3 flow lần này)**: rate limiting tầng Express (chưa có `express-rate-limit`), tăng `connectionLimit` pool MySQL (hiện `10`, dùng chung toàn hệ thống), AI proxy (`/ai/generate`, `/ai/text`, `/ai/image`) vẫn giữ 1 slot Node đồng bộ chờ LLM — cân nhắc hàng đợi nếu traffic AI tăng thật. Cả 3 việc này chỉ cần khi thực sự scale lớn, không phải fix cấp bách.
+- [x] **Rate limiting tầng Express**: xem mục "Audit đồng bộ extension-website" (2026-07-06) bên dưới — đã thêm `express-rate-limit`.
+- [ ] **Còn lại, chưa làm**: AI proxy (`/ai/generate`, `/ai/text`, `/ai/image`) vẫn giữ 1 slot Node đồng bộ chờ LLM — cân nhắc hàng đợi nếu traffic AI tăng thật. Chỉ cần khi thực sự scale lớn, không phải fix cấp bách.
 
 ## Đồng bộ thông minh my-posts/cross-posts — cursor + merge-cache + throttle (2026-07-03)
 
 - [x] **Root cause "bài đã tải rồi vẫn tải lại hoài"**: `GET /api/user-sync/my-posts` (tham số `since` có sẵn nhưng client chưa từng gửi) và `GET /api/user-sync/cross-posts` (chưa hề có `since`) luôn trả full 200/100 bài mới nhất mỗi lần gọi, không cursor, không throttle, không cache incremental phía client — tải lại gần như y hệt lần trước ở mọi thao tác (mở panel/tab, đăng bài, comment xong, Làm mới).
 - [x] **Fix**: migration `038` — `user_posts.updated_at` (`ON UPDATE CURRENT_TIMESTAMP`) + index `(user_account_id, updated_at)`/`(updated_at)`. 2 route trên nhận `?since=<updated_at cuối>`. Extension: `pullMyPostsFromServer()`/`fetchCrossPostsFromServer()` lưu cursor (`myPostsSyncMeta`/`crossPostsSyncMeta`) + merge-upsert (`mergeUserPostsById()`) thay vì ghi đè cache; throttle 30s giữa 2 lần gọi mạng thật, bấm "Làm mới" tay (`#btnRefreshComments`) mới bỏ throttle (`force: true`). GroupFlow bump `1.0.186`. Chi tiết: `docs/GROUPFLOW.md` đầu file.
 - [ ] **Cần Tony xác nhận**: restart backend (migration 038 tự chạy lúc khởi động), reload extension, test đăng bài + comment chéo giữa 2 tài khoản license key khác nhau — bài mới/trạng thái đã comment phải vẫn lan truyền đúng qua nhiều lần refresh, không còn tải lặp lại y hệt mỗi lần.
-- [ ] **Đề xuất mở rộng, chưa làm (nếu cần scale tới hàng nghìn user)**: rate limiting tầng Express (chưa có `express-rate-limit` nào trong repo), endpoint `status`-rẻ kiểu `sync/status` cho `user-sync/*` để hỏi "có gì mới không" trước khi full pull, tăng `connectionLimit` pool MySQL (hiện `10`, dùng chung toàn hệ thống) nếu tải tăng thật.
+- [x] **Rate limiting tầng Express + trần queueLimit MySQL pool**: xem mục "Audit đồng bộ extension-website" (2026-07-06) bên dưới.
+- [ ] **Còn lại, chưa làm (nếu cần scale tới hàng nghìn user)**: endpoint `status`-rẻ kiểu `sync/status` cho `user-sync/*` để hỏi "có gì mới không" trước khi full pull; tăng hẳn `connectionLimit` pool MySQL (hiện vẫn `10`) nếu tải tăng thật (queueLimit đã chặn ở `30` thay vì vô hạn, nhưng chưa tăng số connection thật).
+
+## Audit đồng bộ extension-website — chặn nguy cơ quá tải VPS (2026-07-06)
+
+Tony yêu cầu review lại toàn bộ cơ chế đồng bộ extension↔backend, fix theo hướng "thông minh nhất để VPS không chết mà chạy nhịp nhàng". Audit (agent Explore quét toàn bộ alarm/API call site/query backend) ra 8 vấn đề thật:
+
+- [x] Không có rate-limit nào ở Express — thêm `express-rate-limit` (`backend/src/middleware/rateLimit.js`): `syncApiLimiter` (60 req/phút/license-key) cho `/api/user-sync/*` + các route `authenticateExtension` trong `groupPosts.js`; `licenseValidateLimiter` (10 req/15 phút/IP) riêng cho `/api/user-auth/validate-key` (public, không auth — bề mặt brute-force key duy nhất).
+- [x] `db.js` `queueLimit: 0` (hàng đợi MySQL pool vô hạn, dùng chung cho cả website admin) — đổi thành `30`, vượt trần thì lỗi nhanh thay vì cả app treo.
+- [x] `GET /api/user-sync/cross-posts` không index `visible_after`/`comment_count`, extension tự gọi mỗi ~10 phút/thiết bị — cold-start/thiết bị lâu ngày phải quét gần hết `user_posts` mọi user. Thêm trần lookback 30 ngày, tái dùng index `idx_user_posts_updated` có sẵn (migration 038) — không cần migration mới.
+- [x] `POST /api/user-sync/posts` không cap mảng `posts` (khác `/activity` đã cap 100) — thêm `.slice(0, 200)`.
+- [x] `group_post_drafts.is_shared` (migration 026) chưa từng có index — thêm migration `040_group_post_drafts_shared_index.sql` + `ensureGroupPostDraftsSharedIndex()`.
+- [x] `syncLocalPostsToServer()` (sidepanel.js) chạy vô điều kiện mỗi lần mở panel, gửi lại TOÀN BỘ bài `posted` trong `postQueue` thay vì chỉ bài mới — sửa dùng lại cờ `tidienSynced` có sẵn (đã dùng đúng bởi `pushUnsyncedPostsFromQueue()`, background.js).
+- [x] Nút "Làm mới" (`#btnRefreshComments`) không có disabled-guard + dùng `force:true` bỏ throttle — thêm guard giống `runTidienSyncNow()`.
+- [x] "Lưu" Cài đặt luôn force full tidien sync (bỏ cooldown 90s + kích hoạt vòng lặp pull draft ~40 lượt) dù đổi field không liên quan — chỉ force khi field tidien thật sự đổi.
+- [ ] **Cần Tony xác nhận trên server thật**: restart backend (migration 040 tự chạy), theo dõi log/CPU MySQL sau vài ngày nhiều user dùng cùng lúc xem tải có giảm rõ so với trước không; test rate-limit không chặn nhầm luồng dùng bình thường (đăng nhiều bài liên tục, mở/đóng panel nhanh).
 
 ## Fix GroupFlow tab Comment tự lên lịch + tự comment lặp lại vô hạn (2026-07-03)
 

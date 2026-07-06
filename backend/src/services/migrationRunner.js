@@ -54,6 +54,19 @@ async function columnExists(tableName, columnName) {
   }
 }
 
+async function indexExists(tableName, indexName) {
+  try {
+    const rows = await query(
+      `SELECT 1 FROM information_schema.STATISTICS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1`,
+      [tableName, indexName]
+    );
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function ensurePageSkillsTable() {
   if (await tableExists('page_skills')) return;
 
@@ -579,4 +592,19 @@ export async function ensureUserPostsMergedGroupPosts() {
       'Migration 039b applied: backfill group_posts/group_post_comments vào user_posts/user_post_comments'
     );
   }
+}
+
+// Audit 2026-07-06 (cơ chế đồng bộ extension-website): `is_shared` (migration 026) không có index
+// nào — điều kiện "eligibility" của draft (`(user_id=? AND is_shared=0) OR is_shared=1`, dùng ở cả
+// getExtensionSyncStatus() lẫn pullDraftsForExtension()) phải quét/đánh giá từng dòng thay vì lọc
+// được ngay bằng index khi có nhiều shared draft tích luỹ theo thời gian (draft không bị xoá, chỉ
+// đánh dấu đã pull).
+export async function ensureGroupPostDraftsSharedIndex() {
+  if (!(await tableExists('group_post_drafts'))) return;
+  if (!(await columnExists('group_post_drafts', 'is_shared'))) return;
+  if (await indexExists('group_post_drafts', 'idx_gpd_shared')) return;
+  await runMigrationFile(
+    '040_group_post_drafts_shared_index.sql',
+    'Migration 040 applied: group_post_drafts.is_shared index'
+  );
 }

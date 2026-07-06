@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { authenticateExtension } from '../middleware/extensionAuth.js';
+import { syncApiLimiter } from '../middleware/rateLimit.js';
 import { authenticateUser, signToken } from '../services/authService.js';
 import {
   getOrCreateExtensionKey,
@@ -57,7 +58,7 @@ router.post('/login', asyncHandler(async (req, res) => {
   });
 }));
 
-router.get('/me', authenticateExtension, asyncHandler(async (req, res) => {
+router.get('/me', syncApiLimiter, authenticateExtension, asyncHandler(async (req, res) => {
   const ext = req.extension || await getOrCreateExtensionKey(req.user.id);
   res.json({
     user: req.user,
@@ -88,20 +89,20 @@ router.get('/stats', authenticate, asyncHandler(async (req, res) => {
   res.json(stats);
 }));
 
-router.put('/fb-profile', authenticateExtension, asyncHandler(async (req, res) => {
+router.put('/fb-profile', syncApiLimiter, authenticateExtension, asyncHandler(async (req, res) => {
   const { fb_user_id, fb_user_name } = req.body;
   const profile = await updateExtensionFbProfile(req.user.id, { fb_user_id, fb_user_name });
   res.json(profile);
 }));
 
 /** Extension: danh sách AI provider user được dùng (giống fanpage) */
-router.get('/ai-providers', authenticateExtension, asyncHandler(async (req, res) => {
+router.get('/ai-providers', syncApiLimiter, authenticateExtension, asyncHandler(async (req, res) => {
   const providers = await listExtensionAiProviders(req.user);
   res.json(providers);
 }));
 
 /** Extension: xuất ảnh qua image provider đã chọn */
-router.post('/ai/image', authenticateExtension, asyncHandler(async (req, res) => {
+router.post('/ai/image', syncApiLimiter, authenticateExtension, asyncHandler(async (req, res) => {
   const prompt = String(req.body.prompt || '').trim();
   if (!prompt) return res.status(400).json({ error: 'Thiếu prompt' });
   const providerId = req.body.provider_id || req.body.image_provider_id;
@@ -110,7 +111,7 @@ router.post('/ai/image', authenticateExtension, asyncHandler(async (req, res) =>
 }));
 
 /** Extension: viết lại / comment qua text provider đã chọn */
-router.post('/ai/text', authenticateExtension, asyncHandler(async (req, res) => {
+router.post('/ai/text', syncApiLimiter, authenticateExtension, asyncHandler(async (req, res) => {
   const text = String(req.body.text || '').trim();
   if (!text) return res.status(400).json({ error: 'Thiếu text' });
   const out = await extensionGenerateText(req.user, {
@@ -123,7 +124,7 @@ router.post('/ai/text', authenticateExtension, asyncHandler(async (req, res) => 
 }));
 
 /** Extension: viết bài từ chủ đề + prompt skill local — giống POST /posts/generate (không lưu DB) */
-router.post('/ai/generate', authenticateExtension, asyncHandler(async (req, res) => {
+router.post('/ai/generate', syncApiLimiter, authenticateExtension, asyncHandler(async (req, res) => {
   const result = await extensionGeneratePost(req.user, {
     topic: req.body.topic,
     prompt: req.body.prompt,
@@ -190,21 +191,21 @@ router.get('/drafts', authenticate, asyncHandler(async (req, res) => {
 
 /** Extension: client gửi last_draft_id (ID lớn nhất đang giữ) — chỉ còn lo phần draft, phần "posts"
  * (pending_posts_sync/total_posts) đã bỏ cùng nhánh /posts/pull chết, xem getExtensionSyncStatus(). */
-router.post('/sync/status', authenticateExtension, asyncHandler(async (req, res) => {
+router.post('/sync/status', syncApiLimiter, authenticateExtension, asyncHandler(async (req, res) => {
   const result = await getExtensionSyncStatus(req.user.id, {
     lastDraftId: req.body?.last_draft_id,
   });
   res.json(result);
 }));
 
-router.get('/sync/status', authenticateExtension, asyncHandler(async (req, res) => {
+router.get('/sync/status', syncApiLimiter, authenticateExtension, asyncHandler(async (req, res) => {
   const result = await getExtensionSyncStatus(req.user.id, {
     lastDraftId: req.query?.last_draft_id,
   });
   res.json(result);
 }));
 
-router.post('/drafts/pull', authenticateExtension, asyncHandler(async (req, res) => {
+router.post('/drafts/pull', syncApiLimiter, authenticateExtension, asyncHandler(async (req, res) => {
   const result = await pullDraftsForExtension(req.user.id, {
     limit: req.body?.limit ?? req.query?.limit,
     afterDraftId: req.body?.last_draft_id ?? req.body?.after_draft_id,
@@ -212,7 +213,7 @@ router.post('/drafts/pull', authenticateExtension, asyncHandler(async (req, res)
   res.json(result);
 }));
 
-router.get('/drafts/pull', authenticateExtension, asyncHandler(async (req, res) => {
+router.get('/drafts/pull', syncApiLimiter, authenticateExtension, asyncHandler(async (req, res) => {
   const result = await pullDraftsForExtension(req.user.id, {
     limit: req.query.limit,
     afterDraftId: req.query.last_draft_id ?? req.query.after_draft_id,
@@ -235,7 +236,7 @@ router.delete('/drafts/:id', authenticate, asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
-router.post('/sync', authenticateExtension, asyncHandler(async (req, res) => {
+router.post('/sync', syncApiLimiter, authenticateExtension, asyncHandler(async (req, res) => {
   const result = await syncGroupPost(req.user.id, req.body);
   res.status(result.updated ? 200 : 201).json(result);
 }));

@@ -9,7 +9,11 @@ const pool = mysql.createPool({
   charset: 'utf8mb4_unicode_ci',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0,
+  // 0 = hàng đợi vô hạn — 1 client (extension bug vòng lặp, hoặc chỉ đơn giản nhiều user cùng lúc)
+  // gọi dồn dập sẽ khiến MỌI request khác (kể cả website admin, dùng chung pool này) phải xếp hàng
+  // chờ vô thời hạn thay vì lỗi nhanh — cả app "treo" chứ không phải chỉ chậm. Đặt trần hữu hạn để
+  // request vượt quá bị từ chối ngay (lỗi rõ ràng, client tự retry được) thay vì cả VPS đơ.
+  queueLimit: 30,
   decimalNumbers: true,
   dateStrings: ['DATE', 'DATETIME', 'TIMESTAMP'],
   timezone: '+07:00',

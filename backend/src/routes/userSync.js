@@ -15,7 +15,12 @@ router.post('/posts', authenticateLicenseKey, asyncHandler(async (req, res) => {
   if (!Array.isArray(posts) || !posts.length) return res.json({ ok: true, inserted: 0 });
 
   let inserted = 0;
-  for (const p of posts) {
+  // Trần 200 — không như /activity (đã cap sẵn .slice(0,100)), route này trước đây KHÔNG có cap
+  // nào, mỗi phần tử tốn 2 query tuần tự (SELECT rồi INSERT/UPDATE, xem upsertUserPost()) — client
+  // lỗi/cũ gửi mảng cực lớn (vd resync toàn bộ postQueue tích lũy nhiều năm) sẽ tự tạo hàng trăm-
+  // nghìn query tuần tự trong 1 request duy nhất. Extension đã tự giới hạn chỉ gửi item CHƯA sync
+  // (xem CHANGELOG — sửa cùng đợt), 200 là biên an toàn phía server, không phụ thuộc client đúng.
+  for (const p of posts.slice(0, 200)) {
     if (!p.post_id || !p.group_id) continue;
     try {
       await upsertUserPost(req.userAccount.id, {
@@ -73,9 +78,19 @@ router.get('/my-posts', authenticateLicenseKey, asyncHandler(async (req, res) =>
 //   2. Ưu tiên `comment_count ASC` (bài đang có ít người comment nhất) trước `posted_at`/`updated_at`
 //      — chỉ để dàn đều lượt comment, không phải để khoá bài — tránh dồn hết vào bài mới nhất của
 //      người đăng nhiều, bỏ quên bài của người đăng ít.
+// Trần lookback cho query bên dưới — không có cột nào index `visible_after`/`comment_count`
+// (audit 2026-07-06, xem CHANGELOG), nên nếu không chặn cửa sổ thời gian, WHERE chỉ còn lọc được
+// bằng `updated_at` (đã có index `idx_user_posts_updated`) — thiếu chặn này, 1 request cold-start
+// (thiết bị mới/`since` rỗng) hoặc 1 thiết bị lâu ngày chưa mở app (`since` cũ) phải quét TOÀN BỘ
+// lịch sử `user_posts` của MỌI user rồi filesort — chi phí tăng vô hạn theo thời gian hệ thống tồn
+// tại, bất kể user đó có bao nhiêu bài. 30 ngày đủ rộng để không bỏ sót bài thật (bài cũ hơn gần
+// như chắc chắn đã được ai đó comment hoặc hết liên quan) mà vẫn chặn được chi phí tăng vô hạn.
+const CROSS_POSTS_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
+
 router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
   const requestedSince = req.query.since ? new Date(req.query.since) : null;
+  const lookbackFloor = new Date(Date.now() - CROSS_POSTS_LOOKBACK_MS);
   // Bug đã gặp thật: client (fetchCrossPostsFromServer(), sidepanel.js) đẩy cursor `since` = MAX
   // updated_at của các bài ĐÃ THẤY (visible) trong lượt gọi trước — nhưng `visible_after` (độ trễ
   // ngẫu nhiên 5-60', xem randomVisibleAfter() ở trên) không đồng bộ với updated_at. Nếu 1 bài A
@@ -84,10 +99,11 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
   // "since > updated_at" loại vĩnh viễn ở mọi lần gọi sau, dù visible_after của A rồi cũng qua NOW().
   // Chặn floor của since ở NOW() - VISIBLE_AFTER_MAX_MINUTES: mọi bài update trong cửa sổ này luôn
   // được quét lại (an toàn, dư vài phần tử không đáng kể) — bài cũ hơn cửa sổ này thì visible_after
-  // của nó chắc chắn đã ngã ngũ (tối đa 60' sau updated_at) nên bỏ qua vẫn đúng.
+  // của nó chắc chắn đã ngã ngũ (tối đa 60' sau updated_at) nên bỏ qua vẫn đúng. Kẹp thêm CẬN DƯỚI
+  // (lookbackFloor) — nếu 1 thiết bị không mở app cả tháng, `since` cũ không được để scan lùi vô hạn.
   const safetyFloor = new Date(Date.now() - VISIBLE_AFTER_MAX_MINUTES * 60_000);
   const since = requestedSince
-    ? new Date(Math.min(requestedSince.getTime(), safetyFloor.getTime()))
+    ? new Date(Math.max(Math.min(requestedSince.getTime(), safetyFloor.getTime()), lookbackFloor.getTime()))
     : null;
   const myId = req.userAccount.id;
   const baseWhere = `up.user_account_id != ?
@@ -111,14 +127,18 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
          LIMIT ?`,
         [myId, myId, since, limit]
       )
+    // Cold-start (thiết bị mới, chưa có cursor) — giữ nguyên thứ tự ưu tiên cũ (bài mới nhất
+    // trước), chỉ thêm bound `updated_at` (dùng chung idx_user_posts_updated) để tận dụng index
+    // thay vì quét hết bảng — không đổi kết quả trả về với hệ thống mới (mọi bài đều trong 30
+    // ngày), chỉ khác khi hệ thống đã chạy lâu và có bài rất cũ (vốn cũng hiếm khi còn cần comment).
     : await query(
         `SELECT ${selectFields}
          FROM user_posts up
          JOIN users u ON u.id = up.user_account_id
-         WHERE ${baseWhere}
+         WHERE ${baseWhere} AND up.updated_at > ?
          ORDER BY up.comment_count ASC, up.posted_at DESC
          LIMIT ?`,
-        [myId, myId, limit]
+        [myId, myId, lookbackFloor, limit]
       );
   res.json(rows);
 }));
