@@ -707,10 +707,22 @@ const GF_BG = {
             : `Cổ điển: cùng tab FB → nhóm ${payload.groupName || payload.groupId}`,
         },
       }).catch(() => {});
+      // Bug thật đã gặp: job hẹn lịch (chạy tự động, không ai theo dõi) đăng vào 2+ nhóm — nhóm
+      // ĐẦU dùng active:true (firstClassicFocus) chạy ổn, nhưng từ nhóm THỨ 2 trở đi (tab đã
+      // "warm") trước đây dùng active:false để đỡ giật focus liên tục — tab nằm NỀN, Chrome giảm
+      // tốc setTimeout mạnh (gõ chữ/chờ composer đều dùng setTimeout) → "kẹt" rất lâu, có khi gõ
+      // ra chữ mà mất luôn ảnh do reconciliation của Lexical bị trễ/rối khi cuối cùng cũng chạy.
+      // Đúng bug đã từng gặp + đã fix cho luồng Comment (xem chú thích ở nhánh GF_COMMENT bên
+      // dưới) — nay áp dụng lại cho luồng Đăng bài: LUÔN active:true, không chỉ nhóm đầu tiên.
       tab = await this.navigateFbTabToGroup(payload.groupId, {
-        active: firstClassicFocus,
-        forClassic: firstClassicFocus,
+        active: true,
+        forClassic: true,
       });
+      // tabs.active:true chỉ đảm bảo đây là tab được chọn TRONG cửa sổ của nó — nếu cả CỬA SỔ
+      // không phải cửa sổ đang có focus hệ điều hành (job chạy tự động không ai ngồi trước máy,
+      // hoặc đang xem màn hình khác qua remote desktop), Chrome vẫn có thể giảm tốc tab như bình
+      // thường. Ép luôn cửa sổ lên foreground cho chắc.
+      if (tab.windowId) await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
       await this.markPostingSession(true, tab.id);
       const gid = String(payload.groupId);
       const prevGroup = this._lastClassicGroupId;
@@ -723,7 +735,7 @@ const GF_BG = {
       const needsGroupUrl = !onGroupFeed;
       if (needsGroupUrl) {
         const groupUrl = `https://www.facebook.com/groups/${gid}`;
-        await chrome.tabs.update(tab.id, { url: groupUrl, active: firstClassicFocus });
+        await chrome.tabs.update(tab.id, { url: groupUrl, active: true });
         await this.waitForTabLoad(tab.id);
         tab = await chrome.tabs.get(tab.id);
       }
@@ -1766,6 +1778,21 @@ const GF_BG = {
       if (alarmName) await this.removeUpcomingByAlarmName(alarmName);
       return true;
     } catch (e) {
+      // v1.0.221 — lịch "1 lần cụ thể" gặp bài chưa sẵn sàng (chờ duyệt/đã xóa — getPostAccess()
+      // đã xác nhận) coi như XỬ LÝ XONG, không lặp lại retry mỗi phút vô hạn (khác lỗi mạng/session
+      // thật, vẫn cần giữ lại để retryMissedActivity() thử lại). Tony: "tới lịch thì bỏ qua", không
+      // phải "báo lỗi liên tục cho tới khi admin duyệt".
+      if (e.skippedNotReady) {
+        console.info('[GroupFlow] scheduled comment skipped — bài chưa sẵn sàng:', alarmName || data.kind, e.message);
+        chrome.notifications.create(`gf_sched_skip_${Date.now()}`, {
+          type: 'basic',
+          iconUrl: 'icons/icon128.png',
+          title: 'GroupFlow — Bỏ qua lịch comment',
+          message: e.message?.slice(0, 120) || 'Bài chưa sẵn sàng',
+        }).catch(() => {});
+        if (alarmName) await this.removeUpcomingByAlarmName(alarmName);
+        return true;
+      }
       console.error('[GroupFlow] scheduled job failed:', alarmName || data.kind, e.message);
       chrome.notifications.create(`gf_sched_err_${Date.now()}`, {
         type: 'basic',
@@ -2144,7 +2171,15 @@ const GF_BG = {
       } catch (e) {
         const noDomFallback = /không tồn tại|chờ admin|bị xóa|pending|không hợp lệ|không thể comment|không xác nhận/i
           .test(e.message || '');
-        if (noDomFallback) throw e;
+        if (noDomFallback) {
+          // v1.0.221 — đánh dấu riêng lỗi "bài chưa sẵn sàng" (khác lỗi mạng/session thật) để
+          // runComment()/runCommentOwn() ghi Log rõ ràng là "bỏ qua" thay vì "lỗi", và
+          // runScheduledJob() coi lịch "1 lần cụ thể" là ĐÃ XỬ LÝ XONG (không lặp lại retry mỗi
+          // phút cho tới khi admin duyệt — bài chờ duyệt còn cache 20 phút, tickDailyFixedSchedules
+          // (lặp lại hàng ngày) đã tự thử lại vào ngày mai sẵn, không cần retry dồn dập ở đây nữa).
+          e.skippedNotReady = true;
+          throw e;
+        }
         console.warn('[GroupFlow] comment bg failed, fallback DOM:', e.message);
       }
       // Nếu Quick trả về commentId hợp lệ → dùng kết quả đó
@@ -2177,11 +2212,12 @@ const GF_BG = {
       await this.appendHistory({
         type: 'comment',
         ok: false,
+        skipped: Boolean(e.skippedNotReady),
         group_id: job.group_id,
         group_name: job.group_name,
         post_id: job.post_id,
         snippet: comment.slice(0, 80),
-        error: e.message,
+        error: e.skippedNotReady ? `Bỏ qua — ${e.message}` : e.message,
       });
       throw e;
     }
@@ -2227,10 +2263,11 @@ const GF_BG = {
       await this.appendHistory({
         type: 'comment',
         ok: false,
+        skipped: Boolean(e.skippedNotReady),
         group_id: job.group_id,
         post_id: job.post_id,
         snippet: comment.slice(0, 80),
-        error: e.message,
+        error: e.skippedNotReady ? `Bỏ qua — ${e.message}` : e.message,
       });
       throw e;
     }
@@ -2960,6 +2997,55 @@ const GF_BG = {
     }
     await chrome.storage.local.set({ activityUpcoming: remaining });
   },
+
+  // v1.0.221 — Tony: "đã check rồi thì khỏi check nữa, bài mới đồng bộ về thì tự check tiếp".
+  // Quét TOÀN BỘ bài có thể cần comment (của mình — `postQueue`/`serverMyPosts`, VÀ đồng đội —
+  // `crossPostsCache`, cả 3 đã persist sẵn ra chrome.storage.local qua các luồng pull hiện có,
+  // không cần thêm bước lưu riêng nào) tìm bài CHƯA có cache hoặc cache 'pending' đã hết hạn
+  // (`isAccessEntryFresh()` — fbCommentBg.js) rồi check dần — chỉ 1-2 bài/lượt, rải delay ngẫu
+  // nhiên, tránh dồn dập gọi Facebook cùng lúc dễ bị soi (cùng lý do giãn cách các job đăng/comment
+  // thật). Nhờ vậy khi user bấm ▶ Chạy hay tới giờ lịch, phần lớn bài ĐÃ có sẵn cache — khỏi phải
+  // chờ fetch ngay lúc đó, và UI (sidepanel đọc thẳng `gf_post_access_cache`) có thể hiện tag
+  // trạng thái mà không cần tự gọi kiểm tra.
+  async warmPostAccessCache() {
+    const FC = globalThis.GF?.fbCommentBg;
+    const S = globalThis.GF?.fbSessionBg;
+    if (!FC || !S) return;
+    const d = await chrome.storage.local.get([
+      'postQueue', 'serverMyPosts', 'crossPostsCache', 'activeActorId',
+    ]);
+    const targets = new Map();
+    const addTarget = (groupId, postId) => {
+      const pid = String(postId || '');
+      if (!groupId || !/^\d+$/.test(pid) || targets.has(pid)) return;
+      targets.set(pid, { groupId: String(groupId), postId: pid });
+    };
+    (d.postQueue || []).forEach((p) => (p.postedGroups || []).forEach((g) => addTarget(g.group_id, g.post_id)));
+    (d.serverMyPosts || []).forEach((sp) => addTarget(sp.group_id, sp.post_id));
+    (d.crossPostsCache || []).forEach((cp) => addTarget(cp.group_id, cp.post_id));
+    if (!targets.size) return;
+
+    const cache = await FC.readPostAccessCache();
+    const stale = [...targets.values()].filter((t) => !FC.isAccessEntryFresh(cache[t.postId]));
+    if (!stale.length) return;
+
+    let session;
+    try {
+      session = await S.resolveSession({ actorId: d.activeActorId });
+    } catch (e) {
+      console.warn('[GroupFlow] warmPostAccessCache: không lấy được session:', e.message);
+      return;
+    }
+    const batch = stale.slice(0, 2);
+    for (const t of batch) {
+      try {
+        await FC.getPostAccess({ groupId: t.groupId, postId: t.postId, session, isTimeline: false });
+      } catch (e) {
+        console.warn('[GroupFlow] warmPostAccessCache: check lỗi', t.postId, e.message);
+      }
+      await this.delay(1200 + Math.floor(Math.random() * 1800));
+    }
+  },
 };
 
 async function ensureGroupFlowPeriodicAlarms() {
@@ -2973,6 +3059,9 @@ async function ensureGroupFlowPeriodicAlarms() {
   }
   if (!names.has('gf_comment_daily')) {
     chrome.alarms.create('gf_comment_daily', { periodInMinutes: 1 });
+  }
+  if (!names.has('gf_check_post_access')) {
+    chrome.alarms.create('gf_check_post_access', { periodInMinutes: 3 });
   }
 }
 
@@ -3039,6 +3128,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'gf_tidien_sync') {
     await GF_BG.syncFromTidien().catch((e) => {
       console.warn('[GroupFlow] tidien auto-sync:', e.message);
+    });
+  }
+  if (alarm.name === 'gf_check_post_access') {
+    await GF_BG.warmPostAccessCache().catch((e) => {
+      console.warn('[GroupFlow] warm post access cache:', e.message);
     });
   }
 });

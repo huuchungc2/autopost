@@ -1,6 +1,82 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-07-05
+> Cập nhật: 2026-07-06
+
+## Backend: giờ đăng bài (`posted_at`) đồng bộ từ extension lệch 7 tiếng so với giờ VN (2026-07-06)
+
+Tony báo website ghi nhận giờ đăng bài không đúng giờ Việt Nam khi đồng bộ giờ đăng từ extension.
+
+- [x] Root cause: `toMysqlDatetime()` (`backend/src/services/groupPostService.js`) lưu `posted_at` theo giờ UTC (`.toISOString()`) trong khi cột DATETIME toàn hệ thống quy ước lưu giờ VN wall-clock (xem `scheduleTime.js`, `frontend/src/utils/date.js`) — hiện sớm hơn 7 tiếng.
+- [x] Fix `toMysqlDatetime()` cộng `+7h` trước khi format; sửa `upsertUserPost()` để `visible_after` tính trên mốc UTC thật, không re-parse chuỗi đã lệch giờ VN (tránh lệch 2 lần).
+- [x] Cập nhật `CHANGELOG.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: restart backend, đăng 1 bài nhóm qua extension, kiểm tra website (`/groups` hoặc dashboard user) hiện đúng giờ đăng theo giờ VN thật (không lệch 7 tiếng).
+- [ ] Lưu ý: các bản ghi `posted_at`/`visible_after` cũ (đã đồng bộ trước bản fix này) vẫn còn sai lệch 7 tiếng trong DB — fix chỉ áp dụng cho bài đồng bộ mới, không tự sửa dữ liệu cũ.
+
+## GroupFlow: dọn lỗi rác "File chooser dialog can only be shown with a user activation" (2026-07-05)
+
+Tony gửi ảnh chụp trang Lỗi extension (Cốc Cốc) thấy lỗi này lặp lại liên tục mỗi lần gắn ảnh.
+
+- [x] Root cause: `attachMedia()` (`content.js`) dispatch thêm 1 `MouseEvent('click')` giả lập lên input file sau khi đã gắn file đúng cách — trình duyệt chặn cứng mở hộp thoại chọn file bằng script, dòng này luôn luôn ném lỗi (bị try/catch bắt nên không phá chức năng, chỉ làm rác Log lỗi).
+- [x] Bỏ hẳn dòng dispatch 'click' đó — không có tác dụng gì.
+- [x] Bump `manifest.json` → v1.0.218, cập nhật `CHANGELOG.md`. Không cần rebuild `swBundle.js` (content.js không nằm trong bundle).
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, gắn ảnh đăng vài lượt — không còn thấy lỗi "File chooser dialog..." trong trang Lỗi của extension nữa.
+
+## GroupFlow: tag giờ đăng/lịch hiện đúng định dạng VN (HH:mm dd/mm/yyyy) (2026-07-05)
+
+Tony yêu cầu tag "Đăng: ..." (card Tạo bài) + tag "🕒 .../📌 Đăng ..." (tab Comment) hiện đúng kiểu giờ:phút ngày/tháng/năm VN thay vì ISO "YYYY-MM-DD HH:mm".
+
+- [x] `formatNgayGioVn()` mới (`sidepanel.js`) — đổi `ngay_dang`/`gio_dang` sang "HH:mm dd/mm/yyyy", dùng trong `postScheduleTagHtml()`.
+- [x] `formatScheduleWhen()` đổi sang cùng format — áp dụng cho tag lịch comment + "📌 Đăng" (giờ đăng gốc) + "✓ Đã comment · giờ".
+- [x] KHÔNG đụng `scheduleWhenInputValue()` (giữ nguyên ISO — bắt buộc cho input `datetime-local`).
+- [x] Bump `manifest.json` → v1.0.217, cập nhật `CHANGELOG.md`. Không cần rebuild `swBundle.js` (sidepanel.js không nằm trong bundle).
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, mở tab Tạo bài (tag "Đăng: ...") và tab Comment (tag "🕒 .../📌 Đăng ...") — cả 2 phải hiện đúng "HH:mm dd/mm/yyyy".
+
+## GroupFlow: Nhanh đăng thành công thật vẫn bị coi là lỗi → đăng trùng Cổ điển (2026-07-05)
+
+Tony xác nhận nhóm 2 đăng Nhanh thành công thật (thấy bài trên FB) nhưng vẫn bị đăng thêm 1 bài Cổ điển — hỏi tại sao Log không ghi nhận lượt Nhanh, chỉ thấy Cổ điển.
+
+- [x] Root cause: `createGroupPost()` (`fbPostBg.js`) kiểm tra lỗi nghiêm trọng (`parseFbErrors()`) bằng substring rất rộng trên TOÀN BỘ raw response, chạy TRƯỚC KHI trích `post_id` — match nhầm (do response gộp chung nhiều story bundle) khiến throw lỗi ngay dù bài đã tạo thành công thật; lỗi này chỉ `console.warn()` ra DevTools (không vào Log extension) rồi lặng lẽ fallback Cổ điển đăng trùng.
+- [x] Đảo thứ tự: trích `post_id` TRƯỚC — có rồi thì coi thành công ngay, bỏ qua nghi ngờ critical/auth phía dưới.
+- [x] Chạy lại `node build-sw-bundle.js` (fbPostBg.js nằm trong bundle).
+- [x] Bump `manifest.json` → v1.0.216, cập nhật `CHANGELOG.md`/`docs/GROUPFLOW.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension lên v1.0.216, hẹn lịch 1 bài vào 2+ nhóm, để máy tự chạy — không còn nhóm nào bị đăng trùng Nhanh+Cổ điển nữa; nếu Nhanh thành công, Log phải ghi nhận đúng lượt Nhanh đó (không phải Cổ điển).
+
+## GroupFlow: job hẹn lịch đăng nhóm thứ 2+ bị kẹt/mất ảnh (2026-07-05)
+
+Tony xác nhận A/B rõ ràng: đăng tay 2 nhóm ổn, cùng bài đó chạy qua hẹn lịch thì đứng kẹt lâu rồi tự đăng mất ảnh.
+
+- [x] Root cause: `sendToFb()` (`background.js`) chỉ ép tab `active:true` cho nhóm ĐẦU TIÊN trong job — từ nhóm 2 trở đi dùng `active:false`, tab nằm nền bị Chrome giảm tốc khi job chạy tự động không ai theo dõi (đúng bug đã fix cho luồng Comment trước đó, nhưng chưa áp dụng hết cho luồng Đăng bài).
+- [x] Bỏ điều kiện `firstClassicFocus` khỏi `active` — luôn `active:true` mọi nhóm; thêm `chrome.windows.update({focused:true})` để ép luôn cả cửa sổ lên foreground (tab active vẫn có thể bị giảm tốc nếu cửa sổ không phải cửa sổ có focus hệ điều hành — quan trọng khi chạy qua remote desktop).
+- [x] Bump `manifest.json` → v1.0.215, cập nhật `CHANGELOG.md`/`docs/GROUPFLOW.md`. Không cần rebuild `swBundle.js` (background.js không nằm trong bundle).
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, hẹn lịch 1 bài đăng vào 2+ nhóm rồi ĐỂ MÁY TỰ CHẠY (không thao tác gì) — cả 2 nhóm phải đăng đúng, đủ ảnh, không kẹt, không đăng trùng.
+
+## GroupFlow: vẫn đăng trùng Nhanh + Cổ điển (response Nhanh sạch nhưng không đọc được post_id) (2026-07-05)
+
+Tony báo tiếp sau v1.0.211: "bật cổ điển lên là thấy đăng rồi (đã đăng grap) nhưng vẫn đăng cổ điển tiếp... log chỉ ghi nhận cổ điển không ghi nhận nhanh".
+
+- [x] Root cause: v1.0.211 chỉ đánh dấu `ambiguousDelivery` cho lỗi MẠNG (fetch throw, 5xx). Trường hợp này response Nhanh về sạch (HTTP 200) nhưng `extractPostId()`/`detectSubmittedWithoutId()` (`fbPostBg.js`) không nhận diện được post_id — không được đánh dấu ambiguous nên vẫn tự fallback Cổ điển → đăng trùng.
+- [x] `createGroupPost()` (`fbPostBg.js`) giờ đánh dấu `ambiguousDelivery = true` cho MỌI trường hợp không khẳng định chắc FB đã từ chối — chỉ giữ KHÔNG ambiguous cho tín hiệu từ chối rõ ràng (spam/action_blocked).
+- [x] Chạy lại `node build-sw-bundle.js` (fbPostBg.js nằm trong bundle).
+- [x] Bump `manifest.json` → v1.0.214, cập nhật `CHANGELOG.md`/`docs/GROUPFLOW.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, đăng vài lượt — nếu Nhanh gặp lại tình huống "response sạch nhưng không đọc được post_id", phải thấy job DỪNG lại + báo lỗi rõ ("Không rõ FB đã tạo bài chưa...") thay vì tự động đăng Cổ điển tiếp; kiểm tra trên FB xem có còn bị trùng bài không.
+
+## GroupFlow: Cổ điển đăng mất ảnh, chỉ còn chữ (2026-07-05)
+
+Tony báo sau khi gắn ảnh xong, job đứng 1 hồi lâu rồi tự đăng — nhưng bài lên không có ảnh, chỉ còn chữ.
+
+- [x] Root cause: `typeHumanLike()`/`injectHybridText()`/`pasteComposerContent()` (`content.js`) chạy `selectAll`+`delete` vô điều kiện trước khi gõ, kể cả khi ô soạn bài đang trống chữ (đúng lúc vừa gắn ảnh xong, chưa gõ gì) — nếu ảnh nằm chung vùng soạn thảo (Lexical decorator node), lệnh này xóa luôn ảnh.
+- [x] Cả 3 hàm giờ chỉ xóa khi ô ĐÃ có chữ thật (`composerTextLength(el) > 0`) — bỏ qua bước xóa khi ô đang trống, không ảnh hưởng retry hợp lệ.
+- [x] Bump `manifest.json` → v1.0.213, cập nhật `CHANGELOG.md`/`docs/GROUPFLOW.md`. Không cần rebuild `swBundle.js` (content.js là content script nạp trực tiếp).
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, đăng lại 1 bài có ảnh vào nhóm — bài phải giữ nguyên cả ảnh lẫn chữ, không còn mất ảnh sau khi gõ chữ.
+
+## GroupFlow: Cổ điển báo "không tìm thấy ô soạn bài" dù hộp thoại đã mở sẵn (2026-07-05)
+
+Tony gửi ảnh chụp: hộp thoại "Tạo bài viết" hiện rõ, đã mở sẵn 10-20s+, nhưng Log vẫn báo "Không tìm thấy ô soạn bài nhóm".
+
+- [x] Root cause: `findComposerEditor()`/`getGroupPostDialog()` (`content.js`) dùng `document.querySelector('[role="dialog"]')` — chỉ lấy phần tử ĐẦU TIÊN khớp. FB Comet có thể render nhiều `[role="dialog"]` cùng lúc — nếu phần tử đầu không phải dialog composer thật, vòng lặp không bao giờ thấy composer thật dù nó vẫn đứng yên sẵn đó.
+- [x] Đổi sang quét TẤT CẢ `[role="dialog"]` mỗi lượt, thử tìm composer trên từng cái.
+- [x] Bump `manifest.json` → v1.0.212, cập nhật `CHANGELOG.md`/`docs/GROUPFLOW.md`. Không cần rebuild `swBundle.js` (content.js là content script nạp trực tiếp).
+- [ ] **Cần Tony xác nhận trên máy thật**: thử đăng lại đúng 2 nhóm đã lỗi trước đó ("Chợ Đakai...", "CHỢ SÙNG NHƠN...") — Cổ điển phải tìm thấy ô soạn bài và đăng được, không còn báo "không tìm thấy" nữa.
 
 ## GroupFlow: đăng trùng 1 bài vào 1 nhóm (Nhanh + Cổ điển) (2026-07-05)
 

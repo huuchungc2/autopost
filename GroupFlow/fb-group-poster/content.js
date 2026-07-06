@@ -692,13 +692,17 @@ if (!GF_CONTENT) GF_CONTENT = {
   },
 
   getGroupPostDialog() {
-    const dialog = document.querySelector('[role="dialog"]');
-    if (!dialog || this.isPersonalShareDialog(dialog)) return null;
-    if (this.isAnonymousIntroDialog(dialog)) return null;
-    const heading = dialog.querySelector('h2, h3, [role="heading"]')?.textContent?.trim().toLowerCase() || '';
-    const t = (dialog.textContent || '').slice(0, 1200).toLowerCase();
-    if (/tạo bài viết|create post|bài viết công khai|public post|write something/.test(heading + t)) return dialog;
-    if (this.findComposerInRoot(dialog)) return dialog;
+    // Quét TẤT CẢ [role="dialog"] hiện có, không chỉ phần tử đầu tiên — FB Comet có thể render
+    // nhiều dialog cùng lúc (backdrop/layer lồng nhau...), lấy đúng 1 phần tử đầu dễ trúng nhầm
+    // dialog không phải composer thật (xem chú thích findComposerEditor()).
+    for (const dialog of this.qsa('[role="dialog"]')) {
+      if (this.isPersonalShareDialog(dialog)) continue;
+      if (this.isAnonymousIntroDialog(dialog)) continue;
+      const heading = dialog.querySelector('h2, h3, [role="heading"]')?.textContent?.trim().toLowerCase() || '';
+      const t = (dialog.textContent || '').slice(0, 1200).toLowerCase();
+      if (/tạo bài viết|create post|bài viết công khai|public post|write something/.test(heading + t)) return dialog;
+      if (this.findComposerInRoot(dialog)) return dialog;
+    }
     return null;
   },
 
@@ -762,21 +766,29 @@ if (!GF_CONTENT) GF_CONTENT = {
     if (quick) return quick;
     const end = Date.now() + timeout;
     while (Date.now() < end) {
-      const dialog = document.querySelector('[role="dialog"]');
-      if (dialog && this.isPersonalShareDialog(dialog)) {
+      // Bug thật đã gặp: hộp thoại "Tạo bài viết" mở sẵn, đứng yên >10-20s, vẫn báo "không tìm
+      // thấy ô soạn bài" sau khi hết timeout. Nguyên nhân: FB Comet có thể render NHIỀU
+      // [role="dialog"] cùng lúc (backdrop/layer lồng nhau, dialog ẩn/phụ khác...) —
+      // document.querySelector chỉ lấy ĐÚNG 1 phần tử ĐẦU TIÊN khớp; nếu đó không phải dialog
+      // composer thật, findComposerInRoot() trên nó luôn trả null suốt cả vòng lặp dù dialog
+      // thật vẫn nằm sẵn ở chỗ khác trong DOM. Giờ quét TẤT CẢ dialog hiện có mỗi lượt.
+      const dialogs = this.qsa('[role="dialog"]');
+      const shareDialog = dialogs.find((d) => this.isPersonalShareDialog(d));
+      if (shareDialog) {
         await this.dismissPersonalShareDialog();
         await this.sleep(400);
         continue;
       }
-      if (dialog && this.isAnonymousIntroDialog(dialog)) {
+      const anonDialog = dialogs.find((d) => this.isAnonymousIntroDialog(d));
+      if (anonDialog) {
         await this.dismissAnonymousIntroDialog();
         await this.sleep(400);
         continue;
       }
-      const fromDialog = dialog && !this.isPersonalShareDialog(dialog)
-        ? this.findComposerInRoot(dialog)
-        : null;
-      if (fromDialog) return fromDialog;
+      for (const dialog of dialogs) {
+        const ed = this.findComposerInRoot(dialog);
+        if (ed) return ed;
+      }
 
       for (const pagelet of this.qsa('[data-pagelet="GroupInlineComposer"], [data-pagelet*="Composer"]')) {
         const ed = this.findComposerInRoot(pagelet);
@@ -1031,7 +1043,12 @@ if (!GF_CONTENT) GF_CONTENT = {
 
   async typeHumanLike(el, text, { clearFirst = true } = {}) {
     const plain = String(text || '');
-    if (clearFirst) {
+    // Chỉ xóa khi ô ĐANG CÓ CHỮ THẬT (đang gõ lại sau lần thử trước) — bug thật đã gặp: bài có
+    // ảnh gắn trước (đúng thứ tự "gắn ảnh trước chèn chữ"), lần gõ ĐẦU TIÊN ô soạn bài chưa có chữ
+    // gì, nhưng selectAll+delete vẫn chạy vô điều kiện — nếu ảnh đính kèm nằm chung vùng soạn thảo
+    // (kiểu decorator node của Lexical, không phải khối tách biệt) thì lệnh này xóa luôn cả ảnh,
+    // đăng ra bài mất ảnh chỉ còn chữ. Không có gì để xóa thì bỏ qua bước này.
+    if (clearFirst && this.composerTextLength(el) > 0) {
       document.execCommand('selectAll', false, null);
       document.execCommand('delete', false, null);
       await this.sleep(180 + Math.floor(Math.random() * 220));
@@ -1263,9 +1280,13 @@ if (!GF_CONTENT) GF_CONTENT = {
   },
 
   async injectHybridText(el, segments, TF) {
-    document.execCommand('selectAll', false, null);
-    document.execCommand('delete', false, null);
-    await this.sleep(180 + Math.floor(Math.random() * 160));
+    // Xem chú thích ở typeHumanLike() — chỉ xóa khi ô đã có chữ thật, tránh xóa nhầm ảnh đã gắn
+    // trước đó khi ô soạn bài đang trống (lần gõ đầu tiên).
+    if (this.composerTextLength(el) > 0) {
+      document.execCommand('selectAll', false, null);
+      document.execCommand('delete', false, null);
+      await this.sleep(180 + Math.floor(Math.random() * 160));
+    }
 
     for (let i = 0; i < segments.length; i += 1) {
       this.checkAborted();
@@ -1299,9 +1320,13 @@ if (!GF_CONTENT) GF_CONTENT = {
     if (!expect) return false;
     try {
       el.focus();
-      document.execCommand('selectAll', false, null);
-      document.execCommand('delete', false, null);
-      await this.sleep(120);
+      // Xem chú thích ở typeHumanLike() — chỉ xóa khi ô đã có chữ thật, tránh xóa nhầm ảnh đã
+      // gắn trước đó khi ô soạn bài đang trống (lần gõ đầu tiên).
+      if (this.composerTextLength(el) > 0) {
+        document.execCommand('selectAll', false, null);
+        document.execCommand('delete', false, null);
+        await this.sleep(120);
+      }
       const dt = new DataTransfer();
       dt.setData('text/plain', plain);
       if (html) dt.setData('text/html', html);
@@ -1700,9 +1725,11 @@ if (!GF_CONTENT) GF_CONTENT = {
     input.dispatchEvent(new Event('focus', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    try {
-      input.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    } catch { /* ignore */ }
+    // Bug đã gặp: dispatch 'click' giả lập trên input file — trình duyệt (Cốc Cốc/Chrome) chặn
+    // cứng việc mở hộp thoại chọn file bằng script (không phải người dùng bấm thật), nên dòng này
+    // LUÔN LUÔN ném "File chooser dialog can only be shown with a user activation" (100% mọi lần
+    // gắn ảnh) — dù được try/catch bắt nên không phá gì (file đã gắn đúng cách ở trên rồi), nó chỉ
+    // làm rác Log lỗi của extension, gây nhiễu khi tìm lỗi thật. Bỏ hẳn — không có tác dụng gì.
 
     const previewOk = await this.waitForMediaPreview(isVideo ? 120000 : 60000);
     if (!previewOk && isVideo) {

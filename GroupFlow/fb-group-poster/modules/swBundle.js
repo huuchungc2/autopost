@@ -2577,19 +2577,15 @@ const FP = globalThis.GF.fbPostBg = {
       { referer: groupUrl },
     );
 
-    const err = this.parseFbErrors(rawText);
-    if (err?.critical || err?.auth) {
-      // Log raw text khi gặp lỗi critical/auth (checkpoint, rate limit, session hết hạn...) —
-      // parseFbErrors chỉ match substring rất rộng (vd "checkpoint" ở bất kỳ đâu trong response),
-      // nên cần thấy nguyên văn để biết có đúng là lỗi thật hay match nhầm vào field không liên quan.
-      console.warn('[GroupFlow] Fast post critical/auth error:', err.message, '| raw:', rawText.slice(0, 800));
-    }
-    if (err?.critical) throw new Error(err.message);
-    if (err?.auth) {
-      S.invalidateCache();
-      throw new Error(err.message);
-    }
-
+    // Bug thật đã gặp: Tony báo "nhóm 2 đăng Nhanh thành công (thấy bài thật trên FB) nhưng vẫn
+    // đăng Cổ điển tiếp" — parseFbErrors() quét TOÀN BỘ raw response (có thể chứa nhiều story
+    // bundle khác nhau trong 1 response GraphQL batch của FB) tìm substring RẤT RỘNG (vd
+    // "checkpoint"/"permission"/"please log in" ở bất kỳ đâu) — comment cũ bên dưới đã tự cảnh báo
+    // rủi ro match nhầm này nhưng trước đây check critical/auth chạy TRƯỚC KHI thử trích post_id,
+    // nên 1 match nhầm (vd nội dung bài hoặc dữ liệu feed khác bundle chung vô tình chứa đúng từ
+    // khoá) khiến code throw NGAY dù story_create thực ra đã tạo bài thành công thật. Giờ trích
+    // post_id TRƯỚC — có post_id thật (bằng chứng cấu trúc, đáng tin hơn hẳn 1 regex match) thì
+    // coi là thành công ngay, bỏ qua mọi nghi ngờ critical/auth phía dưới.
     const debugMsgs = [];
     const postId = this.extractPostId(json, rawText, chunks, (m) => debugMsgs.push(m));
     if (debugMsgs.length) {
@@ -2598,6 +2594,20 @@ const FP = globalThis.GF.fbPostBg = {
         groupId: String(groupId),
       }).catch?.(() => {});
     }
+
+    const err = postId ? null : this.parseFbErrors(rawText);
+    if (err?.critical || err?.auth) {
+      // Log raw text khi gặp lỗi critical/auth (checkpoint, rate limit, session hết hạn...) —
+      // parseFbErrors chỉ match substring rất rộng, nên cần thấy nguyên văn để biết có đúng là
+      // lỗi thật hay match nhầm vào field không liên quan.
+      console.warn('[GroupFlow] Fast post critical/auth error:', err.message, '| raw:', rawText.slice(0, 800));
+    }
+    if (err?.critical) throw new Error(err.message);
+    if (err?.auth) {
+      S.invalidateCache();
+      throw new Error(err.message);
+    }
+
     const notice = this.parseGraphqlNotice(json, rawText, chunks);
     const pending = !postId && this.detectPending(json, rawText, chunks);
     const spamWarn = this.detectSpamWarning(json, chunks) || notice;
@@ -2654,13 +2664,26 @@ const FP = globalThis.GF.fbPostBg = {
     if (storyErr) throw new Error(storyErr);
     if (err?.soft) throw new Error(err.message);
 
+    // Bug thật đã gặp: Tony báo "bật Cổ điển lên là thấy đã đăng Nhanh rồi nhưng vẫn đăng Cổ điển
+    // tiếp" — request Nhanh có response HTTP sạch (không lỗi mạng/5xx, không bị extractStoryCreateError()
+    // bắt được lỗi rõ ràng), tức FB CÓ THỂ đã tạo bài thật, chỉ là extractPostId()/detectSubmittedWithoutId()
+    // không nhận ra được post_id trong response (nghi do FB đang đổi schema — cùng đợt với lỗi
+    // field_exception gặp song song) — response hạ tầng OK nên fetchWithRetry()/graphqlRequest()
+    // (fbSessionBg.js) không đánh dấu ambiguousDelivery, khiến postGroupItem() (background.js) tưởng
+    // đây là lỗi rõ ràng và tự fallback Cổ điển → đăng trùng thật. "spam/action_blocked" là tín hiệu
+    // FB từ chối rõ ràng (không tạo bài) nên KHÔNG đánh dấu ambiguous; mọi trường hợp còn lại (kể cả
+    // "story_create rỗng" và "không rõ gì cả") đều không thể khẳng định CHƯA tạo bài — đánh dấu
+    // ambiguousDelivery để postGroupItem() không tự fallback, bắt user tự kiểm tra trước khi đăng lại.
     const hint = this.inspectGraphqlFailure(json, rawText, chunks);
     console.warn('[GroupFlow] Fast post no post_id', groupId, rawText.slice(0, 600));
-    throw new Error(
+    const isDefiniteReject = /spam|action.?blocked/i.test(hint || '');
+    const failErr = new Error(
       hint
         ? `FB từ chối hoặc không phản hồi (${hint}) — mở nhóm kiểm tra; thử Cổ điển`
-        : 'FB không phản hồi rõ — mở nhóm xem bài đã lên chưa; nếu không → Cổ điển',
+        : 'Không rõ FB đã tạo bài chưa (response không nhận dạng được) — mở nhóm kiểm tra trước khi đăng lại, tránh đăng trùng',
     );
+    if (!isDefiniteReject) failErr.ambiguousDelivery = true;
+    throw failErr;
   },
 
   async postToGroup({ groupId, text, imageBase64, images, mediaMime, actorId, backgroundColor }) {
@@ -2690,6 +2713,15 @@ globalThis.GF = globalThis.GF || {};
 const DOC_COMMENT = '9550500205043457';
 const DOC_TYPING_START = '5359232510868548';
 const DOC_TYPING_STOP = '6911603175550464';
+
+// v1.0.221 — cache kết quả checkPostCommentable() theo post_id, tránh fetch lại mỗi lần
+// chạy/lên lịch comment cho cùng 1 bài (Tony: "đã check rồi thì khỏi check nữa mất công").
+// 'ok'/'deleted' là trạng thái BỀN (bài hiển thị bình thường hiếm khi tự ẩn lại; bài đã xóa
+// không tự "hết xóa") nên cache vô thời hạn. 'pending' (chờ duyệt, hoặc tín hiệu mơ hồ như
+// 404/lỗi mạng) là trạng thái CÓ THỂ ĐỔI (admin duyệt sau, mạng chỉ lỗi tạm) nên chỉ cache
+// ngắn hạn rồi phải check lại — xem getPostAccess().
+const PENDING_ACCESS_TTL_MS = 20 * 60 * 1000;
+const POST_ACCESS_CACHE_KEY = 'gf_post_access_cache';
 
 const FC = globalThis.GF.fbCommentBg = {
   sleep(ms) {
@@ -2738,20 +2770,42 @@ const FC = globalThis.GF.fbCommentBg = {
         },
       });
       if (res.status === 404) {
-        return { canComment: false, reason: 'Bài không tồn tại (404) — có thể bị xóa hoặc chờ duyệt' };
+        // Tín hiệu mơ hồ (có thể xóa thật, có thể chỉ đang chờ duyệt nên FB tạm giấu) — xếp
+        // `kind: 'pending'` (retry-able) thay vì 'deleted' (vĩnh viễn) để không lỡ chặn cứng
+        // 1 bài thực ra sẽ hiện lại sau khi admin duyệt.
+        return { canComment: false, kind: 'pending', reason: 'Bài không tồn tại (404) — có thể bị xóa hoặc chờ duyệt' };
       }
       if (!res.ok) {
-        return { canComment: false, reason: `Không đọc được bài (HTTP ${res.status})` };
+        return { canComment: false, kind: 'pending', reason: `Không đọc được bài (HTTP ${res.status})` };
       }
       const html = await res.text();
-      if (html.includes("This content isn't available at the moment")) {
-        return { canComment: false, reason: 'Bài đã bị xóa hoặc ẩn' };
+      // v1.0.219 — trước bản này chỉ dò marker TIẾNG ANH ("This content isn't available…",
+      // "Your post is pending approval"). Tài khoản FB đặt ngôn ngữ Việt (mặc định của cả hệ
+      // thống — xem `settings.fbLang || 'vi'`) trả HTML với text tiếng Việt bất kể header
+      // accept-language gửi lên, nên 2 marker tiếng Anh KHÔNG BAO GIỜ khớp trên tài khoản VN thật
+      // — checkPostCommentable() luôn rơi xuống nhánh "fail open" (coi là commentable) dù bài
+      // đang thực sự ở trạng thái chờ duyệt/đã xóa/không xem được, khiến job vẫn tốn công mở tab
+      // Cổ điển chạy tiếp và thất bại ở đó thay vì bị chặn sớm, rẻ tiền ngay tại đây. Thêm marker
+      // tiếng Việt tương ứng (xác nhận từ ảnh chụp thật của Tony: "Bạn hiện không xem được nội
+      // dung này").
+      if (
+        html.includes("This content isn't available at the moment")
+        || html.includes('Bạn hiện không xem được nội dung này')
+        || html.includes('Nội dung này hiện không có sẵn')
+        || html.includes('đã xóa nội dung')
+      ) {
+        return { canComment: false, kind: 'deleted', reason: 'Bài đã bị xóa hoặc ẩn' };
       }
-      if (html.includes('Your post is pending approval')) {
-        return { canComment: false, reason: 'Bài đang chờ admin duyệt' };
+      if (
+        html.includes('Your post is pending approval')
+        || html.includes('đang chờ phê duyệt')
+        || html.includes('đang chờ duyệt')
+        || html.includes('chờ quản trị viên nhóm phê duyệt')
+      ) {
+        return { canComment: false, kind: 'pending', reason: 'Bài đang chờ admin duyệt' };
       }
       if (html.includes('story_title') || html.includes('story_token') || html.includes('likeAction')) {
-        return { canComment: true };
+        return { canComment: true, kind: 'ok' };
       }
       // Trang tải OK (không 404), khong thay dau hieu bi xoa/pending ro rang - nhung cung khong
       // tim thay marker cu (story_title/story_token/likeAction) de XAC NHAN chac chan, rat co
@@ -2761,10 +2815,41 @@ const FC = globalThis.GF.fbCommentBg = {
       // Doi sang fail open: trang load duoc, khong co tin hieu xau ro rang thi cu coi la
       // commentable, de createComment() that su quyet dinh dung/sai - neu van sai thi co che
       // fallback Co dien da co san lo.
-      return { canComment: true };
+      return { canComment: true, kind: 'ok' };
     } catch (e) {
-      return { canComment: false, reason: e.message || 'Lỗi kiểm tra bài' };
+      return { canComment: false, kind: 'pending', reason: e.message || 'Lỗi kiểm tra bài' };
     }
+  },
+
+  async readPostAccessCache() {
+    const d = await chrome.storage.local.get(POST_ACCESS_CACHE_KEY);
+    return d[POST_ACCESS_CACHE_KEY] || {};
+  },
+
+  async writePostAccessEntry(postId, entry) {
+    const store = await this.readPostAccessCache();
+    store[String(postId)] = entry;
+    await chrome.storage.local.set({ [POST_ACCESS_CACHE_KEY]: store });
+    return entry;
+  },
+
+  isAccessEntryFresh(entry) {
+    if (!entry) return false;
+    if (entry.kind !== 'pending') return true;
+    return Date.now() - (entry.checkedAt || 0) < PENDING_ACCESS_TTL_MS;
+  },
+
+  // Bọc checkPostCommentable() bằng cache theo post_id — dùng chung cho cả luồng comment thật
+  // (commentOnPost() bên dưới), cron nền quét trước (background.js warmPostAccessCache()), lẫn
+  // UI đọc trực tiếp storage để hiện tag/chặn nút (sidepanel.js không load module này, chỉ đọc
+  // thẳng key `gf_post_access_cache` — xem ghi chú ở buildPermalink()/PENDING_ACCESS_TTL_MS).
+  async getPostAccess({ groupId, postId, session, isTimeline, force = false }) {
+    const cached = force ? null : (await this.readPostAccessCache())[String(postId)];
+    if (this.isAccessEntryFresh(cached)) return cached;
+    const result = await this.checkPostCommentable({ groupId, postId, session, isTimeline });
+    const entry = { ...result, checkedAt: Date.now() };
+    await this.writePostAccessEntry(postId, entry);
+    return entry;
   },
 
   async simulateTyping(session, feedbackId, sessionId) {
@@ -2909,11 +2994,14 @@ const FC = globalThis.GF.fbCommentBg = {
     let session;
     const run = async (force) => {
       session = await S.resolveSession({ force, actorId });
-      const check = await this.checkPostCommentable({
+      const check = await this.getPostAccess({
         groupId,
         postId,
         session,
         isTimeline,
+        // Session vừa bị buộc làm mới (lỗi auth ở lượt trước) — đừng tin cache cũ, check lại
+        // thật vì rất có thể lần trước fail do session hết hạn chứ không phải do bài.
+        force,
       });
       if (!check.canComment) {
         throw new Error(check.reason || 'Không thể comment bài này');

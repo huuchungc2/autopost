@@ -27,6 +27,7 @@ const state = {
   commentScheduleOpenId: null,
   commentScheduleMap: {},
   commentedRecords: {},
+  postAccessCache: {},
   serverMyPostsIndex: new Map(),
   postsPage: 0,
   commentsPage: 0,
@@ -2406,13 +2407,20 @@ function normalizeGioForTimeInput(gio) {
   return `${String(Number(parts[0])).padStart(2, '0')}:${parts[1].slice(0, 2).padStart(2, '0')}`;
 }
 
+// "YYYY-MM-DD" + "HH:mm" (định dạng lưu nội bộ) → "HH:mm dd/mm/yyyy" (định dạng hiển thị VN).
+function formatNgayGioVn(ngay, gio) {
+  const m = String(ngay || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return `${ngay || ''} ${gio || ''}`.trim();
+  return `${gio || ''} ${m[3]}/${m[2]}/${m[1]}`;
+}
+
 function postScheduleTagHtml(p) {
   const info = state.postScheduleMap[p.id];
   if (info?.type === 'daily') {
     return `<button type="button" class="tag tag-schedule tag-clickable" data-cancel-post-daily="${escAttr(p.id)}" title="Bấm để hủy lặp lại">🔁 ${esc(info.timeOfDay)} hàng ngày</button>`;
   }
   if (p.ngay_dang && p.gio_dang) {
-    return `<button type="button" class="tag tag-schedule tag-clickable" data-edit-schedule="${escAttr(p.id)}" title="Bấm sửa giờ đăng">Đăng: ${esc(p.ngay_dang)} ${esc(p.gio_dang)}</button>`;
+    return `<button type="button" class="tag tag-schedule tag-clickable" data-edit-schedule="${escAttr(p.id)}" title="Bấm sửa giờ đăng">Đăng: ${esc(formatNgayGioVn(p.ngay_dang, p.gio_dang))}</button>`;
   }
   return `<button type="button" class="tag tag-schedule tag-clickable tag-pending" data-edit-schedule="${escAttr(p.id)}" title="Hẹn giờ đăng">+ Hẹn giờ</button>`;
 }
@@ -3401,10 +3409,14 @@ async function rescheduleUpcoming(item) {
 }
 
 async function loadPostedPostsForComment({ force = false } = {}) {
-  const d = await chrome.storage.local.get(['postQueue', 'serverMyPosts', 'commentedRecords']);
+  const d = await chrome.storage.local.get(['postQueue', 'serverMyPosts', 'commentedRecords', 'gf_post_access_cache']);
   const queue = d.postQueue || [];
   const serverMyPosts = d.serverMyPosts || [];
   state.commentedRecords = d.commentedRecords || {};
+  // Cache check "bài có comment được không" — ghi bởi cron nền `warmPostAccessCache()`
+  // (background.js) hoặc ngay lúc comment thật chạy (`getPostAccess()`, fbCommentBg.js). Đọc lại
+  // mỗi lần tải list Comment để tag trạng thái + chặn nút Chạy/Lên lịch luôn dùng dữ liệu mới nhất.
+  state.postAccessCache = d.gf_post_access_cache || {};
 
   const localPosts = queue
     .filter((p) => p.postStatus === 'posted'
@@ -3497,6 +3509,56 @@ async function cancelCommentSchedule(postId) {
   }
   state.commentScheduleOpenId = null;
   await loadComments();
+}
+
+// v1.0.221 — giữ ĐỒNG BỘ với PENDING_ACCESS_TTL_MS (modules/fbCommentBg.js) — sidepanel.js không
+// load module đó (chỉ background/service worker mới có, xem manifest.json), nên đọc thẳng key
+// `gf_post_access_cache` (chrome.storage.local, dùng chung mọi context extension) rồi tự áp lại
+// đúng luật hết hạn ở đây thay vì gọi sang background hỏi.
+const POST_ACCESS_PENDING_TTL_MS = 20 * 60 * 1000;
+
+// Cache 'ok'/'deleted' coi là bền (không hết hạn); 'pending' (chờ duyệt, hoặc tín hiệu mơ hồ như
+// lỗi mạng/404) chỉ tin trong 20 phút — quá hạn thì coi như "chưa check", không chặn gì cả.
+function isPostAccessFresh(entry) {
+  if (!entry) return false;
+  if (entry.kind !== 'pending') return true;
+  return Date.now() - (entry.checkedAt || 0) < POST_ACCESS_PENDING_TTL_MS;
+}
+
+// Tách nhóm THẬT SỰ biết chắc chưa comment được (cache còn hạn + canComment:false) ra khỏi nhóm
+// còn lại — nhóm CHƯA từng check (không có cache) vẫn coi là "ready", không bắt user đợi cron nền
+// check xong mới được bấm ▶ Chạy/Lên lịch (đúng hành vi hiện có, chỉ chặn khi ĐÃ BIẾT CHẮC là
+// không được, không suy đoán khi chưa rõ).
+function splitGroupsByAccess(groups) {
+  const ready = [];
+  const blocked = [];
+  (groups || []).forEach((g) => {
+    const entry = state.postAccessCache[String(g.post_id)];
+    if (isPostAccessFresh(entry) && entry.canComment === false) {
+      blocked.push({ ...g, _accessReason: entry.reason || 'Bài chưa sẵn sàng' });
+    } else {
+      ready.push(g);
+    }
+  });
+  return { ready, blocked };
+}
+
+// Tag trạng thái "có comment được không" trên card Comment — đọc thẳng state.postAccessCache
+// (ghi bởi cron nền warmPostAccessCache() hoặc lúc chạy comment thật), KHÔNG tự gọi check gì ở
+// đây. Bài chưa từng check (cache trống) không hiện tag gì — tránh nhầm "chưa biết" với "đã xóa".
+function commentAccessTagHtml(validGroups) {
+  if (!validGroups?.length) return '';
+  const { ready, blocked } = splitGroupsByAccess(validGroups);
+  if (blocked.length) {
+    const entry = state.postAccessCache[String(blocked[0].post_id)];
+    const isDeleted = entry?.kind === 'deleted';
+    return `<span class="tag error" title="${escAttr(blocked[0]._accessReason)}">${isDeleted ? '✕ Đã xóa' : '⏳ Chờ duyệt'}</span>`;
+  }
+  const allChecked = ready.length && ready.every((g) => {
+    const entry = state.postAccessCache[String(g.post_id)];
+    return isPostAccessFresh(entry) && entry.canComment === true;
+  });
+  return allChecked ? '<span class="tag ready">✓ Có thể comment</span>' : '';
 }
 
 // Bài đã được comment xong hay chưa — dùng chung cho tag "✓ Đã comment" và filter Bình luận, áp
@@ -3730,11 +3792,12 @@ async function cancelDailyFixedSchedule(id) {
 }
 
 // Format giống postScheduleTagHtml (ngay_dang + gio_dang) để tag lịch ở Comment và Tạo bài nhìn
-// nhất quán: "YYYY-MM-DD HH:MM".
+// nhất quán: "HH:mm dd/mm/yyyy" (định dạng ngày giờ Việt Nam — Tony yêu cầu, trước đây là
+// "YYYY-MM-DD HH:mm" dễ đọc nhầm ngày/tháng).
 function formatScheduleWhen(ms) {
   const t = new Date(ms);
   const pad = (n) => String(n).padStart(2, '0');
-  return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
+  return `${pad(t.getHours())}:${pad(t.getMinutes())} ${pad(t.getDate())}/${pad(t.getMonth() + 1)}/${t.getFullYear()}`;
 }
 
 // Cùng epoch `ms` như formatScheduleWhen() (tag hiển thị) nhưng ra định dạng cho input
@@ -3918,6 +3981,7 @@ function renderComments() {
     // tiền tố/tooltip để tách rõ khỏi tag lịch ngay cạnh nó.
     const postedAt = c.lastPostedAt ? formatScheduleWhen(new Date(c.lastPostedAt).getTime()) : '';
     const crossLabel = c._source === 'cross' ? `<span class="tag web">↔ ${esc(c._userLabel || 'cross')}</span>` : '';
+    const accessTag = commentAccessTagHtml(validGroups);
     // Bài đã comment xong không bị lọc mất khỏi danh sách (dù của mình hay đồng đội) — chỉ gắn tag
     // để biết trạng thái, dùng chung isCommentDone() cho cả 2 nguồn.
     const lastCommentedAt = lastCommentedAtLabel(c);
@@ -3951,6 +4015,7 @@ function renderComments() {
         ${crossLabel}
         ${commentedTag}
         <span class="tag">${groupInfo}</span>
+        ${accessTag}
         ${commentTemplateTagHtml(c, draft)}
         ${commentScheduleTagHtml(c)}
         ${postedAt ? `<span class="tag" title="Bài gốc đăng lên Facebook lúc này — không đổi theo lịch comment">📌 Đăng ${esc(postedAt)}</span>` : ''}
@@ -4076,13 +4141,20 @@ async function runComment(id) {
   }
   const validGroups = (c.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
   if (!validGroups.length) return alert('Bài chưa có post_id FB hợp lệ');
+  // Chặn nhóm ĐÃ BIẾT CHẮC chưa comment được (cache còn hạn — chờ duyệt/đã xóa), khỏi tốn công mở
+  // tab Cổ điển chạy rồi mới fail — nhóm chưa từng check vẫn cho qua bình thường.
+  const { ready: readyGroups, blocked: blockedGroups } = splitGroupsByAccess(validGroups);
+  if (blockedGroups.length) {
+    showToast(`Bỏ qua ${blockedGroups.length} nhóm chưa sẵn sàng — ${blockedGroups[0]._accessReason}`, 'warn', 5000);
+  }
+  if (!readyGroups.length) return;
   const actorId = state.activeActorId || settings.activeActorId;
   // Gửi draft thô (có thể rỗng/còn spintax) — resolveJobComment() (background.js) tự spin +
   // fallback random mẫu Settings khi trống, không bắt buộc phải nhập mẫu trước khi Chạy nữa.
   const comment = state.commentDrafts[id] || '';
   let okCount = 0;
   let lastError = '';
-  for (const g of validGroups) {
+  for (const g of readyGroups) {
     try {
       const res = await gfSendMessage({
         type: 'GF_RUN_COMMENT',
@@ -4106,7 +4178,7 @@ async function runComment(id) {
     }
   }
   if (okCount > 0) {
-    showToast(`Đã comment ${okCount}/${validGroups.length} bài`, okCount === validGroups.length ? 'success' : 'warn');
+    showToast(`Đã comment ${okCount}/${readyGroups.length} bài`, okCount === readyGroups.length ? 'success' : 'warn');
   } else {
     showToast(`Comment thất bại: ${lastError}`, 'error', 6000);
   }
@@ -4126,7 +4198,15 @@ function buildRawJobsForOneComment(id, { alertOnEmpty = true } = {}) {
     if (alertOnEmpty) alert('Bài chưa có post_id FB hợp lệ');
     return null;
   }
-  return validGroups.map((g) => ({
+  // Không cho LÊN LỊCH nhóm đã biết chắc chưa comment được (chờ duyệt/đã xóa) — khỏi tốn 1 alarm
+  // chỉ để tới giờ lại bị bỏ qua. Nhóm chưa từng check vẫn cho lên lịch bình thường (job thật sẽ tự
+  // check lại lúc chạy — xem runComment()/runCommentOwn(), background.js).
+  const { ready: readyGroups, blocked: blockedGroups } = splitGroupsByAccess(validGroups);
+  if (!readyGroups.length) {
+    if (alertOnEmpty) alert(`Bài chưa sẵn sàng để lên lịch — ${blockedGroups[0]?._accessReason || 'chưa thể comment'}`);
+    return null;
+  }
+  return readyGroups.map((g) => ({
     post_queue_id: c.id,
     group_id: g.group_id,
     group_name: g.group_name,
@@ -4142,11 +4222,13 @@ function buildRawJobsForOneComment(id, { alertOnEmpty = true } = {}) {
 function collectSelectedCommentJobGroups() {
   const ids = [...document.querySelectorAll('[data-comment-id]:checked')].map((el) => el.dataset.commentId);
   const groups = [];
+  let skipped = 0;
   for (const id of ids) {
     const jobs = buildRawJobsForOneComment(id, { alertOnEmpty: false });
     if (jobs?.length) groups.push(jobs);
+    else skipped += 1;
   }
-  return groups;
+  return { groups, skipped };
 }
 
 // Đăng ký alarm gf_cmt_* cho từng job trong 1 bài (nhiều nhóm), bắt đầu từ startWhen, giãn cách
@@ -4203,8 +4285,12 @@ function toggleCommentSchedulePanel() {
 // "Lặp lại hàng ngày" thì KHÔNG đặt alarm 1 lần — ghi vào dailyFixedSchedules với timeOfDay lấy
 // từ mốc đã tính, chạy lại đúng giờ đó mỗi ngày (background.js tickDailyFixedSchedules()).
 async function scheduleSelectedComments() {
-  const itemJobGroups = collectSelectedCommentJobGroups();
-  if (!itemJobGroups.length) return alert('Chọn ít nhất một bài có post_id hợp lệ');
+  const { groups: itemJobGroups, skipped } = collectSelectedCommentJobGroups();
+  if (!itemJobGroups.length) {
+    return alert(skipped
+      ? `Cả ${skipped} bài đã chọn đều chưa sẵn sàng (chờ duyệt/đã xóa) — không thể lên lịch`
+      : 'Chọn ít nhất một bài có post_id hợp lệ');
+  }
   const input = $('#commentScheduleStart')?.value;
   if (!input) return alert('Chọn ngày giờ bắt đầu ở trên');
   const startWhen = new Date(input).getTime();
@@ -4246,7 +4332,8 @@ async function scheduleSelectedComments() {
     }
   }
   $('#commentStaggerPanel')?.classList.add('hidden');
-  showToast(`Đã ${repeatDaily ? 'đặt lặp lại hàng ngày' : 'lên lịch'} ${itemJobGroups.length} bài`, 'success');
+  const skippedNote = skipped ? ` (bỏ qua ${skipped} bài chưa sẵn sàng)` : '';
+  showToast(`Đã ${repeatDaily ? 'đặt lặp lại hàng ngày' : 'lên lịch'} ${itemJobGroups.length} bài${skippedNote}`, 'success');
   await loadComments();
   await refreshActivityFromStorage();
 }
@@ -4307,7 +4394,7 @@ function buildPostedGroupUrl(g) {
   const gid = g?.group_id;
   const pid = g?.post_id;
   if (gid && pid && pid !== 'pending' && /^\d+$/.test(String(pid))) {
-    return `https://www.facebook.com/permalink.php?story_fbid=${String(pid)}&id=${gid}`;
+    return `https://www.facebook.com/groups/${gid}/posts/${String(pid)}/`;
   }
   if (gid) return `https://www.facebook.com/groups/${gid}/`;
   return null;

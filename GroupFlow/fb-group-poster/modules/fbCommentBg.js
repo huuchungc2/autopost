@@ -5,6 +5,15 @@ const DOC_COMMENT = '9550500205043457';
 const DOC_TYPING_START = '5359232510868548';
 const DOC_TYPING_STOP = '6911603175550464';
 
+// v1.0.221 — cache kết quả checkPostCommentable() theo post_id, tránh fetch lại mỗi lần
+// chạy/lên lịch comment cho cùng 1 bài (Tony: "đã check rồi thì khỏi check nữa mất công").
+// 'ok'/'deleted' là trạng thái BỀN (bài hiển thị bình thường hiếm khi tự ẩn lại; bài đã xóa
+// không tự "hết xóa") nên cache vô thời hạn. 'pending' (chờ duyệt, hoặc tín hiệu mơ hồ như
+// 404/lỗi mạng) là trạng thái CÓ THỂ ĐỔI (admin duyệt sau, mạng chỉ lỗi tạm) nên chỉ cache
+// ngắn hạn rồi phải check lại — xem getPostAccess().
+const PENDING_ACCESS_TTL_MS = 20 * 60 * 1000;
+const POST_ACCESS_CACHE_KEY = 'gf_post_access_cache';
+
 const FC = globalThis.GF.fbCommentBg = {
   sleep(ms) {
     return new Promise((r) => setTimeout(r, ms));
@@ -52,20 +61,42 @@ const FC = globalThis.GF.fbCommentBg = {
         },
       });
       if (res.status === 404) {
-        return { canComment: false, reason: 'Bài không tồn tại (404) — có thể bị xóa hoặc chờ duyệt' };
+        // Tín hiệu mơ hồ (có thể xóa thật, có thể chỉ đang chờ duyệt nên FB tạm giấu) — xếp
+        // `kind: 'pending'` (retry-able) thay vì 'deleted' (vĩnh viễn) để không lỡ chặn cứng
+        // 1 bài thực ra sẽ hiện lại sau khi admin duyệt.
+        return { canComment: false, kind: 'pending', reason: 'Bài không tồn tại (404) — có thể bị xóa hoặc chờ duyệt' };
       }
       if (!res.ok) {
-        return { canComment: false, reason: `Không đọc được bài (HTTP ${res.status})` };
+        return { canComment: false, kind: 'pending', reason: `Không đọc được bài (HTTP ${res.status})` };
       }
       const html = await res.text();
-      if (html.includes("This content isn't available at the moment")) {
-        return { canComment: false, reason: 'Bài đã bị xóa hoặc ẩn' };
+      // v1.0.219 — trước bản này chỉ dò marker TIẾNG ANH ("This content isn't available…",
+      // "Your post is pending approval"). Tài khoản FB đặt ngôn ngữ Việt (mặc định của cả hệ
+      // thống — xem `settings.fbLang || 'vi'`) trả HTML với text tiếng Việt bất kể header
+      // accept-language gửi lên, nên 2 marker tiếng Anh KHÔNG BAO GIỜ khớp trên tài khoản VN thật
+      // — checkPostCommentable() luôn rơi xuống nhánh "fail open" (coi là commentable) dù bài
+      // đang thực sự ở trạng thái chờ duyệt/đã xóa/không xem được, khiến job vẫn tốn công mở tab
+      // Cổ điển chạy tiếp và thất bại ở đó thay vì bị chặn sớm, rẻ tiền ngay tại đây. Thêm marker
+      // tiếng Việt tương ứng (xác nhận từ ảnh chụp thật của Tony: "Bạn hiện không xem được nội
+      // dung này").
+      if (
+        html.includes("This content isn't available at the moment")
+        || html.includes('Bạn hiện không xem được nội dung này')
+        || html.includes('Nội dung này hiện không có sẵn')
+        || html.includes('đã xóa nội dung')
+      ) {
+        return { canComment: false, kind: 'deleted', reason: 'Bài đã bị xóa hoặc ẩn' };
       }
-      if (html.includes('Your post is pending approval')) {
-        return { canComment: false, reason: 'Bài đang chờ admin duyệt' };
+      if (
+        html.includes('Your post is pending approval')
+        || html.includes('đang chờ phê duyệt')
+        || html.includes('đang chờ duyệt')
+        || html.includes('chờ quản trị viên nhóm phê duyệt')
+      ) {
+        return { canComment: false, kind: 'pending', reason: 'Bài đang chờ admin duyệt' };
       }
       if (html.includes('story_title') || html.includes('story_token') || html.includes('likeAction')) {
-        return { canComment: true };
+        return { canComment: true, kind: 'ok' };
       }
       // Trang tải OK (không 404), khong thay dau hieu bi xoa/pending ro rang - nhung cung khong
       // tim thay marker cu (story_title/story_token/likeAction) de XAC NHAN chac chan, rat co
@@ -75,10 +106,41 @@ const FC = globalThis.GF.fbCommentBg = {
       // Doi sang fail open: trang load duoc, khong co tin hieu xau ro rang thi cu coi la
       // commentable, de createComment() that su quyet dinh dung/sai - neu van sai thi co che
       // fallback Co dien da co san lo.
-      return { canComment: true };
+      return { canComment: true, kind: 'ok' };
     } catch (e) {
-      return { canComment: false, reason: e.message || 'Lỗi kiểm tra bài' };
+      return { canComment: false, kind: 'pending', reason: e.message || 'Lỗi kiểm tra bài' };
     }
+  },
+
+  async readPostAccessCache() {
+    const d = await chrome.storage.local.get(POST_ACCESS_CACHE_KEY);
+    return d[POST_ACCESS_CACHE_KEY] || {};
+  },
+
+  async writePostAccessEntry(postId, entry) {
+    const store = await this.readPostAccessCache();
+    store[String(postId)] = entry;
+    await chrome.storage.local.set({ [POST_ACCESS_CACHE_KEY]: store });
+    return entry;
+  },
+
+  isAccessEntryFresh(entry) {
+    if (!entry) return false;
+    if (entry.kind !== 'pending') return true;
+    return Date.now() - (entry.checkedAt || 0) < PENDING_ACCESS_TTL_MS;
+  },
+
+  // Bọc checkPostCommentable() bằng cache theo post_id — dùng chung cho cả luồng comment thật
+  // (commentOnPost() bên dưới), cron nền quét trước (background.js warmPostAccessCache()), lẫn
+  // UI đọc trực tiếp storage để hiện tag/chặn nút (sidepanel.js không load module này, chỉ đọc
+  // thẳng key `gf_post_access_cache` — xem ghi chú ở buildPermalink()/PENDING_ACCESS_TTL_MS).
+  async getPostAccess({ groupId, postId, session, isTimeline, force = false }) {
+    const cached = force ? null : (await this.readPostAccessCache())[String(postId)];
+    if (this.isAccessEntryFresh(cached)) return cached;
+    const result = await this.checkPostCommentable({ groupId, postId, session, isTimeline });
+    const entry = { ...result, checkedAt: Date.now() };
+    await this.writePostAccessEntry(postId, entry);
+    return entry;
   },
 
   async simulateTyping(session, feedbackId, sessionId) {
@@ -223,11 +285,14 @@ const FC = globalThis.GF.fbCommentBg = {
     let session;
     const run = async (force) => {
       session = await S.resolveSession({ force, actorId });
-      const check = await this.checkPostCommentable({
+      const check = await this.getPostAccess({
         groupId,
         postId,
         session,
         isTimeline,
+        // Session vừa bị buộc làm mới (lỗi auth ở lượt trước) — đừng tin cache cũ, check lại
+        // thật vì rất có thể lần trước fail do session hết hạn chứ không phải do bài.
+        force,
       });
       if (!check.canComment) {
         throw new Error(check.reason || 'Không thể comment bài này');

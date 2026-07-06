@@ -74,11 +74,18 @@ export async function updateExtensionFbProfile(userId, { fb_user_id, fb_user_nam
   return { fb_user_id, fb_user_name };
 }
 
+// Cột DATETIME trong DB lưu theo giờ VN (wall clock), không phải UTC — xem quy ước chung ở
+// backend/src/utils/scheduleTime.js. `val` là 1 mốc thời gian UTC thật (vd `new Date()` hoặc chuỗi
+// ISO có 'Z' extension gửi lên) — cộng lệch +7h trước khi format để ra đúng giờ VN, tránh trả về
+// UTC khiến website hiện giờ đăng bài lệch 7 tiếng so với giờ VN thật.
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+
 function toMysqlDatetime(val) {
   if (!val) return null;
   const d = new Date(val);
   if (isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 19).replace('T', ' ');
+  const vn = new Date(d.getTime() + VN_OFFSET_MS);
+  return vn.toISOString().slice(0, 19).replace('T', ' ');
 }
 
 // Bài mới nên "từ từ" xuất hiện với người khác thay vì lộ diện ngay lập tức (đỡ giống comment-ring
@@ -149,7 +156,11 @@ export async function upsertUserPost(userAccountId, post) {
     return { id: existing[0].id, updated: true };
   }
 
-  const postedAtDate = toMysqlDatetime(posted_at);
+  // Giữ mốc UTC thật (chưa lệch +7h) để tính visible_after trên cùng 1 trục thời gian thật —
+  // postedAtDate bên dưới đã là chuỗi wall-clock VN, re-parse nó bằng `new Date()` sẽ bị hiểu sai
+  // múi giờ và cộng lệch 2 lần khi qua toMysqlDatetime() lần nữa.
+  const postedAtReal = posted_at ? new Date(posted_at) : new Date();
+  const postedAtDate = toMysqlDatetime(isNaN(postedAtReal.getTime()) ? null : postedAtReal);
   const result = await query(
     `INSERT INTO user_posts
       (user_account_id, post_queue_id, group_id, group_name, post_id, fb_user_id, noi_dung, prompt_anh,
@@ -169,7 +180,7 @@ export async function upsertUserPost(userAccountId, post) {
       gio_dang || null,
       storedUrl,
       DEFAULT_COMMENT_TARGET,
-      toMysqlDatetime(randomVisibleAfter(postedAtDate ? new Date(postedAtDate) : new Date())),
+      toMysqlDatetime(randomVisibleAfter(isNaN(postedAtReal.getTime()) ? new Date() : postedAtReal)),
     ]
   );
   return { id: result.insertId, updated: false };

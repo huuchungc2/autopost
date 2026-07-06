@@ -499,19 +499,15 @@ const FP = globalThis.GF.fbPostBg = {
       { referer: groupUrl },
     );
 
-    const err = this.parseFbErrors(rawText);
-    if (err?.critical || err?.auth) {
-      // Log raw text khi gặp lỗi critical/auth (checkpoint, rate limit, session hết hạn...) —
-      // parseFbErrors chỉ match substring rất rộng (vd "checkpoint" ở bất kỳ đâu trong response),
-      // nên cần thấy nguyên văn để biết có đúng là lỗi thật hay match nhầm vào field không liên quan.
-      console.warn('[GroupFlow] Fast post critical/auth error:', err.message, '| raw:', rawText.slice(0, 800));
-    }
-    if (err?.critical) throw new Error(err.message);
-    if (err?.auth) {
-      S.invalidateCache();
-      throw new Error(err.message);
-    }
-
+    // Bug thật đã gặp: Tony báo "nhóm 2 đăng Nhanh thành công (thấy bài thật trên FB) nhưng vẫn
+    // đăng Cổ điển tiếp" — parseFbErrors() quét TOÀN BỘ raw response (có thể chứa nhiều story
+    // bundle khác nhau trong 1 response GraphQL batch của FB) tìm substring RẤT RỘNG (vd
+    // "checkpoint"/"permission"/"please log in" ở bất kỳ đâu) — comment cũ bên dưới đã tự cảnh báo
+    // rủi ro match nhầm này nhưng trước đây check critical/auth chạy TRƯỚC KHI thử trích post_id,
+    // nên 1 match nhầm (vd nội dung bài hoặc dữ liệu feed khác bundle chung vô tình chứa đúng từ
+    // khoá) khiến code throw NGAY dù story_create thực ra đã tạo bài thành công thật. Giờ trích
+    // post_id TRƯỚC — có post_id thật (bằng chứng cấu trúc, đáng tin hơn hẳn 1 regex match) thì
+    // coi là thành công ngay, bỏ qua mọi nghi ngờ critical/auth phía dưới.
     const debugMsgs = [];
     const postId = this.extractPostId(json, rawText, chunks, (m) => debugMsgs.push(m));
     if (debugMsgs.length) {
@@ -520,6 +516,20 @@ const FP = globalThis.GF.fbPostBg = {
         groupId: String(groupId),
       }).catch?.(() => {});
     }
+
+    const err = postId ? null : this.parseFbErrors(rawText);
+    if (err?.critical || err?.auth) {
+      // Log raw text khi gặp lỗi critical/auth (checkpoint, rate limit, session hết hạn...) —
+      // parseFbErrors chỉ match substring rất rộng, nên cần thấy nguyên văn để biết có đúng là
+      // lỗi thật hay match nhầm vào field không liên quan.
+      console.warn('[GroupFlow] Fast post critical/auth error:', err.message, '| raw:', rawText.slice(0, 800));
+    }
+    if (err?.critical) throw new Error(err.message);
+    if (err?.auth) {
+      S.invalidateCache();
+      throw new Error(err.message);
+    }
+
     const notice = this.parseGraphqlNotice(json, rawText, chunks);
     const pending = !postId && this.detectPending(json, rawText, chunks);
     const spamWarn = this.detectSpamWarning(json, chunks) || notice;
@@ -576,13 +586,26 @@ const FP = globalThis.GF.fbPostBg = {
     if (storyErr) throw new Error(storyErr);
     if (err?.soft) throw new Error(err.message);
 
+    // Bug thật đã gặp: Tony báo "bật Cổ điển lên là thấy đã đăng Nhanh rồi nhưng vẫn đăng Cổ điển
+    // tiếp" — request Nhanh có response HTTP sạch (không lỗi mạng/5xx, không bị extractStoryCreateError()
+    // bắt được lỗi rõ ràng), tức FB CÓ THỂ đã tạo bài thật, chỉ là extractPostId()/detectSubmittedWithoutId()
+    // không nhận ra được post_id trong response (nghi do FB đang đổi schema — cùng đợt với lỗi
+    // field_exception gặp song song) — response hạ tầng OK nên fetchWithRetry()/graphqlRequest()
+    // (fbSessionBg.js) không đánh dấu ambiguousDelivery, khiến postGroupItem() (background.js) tưởng
+    // đây là lỗi rõ ràng và tự fallback Cổ điển → đăng trùng thật. "spam/action_blocked" là tín hiệu
+    // FB từ chối rõ ràng (không tạo bài) nên KHÔNG đánh dấu ambiguous; mọi trường hợp còn lại (kể cả
+    // "story_create rỗng" và "không rõ gì cả") đều không thể khẳng định CHƯA tạo bài — đánh dấu
+    // ambiguousDelivery để postGroupItem() không tự fallback, bắt user tự kiểm tra trước khi đăng lại.
     const hint = this.inspectGraphqlFailure(json, rawText, chunks);
     console.warn('[GroupFlow] Fast post no post_id', groupId, rawText.slice(0, 600));
-    throw new Error(
+    const isDefiniteReject = /spam|action.?blocked/i.test(hint || '');
+    const failErr = new Error(
       hint
         ? `FB từ chối hoặc không phản hồi (${hint}) — mở nhóm kiểm tra; thử Cổ điển`
-        : 'FB không phản hồi rõ — mở nhóm xem bài đã lên chưa; nếu không → Cổ điển',
+        : 'Không rõ FB đã tạo bài chưa (response không nhận dạng được) — mở nhóm kiểm tra trước khi đăng lại, tránh đăng trùng',
     );
+    if (!isDefiniteReject) failErr.ambiguousDelivery = true;
+    throw failErr;
   },
 
   async postToGroup({ groupId, text, imageBase64, images, mediaMime, actorId, backgroundColor }) {
