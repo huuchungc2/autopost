@@ -1938,8 +1938,31 @@ if (!GF_CONTENT) GF_CONTENT = {
     this.checkAborted();
     await this.sleep(500);
     const submit = this.qsa(gfPickSelector(lang, 'commentSubmit')).find((el) => el.offsetParent);
-    if (submit) submit.click();
+    if (submit) {
+      submit.click();
+    } else {
+      // Không phải lúc nào FB cũng render nút gửi riêng (kể cả khi đang hiện, selector có thể
+      // không khớp) — Enter là cách chuẩn FB dùng để gửi 1 bình luận (khác Enter trong composer bài
+      // viết chính, ở đây không có phím tắt xuống dòng riêng nên Enter luôn có nghĩa là gửi).
+      box.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true,
+      }));
+      box.dispatchEvent(new KeyboardEvent('keyup', {
+        key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true,
+      }));
+    }
     await this.sleep(2000);
+    // Bug thật đã báo cáo: trước đây return {ok:true} VÔ ĐIỀU KIỆN dù không tìm thấy nút gửi (không
+    // click gì) hoặc click/Enter không có tác dụng thật (FB chặn ngầm, sai selector, mất focus...)
+    // — chữ vẫn nằm nguyên trong ô, nhưng Log vẫn ghi "OK" như đã gửi thành công. Xác nhận đã gửi
+    // thật bằng cách ô phải rỗng lại (FB luôn tự xóa sạch ô soạn bình luận sau khi đăng thành công,
+    // dù gửi qua nút hay Enter) — còn chữ sau khi chờ thêm nghĩa là gửi thất bại, không được báo OK.
+    if (this.composerTextLength(box) > 0) {
+      await this.sleep(1500);
+      if (this.composerTextLength(box) > 0) {
+        throw new Error('Gửi bình luận không thành công — ô soạn bài vẫn còn chữ sau khi gửi');
+      }
+    }
     return { ok: true };
   },
 

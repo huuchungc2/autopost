@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:oklch(96.5% 0.006 250); font-family:'Be Vietnam Pro',system-ui,sans-serif; }
+    a { color:oklch(56% 0.19 258); }
+    a:hover { color:oklch(48% 0.19 258); }
+  </style>
+</helmet>
+
+<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:48px; box-sizing:border-box;">
+
+  <div style="width:380px; background:oklch(100% 0 0); border-radius:20px; overflow:hidden; box-shadow:0 20px 50px -20px oklch(30% 0.02 250 / 0.35), 0 1px 0 oklch(90% 0.01 250); font-family:'Be Vietnam Pro',sans-serif;">
+
+    <!-- header -->
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 18px; background:oklch(24% 0.03 258);">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:34px; height:34px; border-radius:10px; background:oklch(56% 0.19 258); display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; font-size:16px;">G</div>
+        <div>
+          <div style="font-size:14px; font-weight:700; color:#fff;">GroupFlow</div>
+          <div style="font-size:10.5px; color:oklch(78% 0.02 258); letter-spacing:0.03em;">FB GROUP POSTER</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; background:oklch(32% 0.03 258); padding:5px 10px 5px 5px; border-radius:999px;">
+        <div style="width:22px; height:22px; border-radius:999px; background:oklch(60% 0.15 40); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff;">T</div>
+        <span style="font-size:11.5px; color:#fff; font-weight:500;">Tony</span>
+      </div>
+    </div>
+
+    <!-- tabs -->
+    <div style="display:flex; padding:6px 8px; gap:2px; border-bottom:1px solid oklch(92% 0.01 250); overflow-x:auto;">
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 10px; border-radius:10px; background:oklch(94% 0.03 258); min-width:52px;">
+        <span style="font-size:15px;">✎</span>
+        <span style="font-size:10px; font-weight:700; color:oklch(56% 0.19 258);">Tạo bài</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 10px; min-width:52px; position:relative;">
+        <span style="font-size:15px; color:oklch(55% 0.02 250);">◉</span>
+        <span style="font-size:10px; color:oklch(55% 0.02 250);">Comment</span>
+        <span style="position:absolute; top:2px; right:6px; background:oklch(58% 0.22 25); color:#fff; font-size:9px; font-weight:700; border-radius:999px; padding:0px 4px;">37</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 10px; min-width:52px;">
+        <span style="font-size:15px; color:oklch(55% 0.02 250);">⚙</span>
+        <span style="font-size:10px; color:oklch(55% 0.02 250);">Cài đặt</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 10px; min-width:52px;">
+        <span style="font-size:15px; color:oklch(55% 0.02 250);">◎</span>
+        <span style="font-size:10px; color:oklch(55% 0.02 250);">Nhóm</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 10px; min-width:52px;">
+        <span style="font-size:15px; color:oklch(55% 0.02 250);">◎</span>
+        <span style="font-size:10px; color:oklch(55% 0.02 250);">Radar</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 10px; min-width:52px;">
+        <span style="font-size:15px; color:oklch(55% 0.02 250);">▤</span>
+        <span style="font-size:10px; color:oklch(55% 0.02 250);">Log</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 10px; min-width:52px;">
+        <span style="font-size:15px; color:oklch(55% 0.02 250);">?</span>
+        <span style="font-size:10px; color:oklch(55% 0.02 250);">Hướng dẫn</span>
+      </div>
+    </div>
+
+    <!-- content -->
+    <div style="padding:18px; display:flex; flex-direction:column; gap:16px;">
+
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="width:20px; height:20px; border-radius:999px; background:oklch(22% 0.02 250); color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">1</span>
+          <span style="font-size:13.5px; font-weight:600; color:oklch(22% 0.02 250);">Bạn muốn đăng ở đâu?</span>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; border:1px solid oklch(90% 0.01 250); border-radius:12px; padding:11px 14px; background:oklch(98% 0.004 250);">
+          <span style="font-size:13px; color:oklch(55% 0.02 250);">Nhấp để chọn các nhóm mục tiêu cần đăng</span>
+          <span style="font-size:11.5px; font-weight:600; color:oklch(56% 0.19 258); background:oklch(94% 0.03 258); padding:3px 9px; border-radius:999px; white-space:nowrap;">0 nhóm ▾</span>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="width:20px; height:20px; border-radius:999px; background:oklch(22% 0.02 250); color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">2</span>
+          <span style="font-size:13.5px; font-weight:600; color:oklch(22% 0.02 250);">Bạn muốn nói gì?</span>
+        </div>
+
+        <div style="display:flex; background:oklch(96% 0.006 250); border-radius:11px; padding:3px; gap:2px;">
+          <div style="flex:1; text-align:center; padding:8px 0; border-radius:9px; background:oklch(56% 0.19 258); color:#fff; font-size:12.5px; font-weight:600;">Nhập tay</div>
+          <div style="flex:1; text-align:center; padding:8px 0; border-radius:9px; color:oklch(50% 0.02 250); font-size:12.5px; font-weight:500;">AI viết</div>
+          <div style="flex:1; text-align:center; padding:8px 0; border-radius:9px; color:oklch(50% 0.02 250); font-size:12.5px; font-weight:500;">Excel</div>
+        </div>
+
+        <div style="border:1px solid oklch(90% 0.01 250); border-radius:14px; overflow:hidden;">
+          <div style="display:flex; align-items:center; gap:6px; padding:9px 12px; border-bottom:1px solid oklch(92% 0.01 250); flex-wrap:wrap;">
+            <span style="font-size:11.5px; font-weight:700; color:oklch(22% 0.02 250); border:1.5px solid oklch(56% 0.19 258); border-radius:7px; padding:2px 8px;">A</span>
+            <span style="font-size:11.5px; font-weight:600; color:oklch(55% 0.02 250); border:1px solid oklch(90% 0.01 250); border-radius:7px; padding:2px 8px;">B</span>
+            <span style="font-size:11.5px; font-weight:600; color:oklch(55% 0.02 250); border:1px solid oklch(90% 0.01 250); border-radius:7px; padding:2px 8px;">C</span>
+            <span style="font-size:11.5px; font-weight:600; color:oklch(55% 0.02 250); border:1px solid oklch(90% 0.01 250); border-radius:7px; padding:2px 8px;">D</span>
+            <span style="margin-left:auto; font-size:10.5px; font-weight:700; color:oklch(58% 0.22 25); background:oklch(95% 0.03 25); padding:2px 8px; border-radius:999px;">40/100</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; padding:8px 12px; border-bottom:1px solid oklch(92% 0.01 250); flex-wrap:wrap;">
+            <span style="font-size:11px; color:oklch(50% 0.02 250); background:oklch(96% 0.006 250); border-radius:7px; padding:3px 8px;">{spin}</span>
+            <span style="font-size:11px; color:oklch(50% 0.02 250); background:oklch(96% 0.006 250); border-radius:7px; padding:3px 8px;">Bọc</span>
+            <span style="font-size:13px;">😊</span>
+            <select style="margin-left:auto; font-size:11px; color:oklch(50% 0.02 250); border:1px solid oklch(90% 0.01 250); border-radius:7px; padding:3px 6px; background:#fff;">
+              <option>AI…</option>
+            </select>
+          </div>
+          <div style="min-height:64px; padding:12px;"></div>
+          <div style="display:flex; align-items:center; gap:12px; padding:8px 12px; border-top:1px solid oklch(92% 0.01 250); color:oklch(55% 0.02 250); font-size:13px;">
+            <b>B</b><i>I</i><span>1.</span><span>≡</span><span style="margin-left:auto; font-size:11px;">Tx</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:oklch(96% 0.006 250); border-radius:12px; padding:10px 14px; font-size:11.5px; color:oklch(50% 0.02 250); line-height:1.4;">
+        <b style="color:oklch(22% 0.02 250);">30 bài</b> — tick để hẹn lịch · đăng ngay: nút đăng trên từng card
+      </div>
+
+      <button style="width:100%; padding:12px; border-radius:12px; border:1.5px solid oklch(90% 0.01 250); background:#fff; font-size:13.5px; font-weight:600; color:oklch(30% 0.02 250);">Lên lịch đã chọn</button>
+
+      <div style="display:flex; gap:8px;">
+        <div style="flex:1; display:flex; align-items:center; gap:6px; padding:8px 10px; border-radius:10px; background:oklch(95% 0.03 258); font-size:11px; font-weight:600; color:oklch(40% 0.1 258);">🤖 Zalopilot</div>
+        <div style="flex:1; display:flex; align-items:center; gap:6px; padding:8px 10px; border-radius:10px; background:oklch(96% 0.03 55); font-size:11px; font-weight:600; color:oklch(45% 0.1 55);">🚌 Đặt xe về quê</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</x-dc>
+</body>
+</html>

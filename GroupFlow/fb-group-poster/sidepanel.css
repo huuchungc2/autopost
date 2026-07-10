@@ -1,27 +1,30 @@
 :root {
-  /* Đồng bộ với website AutoPost (tokens.css) — xanh dương chuyên nghiệp, bo tròn mềm */
-  --bg: #f4f6f9;
-  --surface: #ffffff;
-  --surface-2: #f5f7fa;
-  --border: #e2e6ed;
-  --border-strong: #cad1dc;
-  --text: #111827;
-  --text-muted: #5b6472;
-  --text-faint: #97a0ac;
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-soft: #eff6ff;
-  --accent: #2563eb;
+  /* Redesign GroupFlow (xem docs/design/GroupFlow Redesign.dc.html) — Be Vietnam Pro + oklch,
+     bo tròn mềm hơn. Token màu dùng oklch() trực tiếp (Chrome — môi trường duy nhất extension
+     chạy — hỗ trợ đầy đủ từ M111, không cần fallback hex). */
+  --bg: oklch(96.5% 0.006 250);
+  --surface: oklch(100% 0 0);
+  --surface-2: oklch(96% 0.006 250);
+  --border: oklch(90% 0.01 250);
+  --border-strong: oklch(82% 0.01 250);
+  --text: oklch(22% 0.02 250);
+  --text-muted: oklch(50% 0.02 250);
+  --text-faint: oklch(62% 0.02 250);
+  --primary: oklch(56% 0.19 258);
+  --primary-hover: oklch(48% 0.19 258);
+  --primary-soft: oklch(94% 0.03 258);
+  --accent: oklch(56% 0.19 258);
   --success: #16a34a;
-  --error: #dc2626;
+  --error: oklch(58% 0.22 25);
   --warning: #b45309;
-  --header: #111a2e;
-  --header-2: #1a2744;
+  --header: oklch(24% 0.03 258);
+  --header-2: oklch(32% 0.03 258);
+  --avatar-alt: oklch(60% 0.15 40);
   --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.06);
   --shadow-md: 0 8px 24px rgba(17, 24, 39, 0.12);
-  --radius: 16px;
-  --radius-sm: 10px;
-  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --radius: 18px;
+  --radius-sm: 12px;
+  --font: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -156,7 +159,7 @@ body {
 
 .gf-activation-input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px oklch(56% 0.19 258 / 0.12);
 }
 
 .gf-activation-submit {
@@ -170,13 +173,13 @@ body {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 1px 3px oklch(56% 0.19 258 / 0.3);
   transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
 .gf-activation-submit:hover:not(:disabled) {
   background: var(--primary-hover);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 4px 12px oklch(56% 0.19 258 / 0.35);
   transform: translateY(-1px);
 }
 
@@ -214,6 +217,59 @@ body {
   color: var(--primary);
 }
 
+/* Quảng bá tool khác — 1 bản trong overlay kích hoạt (overlay che toàn màn hình, phải nhét ở đây
+   mới thấy được TRƯỚC khi có key hợp lệ), 1 bản persistent trong .gf-promo-footer (footer riêng ở
+   cuối body, ngoài overlay — overlay bị remove() hẳn khỏi DOM sau khi kích hoạt xong nên nội dung
+   bên trong nó cũng mất theo, cần bản ngoài để còn thấy SAU khi kích hoạt, mọi tab). Tony yêu cầu
+   "đập vào mắt" — pill màu rực thay vì link chữ thường, ngắn gọn (tên + 2-3 từ), không caption dài. */
+.gf-promo-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gf-promo-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  color: #fff;
+  text-decoration: none;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.gf-promo-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.28);
+  color: #fff;
+}
+
+/* Xanh Zalo — dễ nhận diện đúng brand đang quảng bá */
+.gf-promo-card-zalo { background: linear-gradient(135deg, #0068ff, #22a6ff); }
+/* Cam — nổi bật, tương phản với xanh dương chủ đạo của cả panel */
+.gf-promo-card-xe { background: linear-gradient(135deg, #f97316, #fbb040); }
+
+.gf-promo-footer-overlay {
+  width: 100%;
+  max-width: 300px;
+  margin: 4px 0 0;
+}
+
+footer.gf-promo-footer {
+  flex-shrink: 0;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+}
+
 /* ── Header ── */
 .header {
   position: relative;
@@ -222,7 +278,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  background: linear-gradient(135deg, var(--header) 0%, var(--header-2) 100%);
+  background: var(--header);
   flex-shrink: 0;
   z-index: 20;
 }
@@ -267,17 +323,17 @@ body {
 
 .brand-mark {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--primary);
   color: #fff;
   font-weight: 700;
   font-size: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 2px 8px oklch(56% 0.19 258 / 0.4);
 }
 
 .brand-text {
@@ -331,27 +387,26 @@ body {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 5px 8px 5px 5px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 5px 10px 5px 5px;
+  border: none;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--header-2);
   cursor: pointer;
   font-family: inherit;
   text-align: left;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s;
 }
 
 .profile-trigger:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: oklch(38% 0.03 258);
 }
 
 .profile-avatar {
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary), var(--accent));
+  background: var(--avatar-alt);
   color: #fff;
   font-size: 12px;
   font-weight: 700;
@@ -454,7 +509,7 @@ body {
 
 .profile-option.active {
   background: var(--primary-soft);
-  border-color: rgba(37, 99, 235, 0.25);
+  border-color: oklch(56% 0.19 258 / 0.25);
 }
 
 .profile-option-info {
@@ -521,7 +576,7 @@ body {
 }
 
 .tab-icon {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1;
   opacity: 0.7;
 }
@@ -793,7 +848,7 @@ body.gf-tab-settings .footer-global {
   background: var(--primary);
   color: #fff;
   font-weight: 600;
-  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 1px 4px oklch(56% 0.19 258 / 0.35);
 }
 
 .segmented-btn:hover:not(:has(input:checked)):not(.active) {
@@ -927,7 +982,7 @@ input, textarea, select {
 input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px oklch(56% 0.19 258 / 0.12);
 }
 
 .search-wrap {
@@ -1018,12 +1073,12 @@ input:focus, textarea:focus, select:focus {
 .btn.primary {
   background: var(--primary);
   color: #fff;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 1px 3px oklch(56% 0.19 258 / 0.3);
 }
 
 .btn.primary:hover {
   background: var(--primary-hover);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 4px 12px oklch(56% 0.19 258 / 0.35);
   transform: translateY(-1px);
 }
 
@@ -1047,7 +1102,7 @@ input:focus, textarea:focus, select:focus {
 
 .btn.ghost.accent {
   color: var(--primary);
-  border-color: rgba(37, 99, 235, 0.25);
+  border-color: oklch(56% 0.19 258 / 0.25);
   background: var(--primary-soft);
 }
 
@@ -1268,7 +1323,7 @@ input:focus, textarea:focus, select:focus {
 .list-item.selected {
   border-color: var(--primary);
   background: var(--primary-soft);
-  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 0 1px oklch(56% 0.19 258 / 0.15);
 }
 
 .group-row {
@@ -1551,7 +1606,7 @@ video.thumb {
 .strategy-card:has(input:checked) {
   border-color: var(--primary);
   background: var(--primary-soft);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 0 2px oklch(56% 0.19 258 / 0.15);
 }
 
 .strategy-card:hover:not(:has(input:checked)) {
@@ -2125,7 +2180,7 @@ video.thumb {
 
 .settings-nav-btn.active {
   background: var(--primary-soft);
-  border-color: rgba(37, 99, 235, 0.45);
+  border-color: oklch(56% 0.19 258 / 0.45);
   color: var(--primary);
 }
 
@@ -2706,7 +2761,7 @@ video.thumb {
 }
 
 .posting-config-bar:hover {
-  border-color: rgba(37, 99, 235, 0.4);
+  border-color: oklch(56% 0.19 258 / 0.4);
 }
 
 .posting-config-label {
@@ -2732,8 +2787,8 @@ video.thumb {
 }
 
 .card-posting-strategy {
-  border-color: rgba(37, 99, 235, 0.25);
-  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.08);
+  border-color: oklch(56% 0.19 258 / 0.25);
+  box-shadow: 0 0 0 1px oklch(56% 0.19 258 / 0.08);
 }
 
 .create-flow {
@@ -2840,7 +2895,7 @@ video.thumb {
 }
 
 .gf-group-trigger.has-groups {
-  border-color: rgba(37, 99, 235, 0.35);
+  border-color: oklch(56% 0.19 258 / 0.35);
   background: var(--primary-soft);
 }
 
@@ -3159,7 +3214,7 @@ body.gf-posting-active .footer {
 
 #btnToggleAdvanced.active {
   background: var(--primary-soft);
-  border-color: rgba(37, 99, 235, 0.35);
+  border-color: oklch(56% 0.19 258 / 0.35);
   color: var(--primary);
 }
 

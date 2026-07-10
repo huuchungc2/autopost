@@ -125,6 +125,14 @@ export async function upsertUserPost(userAccountId, post) {
 
   if (!group_id || !post_id) return null;
 
+  // Chủ bài "báo hộ" trạng thái chờ duyệt cho đồng đội (xem GET /cross-posts, userSync.js) —
+  // piggyback qua field optional này, không phải mọi lần gọi upsertUserPost() đều có. `undefined`
+  // (route thường không gửi field này) → giữ nguyên giá trị cũ (COALESCE param NULL); có gửi
+  // (true/false, kể cả false để TỰ GỠ cờ khi phát hiện đã duyệt) → ghi đè + cập nhật mốc check.
+  const hasPendingUpdate = typeof post.pending_approval === 'boolean';
+  const pendingApprovalVal = hasPendingUpdate ? (post.pending_approval ? 1 : 0) : null;
+  const pendingCheckedAtVal = hasPendingUpdate ? toMysqlDatetime(new Date()) : null;
+
   const existing = await query(
     'SELECT id FROM user_posts WHERE user_account_id = ? AND group_id = ? AND post_id = ?',
     [userAccountId, group_id, post_id]
@@ -138,7 +146,9 @@ export async function upsertUserPost(userAccountId, post) {
            ngay_dang = COALESCE(?, ngay_dang), gio_dang = COALESCE(?, gio_dang),
            posted_at = COALESCE(?, posted_at), fb_user_id = COALESCE(?, fb_user_id),
            group_name = COALESCE(?, group_name), fb_url = COALESCE(fb_url, ?),
-           post_queue_id = COALESCE(NULLIF(?, ''), post_queue_id)
+           post_queue_id = COALESCE(NULLIF(?, ''), post_queue_id),
+           pending_approval = COALESCE(?, pending_approval),
+           pending_checked_at = COALESCE(?, pending_checked_at)
        WHERE id = ?`,
       [
         noi_dung || null,
@@ -150,6 +160,8 @@ export async function upsertUserPost(userAccountId, post) {
         group_name || null,
         storedUrl,
         post_queue_id || '',
+        pendingApprovalVal,
+        pendingCheckedAtVal,
         existing[0].id,
       ]
     );
@@ -164,8 +176,9 @@ export async function upsertUserPost(userAccountId, post) {
   const result = await query(
     `INSERT INTO user_posts
       (user_account_id, post_queue_id, group_id, group_name, post_id, fb_user_id, noi_dung, prompt_anh,
-       posted_at, ngay_dang, gio_dang, fb_url, comment_target, comment_count, visible_after)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+       posted_at, ngay_dang, gio_dang, fb_url, comment_target, comment_count, visible_after,
+       pending_approval, pending_checked_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
     [
       userAccountId,
       post_queue_id || '',
@@ -181,6 +194,8 @@ export async function upsertUserPost(userAccountId, post) {
       storedUrl,
       DEFAULT_COMMENT_TARGET,
       toMysqlDatetime(randomVisibleAfter(isNaN(postedAtReal.getTime()) ? new Date() : postedAtReal)),
+      pendingApprovalVal || 0,
+      pendingCheckedAtVal,
     ]
   );
   return { id: result.insertId, updated: false };

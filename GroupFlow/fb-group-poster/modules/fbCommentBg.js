@@ -7,11 +7,22 @@ const DOC_TYPING_STOP = '6911603175550464';
 
 // v1.0.221 — cache kết quả checkPostCommentable() theo post_id, tránh fetch lại mỗi lần
 // chạy/lên lịch comment cho cùng 1 bài (Tony: "đã check rồi thì khỏi check nữa mất công").
-// 'ok'/'deleted' là trạng thái BỀN (bài hiển thị bình thường hiếm khi tự ẩn lại; bài đã xóa
-// không tự "hết xóa") nên cache vô thời hạn. 'pending' (chờ duyệt, hoặc tín hiệu mơ hồ như
-// 404/lỗi mạng) là trạng thái CÓ THỂ ĐỔI (admin duyệt sau, mạng chỉ lỗi tạm) nên chỉ cache
-// ngắn hạn rồi phải check lại — xem getPostAccess().
+// 'deleted' là trạng thái BỀN (bài đã xóa không tự "hết xóa") nên cache vô thời hạn. 'pending'
+// (chờ duyệt, hoặc tín hiệu mơ hồ như 404/lỗi mạng) là trạng thái CÓ THỂ ĐỔI (admin duyệt sau,
+// mạng chỉ lỗi tạm) nên chỉ cache ngắn hạn rồi phải check lại — xem getPostAccess().
 const PENDING_ACCESS_TTL_MS = 20 * 60 * 1000;
+// v1.0.229 — Tony xác nhận bằng ảnh chụp thật 1 bài "Bạn hiện không xem được nội dung này" (chủ
+// bài giới hạn người xem/đã xóa — đúng marker đã có ở checkPostCommentable() bên dưới) nhưng vẫn
+// bị cache 'ok' — nghĩa là marker string-match không khớp được HTML thô fetch() lấy về (rất có thể
+// do fetch() nền thiếu header điều hướng thật/Facebook trả biến thể khác cho request không phải
+// browser navigation, hoặc trang render phần lỗi bằng JS sau khi tải chứ không có sẵn trong HTML
+// gốc) — checkPostCommentable() rơi vào nhánh fail-open ("không xác định được thì coi là OK").
+// Kiểu lỗi string-match kiểu này đã tái diễn nhiều lần (v1.0.219/220/222) mỗi khi Facebook đổi
+// cách hiển thị — thay vì tiếp tục vá từng chuỗi (dễ vỡ lại), 'ok' KHÔNG còn cache vĩnh viễn nữa:
+// hết hạn sau `OK_ACCESS_TTL_MS` để tự check lại định kỳ — false positive (nếu marker vẫn không
+// khớp được) tự bị giới hạn phạm vi theo thời gian thay vì tin sai mãi mãi, thay vì phải chờ user
+// phát hiện + báo cáo thủ công như lần này.
+const OK_ACCESS_TTL_MS = 6 * 60 * 60 * 1000;
 const POST_ACCESS_CACHE_KEY = 'gf_post_access_cache';
 // v1.0.222 — bug ở buildPermalink() (dùng route `/permalink/` thay vì `/posts/` thật) khiến
 // checkPostCommentable() gần như LUÔN fail-open ("ok") bất kể bài thật có xem được hay không —
@@ -85,7 +96,17 @@ const FC = globalThis.GF.fbCommentBg = {
       if (!res.ok) {
         return { canComment: false, kind: 'pending', reason: `Không đọc được bài (HTTP ${res.status})` };
       }
-      const html = await res.text();
+      // v1.0.229 — Tony xác nhận bằng 2 bài KHÁC NHAU, cả 2 đều hiện đúng marker "Bạn hiện không
+      // xem được nội dung này" trên màn hình nhưng checkPostCommentable() vẫn báo canComment:true
+      // MỖI LẦN (không phải lỗi cache 1 lần) — nghĩa là bản thân string-match luôn thất bại, không
+      // phải do FB thay đổi wording. Nghi vấn cao nhất: HTML server trả về encode tiếng Việt có dấu
+      // ở dạng NFD (ký tự gốc + dấu tổ hợp tách rời) trong khi chuỗi marker trong code là NFC (ký
+      // tự có dấu dựng sẵn) — 2 dạng hiển thị giống hệt nhau cho mắt người/trình duyệt (browser tự
+      // normalize khi render) nhưng so sánh chuỗi thô (`.includes()`) coi là 2 chuỗi byte khác nhau
+      // nên không bao giờ khớp. `.normalize('NFC')` chuẩn hóa lại HTML thô về cùng dạng với marker
+      // trước khi so khớp — không đổi gì nếu HTML vốn đã là NFC (fix vô hại nếu đoán sai nguyên
+      // nhân), chỉ có tác dụng khi thật sự lệch chuẩn hóa.
+      const html = (await res.text()).normalize('NFC');
       // v1.0.219 — trước bản này chỉ dò marker TIẾNG ANH ("This content isn't available…",
       // "Your post is pending approval"). Tài khoản FB đặt ngôn ngữ Việt (mặc định của cả hệ
       // thống — xem `settings.fbLang || 'vi'`) trả HTML với text tiếng Việt bất kể header
@@ -95,6 +116,14 @@ const FC = globalThis.GF.fbCommentBg = {
       // Cổ điển chạy tiếp và thất bại ở đó thay vì bị chặn sớm, rẻ tiền ngay tại đây. Thêm marker
       // tiếng Việt tương ứng (xác nhận từ ảnh chụp thật của Tony: "Bạn hiện không xem được nội
       // dung này").
+      // v1.0.230 (ĐÃ REVERT ở v1.0.232) — từng đổi sang ưu tiên marker OK trước, với giả thuyết
+      // bài CỦA CHÍNH MÌNH chờ duyệt vẫn commentable bình thường (FB chỉ chặn người khác). Tony
+      // xác nhận bằng thao tác tay thực tế: bài của chính mình chờ duyệt vẫn hiện ĐẦY ĐỦ nội
+      // dung (có marker OK thật) NHƯNG KHÔNG CÓ Ô BÌNH LUẬN nào cả (tùy cấu hình duyệt bài từng
+      // nhóm — Facebook không cho tương tác kể cả với chủ bài tới khi duyệt xong) — giả thuyết
+      // v1.0.230 SAI. Banner "chờ phê duyệt" là tín hiệu ĐÁNG TIN CẬY HƠN marker OK để xác định
+      // có comment được hay không (marker OK chỉ xác nhận NỘI DUNG hiện ra, không xác nhận Ô
+      // BÌNH LUẬN có tồn tại) — quay lại kiểm tra deleted/pending TRƯỚC marker OK.
       if (
         html.includes("This content isn't available at the moment")
         || html.includes('Bạn hiện không xem được nội dung này')
@@ -122,6 +151,12 @@ const FC = globalThis.GF.fbCommentBg = {
       // Doi sang fail open: trang load duoc, khong co tin hieu xau ro rang thi cu coi la
       // commentable, de createComment() that su quyet dinh dung/sai - neu van sai thi co che
       // fallback Co dien da co san lo.
+      // v1.0.229 — log lại khi rơi vào fail-open để có dữ liệu chẩn đoán nếu marker (kể cả sau khi
+      // đã normalize NFC) vẫn không khớp được lần nào đó trong tương lai — xem qua
+      // chrome://extensions → GroupFlow → "service worker" → Console (không hiện trong Log UI).
+      console.warn('[GroupFlow] checkPostCommentable fail-open — không khớp marker nào', {
+        postId, groupId, htmlLength: html.length, htmlHead: html.slice(0, 400),
+      });
       return { canComment: true, kind: 'ok' };
     } catch (e) {
       return { canComment: false, kind: 'pending', reason: e.message || 'Lỗi kiểm tra bài' };
@@ -146,8 +181,9 @@ const FC = globalThis.GF.fbCommentBg = {
 
   isAccessEntryFresh(entry) {
     if (!entry) return false;
-    if (entry.kind !== 'pending') return true;
-    return Date.now() - (entry.checkedAt || 0) < PENDING_ACCESS_TTL_MS;
+    if (entry.kind === 'deleted') return true;
+    const ttl = entry.kind === 'pending' ? PENDING_ACCESS_TTL_MS : OK_ACCESS_TTL_MS;
+    return Date.now() - (entry.checkedAt || 0) < ttl;
   },
 
   // Bọc checkPostCommentable() bằng cache theo post_id — dùng chung cho cả luồng comment thật

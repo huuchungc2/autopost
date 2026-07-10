@@ -2190,13 +2190,30 @@ const GF_BG = {
         console.warn('[GroupFlow] comment bg returned no commentId, falling back to Classic DOM');
       }
     }
-    await this.sendToFb('GF_COMMENT', {
-      groupId: job.group_id,
-      postId: job.post_id,
-      text: comment,
-      lang: settings.fbLang || 'vi',
-      actorId: job.actorId || settings.activeActorId,
-    });
+    try {
+      await this.sendToFb('GF_COMMENT', {
+        groupId: job.group_id,
+        postId: job.post_id,
+        text: comment,
+        lang: settings.fbLang || 'vi',
+        actorId: job.actorId || settings.activeActorId,
+      });
+    } catch (e) {
+      // v1.0.231 — Tony xác nhận bằng thực tế: bài CỦA CHÍNH MÌNH đang chờ admin duyệt có thể
+      // hoàn toàn KHÔNG có ô bình luận nào cả (tùy cấu hình duyệt bài của từng nhóm — Facebook
+      // không cho tương tác kể cả với chủ bài tới khi duyệt xong), không phải lỗi tìm sai
+      // selector — content.js waitFor(boxSel) timeout ĐÚNG vì ô thật sự chưa tồn tại lúc này,
+      // không phải sẽ không bao giờ tồn tại (chờ admin duyệt xong là có). Lỗi timeout này trước
+      // đây rơi thẳng ra ngoài như lỗi thật — nhánh noDomFallback ở trên chỉ xét lỗi TỪ NHANH,
+      // không áp dụng cho lỗi timeout của CỔ ĐIỂN — khiến runScheduledJob() coi là lỗi thật, tự
+      // retry mỗi phút vô hạn tới khi admin duyệt (đúng hiện tượng gốc đã báo cáo: "lịch mở lên
+      // lại đứng yên tại đây"). Coi timeout chờ ô bình luận cũng là "chưa sẵn sàng" giống các lý
+      // do khác — Log ghi "Bỏ qua" thay vì lặp lại báo lỗi mỗi phút.
+      if (/^Timeout chờ/i.test(e.message || '')) {
+        e.skippedNotReady = true;
+      }
+      throw e;
+    }
     return { ok: true, mode: 'classic' };
   },
 
@@ -3022,14 +3039,25 @@ const GF_BG = {
       'postQueue', 'serverMyPosts', 'crossPostsCache', 'activeActorId',
     ]);
     const targets = new Map();
-    const addTarget = (groupId, postId) => {
+    // v1.0.234 — đánh dấu riêng target nào là BÀI CỦA CHÍNH MÌNH (postQueue/serverMyPosts) khác
+    // với bài đồng đội (crossPostsCache) — chỉ bài của mình mới đủ điều kiện "báo hộ" trạng thái
+    // chờ duyệt về server (xem reportOwnPendingApproval() bên dưới) vì chỉ chủ bài mới thật sự
+    // biết chắc bài có đang chờ duyệt hay không (Facebook chỉ cho chủ bài xem banner đó — check
+    // trên bài của NGƯỜI KHÁC luôn ra trang trắng không có thông tin, không thể dùng để suy đoán
+    // hộ trạng thái của họ).
+    const addTarget = (groupId, postId, isOwn) => {
       const pid = String(postId || '');
-      if (!groupId || !/^\d+$/.test(pid) || targets.has(pid)) return;
-      targets.set(pid, { groupId: String(groupId), postId: pid });
+      if (!groupId || !/^\d+$/.test(pid)) return;
+      const existing = targets.get(pid);
+      if (existing) {
+        if (isOwn) existing.isOwn = true;
+        return;
+      }
+      targets.set(pid, { groupId: String(groupId), postId: pid, isOwn: Boolean(isOwn) });
     };
-    (d.postQueue || []).forEach((p) => (p.postedGroups || []).forEach((g) => addTarget(g.group_id, g.post_id)));
-    (d.serverMyPosts || []).forEach((sp) => addTarget(sp.group_id, sp.post_id));
-    (d.crossPostsCache || []).forEach((cp) => addTarget(cp.group_id, cp.post_id));
+    (d.postQueue || []).forEach((p) => (p.postedGroups || []).forEach((g) => addTarget(g.group_id, g.post_id, true)));
+    (d.serverMyPosts || []).forEach((sp) => addTarget(sp.group_id, sp.post_id, true));
+    (d.crossPostsCache || []).forEach((cp) => addTarget(cp.group_id, cp.post_id, false));
     if (!targets.size) return;
 
     const cache = await FC.readPostAccessCache();
@@ -3046,12 +3074,35 @@ const GF_BG = {
     const batch = stale.slice(0, batchSize);
     for (const t of batch) {
       try {
-        await FC.getPostAccess({ groupId: t.groupId, postId: t.postId, session, isTimeline: false });
+        const result = await FC.getPostAccess({ groupId: t.groupId, postId: t.postId, session, isTimeline: false });
+        if (t.isOwn && (result?.kind === 'pending' || result?.kind === 'ok')) {
+          await this.reportOwnPendingApproval(t.groupId, t.postId, result.kind === 'pending');
+        }
       } catch (e) {
         console.warn('[GroupFlow] warmPostAccessCache: check lỗi', t.postId, e.message);
       }
       await this.delay(1200 + Math.floor(Math.random() * 1800));
     }
+  },
+
+  // v1.0.234 — "báo hộ" trạng thái chờ duyệt của CHÍNH BÀI MÌNH lên server, để GET /cross-posts
+  // (backend) tự loại bài này khỏi danh sách của đồng đội — quá giang đúng route POST
+  // /api/user-sync/posts đã có sẵn (không thêm endpoint/cron mới, tần suất gọi đã bị giới hạn tự
+  // nhiên theo batchSize của warmPostAccessCache() — vài request/3 phút là tối đa). Best-effort:
+  // lỗi mạng/chưa đăng nhập tidien thì bỏ qua im lặng, không throw — không ảnh hưởng luồng check
+  // access cục bộ, và tự thử lại ở lượt cron kế tiếp nếu vẫn còn stale.
+  async reportOwnPendingApproval(groupId, postId, pendingApproval) {
+    const auth = await this.getTidienAuth();
+    if (!auth) return;
+    try {
+      await fetch(`${auth.base}/api/user-sync/posts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+        body: JSON.stringify({
+          posts: [{ group_id: groupId, post_id: postId, pending_approval: pendingApproval }],
+        }),
+      });
+    } catch { /* best-effort — lượt cron kế tiếp tự thử lại nếu access cache còn stale */ }
   },
 };
 

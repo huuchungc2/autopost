@@ -6086,12 +6086,6 @@ async function checkLicenseGate() {
   const status = $('#overlayStatus');
   if (licenseKey && input) input.value = licenseKey;
   $('#overlayCloseBtn')?.addEventListener('click', closeSidePanel);
-  $('#overlayRegisterLink')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    const s = GF.storage.cachedSettings;
-    const base = (s?.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
-    chrome.tabs.create({ url: `${base}/user/register` });
-  });
   $('#overlayLoginLink')?.addEventListener('click', (e) => {
     e.preventDefault();
     const s = GF.storage.cachedSettings;

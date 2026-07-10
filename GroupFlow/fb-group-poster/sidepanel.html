@@ -6,7 +6,7 @@
   <title>GroupFlow</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" />
   <link rel="stylesheet" href="sidepanel.css" />
   <link rel="stylesheet" href="lib/quill.snow.css" />
 </head>
@@ -20,8 +20,15 @@
     <input type="text" id="overlayLicenseKey" placeholder="Dán key tại đây…" class="gf-activation-input" />
     <button type="button" id="overlayValidateBtn" class="gf-activation-submit">Xác thực key</button>
     <p id="overlayStatus" class="gf-activation-status"></p>
-    <p class="gf-activation-hint">Chưa có key? <a href="#" id="overlayRegisterLink">Đăng ký tại tidien.xyz</a></p>
     <p class="gf-activation-hint">Có tài khoản rồi? <a href="#" id="overlayLoginLink">Đăng nhập để xem lại key</a></p>
+    <div class="gf-promo-footer gf-promo-footer-overlay">
+      <a class="gf-promo-card gf-promo-card-zalo" href="https://www.zalopilot.vn" target="_blank" rel="noopener noreferrer">
+        <span aria-hidden="true">🤖</span> Zalopilot – Auto Zalo Android
+      </a>
+      <a class="gf-promo-card gf-promo-card-xe" href="https://www.datxeveque.vn" target="_blank" rel="noopener noreferrer">
+        <span aria-hidden="true">🚌</span> Đặt Xe Về Quê – Vé xe khách
+      </a>
+    </div>
   </div>
 
   <header class="header">
@@ -991,6 +998,16 @@
   <footer class="footer footer-global" id="commentFooterGlobal" aria-label="Lên lịch comment">
     <span class="batch-queue-label batch-queue-label-global">Tick bài → Lên lịch</span>
     <button type="button" id="btnScheduleComments" class="btn primary">Lên lịch đã chọn</button>
+  </footer>
+
+  <!-- Luôn hiện, mọi tab, không tắt theo body.gf-tab-* như 2 footer trên -->
+  <footer class="gf-promo-footer" id="gfPromoFooter" aria-label="Công cụ khác">
+    <a class="gf-promo-card gf-promo-card-zalo" href="https://www.zalopilot.vn" target="_blank" rel="noopener noreferrer">
+      <span aria-hidden="true">🤖</span> Zalopilot – Auto Zalo Android
+    </a>
+    <a class="gf-promo-card gf-promo-card-xe" href="https://www.datxeveque.vn" target="_blank" rel="noopener noreferrer">
+      <span aria-hidden="true">🚌</span> Đặt Xe Về Quê – Vé xe khách
+    </a>
   </footer>
 
   <script src="lib/quill.js"></script>

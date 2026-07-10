@@ -608,3 +608,21 @@ export async function ensureGroupPostDraftsSharedIndex() {
     'Migration 040 applied: group_post_drafts.is_shared index'
   );
 }
+
+// 2026-07-10 — chủ bài (extension) tự biết bài mình đang "chờ admin duyệt" (thấy banner khi tự
+// check quyền comment — checkPostCommentable(), modules/fbCommentBg.js) nhưng đồng đội (khác máy,
+// khác extension) không có cách nào tự dò được — Facebook không nhúng gì vào HTML cho người
+// KHÔNG PHẢI chủ bài xem 1 bài chưa duyệt (trang khóa trắng, không marker), khiến GET /cross-posts
+// vẫn trả về bài đó cho đồng đội dù chắc chắn chưa comment được. Thêm 2 cột để chủ bài "báo hộ"
+// đúng 1 lần (piggyback vào POST /user-sync/posts sẵn có — không endpoint/cron mới) — GET
+// /cross-posts dùng để loại bài đang chờ duyệt khỏi danh sách đồng đội. Có TTL (xem
+// PENDING_APPROVAL_TTL_MS, userSync.js) — nếu chủ bài không mở lại extension để cập nhật (vd đã
+// duyệt xong), cờ tự hết hạn, bài lại hiện bình thường — không bao giờ bị chặn vĩnh viễn.
+export async function ensureUserPostsPendingApproval() {
+  if (!(await tableExists('user_posts'))) return;
+  if (await columnExists('user_posts', 'pending_approval')) return;
+  await runMigrationFile(
+    '041_user_posts_pending_approval.sql',
+    'Migration 041 applied: user_posts.pending_approval + pending_checked_at'
+  );
+}

@@ -1,6 +1,77 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-07-06
+> Cập nhật: 2026-07-10
+
+## GroupFlow + backend: bài chờ duyệt tự "báo hộ" đồng đội qua cross-posts (2026-07-10)
+
+Tony chỉ ra: bài của chính mình chờ duyệt thì mình xem được (banner), nhưng đồng đội vào cùng bài đó chỉ thấy trang khóa trắng không dò được gì — vẫn thử comment vô ích. Đề xuất backend field + API để chủ bài báo hộ, nhưng Tony lo ngại đúng 2 điều: (1) quá tải server, (2) nếu chủ bài không mở lại extension thì bị chặn vĩnh viễn.
+
+- [x] Thiết kế né cả 2 lo ngại: KHÔNG thêm endpoint/cron mới (piggyback `POST /api/user-sync/posts` sẵn có, tần suất giới hạn tự nhiên theo cron `warmPostAccessCache()` — vài request/3 phút); có TTL 30 phút (`PENDING_APPROVAL_TTL_MS`) — chủ bài không mở lại app thì cờ tự hết hạn, không chặn vĩnh viễn.
+- [x] Backend: migration `041_user_posts_pending_approval.sql` (+ `ensureUserPostsPendingApproval()` trong `migrationRunner.js`/`app.js`) thêm `user_posts.pending_approval`/`pending_checked_at`.
+- [x] `upsertUserPost()` (`groupPostService.js`) nhận optional `pending_approval` (undefined = giữ nguyên, không tự xoá cờ khi sync bình thường không liên quan).
+- [x] `POST /api/user-sync/posts` (`userSync.js`) nhận field `pending_approval` từ extension; `GET /api/user-sync/cross-posts` thêm điều kiện loại bài đang chờ duyệt còn trong TTL.
+- [x] Extension: `warmPostAccessCache()` (`background.js`) đánh dấu target nào là bài CỦA CHÍNH MÌNH (postQueue/serverMyPosts) khác bài đồng đội (crossPostsCache) — chỉ bài của mình mới báo hộ; `reportOwnPendingApproval()` gửi kết quả check (`pending`/`ok`) lên server ngay sau mỗi lần check.
+- [x] Bump `manifest.json` → v1.0.234, cập nhật `CHANGELOG.md`. Không cần rebuild `swBundle.js` (`background.js` không nằm trong bundle).
+- [ ] **Cần Tony xác nhận trên máy thật**: restart backend (để migration 041 tự chạy), reload extension. Chờ vài phút cho cron `warmPostAccessCache()` check bài chờ duyệt của chính mình — sau đó nhờ đồng đội (tài khoản khác) mở tab Comment → Đồng đội, bài đó phải KHÔNG còn hiện trong danh sách nữa (thay vì hiện ra rồi thử comment thất bại). Sau khi admin duyệt bài xong (hoặc sau 30 phút không ai cập nhật), bài phải tự xuất hiện lại bình thường cho đồng đội.
+
+## GroupFlow: redesign khung sườn (header + tab bar) theo file thiết kế mới (2026-07-10)
+
+Tony gửi file thiết kế (`GroupFlow Redesign.dc.html` + README, mockup màn "Tạo bài") — chọn phạm vi: áp dụng cho khung sườn dùng chung (header/tab bar/token màu/font/radius/shadow) của TẤT CẢ tab, chưa động vào layout chi tiết bên trong từng tab.
+
+- [x] Đổi font `Inter` → `Be Vietnam Pro` (`sidepanel.html` Google Fonts link + `--font` trong `sidepanel.css`).
+- [x] Đổi toàn bộ token màu trong `:root` (`sidepanel.css`) sang `oklch()` khớp đúng giá trị thiết kế (bg/surface/primary/header/error...); `--radius`/`--radius-sm` nới 18px/12px.
+- [x] `.header` bỏ gradient sang phẳng đúng token; `.brand-mark` (logo G) bỏ gradient, 34px/10px bo góc; `.profile-trigger` (pill Tony) đổi nền `--header-2` phẳng; `.profile-avatar` đổi màu cam riêng (`--avatar-alt`) phân biệt với logo xanh app.
+- [x] Đổi đồng bộ 18 chỗ `rgba(37, 99, 235, X)` (glow/ring primary cũ) sang `oklch(56% 0.19 258 / X)` khớp primary mới.
+- [x] Bump `manifest.json` → v1.0.233, cập nhật `CHANGELOG.md`. Không cần rebuild `swBundle.js` (CSS/HTML không nằm trong bundle).
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, mở panel — kiểm tra header navy phẳng + pill "Tony" cam/navy đúng thiết kế, tab bar/badge đỏ, card/button/segmented control mọi tab (Tạo bài/Comment/Cài đặt/Nhóm/Radar/Log/Hướng dẫn) không bị vỡ layout hay lệch màu do đổi token gốc. Nếu muốn redesign chi tiết bên trong từng tab (không chỉ khung sườn), cần trao đổi thêm scope/mockup cho từng tab cụ thể.
+
+
+## GroupFlow: REVERT v1.0.230 — banner "chờ phê duyệt" phải chặn hiển thị "✓ Có thể comment" TRƯỚC, không đợi chạy thử (2026-07-10)
+
+Tony làm rõ yêu cầu thật: "phải check bài nào cho phép comment mới hiển thị ra thôi chứ" — chặn ngay bước hiển thị/lọc, không phải để job chạy rồi mới báo "Bỏ qua".
+
+- [x] Xác nhận thêm bằng thao tác tay: bài của chính mình chờ duyệt hiện ĐẦY ĐỦ nội dung (có marker OK) NHƯNG KHÔNG CÓ Ô BÌNH LUẬN — giả thuyết v1.0.230 ("có OK marker → luôn commentable") SAI.
+- [x] Revert lại đúng thứ tự ban đầu ở `checkPostCommentable()` (`modules/fbCommentBg.js`) — deleted/pending TRƯỚC marker OK — banner "chờ phê duyệt" luôn thắng, đúng ý ẩn bài khỏi "✓ Có thể comment" ngay từ đầu.
+- [x] Giữ nguyên fix v1.0.231 (timeout Cổ điển = "chưa sẵn sàng") làm lớp phòng thủ thứ 2 cho trường hợp lọt qua check (bài mới chưa kịp cache).
+- [x] Bump `manifest.json` → v1.0.232, cập nhật `CHANGELOG.md`. Đã chạy lại `node build-sw-bundle.js`.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, xóa cache cũ (`chrome.storage.local.remove('gf_post_access_cache')` trong Console service worker) rồi mở lại tab Comment → bài chờ duyệt của chính mình phải hiện tag "⏳ Chờ duyệt" (không còn "✓ Có thể comment"), không bị chọn khi bấm "Lên lịch đã chọn"/"Chạy" hàng loạt.
+
+## GroupFlow: bài của chính mình chờ duyệt KHÔNG có ô bình luận → job đứng lặp lại lỗi mỗi phút (2026-07-10)
+
+Đây là root cause thật của câu hỏi gốc đầu tiên ("sao đến lịch mở lên lại đứng yên tại đây"). Tony xác nhận bằng thao tác tay: bài của chính mình chờ admin duyệt (tùy cấu hình từng nhóm) có thể HOÀN TOÀN không có ô bình luận nào — không phải lỗi selector sai.
+
+- [x] Root cause: `commentOnPost()` (`content.js`) timeout đúng (`waitFor(boxSel)` — ô chưa tồn tại lúc này) nhưng lỗi này ném thẳng ra ngoài `commentOnPostBgOrClassic()` không qua bước phân loại `skippedNotReady` (nhánh đó chỉ xét lỗi từ đường Nhanh/GraphQL, không áp dụng cho Cổ điển/DOM) — `runComment()`/`runScheduledJob()` coi là lỗi thật, retry mỗi phút vô hạn tới khi admin duyệt xong.
+- [x] Fix: bọc lời gọi Cổ điển trong try/catch, đánh dấu `skippedNotReady = true` khi lỗi khớp `/^Timeout chờ/i` — Log ghi "Bỏ qua", lịch "1 lần cụ thể" coi là xong (không retry dồn dập), lịch lặp lại hàng ngày tự thử lại hôm sau.
+- [x] Bump `manifest.json` → v1.0.231, cập nhật `CHANGELOG.md`. Không cần rebuild `swBundle.js` (`background.js` không nằm trong bundle).
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, chạy/lên lịch comment đúng bài chờ duyệt không có ô bình luận đó — Log phải ghi "Bỏ qua — Timeout chờ..." thay vì lặp lại "Lỗi" mỗi phút; sau khi admin duyệt bài xong, job phải tự chạy được bình thường ở lượt kế tiếp (lịch lặp lại) hoặc cần lên lịch lại (lịch 1 lần đã bị coi là xong).
+
+## GroupFlow: bài của chính mình chờ duyệt bị chặn nhầm "không thể comment" (2026-07-10)
+
+Tony gửi thêm link 1 bài của CHÍNH MÌNH đang chờ admin duyệt ("Bài viết đang chờ phê duyệt"), rồi làm rõ: chủ bài vẫn xem + comment được bình thường trên bài của mình dù chưa duyệt — khác với 2 bài "Bạn hiện không xem được nội dung này" ở mục dưới (bị chặn xem hoàn toàn với người khác).
+
+- [x] Root cause: `checkPostCommentable()` (`modules/fbCommentBg.js`) check marker "chờ phê duyệt" TRƯỚC marker OK (`story_title`/`story_token`/`likeAction`) — banner "chờ phê duyệt" của bài chính mình xuất hiện CHUNG với marker OK thật (nội dung vẫn render đầy đủ cho chủ bài) nên bị bắt nhầm thành `canComment:false` trước khi kịp thấy marker OK.
+- [x] Fix: đảo thứ tự — kiểm tra OK marker TRƯỚC, có là commentable ngay bất kể có banner chờ duyệt hay không; chỉ khi KHÔNG có OK marker (trang bị chặn hoàn toàn) mới xét deleted/pending.
+- [x] Bump `manifest.json` → v1.0.230, cập nhật `CHANGELOG.md`. Đã chạy lại `node build-sw-bundle.js`.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, kiểm tra lại bài của chính mình đang chờ duyệt (`/groups/2885408438373818/posts/4449138232000823/`) vẫn hiện "✓ Có thể comment" như cũ (không bị regress); đồng thời 2 link ở mục dưới phải chuyển đúng "⏳ Chờ duyệt"/"✕ Đã xóa".
+
+## GroupFlow: "✓ Có thể comment" báo sai cho bài bị hạn chế xem — Facebook không nhúng nội dung/marker vào HTML (2026-07-10)
+
+Tony gửi link 2 bài KHÁC NHAU, cả 2 đều hiện "Bạn hiện không xem được nội dung này" khi mở bằng tay nhưng đều bị extension báo "có thể comment". Đã lấy được log debug thật từ Console service worker.
+
+- [x] Log thật (`checkPostCommentable fail-open`, postId `1875146320534156`) xác nhận: HTML fetch về 870KB (tải đầy đủ, không lỗi mạng) nhưng KHÔNG chứa marker nào — kể cả marker lỗi lẫn marker OK. Giả thuyết ban đầu (lệch chuẩn hóa NFC/NFD) đã bị LOẠI BỎ bởi bằng chứng này.
+- [x] Kết luận đúng: Facebook không server-render nội dung/thông báo chặn vào HTML cho bài không có quyền xem (khả năng cao là thiết kế bảo mật cố ý) — phần hiện ra chỉ được dựng bằng JS sau 1 API call riêng mà `fetch()` nền không chạy JS không bao giờ thấy được. Đây là giới hạn thật của cách check nhẹ, không phải bug string-match có thể vá tiếp — đội cũ từng thử fail-closed nhưng gây chặn nhầm bài bình thường nên phải giữ fail-open.
+- [x] Giảm rủi ro thay vì cố vá triệt để: `console.warn()` debug khi fail-open (đã dùng để lấy log trên); cache `'ok'` hết hạn sau 6 giờ thay vì vĩnh viễn; **hàng phòng thủ thật** là v1.0.228 (mục dưới) — dù tag pre-check sai, lúc chạy comment thật (tab thật, có JS) sẽ báo Lỗi/timeout thay vì "OK" giả.
+- [x] Bump `manifest.json` → v1.0.229, cập nhật `CHANGELOG.md` (đã sửa lại đúng chẩn đoán, bỏ giả thuyết NFC sai). Đã chạy lại `node build-sw-bundle.js`.
+- [ ] **Không cần Tony làm gì thêm cho mục này** — tag "✓ Có thể comment" có thể vẫn thỉnh thoảng sai cho bài bị hạn chế (giới hạn kỹ thuật đã biết), nhưng Log sẽ không còn ghi "OK" giả nữa nhờ v1.0.228. Nếu muốn pre-check chính xác 100%, cách duy nhất là mở tab thật để JS render rồi soi DOM — tốn tài nguyên hơn hẳn, cần Tony xác nhận có muốn đánh đổi vậy không trước khi làm.
+
+## GroupFlow: comment Cổ điển báo "OK" trong Log dù chưa gửi được, ô bình luận đứng yên (2026-07-10)
+
+Tony gửi ảnh chụp — lịch comment tới giờ, tab FB mở đúng bài nhưng ô bình luận vẫn đứng yên ở placeholder không có gì xảy ra, trong khi Log lại ghi "OK".
+
+- [x] Root cause: `commentOnPost()` (`content.js`) sau khi gõ chữ chỉ tìm nút gửi đang hiển thị rồi `if (submit) submit.click()` — không tìm thấy nút thì không click gì, không có fallback, vẫn `return { ok: true }` vô điều kiện, không kiểm tra bình luận có thực sự được gửi hay không.
+- [x] Fix: thêm fallback nhấn Enter khi không thấy nút gửi; xác nhận gửi thật bằng cách ô soạn bài phải RỖNG LẠI sau khi gửi (chờ thêm 1 lần nếu chưa rỗng ngay) — còn chữ thì ném lỗi thay vì báo OK giả.
+- [x] Bump `manifest.json` → v1.0.228, cập nhật `CHANGELOG.md` + `docs/GROUPFLOW.md`. Không cần rebuild `swBundle.js` (content.js không nằm trong bundle).
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, chạy/lên lịch comment vài bài — nếu FB không cho gửi thật (mất nút, mất phiên...) Log phải ghi "Lỗi", không còn ghi "OK" giả khi ô bình luận vẫn còn chữ.
 
 ## Backend: giờ đăng bài (`posted_at`) đồng bộ từ extension lệch 7 tiếng so với giờ VN (2026-07-06)
 
