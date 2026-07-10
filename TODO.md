@@ -2,6 +2,17 @@
 
 > Cập nhật: 2026-07-10
 
+## GroupFlow: mở rộng redesign vào chi tiết tab Tạo bài sau khi so ảnh với mockup (2026-07-10)
+
+Tony gửi 2 ảnh so sánh (mockup vs extension thật sau redesign v1.0.233), chỉ ra 4 chỗ vẫn lệch — chọn mở rộng phạm vi thay vì chỉ sửa footer.
+
+- [x] Nút "AI" rớt dòng riêng: tách badge "xx/100" ra khỏi `.composer-tools` (hàng 2 quá chật với 6 phần tử), đưa lên hàng 1 cùng A/B/C/D đúng vị trí mockup.
+- [x] Thanh tab: `flex:1` (ép co giãn vừa 7 tab) → `flex:0 0 auto` + `overflow-x:auto` (cuộn ngang đúng mockup).
+- [x] Footer quảng bá: xếp chồng dọc → 2 cột ngang gọn (`footer.gf-promo-footer` đổi row), giữ nguyên chữ mô tả đầy đủ (không rút gọn — đã chốt ở v1.0.227).
+- [x] Label "TICK BÀI → LÊN LỊCH": mềm hóa thành khối nền xám bo góc kiểu "info strip" thay vì chữ hoa khô khan.
+- [x] Bump `manifest.json` → v1.0.235, cập nhật `CHANGELOG.md`. Không cần rebuild `swBundle.js` (chỉ sửa HTML/CSS, không sửa module nào trong bundle).
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, mở tab Tạo bài — nút AI không còn rớt dòng riêng, thanh tab cuộn ngang mượt (không bị bóp chữ/icon), footer quảng bá 2 cột, label lịch mềm mại hơn. So lại với ảnh mockup xem còn lệch chỗ nào không.
+
 ## GroupFlow + backend: bài chờ duyệt tự "báo hộ" đồng đội qua cross-posts (2026-07-10)
 
 Tony chỉ ra: bài của chính mình chờ duyệt thì mình xem được (banner), nhưng đồng đội vào cùng bài đó chỉ thấy trang khóa trắng không dò được gì — vẫn thử comment vô ích. Đề xuất backend field + API để chủ bài báo hộ, nhưng Tony lo ngại đúng 2 điều: (1) quá tải server, (2) nếu chủ bài không mở lại extension thì bị chặn vĩnh viễn.

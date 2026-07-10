@@ -262,12 +262,25 @@ body {
   margin: 4px 0 0;
 }
 
+/* Đúng mockup: 2 pill gọn nằm ngang (không xếp chồng dọc như trước) — bo góc chữ nhật 10px thay vì
+   pill tròn 999px vì chữ mô tả đầy đủ ("Auto Zalo Android"/"Vé xe khách", Tony yêu cầu giữ nguyên ở
+   v1.0.227 — không rút gọn lại) cần xuống dòng gọn trong khung, pill tròn không hợp với chữ 2 dòng. */
 footer.gf-promo-footer {
   flex-shrink: 0;
   width: 100%;
   padding: 8px 10px;
   background: var(--surface-2);
   border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+
+footer.gf-promo-footer .gf-promo-card {
+  flex: 1;
+  min-width: 0;
+  border-radius: 10px;
+  padding: 8px 10px;
 }
 
 /* ── Header ── */
@@ -545,6 +558,8 @@ footer.gf-promo-footer {
 .fb-status-dot { display: none; }
 
 /* ── Tabs ── */
+/* Đúng mockup: 7 tab KHÔNG co giãn ép vừa khung (flex:1 cũ làm icon/chữ bị bóp lại khi đủ 7 tab) —
+   mỗi tab giữ nguyên kích thước, cả hàng cuộn ngang khi không đủ chỗ (overflow-x:auto). */
 .tabs {
   display: flex;
   gap: 2px;
@@ -554,17 +569,24 @@ footer.gf-promo-footer {
   flex-shrink: 0;
   z-index: 19;
   box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
+.tabs::-webkit-scrollbar { height: 5px; }
+.tabs::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
+.tabs::-webkit-scrollbar-track { background: transparent; }
+
 .tabs button {
-  flex: 1;
+  flex: 0 0 auto;
+  min-width: 56px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   border: none;
   background: transparent;
-  padding: 6px 4px;
+  padding: 8px 10px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--text-muted);
@@ -579,6 +601,10 @@ footer.gf-promo-footer {
   font-size: 15px;
   line-height: 1;
   opacity: 0.7;
+}
+
+.tab-label {
+  white-space: nowrap;
 }
 
 .tabs button:hover {
@@ -833,7 +859,7 @@ body.gf-tab-settings .footer-global {
   border: none;
   background: transparent;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: 9px;
   font-family: inherit;
   font-size: 12px;
   font-weight: 500;
@@ -1513,13 +1539,19 @@ input[type="checkbox"] {
   align-items: center;
 }
 
+/* Mềm hóa theo mockup (schedule info strip — nền xám bo góc thay vì chữ hoa nhỏ khô khan nằm trực
+   tiếp trên nền footer) — giữ nguyên chữ/hành vi thật (#batchFooterLabel vẫn đổi nội dung động qua
+   JS), chỉ đổi phần trình bày. */
 .batch-queue-label {
   flex: 1 1 100%;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 11.5px;
+  font-weight: 500;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: normal;
+  text-transform: none;
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 8px 12px;
   margin-bottom: 2px;
 }
 
@@ -2487,11 +2519,20 @@ video.thumb {
 
 .composer-toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* Badge "xx/100" đứng cùng hàng A/B/C/D (không chung hàng với {spin}/Bọc/emoji/AI…) — bug thật đã
+   gặp: 6 phần tử (badge + spin + Bọc + emoji + select + nút AI) không đủ chỗ trên 1 hàng ở panel
+   380px, khiến nút AI cuối cùng bị rớt xuống dòng riêng trông như lỗi. Tách badge sang hàng 1 giải
+   phóng đủ chỗ cho hàng 2 (5 phần tử còn lại) luôn vừa 1 hàng. */
+.composer-toolbar-row1 {
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  gap: 8px;
 }
 
 .variation-tabs {
