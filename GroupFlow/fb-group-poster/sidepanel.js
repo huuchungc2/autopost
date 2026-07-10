@@ -3554,8 +3554,16 @@ function splitGroupsByAccess(groups) {
 // đổi: ngay sau khi mở tab lần đầu, list có thể trống/ít do cron chưa kịp check — bù lại bằng
 // GF_WARM_POST_ACCESS (gfSendMessage lúc mở tab Comment, xem bindEvents()) bắn 1 lượt check batch
 // lớn hơn ngay lập tức thay vì chỉ trông chờ tick nền.
+// v1.0.236 — bài đồng đội (`_source: 'cross'`) giờ KHÔNG tự check lại cục bộ nữa — server
+// (`GET /cross-posts`, userSync.js) đã đổi sang chỉ gửi về bài mà CHÍNH CHỦ BÀI tự confirm
+// `canComment:true` (đáng tin, vì Facebook luôn cho chủ bài xem thật), thay vì để mỗi máy đồng đội
+// tự fetch-check bài của người khác — cách đó luôn fail-open (đoán bừa OK) với bài bị hạn chế xem,
+// vì Facebook không cho non-owner thấy gì để dò. Máy đồng đội chỉ cần tin thẳng: có mặt trong
+// crossPostsCache tức là đã được xác nhận. Bài CỦA CHÍNH MÌNH vẫn giữ nguyên check cục bộ (đáng tin
+// vì chính là chủ bài).
 function isCommentActionable(c) {
   if (isCommentDone(c)) return true;
+  if (c._source === 'cross') return true;
   const validGroups = (c.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
   if (!validGroups.length) return false;
   return validGroups.some((g) => {
@@ -3567,7 +3575,11 @@ function isCommentActionable(c) {
 // Tag trạng thái "có comment được không" trên card Comment — đọc thẳng state.postAccessCache
 // (ghi bởi cron nền warmPostAccessCache() hoặc lúc chạy comment thật), KHÔNG tự gọi check gì ở
 // đây. Bài chưa từng check (cache trống) không hiện tag gì — tránh nhầm "chưa biết" với "đã xóa".
-function commentAccessTagHtml(validGroups) {
+// v1.0.236 — bài đồng đội (isCross) luôn hiện "✓ Có thể comment" thẳng — không đọc
+// state.postAccessCache (máy này không tự check bài của người khác nữa, xem isCommentActionable()),
+// vì có mặt trong danh sách tức là server đã xác nhận chủ bài confirm OK rồi.
+function commentAccessTagHtml(validGroups, isCross = false) {
+  if (isCross) return '<span class="tag ready">✓ Có thể comment</span>';
   if (!validGroups?.length) return '';
   const { ready, blocked } = splitGroupsByAccess(validGroups);
   if (blocked.length) {
@@ -3906,9 +3918,15 @@ function populateCommentFilterPersonOptions() {
   const input = $('#commentFilterPerson');
   const list = $('#commentFilterPersonList');
   if (!input || !list) return;
+  // Bug thật đã báo cáo: số "(N)" đếm từ TOÀN BỘ state.comments đồng bộ về, không áp `isCommentActionable()`
+  // — hiện số bài SAI (gồm cả bài chưa check xong quyền comment), trong khi danh sách thật (render
+  // qua getFilteredComments(), luôn lọc isCommentActionable()) chỉ hiện đúng bài đã confirm được. Áp
+  // đúng cùng điều kiện ở đây để số đếm khớp với những gì thực sự hiện ra khi lọc theo người đó.
   const counts = new Map();
   state.comments.forEach((c) => {
-    if (c._source === 'cross' && c._userLabel) counts.set(c._userLabel, (counts.get(c._userLabel) || 0) + 1);
+    if (c._source === 'cross' && c._userLabel && isCommentActionable(c)) {
+      counts.set(c._userLabel, (counts.get(c._userLabel) || 0) + 1);
+    }
   });
   const sortedNames = [...counts.keys()].sort((a, b) => a.localeCompare(b));
   state.commentPersonOptions = sortedNames.map((n) => ({ value: `user:${n}`, label: `${n} (${counts.get(n)})`, name: n }));
@@ -4003,7 +4021,7 @@ function renderComments() {
     // tiền tố/tooltip để tách rõ khỏi tag lịch ngay cạnh nó.
     const postedAt = c.lastPostedAt ? formatScheduleWhen(new Date(c.lastPostedAt).getTime()) : '';
     const crossLabel = c._source === 'cross' ? `<span class="tag web">↔ ${esc(c._userLabel || 'cross')}</span>` : '';
-    const accessTag = commentAccessTagHtml(validGroups);
+    const accessTag = commentAccessTagHtml(validGroups, c._source === 'cross');
     // Bài đã comment xong không bị lọc mất khỏi danh sách (dù của mình hay đồng đội) — chỉ gắn tag
     // để biết trạng thái, dùng chung isCommentDone() cho cả 2 nguồn.
     const lastCommentedAt = lastCommentedAtLabel(c);

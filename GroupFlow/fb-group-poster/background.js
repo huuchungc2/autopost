@@ -3036,28 +3036,23 @@ const GF_BG = {
     const S = globalThis.GF?.fbSessionBg;
     if (!FC || !S) return;
     const d = await chrome.storage.local.get([
-      'postQueue', 'serverMyPosts', 'crossPostsCache', 'activeActorId',
+      'postQueue', 'serverMyPosts', 'activeActorId',
     ]);
     const targets = new Map();
-    // v1.0.234 — đánh dấu riêng target nào là BÀI CỦA CHÍNH MÌNH (postQueue/serverMyPosts) khác
-    // với bài đồng đội (crossPostsCache) — chỉ bài của mình mới đủ điều kiện "báo hộ" trạng thái
-    // chờ duyệt về server (xem reportOwnPendingApproval() bên dưới) vì chỉ chủ bài mới thật sự
-    // biết chắc bài có đang chờ duyệt hay không (Facebook chỉ cho chủ bài xem banner đó — check
-    // trên bài của NGƯỜI KHÁC luôn ra trang trắng không có thông tin, không thể dùng để suy đoán
-    // hộ trạng thái của họ).
-    const addTarget = (groupId, postId, isOwn) => {
+    // v1.0.236 — REVERT quét cả `crossPostsCache` (v1.0.234): check quyền comment trên bài của
+    // NGƯỜI KHÁC luôn fail-open (Facebook không cho non-owner thấy gì để dò — trang khóa trắng),
+    // không có cách nào sửa được ở phía đồng đội. Đảo hướng đúng: GET /cross-posts (backend) giờ
+    // CHỈ gửi về bài mà CHỦ BÀI đã tự confirm OK (xem userSync.js) — đồng đội không cần và không
+    // nên tự check lại bài không phải của mình nữa, chỉ cần check ĐÚNG bài của chính mình (nguồn
+    // duy nhất đáng tin — Facebook luôn cho chủ bài xem thật) rồi báo hộ lên server.
+    const addTarget = (groupId, postId) => {
       const pid = String(postId || '');
       if (!groupId || !/^\d+$/.test(pid)) return;
-      const existing = targets.get(pid);
-      if (existing) {
-        if (isOwn) existing.isOwn = true;
-        return;
-      }
-      targets.set(pid, { groupId: String(groupId), postId: pid, isOwn: Boolean(isOwn) });
+      if (targets.has(pid)) return;
+      targets.set(pid, { groupId: String(groupId), postId: pid });
     };
-    (d.postQueue || []).forEach((p) => (p.postedGroups || []).forEach((g) => addTarget(g.group_id, g.post_id, true)));
-    (d.serverMyPosts || []).forEach((sp) => addTarget(sp.group_id, sp.post_id, true));
-    (d.crossPostsCache || []).forEach((cp) => addTarget(cp.group_id, cp.post_id, false));
+    (d.postQueue || []).forEach((p) => (p.postedGroups || []).forEach((g) => addTarget(g.group_id, g.post_id)));
+    (d.serverMyPosts || []).forEach((sp) => addTarget(sp.group_id, sp.post_id));
     if (!targets.size) return;
 
     const cache = await FC.readPostAccessCache();
@@ -3075,7 +3070,7 @@ const GF_BG = {
     for (const t of batch) {
       try {
         const result = await FC.getPostAccess({ groupId: t.groupId, postId: t.postId, session, isTimeline: false });
-        if (t.isOwn && (result?.kind === 'pending' || result?.kind === 'ok')) {
+        if (result?.kind === 'pending' || result?.kind === 'ok') {
           await this.reportOwnPendingApproval(t.groupId, t.postId, result.kind === 'pending');
         }
       } catch (e) {

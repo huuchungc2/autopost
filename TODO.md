@@ -2,6 +2,16 @@
 
 > Cập nhật: 2026-07-10
 
+## GroupFlow + backend: đảo thiết kế cross-posts sang "opt-in" — chỉ gửi bài chủ đã confirm OK (2026-07-10)
+
+Tony rất bực vì bài "khóa hoàn toàn" (đồng đội không có quyền xem — khác bài "chờ duyệt") vẫn hiện "✓ Có thể comment" sai. Xác nhận đây không sửa được ở phía đồng đội (Facebook không cho non-owner thấy gì để dò). Tony chốt hướng: "đăng 1000 bài, 20 bài duyệt thì chỉ hiện 20 bài" — server chỉ gửi bài chủ đã confirm, đồng đội không tự check lại.
+
+- [x] `GET /api/user-sync/cross-posts` (`userSync.js`): đảo từ loại-trừ-khi-pending sang chỉ-gửi-khi-đã-confirm-ok (`pending_approval=0 AND pending_checked_at` còn trong TTL 6 giờ `OK_CONFIRMED_TTL_MS`).
+- [x] `warmPostAccessCache()` (`background.js`): bỏ quét `crossPostsCache` (không còn ý nghĩa, server đã lọc) — chỉ check bài của chính mình, báo hộ MỌI kết quả ('ok' lẫn 'pending') lên server.
+- [x] `isCommentActionable()`/`commentAccessTagHtml()` (`sidepanel.js`): bài `_source: 'cross'` tin thẳng server, không tự check cục bộ nữa.
+- [x] Bump `manifest.json` → v1.0.236, cập nhật `CHANGELOG.md`. Không cần rebuild `swBundle.js` (không sửa file nào trong bundle lần này).
+- [ ] **Cần Tony xác nhận trên máy thật**: `git pull` + restart backend trên VPS (migration không đổi, chỉ đổi query — không cần migration mới). Reload extension. Đăng vài bài, đợi cron check (~3 phút/2 bài của chính mình) — tab Đồng đội của tài khoản KHÁC chỉ được hiện đúng những bài đã confirm OK, bài chưa check/đang chờ duyệt/bị hạn chế phải hoàn toàn KHÔNG hiện (thay vì hiện sai như trước).
+
 ## Backend: sửa dứt điểm unique key sai của user_posts (migration 042) (2026-07-10)
 
 Sau khi vá tạm migration 039b (INSERT IGNORE) để unblock migration 041, Tony yêu cầu sửa dứt điểm bug thiết kế gốc: `uq_post_group` định nghĩa theo `post_queue_id` (thường rỗng) thay vì `post_id` (định danh thật của 1 bài Facebook).

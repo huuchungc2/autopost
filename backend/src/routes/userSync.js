@@ -92,21 +92,29 @@ router.get('/my-posts', authenticateLicenseKey, asyncHandler(async (req, res) =>
 // như chắc chắn đã được ai đó comment hoặc hết liên quan) mà vẫn chặn được chi phí tăng vô hạn.
 const CROSS_POSTS_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
 
-// 2026-07-10 — bài đang chờ admin duyệt: chủ bài tự xem được (Facebook không chặn chủ bài), nhưng
-// đồng đội (không phải chủ bài) mở ra chỉ thấy trang khóa trắng không có gì để dò — extension của
-// đồng đội KHÔNG có cách nào tự biết bài chưa duyệt, vẫn thử comment vô ích. Chủ bài (biết chắc nhờ
-// tự check quyền comment trên bài của chính mình) "báo hộ" qua `pending_approval`/`pending_checked_at`
-// (piggyback vào POST /posts sẵn có — xem upsertUserPost()). Dùng TTL thay vì tin vĩnh viễn: nếu chủ
-// bài không mở lại extension để cập nhật (vd đã duyệt xong nhưng không ai biết báo lại), cờ tự hết
-// hạn sau 30 phút — bài lại hiện bình thường trong cross-posts, đồng đội tự thử lại — không bao giờ
-// bị chặn vĩnh viễn chỉ vì 1 người không mở app.
-const PENDING_APPROVAL_TTL_MS = 30 * 60 * 1000;
+// 2026-07-10 — REVERT hướng "loại bài chờ duyệt" (opt-out) sang "chỉ gửi bài đã CONFIRM" (opt-in).
+// Lý do đảo hẳn hướng: bài "bị hạn chế xem" (không phải chờ duyệt, mà nhóm riêng tư/đã đổi audience/
+// đã xóa) hiện trang khóa trắng KHÔNG CÓ BẤT KỲ THÔNG TIN GÌ cho người KHÔNG PHẢI chủ bài — nên
+// extension của ĐỒNG ĐỘI tự check bài đó (fetch nhẹ, không chạy JS) LUÔN fail-open (đoán bừa
+// "commentable") vì không dò được gì cả — không có cách nào sửa được ở phía đồng đội (Tony xác nhận
+// bằng nhiều bài chụp thật). Chỉ CHỦ BÀI mới check đáng tin (Facebook luôn cho chủ bài xem thật, kể
+// cả bài chờ duyệt — chỉ khác 1 banner nhỏ) — nên đảo lại: CHỦ BÀI check + báo kết quả lên server
+// (piggyback POST /posts, upsertUserPost()) cho MỌI kết quả (cả 'ok' lẫn 'pending', không chỉ
+// 'pending' như thiết kế opt-out cũ) — GET /cross-posts giờ CHỈ gửi bài đã có `pending_approval=0`
+// VÀ `pending_checked_at` còn tươi (chủ bài đã tự confirm KHÔNG chờ duyệt) — bài chưa được chủ bài
+// check tới (dù có thể thực ra bình thường) tạm thời KHÔNG hiện cho đồng đội cho tới khi chủ bài
+// check xong — đánh đổi "chậm lộ diện hơn" lấy "không bao giờ hiện sai nữa" (đúng yêu cầu: "check
+// được bài nào thì hiện bài đó, còn lại để đó, cứ check dần theo cron"). TTL 6 giờ (khớp
+// OK_ACCESS_TTL_MS phía extension, modules/fbCommentBg.js) — nếu chủ bài không mở lại extension,
+// xác nhận cũ tự hết hạn thay vì tin mãi mãi (đề phòng bài sau đó bị xóa/đổi audience mà chủ bài
+// không còn active để phát hiện lại).
+const OK_CONFIRMED_TTL_MS = 6 * 60 * 60 * 1000;
 
 router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
   const requestedSince = req.query.since ? new Date(req.query.since) : null;
   const lookbackFloor = new Date(Date.now() - CROSS_POSTS_LOOKBACK_MS);
-  const pendingFloor = new Date(Date.now() - PENDING_APPROVAL_TTL_MS);
+  const okConfirmedFloor = new Date(Date.now() - OK_CONFIRMED_TTL_MS);
   // Bug đã gặp thật: client (fetchCrossPostsFromServer(), sidepanel.js) đẩy cursor `since` = MAX
   // updated_at của các bài ĐÃ THẤY (visible) trong lượt gọi trước — nhưng `visible_after` (độ trễ
   // ngẫu nhiên 5-60', xem randomVisibleAfter() ở trên) không đồng bộ với updated_at. Nếu 1 bài A
@@ -124,7 +132,9 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
   const myId = req.userAccount.id;
   const baseWhere = `up.user_account_id != ?
     AND up.visible_after <= NOW()
-    AND NOT (up.pending_approval = 1 AND up.pending_checked_at > ?)
+    AND up.pending_approval = 0
+    AND up.pending_checked_at IS NOT NULL
+    AND up.pending_checked_at > ?
     AND NOT EXISTS (
       SELECT 1 FROM user_post_comments upc
       WHERE upc.user_post_id = up.id AND upc.commenter_user_id = ?
@@ -142,7 +152,7 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
          WHERE ${baseWhere} AND up.updated_at > ?
          ORDER BY up.comment_count ASC, up.updated_at ASC
          LIMIT ?`,
-        [myId, pendingFloor, myId, since, limit]
+        [myId, okConfirmedFloor, myId, since, limit]
       )
     // Cold-start (thiết bị mới, chưa có cursor) — giữ nguyên thứ tự ưu tiên cũ (bài mới nhất
     // trước), chỉ thêm bound `updated_at` (dùng chung idx_user_posts_updated) để tận dụng index
@@ -155,7 +165,7 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
          WHERE ${baseWhere} AND up.updated_at > ?
          ORDER BY up.comment_count ASC, up.posted_at DESC
          LIMIT ?`,
-        [myId, pendingFloor, myId, lookbackFloor, limit]
+        [myId, okConfirmedFloor, myId, lookbackFloor, limit]
       );
   res.json(rows);
 }));
