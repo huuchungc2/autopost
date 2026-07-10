@@ -10,7 +10,7 @@
 
 -- 1) Dồn comment (nếu có) từ dòng TRÙNG THẬT (cùng user_account_id+group_id+post_id, khác id) về
 --    dòng giữ lại (id nhỏ nhất trong nhóm trùng) — bỏ qua nếu dòng giữ đã có comment của đúng người
---    đó (tránh đụng UNIQUE KEY uq_post_commenter của user_post_comments); phần hiếm bị bỏ qua này sẽ
+--    đó (tránh đụng UNIQUE KEY uq_post_commenter của user_post_comments) — phần hiếm bị bỏ qua này sẽ
 --    mất theo ở bước 2 khi xóa dòng trùng — chấp nhận được vì đây chỉ là dữ liệu duplicate hiếm gặp.
 UPDATE user_post_comments upc
 JOIN user_posts up_loser ON upc.user_post_id = up_loser.id

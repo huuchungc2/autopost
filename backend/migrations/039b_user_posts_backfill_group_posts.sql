@@ -11,7 +11,7 @@
 -- cho qua (nó không biết gì về post_queue_id) — INSERT ném lỗi "Duplicate entry", chặn đứng TOÀN BỘ
 -- các migration chạy SAU migration này (kể cả migration không liên quan gì, vì mọi ensureXxx() chạy
 -- tuần tự trong cùng 1 try/catch ở app.js). Đổi sang INSERT IGNORE — bài nào đụng unique key (hiếm,
--- chỉ xảy ra với dữ liệu backfill từ hệ JWT cũ) thì bỏ qua an toàn thay vì chặn cả chuỗi migration;
+-- chỉ xảy ra với dữ liệu backfill từ hệ JWT cũ) thì bỏ qua an toàn thay vì chặn cả chuỗi migration —
 -- không mất dữ liệu quan trọng vì đây chỉ là bảng LEGACY đang dọn dần, không phải đường ghi chính.
 --
 -- Lưu ý: bug thiết kế gốc (uq_post_group nên là (user_account_id, group_id, post_id) mới đúng định

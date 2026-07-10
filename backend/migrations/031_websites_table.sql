@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS websites (
   FOREIGN KEY (image_provider_id) REFERENCES ai_providers(id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- posts.page_id chỉ áp dụng cho platform='fanpage'; bài platform='website' dùng website_id thay thế.
+-- posts.page_id chỉ áp dụng cho platform='fanpage' — bài platform='website' dùng website_id thay thế.
 ALTER TABLE posts MODIFY COLUMN page_id INT NULL;
 ALTER TABLE posts ADD COLUMN website_id INT NULL AFTER page_id;
 ALTER TABLE posts ADD CONSTRAINT fk_posts_website_id FOREIGN KEY (website_id) REFERENCES websites(id);
