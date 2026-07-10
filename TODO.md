@@ -2,6 +2,15 @@
 
 > Cập nhật: 2026-07-10
 
+## Backend: sửa dứt điểm unique key sai của user_posts (migration 042) (2026-07-10)
+
+Sau khi vá tạm migration 039b (INSERT IGNORE) để unblock migration 041, Tony yêu cầu sửa dứt điểm bug thiết kế gốc: `uq_post_group` định nghĩa theo `post_queue_id` (thường rỗng) thay vì `post_id` (định danh thật của 1 bài Facebook).
+
+- [x] Migration `042_user_posts_fix_unique_key.sql`: dồn comment từ dòng trùng thật về dòng giữ lại (tránh mất dữ liệu, trừ trường hợp hiếm đụng `uq_post_commenter`) → xóa dòng trùng → tính lại `comment_count` → đổi `uq_post_group` thành `uq_post_group_v2 (user_account_id, group_id, post_id)`.
+- [x] `ensureUserPostsCorrectUniqueKey()` (`migrationRunner.js`, guard theo `indexExists`) + wire vào `app.js` (chạy sau migration 041).
+- [x] Cập nhật `CHANGELOG.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: `git pull` + restart backend trên VPS, xem log phải có `Migration 042 applied: user_posts unique key đổi sang (user_account_id, group_id, post_id)`. Sau đó test đăng 2 bài thật khác nhau vào cùng 1 nhóm (post_id khác, post_queue_id rỗng) — trước đây có thể bị âm thầm rớt 1 trong 2 bài, giờ cả 2 phải lưu được bình thường.
+
 ## GroupFlow: mở rộng redesign vào chi tiết tab Tạo bài sau khi so ảnh với mockup (2026-07-10)
 
 Tony gửi 2 ảnh so sánh (mockup vs extension thật sau redesign v1.0.233), chỉ ra 4 chỗ vẫn lệch — chọn mở rộng phạm vi thay vì chỉ sửa footer.

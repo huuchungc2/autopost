@@ -626,3 +626,17 @@ export async function ensureUserPostsPendingApproval() {
     'Migration 041 applied: user_posts.pending_approval + pending_checked_at'
   );
 }
+
+// 2026-07-10 — bug thiết kế gốc phát hiện khi debug migration 039b bị chặn (xem CHANGELOG):
+// `uq_post_group` (migration 035) định nghĩa theo (user_account_id, post_queue_id, group_id) — SAI,
+// post_queue_id là ID nội bộ client (thường rỗng), không phải định danh thật của 1 bài Facebook.
+// Đổi lại đúng theo (user_account_id, group_id, post_id) — xem chi tiết + cách xử lý dữ liệu trùng
+// trước khi đổi key trong 042_user_posts_fix_unique_key.sql.
+export async function ensureUserPostsCorrectUniqueKey() {
+  if (!(await tableExists('user_posts'))) return;
+  if (await indexExists('user_posts', 'uq_post_group_v2')) return;
+  await runMigrationFile(
+    '042_user_posts_fix_unique_key.sql',
+    'Migration 042 applied: user_posts unique key đổi sang (user_account_id, group_id, post_id)'
+  );
+}
