@@ -21,6 +21,7 @@ export default function UserRegister() {
         email: form.get('email'),
         password,
         name: form.get('name'),
+        phone: form.get('phone'),
       });
       localStorage.setItem('user_token', res.data.token);
       localStorage.setItem('user_info', JSON.stringify(res.data.user));
@@ -49,6 +50,10 @@ export default function UserRegister() {
           <label>
             Email
             <input name="email" type="email" required placeholder="email@example.com" />
+          </label>
+          <label>
+            Số điện thoại
+            <input name="phone" type="tel" required placeholder="0912345678" />
           </label>
           <label>
             Mật khẩu

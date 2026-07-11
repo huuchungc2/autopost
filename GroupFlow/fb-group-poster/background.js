@@ -76,6 +76,25 @@ const GF_BG = {
   // sống trong đúng 1 phiên là đủ chặn race này.
   _claimedAlarms: new Set(),
 
+  // 2026-07-10 — Tony gửi ảnh: 1 bài bị chính tài khoản comment lặp lại y hệt 1 dòng ("Cảm ơn bạn
+  // nhiều lắm") 2 lần cách nhau vài phút, dù đã áp bản vá giãn cách v1.0.237 — xác nhận đây là bug
+  // KHÁC, không phải thiếu giãn cách mà là lịch "lặp lại hàng ngày" bị CHẠY THẬT 2 LẦN. Root cause:
+  // `tickDailyFixedSchedules()` được gọi từ 2 nguồn độc lập — alarm định kỳ `gf_comment_daily` (mỗi
+  // 1 phút) và `chrome.runtime.onStartup` (mỗi lần Chrome/service worker khởi động lại) — không có
+  // gì khoá 2 lời gọi này chạy chồng nhau. Hàm đọc `dailyFixedSchedules` từ storage, đánh dấu
+  // `pendingRunDate` NGAY trên biến `list` cục bộ trong bộ nhớ, nhưng CHỈ ghi `list` trở lại storage
+  // ở CUỐI hàm (sau khi đã enqueue xong toàn bộ entry đến hạn) — nếu lời gọi thứ 2 đọc storage TRƯỚC
+  // khi lời gọi thứ 1 kịp ghi lại, cả 2 đều thấy đúng entry đó "chưa pending", cả 2 đều tự enqueue 1
+  // lượt chạy thật riêng → 2 comment giống hệt nhau (cùng entry, không phải spintax random ra khác
+  // nhau), cách nhau đúng khoảng `betweenComments` (gapMs của closure thứ 2 trong CÙNG 1 lượt gọi —
+  // khớp đúng vài phút Tony thấy). `_claimedAlarms` (trên) chỉ chặn trùng theo alarmName của lịch "1
+  // lần cụ thể", không áp dụng cho đường "lặp lại hàng ngày" này. Set riêng, check-and-claim ĐỒNG BỘ
+  // (trước bất kỳ await nào trong vòng lặp) theo `entryId_ngày` — 2 lời gọi tickDailyFixedSchedules()
+  // dù chồng nhau cũng không thể cùng lọt qua cho ĐÚNG 1 entry trong CÙNG 1 ngày. Chỉ sống trong 1
+  // phiên service worker (mất khi restart) — đủ dùng vì race chỉ xảy ra trong cùng phiên, giống
+  // _claimedAlarms.
+  _claimedDailyEntries: new Set(),
+
   enqueueTask(taskFn) {
     this._queueLength += 1;
     const run = async () => {
@@ -89,6 +108,45 @@ const GF_BG = {
     // Chain tiếp tục dù task này lỗi — 1 task lỗi không được làm kẹt toàn bộ hàng đợi sau nó.
     this._taskQueue = result.then(() => {}, () => {});
     return result;
+  },
+
+  // Mốc (epoch ms) sớm nhất 1 job LỊCH (không phải bấm tay) kế tiếp được phép chạy — chỉ
+  // runSpacedJob() đọc/ghi field này.
+  _nextJobSlotAt: 0,
+
+  // 2026-07-10 — Tony báo nhiều comment lịch chạy dồn dập cách nhau vài phút thay vì rải đều theo
+  // lịch đã đặt (vd 2 bài lịch cách nhau 15+ phút nhưng Log lại ghi 2 dòng OK cách nhau 4 phút).
+  // Root cause: giãn cách `betweenComments`/`betweenPosts` trước đây CHỈ được áp dụng ở 2 nơi — lúc
+  // TẠO lịch (scheduleCommentJobsOnce()) và lúc gom CHẠY BÙ hàng loạt (retryMissedActivity() quét
+  // activityUpcoming mỗi phút) — nhưng KHÔNG áp dụng cho đường phổ biến nhất: alarm THẬT
+  // (`gf_cmt_*`/`gf_job_*`) tự bắn qua `chrome.alarms.onAlarm`. Khi máy/Chrome bị treo (ngủ, tab
+  // nền bị Chrome tạm dừng, service worker bị idle-unload rồi mới thức dậy...), nhiều alarm đã quá
+  // hạn cùng lúc được Chrome bắn gần như liền nhau lúc thức dậy — mỗi alarm tự claim rồi chạy ngay
+  // qua runScheduledJob()/enqueueTask() không có giãn cách nào, tạo đúng hiện tượng "dồn cục" Tony
+  // thấy dù `retryMissedActivity()` (đường CHẠY BÙ) đã có logic giãn cách riêng — vì đường alarm
+  // thật claim trước, không đi qua đường đó. runSpacedJob() gộp giãn cách vào ĐÚNG 1 chỗ dùng chung
+  // cho MỌI đường dẫn tới job LỊCH (alarm thật lẫn chạy bù) — job đầu tiên sau khi rảnh (không có
+  // job lịch nào chạy gần đây) chạy ngay, job kế tiếp trong cùng đợt dồn cục phải chờ đủ khoảng
+  // `betweenComments`/`betweenPosts` kể từ khi job trước đó CHẠY XONG. Không áp dụng cho hành động
+  // bấm tay (▶ Chạy/▶ Bot/Đăng ngay — luôn phải chạy ngay theo đúng ý user, xem các nơi gọi thẳng
+  // `enqueueTask(() => runComment(...))`/`runPostMatrix(...)` khác trong file, không đổi những chỗ
+  // đó). Vì toàn bộ thân hàm chạy trong 1 closure của `enqueueTask` (đã tuần tự hoá theo hàng đợi
+  // chung `_taskQueue`), không có 2 lời gọi nào chạy chồng nhau nên đọc/ghi `_nextJobSlotAt` an toàn
+  // dù không có lock riêng.
+  async runSpacedJob(kind, fn) {
+    const now = Date.now();
+    const waitMs = this._nextJobSlotAt - now;
+    if (waitMs > 0) await this.delay(waitMs);
+    try {
+      return await fn();
+    } finally {
+      const s = await chrome.storage.local.get('securityLevel');
+      const delays = await this.getSecurityDelays(s.securityLevel);
+      const gapSec = kind === 'post'
+        ? this.randBetween([delays.betweenPosts, delays.betweenPosts + 60])
+        : this.randBetween(delays.betweenComments);
+      this._nextJobSlotAt = Date.now() + gapSec * 1000;
+    }
   },
 
   async getPostingFbTabId() {
@@ -1185,6 +1243,12 @@ const GF_BG = {
       // đã qua hôm nay mà chưa chạy thì vẫn chạy ngay khi tick tiếp theo tới (dù trễ), chỉ bỏ qua
       // nếu giờ đó CHƯA tới.
       if (entry.timeOfDay > hhmm) continue;
+      // Claim đồng bộ TRƯỚC bất kỳ await nào — chặn 2 lời gọi tickDailyFixedSchedules() chồng nhau
+      // (gf_comment_daily alarm vs chrome.runtime.onStartup) cùng enqueue lịch chạy thật cho đúng 1
+      // entry trong cùng 1 ngày (xem chú thích _claimedDailyEntries).
+      const claimKey = `${entry.id}_${today}`;
+      if (this._claimedDailyEntries.has(claimKey)) continue;
+      this._claimedDailyEntries.add(claimKey);
       changed = true;
       // Đánh dấu "đã nhận" NGAY (trước khi chạy thật) — tách phát hiện (nhanh) khỏi chạy thật (có
       // thể chờ lâu trong hàng đợi nếu đang bận việc khác). Nếu không, tick sau (1 phút, có thể
@@ -1346,6 +1410,12 @@ const GF_BG = {
 
   async postGroupItem(payload) {
     if (this.stopRequested) throw new Error('Đã dừng đăng');
+    // 2026-07-10 — cùng nguyên nhân đã vá ở commentOnPostBgOrClassic(): `preparePostActorCookie()`
+    // trước đây chỉ được gọi TRONG `sendToFb()` ở nhánh `classicPost` — tức luồng NHANH bên dưới
+    // (thử TRƯỚC, là đường phổ biến nhất) luôn chạy trước khi cookie actor kịp được set, nên đăng
+    // bằng Fanpage qua Nhanh không có gì đảm bảo đúng actor. Gọi ngay đầu hàm để cả Nhanh lẫn Cổ
+    // điển (fallback bên dưới) đều dùng chung đúng actor đã lưu trong payload.
+    await this.preparePostActorCookie(payload.actorId);
     // Nhanh (GraphQL nền, không mở tab) thử trước — giống hệt cách comment đã làm
     // (commentOnPostBgOrClassic). Video chưa hỗ trợ upload qua GraphQL nền nên bỏ qua thẳng
     // sang Cổ điển. Lỗi Nhanh RÕ RÀNG (session hết hạn, FB từ chối kèm response — field_exception,
@@ -1766,12 +1836,14 @@ const GF_BG = {
         const payload = await this.refreshScheduledPostPayload({ ...data.payload });
         // Xếp vào hàng đợi tuần tự chung thay vì tự chờ-rồi-báo-lỗi sau 30 phút — lịch đăng bài
         // và lịch comment trùng giờ (hoặc trùng với thao tác tay của user) giờ chạy tuần tự, không
-        // còn báo "đang bận, thử lại sau" nữa.
-        await this.enqueueTask(() => this.runPostMatrix(payload));
+        // còn báo "đang bận, thử lại sau" nữa. runSpacedJob() giữ đúng khoảng cách betweenPosts kể
+        // từ job LỊCH gần nhất, kể cả khi vào đây từ alarm thật bắn dồn cục (xem chú thích
+        // _nextJobSlotAt phía trên).
+        await this.enqueueTask(() => this.runSpacedJob('post', () => this.runPostMatrix(payload)));
       } else if (data.kind === 'generate_image') {
         await this.runImageGenerate(data.payload);
       } else if (data.kind === 'comment') {
-        await this.enqueueTask(() => this.runComment(data.payload));
+        await this.enqueueTask(() => this.runSpacedJob('comment', () => this.runComment(data.payload)));
       } else {
         return false;
       }
@@ -2158,6 +2230,19 @@ const GF_BG = {
     const FC = globalThis.GF?.fbCommentBg;
     const comment = String(job.comment || '').trim();
     if (!comment) throw new Error('Chưa có nội dung comment');
+    // 2026-07-10 — Tony báo comment bằng Fanpage vào nhóm "không được" dù đăng tay được. Root
+    // cause: `preparePostActorCookie()` (set thẳng cookie `i_user` = actorId, cơ chế Facebook dùng
+    // để biết đang "hoá thân" ai) trước đây CHỈ được gọi cho luồng ĐĂNG BÀI Cổ điển (`sendToFb()`,
+    // nhánh `classicPost`) — luồng COMMENT (cả Nhanh `FC.commentOnPost()` lẫn Cổ điển fallback bên
+    // dưới) chưa từng gọi hàm này, nên job comment luôn chạy với BẤT KỲ actor nào đang thật sự active
+    // trên cookie trình duyệt lúc đó (thường là cá nhân, hoặc actor của lần chạy trước) — không phải
+    // đúng actor đã lưu trong job (`job.actorId`, chọn lúc lên lịch/bấm Chạy). Việc "đăng tay được"
+    // chỉ đúng vì lúc đó user vừa tự bấm đổi actor qua profile pill (gọi thật `POST /profile/switch/`
+    // qua `fbActor.switchActor()`) nên cookie tạm thời đúng — job tự động chạy sau đó (kể cả cùng
+    // phiên) không có gì đảm bảo cookie đó còn giữ nguyên. Gọi ngay đầu hàm (dùng chung cho cả 2
+    // nhánh Nhanh/Cổ điển bên dưới) để MỌI lần comment đều tự đảm bảo đúng actor trước khi chạy,
+    // giống hệt cách luồng đăng bài Cổ điển đã làm đúng từ trước.
+    await this.preparePostActorCookie(job.actorId || settings.activeActorId);
     const validPostId = job.post_id && /^\d+$/.test(String(job.post_id));
     if (FC && validPostId) {
       let bgRes;
@@ -2962,15 +3047,17 @@ const GF_BG = {
   // cách bao nhiêu? Trước bản này KHÔNG có giãn cách nào giữa các tác vụ chạy bù — vòng lặp chỉ
   // đảm bảo TUẦN TỰ (không chồng), nhưng job sau chạy NGAY khi job trước xong (có thể chỉ cách vài
   // giây) — khác hẳn tốc độ "tự nhiên" lúc máy chạy liên tục (mỗi job cách nhau nhiều phút/giờ theo
-  // đúng lịch gốc), dồn cục nhiều hành động sát nhau ngay lúc mở máy dễ bị soi hơn. Giờ dùng lại
-  // đúng betweenPosts/betweenComments (getSecurityDelays() theo securityLevel đã cấu hình — không
-  // tạo hằng số riêng) làm khoảng chờ TRƯỚC mỗi tác vụ chạy bù thứ 2 trở đi trong cùng lượt (tác vụ
-  // đầu tiên chạy ngay, không chờ — chỉ tác vụ dồn cục phía sau mới cần giãn).
+  // đúng lịch gốc), dồn cục nhiều hành động sát nhau ngay lúc mở máy dễ bị soi hơn.
+  //
+  // 2026-07-10 — bỏ hẳn phần tự tính gapSec/delay Ở ĐÂY (từng làm đúng thứ mô tả ở trên nhưng CHỈ
+  // cho riêng đường chạy bù này) — giãn cách giờ nằm chung 1 chỗ (`runSpacedJob()`, xem chú thích ở
+  // đó) áp dụng luôn cho cả đường alarm thật bắn trực tiếp, tránh 2 nơi tính riêng dễ lệch/chồng
+  // giãn cách khi cả 2 đường cùng góp job vào 1 đợt dồn cục.
   async retryMissedActivity() {
     await this.reconcileQueueSchedules().catch((e) => {
       console.warn('[GroupFlow] reconcile schedules:', e.message);
     });
-    const d = await chrome.storage.local.get(['activityUpcoming', 'retryMissed', 'securityLevel']);
+    const d = await chrome.storage.local.get(['activityUpcoming', 'retryMissed']);
     if (d.retryMissed === false) return;
     const now = Date.now();
     const due = [];
@@ -2980,9 +3067,7 @@ const GF_BG = {
     }
     if (!due.length) return;
 
-    const delays = await this.getSecurityDelays(d.securityLevel);
-    for (let i = 0; i < due.length; i += 1) {
-      const item = due[i];
+    for (const item of due) {
       const alarmName = item.alarmName || item.id;
       // Alarm thật (gf_cmt_*/gf_job_*) đã tự bắn và đang/vừa xử lý đúng entry này — không giành chạy
       // lại, chỉ giữ trong activityUpcoming (sẽ tự bị removeUpcomingByAlarmName() dọn khi job xong).
@@ -2991,12 +3076,6 @@ const GF_BG = {
         continue;
       }
       this._claimedAlarms.add(alarmName);
-      if (i > 0) {
-        const gapSec = item.kind === 'post'
-          ? this.randBetween([delays.betweenPosts, delays.betweenPosts + 60])
-          : this.randBetween(delays.betweenComments);
-        await this.delay(gapSec * 1000);
-      }
       const ok = await this.runScheduledJob(
         { kind: item.kind, payload: item.payload },
         { alarmName },

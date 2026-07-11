@@ -2454,6 +2454,68 @@ async function cancelPostDailySchedule(postId) {
   await cancelDailyFixedSchedule(info.item.id);
 }
 
+// Hủy lịch đăng HÀNG LOẠT — tick nhiều bài (dùng chung checkbox [data-post-id]/getSelectedPosts()
+// với "Lên lịch đã chọn") rồi hủy lịch (1 lần hoặc lặp lại hàng ngày) của TỪNG bài đã tick đang có
+// lịch. Bài đã tick nhưng chưa có lịch bị bỏ qua êm (không phải lỗi).
+//
+// 2026-07-10 — Tony báo bấm hủy báo "chưa có lịch nào để hủy" dù card đang hiện rõ tag "Đăng:
+// ...". 2 bug thật:
+// 1. Bản đầu chỉ coi có lịch khi `state.postScheduleMap[p.id]` khớp (nguồn: activityUpcoming/
+//    dailyFixedSchedules) — nhưng tag "Đăng: ..." (postScheduleTagHtml()) lại đọc thẳng
+//    p.ngay_dang/p.gio_dang trên post, KHÁC nguồn. 2 nguồn có thể lệch (activityUpcoming đã bị dọn
+//    hoặc chưa kịp reconcile) khiến hàm coi nhầm "chưa có lịch" dù tag vẫn hiện rành rành. Giờ coi
+//    `p.ngay_dang && p.gio_dang` là tín hiệu CHÍNH cho lịch "1 lần" (đúng nguồn tag đang dùng).
+// 2. Chỉ xoá activityUpcoming/alarm mà GIỮ NGUYÊN ngay_dang/gio_dang trên post thì
+//    `reconcileQueueSchedules()` (background.js, chạy mỗi phút qua gf_retry_missed + mỗi lúc service
+//    worker khởi động) sẽ thấy post "có ngay_dang/gio_dang nhưng chưa có activityUpcoming khớp" rồi
+//    TỰ TẠO LẠI lịch mới trong vòng tối đa 1 phút — hủy xong tưởng xong nhưng lịch tự mọc lại (đúng
+//    hiện tượng "chưa tới lịch đã chạy, lịch vẫn còn đó" Tony báo trước đó). Giờ xoá luôn 2 field
+//    này trên post + lưu lại, không chỉ dọn activityUpcoming.
+async function cancelSelectedPostSchedules() {
+  const selected = getSelectedPosts();
+  if (!selected.length) return alert('Chọn ít nhất một bài');
+  const targets = selected.filter((p) => {
+    const info = state.postScheduleMap[p.id];
+    return info?.type === 'daily' || (p.ngay_dang && p.gio_dang);
+  });
+  if (!targets.length) return alert('Các bài đã chọn chưa có lịch nào để hủy');
+  if (!window.confirm(`Hủy lịch của ${targets.length} bài đã chọn?`)) return;
+
+  const onceIds = new Set();
+  for (const p of targets) {
+    const info = state.postScheduleMap[p.id];
+    if (info?.type === 'daily') {
+      await cancelDailyFixedSchedule(info.item.id);
+    } else {
+      onceIds.add(p.id);
+    }
+  }
+
+  if (onceIds.size) {
+    // Đọc/lọc/ghi activityUpcoming đúng 1 lần cho cả batch — quét theo postId (không chỉ đúng 1
+    // entry đã biết trong postScheduleMap) để dọn luôn mọi bản trùng còn sót (kể cả entry
+    // "generate_image" xuất ảnh tự động gắn theo post, giống cancelUpcoming() xử lý cho 1 bài).
+    const d = await chrome.storage.local.get('activityUpcoming');
+    const upcoming = d.activityUpcoming || [];
+    const toCancel = upcoming.filter((u) => onceIds.has(u.postId) && (u.kind === 'post' || u.kind === 'generate_image'));
+    for (const item of toCancel) {
+      const name = item.alarmName || item.id;
+      if (name) await gfSendMessage({ type: 'GF_CANCEL_ALARM', name }).catch(() => {});
+    }
+    const remaining = upcoming.filter((u) => !(onceIds.has(u.postId) && (u.kind === 'post' || u.kind === 'generate_image')));
+    await chrome.storage.local.set({ activityUpcoming: remaining });
+    targets.forEach((p) => {
+      if (!onceIds.has(p.id)) return;
+      p.ngay_dang = '';
+      p.gio_dang = '';
+    });
+    await savePosts();
+  }
+
+  await refreshPostsOnly();
+  showToast(`Đã hủy lịch ${targets.length} bài`, 'success');
+}
+
 // "Đã comment" / "Chưa comment" — tra state.serverMyPostsIndex (needs_comment lấy từ
 // serverMyPosts, đã pull sẵn qua pullMyPostsFromServer(), không gọi thêm request). Chỉ hiện khi
 // có ít nhất 1 nhóm của bài đã đồng bộ lên server (chưa sync thì không đủ dữ liệu để khẳng định).
@@ -3511,6 +3573,26 @@ async function cancelCommentSchedule(postId) {
   }
   state.commentScheduleOpenId = null;
   await loadComments();
+}
+
+// Hủy lịch HÀNG LOẠT — tick nhiều bài (dùng chung checkbox [data-comment-id] với "Lên lịch đã
+// chọn"/collectSelectedCommentJobGroups()) rồi hủy lịch (1 lần hoặc lặp lại hàng ngày) của TỪNG
+// bài đã tick đang có lịch. Bài đã tick nhưng chưa có lịch bị bỏ qua êm (không phải lỗi).
+async function cancelSelectedCommentSchedules() {
+  const ids = [...document.querySelectorAll('[data-comment-id]:checked')].map((el) => el.dataset.commentId);
+  if (!ids.length) return alert('Chọn ít nhất một bài');
+  const targets = ids
+    .map((id) => ({ id, info: state.commentScheduleMap[id] }))
+    .filter((t) => t.info?.item);
+  if (!targets.length) return alert('Các bài đã chọn chưa có lịch nào để hủy');
+  if (!window.confirm(`Hủy lịch của ${targets.length} bài đã chọn?`)) return;
+  for (const { info } of targets) {
+    if (info.type === 'daily') await cancelDailyFixedSchedule(info.item.id);
+    else await cancelUpcoming(info.item);
+  }
+  state.commentScheduleOpenId = null;
+  await loadComments();
+  showToast(`Đã hủy lịch ${targets.length} bài`, 'success');
 }
 
 // v1.0.221 — giữ ĐỒNG BỘ với PENDING_ACCESS_TTL_MS (modules/fbCommentBg.js) — sidepanel.js không
@@ -5502,6 +5584,7 @@ function bindEvents() {
 
   $('#btnComposePostNow')?.addEventListener('click', handleComposePostAction);
   $('#btnScheduleCampaign').addEventListener('click', toggleCampaignStaggerPanel);
+  $('#btnCancelSelectedPosts')?.addEventListener('click', () => cancelSelectedPostSchedules());
   $('#btnConfirmCampaignStagger')?.addEventListener('click', confirmCampaignStagger);
   bindGapUnitDefaultReset('#campaignStaggerGapUnit', '#campaignStaggerGapValue');
   bindGapUnitDefaultReset('#commentScheduleGapUnit', '#commentScheduleGapValue');
@@ -5549,6 +5632,7 @@ function bindEvents() {
     }
   });
   $('#btnScheduleComments').addEventListener('click', () => toggleCommentSchedulePanel());
+  $('#btnCancelSelectedComments')?.addEventListener('click', () => cancelSelectedCommentSchedules());
   $('#btnConfirmCommentSchedule')?.addEventListener('click', () => scheduleSelectedComments());
   $('#commentSelectAll')?.addEventListener('change', (e) => {
     document.querySelectorAll('#commentList [data-comment-id]').forEach((cb) => { cb.checked = e.target.checked; });
@@ -6118,10 +6202,12 @@ async function checkLicenseGate() {
     try {
       const s = await GF.storage.getSettings();
       const base = (s?.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
+      const deviceId = await GF.tidienAuth.getDeviceId();
+      const deviceLabel = navigator.userAgentData?.platform || navigator.platform || 'Unknown';
       const res = await fetch(`${base}/api/user-auth/validate-key`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key }),
+        body: JSON.stringify({ key, deviceId, deviceLabel }),
       });
       const data = await res.json();
       await chrome.storage.local.set({ licenseKey: key, licenseInfo: data });

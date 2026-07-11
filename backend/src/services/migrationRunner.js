@@ -640,3 +640,24 @@ export async function ensureUserPostsCorrectUniqueKey() {
     'Migration 042 applied: user_posts unique key đổi sang (user_account_id, group_id, post_id)'
   );
 }
+
+// 2026-07-10 — Tony chốt hướng public free tier đổi lấy số điện thoại người dùng ("public xài free
+// đổi lại là số điện thoại"). Cột nullable (user cũ trước bản này không có) nhưng route đăng ký mới
+// (userAuth.js POST /register) bắt buộc nhập — validate ở tầng app, không NOT NULL ở DB để không vỡ
+// dữ liệu cũ.
+export async function ensureUsersPhone() {
+  if (!(await tableExists('users'))) return;
+  if (await columnExists('users', 'phone')) return;
+  await runMigrationFile('043_users_phone.sql', 'Migration 043 applied: users.phone ready');
+}
+
+// 2026-07-10 — Tony chốt giới hạn số thiết bị/máy được dùng chung 1 license key, theo từng plan
+// (free/pro/enterprise) — trước bản này license_keys hoàn toàn không phân biệt thiết bị, 1 key dùng
+// được trên vô hạn máy cùng lúc. Bảng riêng (không thêm cột đếm cứng vào license_keys) để còn lưu
+// được danh sách thiết bị thật (device_id, lần thấy đầu/cuối) cho admin xem/gỡ — xem
+// licenseDeviceService.js cho logic giới hạn theo plan.
+export async function ensureLicenseKeyDevices() {
+  if (await tableExists('license_key_devices')) return;
+  if (!(await tableExists('license_keys'))) return;
+  await runMigrationFile('044_license_key_devices.sql', 'Migration 044 applied: license_key_devices ready');
+}

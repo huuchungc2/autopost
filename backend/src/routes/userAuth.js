@@ -7,6 +7,11 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { authenticate } from '../middleware/auth.js';
 import { usernameFromEmail } from '../services/userUsernameService.js';
 import { licenseValidateLimiter } from '../middleware/rateLimit.js';
+import { registerOrCheckDevice, listDevicesForKey, getDeviceLimit, removeDevice } from '../services/licenseDeviceService.js';
+
+// Số điện thoại VN thông dụng: 0 + 9 số, hoặc +84 + 9 số — chỉ chặn rác rõ ràng (chữ cái, quá
+// ngắn/dài), không cố xác thực đầu số nhà mạng vì hay đổi.
+const PHONE_RE = /^(0|\+84)\d{9}$/;
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'replace_with_strong_secret';
@@ -43,10 +48,17 @@ async function generateUniqueUsername(email) {
 }
 
 // POST /api/user-auth/register
+// 2026-07-10 — bắt buộc số điện thoại: gói free công khai đổi lại việc thu thập thông tin liên hệ
+// người dùng thật (Tony: "public xài free đổi lại là số điện thoại"). Không unique — không muốn
+// chặn nhầm người dùng chung số điện thoại gia đình/công ty, chỉ cần thu thập được, không phải
+// khoá 1-số-1-tài-khoản.
 router.post('/register', asyncHandler(async (req, res) => {
-  const { email, password, name } = req.body;
+  const { email, password, name, phone } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email và mật khẩu là bắt buộc' });
   if (password.length < 6) return res.status(400).json({ error: 'Mật khẩu tối thiểu 6 ký tự' });
+  if (!phone || !PHONE_RE.test(String(phone).trim())) {
+    return res.status(400).json({ error: 'Số điện thoại không hợp lệ (VD: 0912345678)' });
+  }
 
   const existing = await query('SELECT id FROM users WHERE email = ?', [email.toLowerCase()]);
   if (existing.length) return res.status(409).json({ error: 'Email đã được đăng ký' });
@@ -54,9 +66,9 @@ router.post('/register', asyncHandler(async (req, res) => {
   const passwordHash = await bcrypt.hash(password, 10);
   const username = await generateUniqueUsername(email);
   const result = await query(
-    `INSERT INTO users (name, username, email, password, role, is_active)
-     VALUES (?, ?, ?, ?, 'group_user', true)`,
-    [name || username, username, email.toLowerCase(), passwordHash]
+    `INSERT INTO users (name, username, email, phone, password, role, is_active)
+     VALUES (?, ?, ?, ?, ?, 'group_user', true)`,
+    [name || username, username, email.toLowerCase(), String(phone).trim(), passwordHash]
   );
   const userId = result.insertId;
 
@@ -163,8 +175,12 @@ router.patch('/me', requireUserAuth, asyncHandler(async (req, res) => {
 // POST /api/user-auth/validate-key  (gọi từ extension — public, không qua auth nào, nên đây là bề
 // mặt dò/brute-force license key duy nhất không cần biết trước gì cả — giới hạn chặt hơn hẳn các
 // route đã có key hợp lệ, xem middleware/rateLimit.js)
+// 2026-07-10 — nhận thêm deviceId (+ deviceLabel tuỳ chọn, vd tên máy/OS) để giới hạn số thiết bị
+// dùng chung 1 key theo plan (xem licenseDeviceService.js). Chỉ chặn NGAY LÚC KÍCH HOẠT trên thiết
+// bị MỚI — thiết bị đã đăng ký trước đó luôn được cho qua (không lặp lại việc check này ở tầng
+// per-request nào khác, giữ đơn giản — xem docs/GROUPFLOW.md).
 router.post('/validate-key', licenseValidateLimiter, asyncHandler(async (req, res) => {
-  const { key } = req.body;
+  const { key, deviceId, deviceLabel } = req.body;
   if (!key) return res.status(400).json({ valid: false, error: 'Thiếu key' });
 
   const rows = await query(
@@ -183,6 +199,23 @@ router.post('/validate-key', licenseValidateLimiter, asyncHandler(async (req, re
   if (!k.user_status) return res.json({ valid: false, error: 'Tài khoản đã bị khóa' });
   if (k.expires_at && new Date(k.expires_at) < new Date()) {
     return res.json({ valid: false, error: 'Key đã hết hạn' });
+  }
+
+  const deviceCheck = await registerOrCheckDevice({
+    licenseKeyId: k.id,
+    plan: k.plan,
+    deviceId,
+    deviceLabel,
+  });
+  if (!deviceCheck.ok) {
+    // error là chuỗi tiếng Việt hiện thẳng ra UI (đúng convention các nhánh lỗi khác ở route này —
+    // xem overlayStatus.textContent = data.error || ..., sidepanel.js) — không phải mã lỗi máy đọc.
+    return res.json({
+      valid: false,
+      error: `Key gói ${k.plan} chỉ dùng được tối đa ${deviceCheck.limit} thiết bị — liên hệ admin để gỡ bớt thiết bị cũ`,
+      code: 'device_limit_reached',
+      limit: deviceCheck.limit,
+    });
   }
 
   await query('UPDATE license_keys SET last_validated_at = NOW() WHERE id = ?', [k.id]);
@@ -207,8 +240,8 @@ router.post('/logout', requireUserAuth, (req, res) => {
 // GET /api/user-auth/admin/users — danh sách tất cả group_user + key + stats
 router.get('/admin/users', authenticate, asyncHandler(async (req, res) => {
   const rows = await query(
-    `SELECT u.id, u.email, u.name, IF(u.is_active, 'active', 'suspended') AS status, u.created_at,
-            lk.key_value, lk.plan, lk.status AS key_status,
+    `SELECT u.id, u.email, u.phone, u.name, IF(u.is_active, 'active', 'suspended') AS status, u.created_at,
+            lk.id AS license_key_id, lk.key_value, lk.plan, lk.status AS key_status,
             lk.expires_at, lk.last_validated_at,
             COUNT(DISTINCT up.group_id) AS group_count,
             COUNT(up.id) AS post_count,
@@ -220,10 +253,18 @@ router.get('/admin/users', authenticate, asyncHandler(async (req, res) => {
      GROUP BY u.id, lk.id
      ORDER BY u.created_at DESC`
   );
-  res.json(rows);
+  const deviceCounts = await query(
+    `SELECT license_key_id, COUNT(*) AS c FROM license_key_devices GROUP BY license_key_id`
+  );
+  const countByKey = new Map(deviceCounts.map((r) => [r.license_key_id, Number(r.c)]));
+  res.json(rows.map((r) => ({
+    ...r,
+    device_count: r.license_key_id ? (countByKey.get(r.license_key_id) || 0) : 0,
+    device_limit: getDeviceLimit(r.plan),
+  })));
 }));
 
-// GET /api/user-auth/admin/users/:id/detail — groups + recent posts của 1 user
+// GET /api/user-auth/admin/users/:id/detail — groups + recent posts + thiết bị đang dùng key của 1 user
 router.get('/admin/users/:id/detail', authenticate, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const groups = await query(
@@ -238,7 +279,20 @@ router.get('/admin/users/:id/detail', authenticate, asyncHandler(async (req, res
      ORDER BY created_at DESC LIMIT 20`,
     [id]
   );
-  res.json({ groups, posts });
+  const [lk] = await query('SELECT id, plan FROM license_keys WHERE user_id = ? LIMIT 1', [id]);
+  const devices = lk ? await listDevicesForKey(lk.id) : [];
+  res.json({ groups, posts, devices, deviceLimit: lk ? getDeviceLimit(lk.plan) : null, licenseKeyId: lk?.id || null });
+}));
+
+// DELETE /api/user-auth/admin/users/:id/devices/:deviceRowId — gỡ 1 thiết bị khỏi key của user,
+// nhường chỗ cho thiết bị mới kích hoạt (không tự ngắt phiên đang chạy của thiết bị bị gỡ — thiết
+// bị đó chỉ bị chặn ở lần validate-key TIẾP THEO, xem chú thích ở registerOrCheckDevice()).
+router.delete('/admin/users/:id/devices/:deviceRowId', authenticate, asyncHandler(async (req, res) => {
+  const { id, deviceRowId } = req.params;
+  const [lk] = await query('SELECT id FROM license_keys WHERE user_id = ? LIMIT 1', [id]);
+  if (!lk) return res.status(404).json({ error: 'User chưa có license key' });
+  await removeDevice(lk.id, deviceRowId);
+  res.json({ ok: true });
 }));
 
 // PATCH /api/user-auth/admin/users/:id — cập nhật status / plan / expires_at

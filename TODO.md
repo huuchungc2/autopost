@@ -2,6 +2,65 @@
 
 > Cập nhật: 2026-07-10
 
+## GroupFlow: fix lịch "lặp lại hàng ngày" chạy thật 2 lần (race giữa alarm định kỳ và onStartup) (2026-07-10)
+
+Tony gửi ảnh: 1 bài bị comment lặp đúng 1 dòng 2 lần cách nhau vài phút, đã reload bản vá giãn cách trước đó rồi mà vẫn xảy ra — bài dùng lịch đặt trước, không phải bấm tay.
+
+- [x] `tickDailyFixedSchedules()` (`background.js`) được gọi từ 2 nguồn độc lập (alarm `gf_comment_daily` mỗi phút + `chrome.runtime.onStartup`) không có khoá — 2 lời gọi chồng nhau đều đọc storage TRƯỚC khi bên kia kịp ghi lại `pendingRunDate`, cả 2 cùng enqueue chạy thật cho đúng 1 entry.
+- [x] Thêm `_claimedDailyEntries` (Set trong bộ nhớ, check-and-claim đồng bộ theo `entryId_ngày`) — cùng pattern `_claimedAlarms` đã có cho lịch "1 lần cụ thể".
+- [x] Bump `manifest.json` → v1.0.242, cập nhật `CHANGELOG.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension → đặt 1 lịch "lặp lại hàng ngày" → để máy chạy qua đúng giờ đó, thử cả trường hợp restart Chrome ngay khoảng giờ đó (kích hoạt `onStartup` + alarm phút cùng lúc) → Log chỉ được ghi ĐÚNG 1 dòng OK cho lịch đó, không còn 2 dòng giống hệt nhau.
+
+## Backend + GroupFlow: giới hạn thiết bị/license key theo plan + bắt buộc số điện thoại đăng ký (2026-07-10)
+
+Tony hỏi license key hiện có phân biệt máy không — xác nhận KHÔNG (1 key dùng vô hạn máy). Chốt: giới hạn theo plan (free=1/pro=3/enterprise=10) + nhân tiện public gói free đổi lấy số điện thoại thay vì chỉ email.
+
+- [x] Migration `043_users_phone.sql` (`users.phone`) + `044_license_key_devices.sql` (bảng `license_key_devices`) + guard `ensureUsersPhone()`/`ensureLicenseKeyDevices()` (`migrationRunner.js`) + wire `app.js`.
+- [x] `licenseDeviceService.js` (mới): `PLAN_DEVICE_LIMITS`, `registerOrCheckDevice()`/`listDevicesForKey()`/`removeDevice()`.
+- [x] `userAuth.js`: `/register` bắt buộc `phone` (validate định dạng VN); `/validate-key` nhận `deviceId`/`deviceLabel`, chặn thiết bị mới nếu đã đủ giới hạn plan; `/admin/users` + `/admin/users/:id/detail` trả thêm phone/device info; route mới `DELETE /admin/users/:id/devices/:deviceRowId`.
+- [x] GroupFlow: `tidienAuth.js` `getDeviceId()` (UUID sinh 1 lần, lưu vĩnh viễn) — gửi kèm lúc kích hoạt key (`sidepanel.js`).
+- [x] Frontend: `UserRegister.jsx` thêm field số điện thoại (required); `UserManagement.jsx` (tab GroupFlow Users) thêm cột Điện thoại + Thiết bị (N/limit) + tab con "Thiết bị" (xem/gỡ từng thiết bị).
+- [x] Bump `manifest.json` → v1.0.241, cập nhật `CHANGELOG.md`.
+- [ ] **Biết trước, chấp nhận cho v1**: gỡ thiết bị qua admin UI chỉ chặn được từ lần validate-key TIẾP THEO của thiết bị đó — không cắt ngay phiên sync nền đang chạy (không kiểm tra deviceId theo từng request, chỉ lúc kích hoạt, giữ đơn giản/rẻ).
+- [ ] **Cần Tony xác nhận trên máy thật**: `git pull` + restart backend (2 migration mới tự chạy) + `npm run build` frontend. Test: (1) đăng ký user mới không nhập số điện thoại → phải báo lỗi; (2) kích hoạt cùng 1 key trên >1 máy vượt giới hạn plan free (1 máy) → máy thứ 2 phải bị chặn với thông báo rõ ràng; (3) trang Admin → Users → tab GroupFlow Users → thấy cột Điện thoại + Thiết bị, mở chi tiết 1 user thấy tab "Thiết bị", gỡ thử 1 thiết bị.
+
+## GroupFlow: fix "Hủy lịch đã chọn" (Tạo bài) báo sai + lịch tự mọc lại sau khi hủy (2026-07-10)
+
+Tony gửi ảnh: bấm "Hủy lịch đã chọn" trên bài đang hiện rõ tag "Đăng: ..." nhưng báo "chưa có lịch nào để hủy". Trước đó cũng báo "chưa tới lịch đã chạy, lịch vẫn còn đó" — cùng gốc.
+
+- [x] `cancelSelectedPostSchedules()` (`sidepanel.js`): coi `p.ngay_dang && p.gio_dang` là tín hiệu chính (đúng nguồn tag `postScheduleTagHtml()` dùng) thay vì chỉ tin `state.postScheduleMap`.
+- [x] Khi hủy: dọn toàn bộ `activityUpcoming` khớp `postId` (bắt cả bản trùng sót + job `generate_image` liên quan) **và** xoá `ngay_dang`/`gio_dang` trên post — nếu không `reconcileQueueSchedules()` (`background.js`, chạy mỗi phút) sẽ tự tạo lại lịch (hoặc chạy ngay nếu giờ đã trôi qua) vì vẫn thấy post "có lịch" qua 2 field này.
+- [x] Bump `manifest.json` → v1.0.240, cập nhật `CHANGELOG.md`. Không cần rebuild `swBundle.js`.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension → tick vài bài đang hiện tag "Đăng: ..." ở tab Tạo bài → "🗑 Hủy lịch đã chọn" → xác nhận → tag phải biến mất (đổi lại "+ Hẹn giờ"), đợi vài phút xem lịch có tự mọc lại không (không được).
+
+## GroupFlow: thêm Hủy lịch hàng loạt cho tab Tạo bài + tab Comment (2026-07-10)
+
+Tony hỏi đã lên lịch hàng loạt/từng bài rồi giờ hủy hàng loạt/từng bài sao — hủy từng bài đã có sẵn, hủy hàng loạt thì chưa.
+
+- [x] `cancelSelectedCommentSchedules()` (`sidepanel.js`) + nút "🗑 Hủy lịch đã chọn" trong `#commentFooterGlobal` (`sidepanel.html`).
+- [x] `cancelSelectedPostSchedules()` (`sidepanel.js`) + nút "🗑 Hủy lịch đã chọn" trong `#batchFooterGlobal` (`sidepanel.html`).
+- [x] Cả 2 tái dùng `cancelUpcoming()`/`cancelDailyFixedSchedule()` sẵn có (không viết logic hủy mới) + `state.commentScheduleMap`/`state.postScheduleMap` sẵn có để biết bài nào đang có lịch.
+- [x] Bump `manifest.json` → v1.0.239, cập nhật `CHANGELOG.md`. Không cần rebuild `swBundle.js`.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension → tick vài bài đã có lịch (trộn cả "1 lần cụ thể" lẫn "lặp lại hàng ngày") ở tab Tạo bài và tab Comment → bấm "🗑 Hủy lịch đã chọn" → xác nhận → tag lịch trên card phải biến mất, tab Log → Sắp tới không còn entry của các bài đó.
+
+## GroupFlow: đăng bài/comment vào Nhóm bằng Fanpage không đúng danh tính khi chạy tự động (2026-07-10)
+
+Tony hỏi "fanpage đăng bài hoặc comment bài viết trong nhóm đó nhưng hình như không được mặc dù tao đăng bằng tay được". Root cause: `preparePostActorCookie()` (set cookie `i_user` = actorId — cơ chế Facebook dùng để biết đang đăng/comment với danh nghĩa ai) trước đây chỉ được gọi cho đúng 1 luồng (đăng bài Cổ điển) — comment (Nhanh lẫn Cổ điển) và đăng bài Nhanh (đường thử TRƯỚC, phổ biến nhất) chưa từng gọi, nên chạy với actor cookie hiện có (thường sai/cũ) thay vì actor đã lưu trong job.
+
+- [x] `commentOnPostBgOrClassic()` (`background.js`): gọi `preparePostActorCookie(job.actorId || settings.activeActorId)` ngay đầu hàm — áp dụng cho cả Nhanh lẫn Cổ điển fallback, dùng chung cho `runComment`/`runCommentOwn`/nút "▶ Chạy".
+- [x] `postGroupItem()` (`background.js`): gọi `preparePostActorCookie(payload.actorId)` ngay đầu hàm — áp dụng cho cả Nhanh (thử trước) lẫn Cổ điển fallback.
+- [x] Bump `manifest.json` → v1.0.238, cập nhật `CHANGELOG.md`. Không cần rebuild `swBundle.js` (không sửa module nào trong bundle).
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, chuyển actor sang 1 Fanpage quản lý (profile pill), rồi **không** đăng/comment tay ngay — dùng nút "▶ Chạy"/"Lên lịch" của extension để đăng bài + comment vào 1 nhóm cho phép Page tương tác. Mở group trên FB kiểm tra bài/comment phải đứng tên ĐÚNG Fanpage, không phải cá nhân.
+
+## GroupFlow: comment lịch chạy dồn dập cách nhau vài phút thay vì rải đều theo lịch (2026-07-10)
+
+Tony gửi ảnh chụp: 2 bài đặt lịch comment cách nhau 15 phút (16:23, 16:38) nhưng Log lại ghi các dòng OK chỉ cách nhau ~4 phút (16:19, 16:19, 16:23) — hỏi "sao comment liên tục vậy không theo lịch". Root cause: giãn cách `betweenComments`/`betweenPosts` trước đây chỉ áp dụng lúc TẠO lịch và lúc CHẠY BÙ hàng loạt (`retryMissedActivity()`), không áp dụng cho alarm THẬT (`gf_cmt_*`/`gf_job_*`) tự bắn qua `chrome.alarms.onAlarm` — đường phổ biến nhất. Khi máy/Chrome bị treo rồi thức dậy, nhiều alarm quá hạn bắn gần như liền nhau, mỗi alarm tự claim rồi chạy ngay không giãn cách.
+
+- [x] Thêm `runSpacedJob()` (`background.js`) — giãn cách gộp về 1 chỗ dùng chung, áp dụng cho MỌI đường dẫn tới job LỊCH (alarm thật lẫn chạy bù) qua `runScheduledJob()`; không áp dụng cho hành động bấm tay (▶ Chạy/▶ Bot/Đăng ngay vẫn chạy ngay theo đúng ý user).
+- [x] Bỏ đoạn tính gapSec/delay trùng lặp trong vòng lặp `retryMissedActivity()` (giờ dư thừa, tránh chồng 2 lần giãn cách).
+- [x] Bump `manifest.json` → v1.0.237, cập nhật `CHANGELOG.md`. Không cần rebuild `swBundle.js` (không sửa module nào trong bundle).
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, đặt vài lịch comment cách nhau nhiều phút, thử để máy sleep/Chrome treo qua giờ hẹn của 2-3 lịch rồi mở lại — Log phải ghi các dòng OK cách nhau đúng khoảng `betweenComments`/`betweenPosts` theo mức bảo mật đang chọn (không còn dồn cục sát giây/vài phút).
+
 ## GroupFlow + backend: đảo thiết kế cross-posts sang "opt-in" — chỉ gửi bài chủ đã confirm OK (2026-07-10)
 
 Tony rất bực vì bài "khóa hoàn toàn" (đồng đội không có quyền xem — khác bài "chờ duyệt") vẫn hiện "✓ Có thể comment" sai. Xác nhận đây không sửa được ở phía đồng đội (Facebook không cho non-owner thấy gì để dò). Tony chốt hướng: "đăng 1000 bài, 20 bài duyệt thì chỉ hiện 20 bài" — server chỉ gửi bài chủ đã confirm, đồng đội không tự check lại.

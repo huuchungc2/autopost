@@ -14,20 +14,38 @@ const ACCOUNT_STATUS_COLOR = { active: '#15803d', suspended: '#b91c1c' };
 function fmtDate(v) { return v ? new Date(v).toLocaleDateString('vi') : '—'; }
 function fmtDatetime(v) { return v ? new Date(v).toLocaleString('vi') : '—'; }
 
-function GFUserDetail({ userId }) {
+function GFUserDetail({ userId, onDeviceChange }) {
   const [data, setData] = useState(null);
   const [tab, setTab] = useState('groups');
+  const { showToast } = useToast();
 
-  useEffect(() => {
+  const load = () => {
     api.get(`/user-auth/admin/users/${userId}/detail`).then((r) => setData(r.data)).catch(() => {});
-  }, [userId]);
+  };
+
+  useEffect(load, [userId]);
+
+  const removeDevice = async (deviceRowId) => {
+    try {
+      await api.delete(`/user-auth/admin/users/${userId}/devices/${deviceRowId}`);
+      showToast('Đã gỡ thiết bị', 'success');
+      load();
+      onDeviceChange?.();
+    } catch {
+      showToast('Lỗi gỡ thiết bị', 'error');
+    }
+  };
 
   if (!data) return <p style={{ padding: '8px 0', color: 'var(--text-secondary)', fontSize: 13 }}>Đang tải…</p>;
 
   return (
     <div style={{ padding: '10px 0' }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-        {[['groups', `Nhóm (${data.groups.length})`], ['posts', `Bài gần đây (${data.posts.length})`]].map(([k, label]) => (
+        {[
+          ['groups', `Nhóm (${data.groups.length})`],
+          ['posts', `Bài gần đây (${data.posts.length})`],
+          ['devices', `Thiết bị (${data.devices.length}/${data.deviceLimit ?? '—'})`],
+        ].map(([k, label]) => (
           <button key={k} type="button" onClick={() => setTab(k)} style={{
             padding: '4px 12px', border: '1px solid', borderRadius: 6, cursor: 'pointer', fontSize: 12,
             background: tab === k ? 'var(--color-primary)' : '#fff',
@@ -66,6 +84,28 @@ function GFUserDetail({ userId }) {
                 <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.noi_dung || '—'}</td>
                 <td>{fmtDatetime(p.posted_at)}</td>
                 <td style={{ color: p.needs_comment ? '#b45309' : '#15803d' }}>{p.needs_comment ? 'Chờ comment' : 'Đã comment'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {tab === 'devices' && (
+        <table className="table" style={{ fontSize: 12 }}>
+          <thead><tr><th>Thiết bị</th><th>Lần đầu kích hoạt</th><th>Hoạt động lần cuối</th><th></th></tr></thead>
+          <tbody>
+            {!data.devices.length && <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-tertiary)' }}>Chưa có thiết bị nào kích hoạt key này</td></tr>}
+            {data.devices.map((d) => (
+              <tr key={d.id}>
+                <td>
+                  <div>{d.device_label || 'Không rõ'}</div>
+                  <code style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>{d.device_id.slice(0, 12)}…</code>
+                </td>
+                <td>{fmtDatetime(d.first_seen_at)}</td>
+                <td>{fmtDatetime(d.last_seen_at)}</td>
+                <td>
+                  <Button type="button" variant="link" style={{ fontSize: 12, color: 'var(--color-error)' }} onClick={() => removeDevice(d.id)}>Gỡ</Button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -147,9 +187,11 @@ function GroupFlowUsers() {
             <tr>
               <th></th>
               <th>Email / Tên</th>
+              <th>Điện thoại</th>
               <th>License Key</th>
               <th>Plan</th>
               <th>Key</th>
+              <th>Thiết bị</th>
               <th>Nhóm</th>
               <th>Bài đăng</th>
               <th>Hoạt động lần cuối</th>
@@ -159,7 +201,7 @@ function GroupFlowUsers() {
           </thead>
           <tbody>
             {!users.length && (
-              <tr><td colSpan={10} style={{ textAlign: 'center', color: 'var(--text-tertiary)' }}>Chưa có user nào</td></tr>
+              <tr><td colSpan={12} style={{ textAlign: 'center', color: 'var(--text-tertiary)' }}>Chưa có user nào</td></tr>
             )}
             {users.map((u) => [
               <tr key={u.id} style={{ cursor: 'pointer' }}>
@@ -171,6 +213,7 @@ function GroupFlowUsers() {
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{u.name || '—'}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Đăng ký {fmtDate(u.created_at)}</div>
                 </td>
+                <td style={{ fontSize: 12 }}>{u.phone || '—'}</td>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <code style={{ fontSize: 10 }}>{u.key_value ? u.key_value.slice(0, 16) + '…' : '—'}</code>
@@ -187,6 +230,9 @@ function GroupFlowUsers() {
                   </select>
                 </td>
                 <td style={{ fontSize: 12 }}>{KEY_STATUS_LABEL[u.key_status] || u.key_status || '—'}</td>
+                <td style={{ textAlign: 'center', fontSize: 12, fontWeight: 600, color: Number(u.device_count) >= Number(u.device_limit) ? 'var(--color-error)' : 'var(--text-secondary)' }}>
+                  {u.device_count ?? 0}/{u.device_limit ?? '—'}
+                </td>
                 <td style={{ textAlign: 'center', fontWeight: 600, color: Number(u.group_count) > 0 ? '#2563eb' : 'var(--text-tertiary)' }}>{u.group_count || 0}</td>
                 <td style={{ textAlign: 'center', fontWeight: 600, color: Number(u.post_count) > 0 ? 'var(--color-warning)' : 'var(--text-tertiary)' }}>{u.post_count || 0}</td>
                 <td style={{ fontSize: 12 }}>{fmtDatetime(u.last_post_at || u.last_validated_at)}</td>
@@ -206,8 +252,8 @@ function GroupFlowUsers() {
               expandedId === u.id && (
                 <tr key={`${u.id}-detail`}>
                   <td></td>
-                  <td colSpan={9} style={{ background: '#f8fafc', paddingTop: 0, paddingBottom: 8 }}>
-                    <GFUserDetail userId={u.id} />
+                  <td colSpan={11} style={{ background: '#f8fafc', paddingTop: 0, paddingBottom: 8 }}>
+                    <GFUserDetail userId={u.id} onDeviceChange={load} />
                   </td>
                 </tr>
               ),
