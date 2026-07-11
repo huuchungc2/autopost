@@ -3600,6 +3600,14 @@ async function cancelSelectedCommentSchedules() {
 // `gf_post_access_cache` (chrome.storage.local, dùng chung mọi context extension) rồi tự áp lại
 // đúng luật hết hạn ở đây thay vì gọi sang background hỏi.
 const POST_ACCESS_PENDING_TTL_MS = 20 * 60 * 1000;
+// v1.0.246 — mirror đúng OK_CONFIRMED_TTL_MS (backend, userSync.js) — server chỉ trả về bài đồng
+// đội đã CONFIRM OK trong vòng 6 giờ gần nhất, nhưng `crossPostsCache` ở đây là merge CỘNG DỒN
+// (mergeUserPostsById()/runFlow1BackgroundSync()), không bao giờ tự xoá entry khi server ngừng trả
+// về nó (vd bài chuyển sang chờ duyệt sau khi đã từng OK) — Tony báo bài chờ duyệt vẫn hiện "✓ Có
+// thể comment" trong list Comment. Thêm hạn dùng ở phía client, tính lại từ `pending_checked_at`
+// server trả kèm mỗi bài — bài cache cũ quá hạn tự coi như "chưa xác nhận", ẩn khỏi list, thay vì
+// tin cache mãi mãi.
+const CROSS_POST_CONFIRMED_TTL_MS = 6 * 60 * 60 * 1000;
 
 // Cache 'ok'/'deleted' coi là bền (không hết hạn); 'pending' (chờ duyệt, hoặc tín hiệu mơ hồ như
 // lỗi mạng/404) chỉ tin trong 20 phút — quá hạn thì coi như "chưa check", không chặn gì cả.
@@ -3645,7 +3653,14 @@ function splitGroupsByAccess(groups) {
 // vì chính là chủ bài).
 function isCommentActionable(c) {
   if (isCommentDone(c)) return true;
-  if (c._source === 'cross') return true;
+  if (c._source === 'cross') {
+    // v1.0.246 — không còn tin thẳng nữa (xem chú thích CROSS_POST_CONFIRMED_TTL_MS) — chỉ coi là
+    // actionable nếu bản cache còn trong hạn xác nhận của CHÍNH bài đó (`pending_checked_at` server
+    // trả kèm), không tin theo tuổi của lần fetch cục bộ.
+    if (!c.pending_checked_at) return false;
+    const checkedAtMs = new Date(c.pending_checked_at).getTime();
+    return Number.isFinite(checkedAtMs) && (Date.now() - checkedAtMs) < CROSS_POST_CONFIRMED_TTL_MS;
+  }
   const validGroups = (c.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
   if (!validGroups.length) return false;
   return validGroups.some((g) => {
@@ -5713,6 +5728,29 @@ function bindEvents() {
     showToast('Đã thoát license key', 'info');
     location.reload();
   });
+
+  // Tự gỡ thiết bị "kẹt" (vd cài lại extension mất device_id cũ) mà KHÔNG cần đổi key/mất lịch sử
+  // bài đã đăng — dùng chung resetMyDevicesAndReactivate() với nút tương tự ở overlay kích hoạt
+  // (checkLicenseGate()) — đây là bản dùng khi phiên HIỆN TẠI vẫn còn vào được Cài đặt (không phải
+  // lúc bị chặn ngay từ đầu, trường hợp đó phải xử lý ở overlay — xem chú thích HTML).
+  $('#btnResetMyDevices')?.addEventListener('click', async () => {
+    const { licenseKey } = await chrome.storage.local.get('licenseKey');
+    if (!licenseKey) { alert('Chưa có license key để đặt lại thiết bị'); return; }
+    if (!window.confirm('Sẽ gỡ TẤT CẢ thiết bị khác đang dùng key này — chỉ máy này được dùng tiếp. Tiếp tục?')) return;
+    const btn = $('#btnResetMyDevices');
+    const originalText = btn?.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = 'Đang xử lý…'; }
+    try {
+      const result = await resetMyDevicesAndReactivate(licenseKey);
+      if (!result.ok) { alert(result.error); return; }
+      await showSyncLicenseStatus();
+      showToast(result.validateData.valid ? 'Đã đặt lại thiết bị — máy này dùng key bình thường' : (result.validateData.error || 'Đặt lại xong nhưng kích hoạt lại thất bại'), result.validateData.valid ? 'success' : 'error');
+    } catch {
+      alert('Lỗi kết nối server');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = originalText || '🔄 Đặt lại thiết bị'; }
+    }
+  });
   $('#btnSaveSettings').addEventListener('click', saveSettingsForm);
   $('#btnSaveActiveProviders')?.addEventListener('click', () => saveActiveProviders().catch((e) => alert(e.message)));
   $('#btnSaveProvider')?.addEventListener('click', () => saveProviderForm().catch((e) => alert(e.message)));
@@ -6160,6 +6198,32 @@ async function fetchCrossPostsFromServer({ force = false } = {}) {
   } catch { return cache; }
 }
 
+// v1.0.248 — dùng chung cho nút overlay (lúc bị chặn NGAY khi kích hoạt lần đầu, thiết bị mới sinh
+// ra chưa từng đăng ký) lẫn nút trong Cài đặt → Đồng bộ (lúc đã có phiên hợp lệ nhưng muốn chủ động
+// dọn thiết bị cũ) — xem chú thích POST /reset-devices (userAuth.js). KHÔNG đổi key_value, KHÔNG
+// đụng user_posts (bài đăng cũ khoá theo user_account_id, không liên quan gì thiết bị/key).
+async function resetMyDevicesAndReactivate(key) {
+  const s = await GF.storage.getSettings();
+  const base = (s?.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
+  const deviceId = await GF.tidienAuth.getDeviceId();
+  const deviceLabel = navigator.userAgentData?.platform || navigator.platform || 'Unknown';
+  const resetRes = await fetch(`${base}/api/user-auth/reset-devices`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, deviceId, deviceLabel }),
+  });
+  const resetData = await resetRes.json();
+  if (!resetData.ok) return { ok: false, error: resetData.error || 'Không đặt lại được thiết bị' };
+  const vRes = await fetch(`${base}/api/user-auth/validate-key`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, deviceId, deviceLabel }),
+  });
+  const validateData = await vRes.json();
+  await chrome.storage.local.set({ licenseKey: key, licenseInfo: validateData });
+  return { ok: true, validateData };
+}
+
 function renderLicenseBadge(licenseInfo) {
   const el = $('#headerLicenseInfo');
   if (!el) return;
@@ -6186,7 +6250,15 @@ async function checkLicenseGate() {
   const input = $('#overlayLicenseKey');
   const btn = $('#overlayValidateBtn');
   const status = $('#overlayStatus');
+  const resetBtn = $('#overlayResetDevicesBtn');
   if (licenseKey && input) input.value = licenseKey;
+  // v1.0.245 — key từng hợp lệ nhưng bị revoke qua chu kỳ nền recheckLicenseStillValid() (khoá/hết
+  // hạn phía admin) — hiện sẵn đúng lý do lần mở panel này, không bắt user phải tự bấm "Xác thực
+  // key" lại mới biết vì sao bị đá về màn hình kích hoạt.
+  if (licenseKey && licenseInfo && licenseInfo.valid === false && status) {
+    status.textContent = licenseInfo.error || 'Key không còn hợp lệ — vui lòng xác thực lại';
+    status.className = 'gf-activation-status gf-activation-status--error';
+  }
   $('#overlayCloseBtn')?.addEventListener('click', closeSidePanel);
   $('#overlayLoginLink')?.addEventListener('click', (e) => {
     e.preventDefault();
@@ -6199,6 +6271,7 @@ async function checkLicenseGate() {
     if (!key) { if (status) status.textContent = 'Nhập key trước'; return; }
     if (btn) { btn.disabled = true; btn.textContent = 'Đang xác thực…'; }
     if (status) { status.textContent = ''; status.className = 'gf-activation-status'; }
+    resetBtn?.classList.add('hidden');
     try {
       const s = await GF.storage.getSettings();
       const base = (s?.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
@@ -6218,10 +6291,42 @@ async function checkLicenseGate() {
       } else {
         if (status) { status.textContent = data.error || 'Key không hợp lệ'; status.className = 'gf-activation-status gf-activation-status--error'; }
         if (btn) { btn.disabled = false; btn.textContent = 'Xác thực key'; }
+        // v1.0.248 — lỗi ĐÚNG "vượt giới hạn thiết bị" (thiết bị mới kích hoạt lần đầu, ví dụ vừa
+        // cài lại extension) → hiện ngay lối thoát tại overlay này, KHÔNG bắt user tự tìm đường vào
+        // Cài đặt (không thể vào được — overlay đang che kín, xem chú thích HTML).
+        if (data.code === 'device_limit_reached' && resetBtn) resetBtn.classList.remove('hidden');
       }
     } catch {
       if (status) { status.textContent = 'Lỗi kết nối server'; status.className = 'gf-activation-status gf-activation-status--error'; }
       if (btn) { btn.disabled = false; btn.textContent = 'Xác thực key'; }
+    }
+  });
+
+  resetBtn?.addEventListener('click', async () => {
+    const key = (input?.value || '').trim().toUpperCase();
+    if (!key) return;
+    if (!window.confirm('Sẽ gỡ TẤT CẢ thiết bị khác đang dùng key này — chỉ máy này được dùng tiếp. Không đổi key, không ảnh hưởng bài đã đăng. Tiếp tục?')) return;
+    resetBtn.disabled = true;
+    resetBtn.textContent = 'Đang xử lý…';
+    try {
+      const result = await resetMyDevicesAndReactivate(key);
+      if (!result.ok) {
+        if (status) { status.textContent = result.error; status.className = 'gf-activation-status gf-activation-status--error'; }
+        return;
+      }
+      if (result.validateData.valid) {
+        renderLicenseBadge(result.validateData);
+        overlay.remove();
+        await finishInit();
+      } else if (status) {
+        status.textContent = result.validateData.error || 'Đặt lại xong nhưng kích hoạt lại thất bại';
+        status.className = 'gf-activation-status gf-activation-status--error';
+      }
+    } catch {
+      if (status) { status.textContent = 'Lỗi kết nối server'; status.className = 'gf-activation-status gf-activation-status--error'; }
+    } finally {
+      resetBtn.disabled = false;
+      resetBtn.textContent = '🔄 Đặt lại thiết bị (chỉ dùng máy này)';
     }
   });
   return false;

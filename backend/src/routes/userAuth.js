@@ -7,7 +7,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { authenticate } from '../middleware/auth.js';
 import { usernameFromEmail } from '../services/userUsernameService.js';
 import { licenseValidateLimiter } from '../middleware/rateLimit.js';
-import { registerOrCheckDevice, listDevicesForKey, getDeviceLimit, removeDevice } from '../services/licenseDeviceService.js';
+import { registerOrCheckDevice, listDevicesForKey, getDeviceLimit, removeDevice, DEVICE_STALE_DAYS } from '../services/licenseDeviceService.js';
 
 // Số điện thoại VN thông dụng: 0 + 9 số, hoặc +84 + 9 số — chỉ chặn rác rõ ràng (chữ cái, quá
 // ngắn/dài), không cố xác thực đầu số nhà mạng vì hay đổi.
@@ -230,12 +230,68 @@ router.post('/validate-key', licenseValidateLimiter, asyncHandler(async (req, re
   });
 }));
 
+// POST /api/user-auth/reset-devices — tự gỡ TẤT CẢ thiết bị đang đăng ký cho 1 key rồi đăng ký lại
+// đúng thiết bị hiện tại. Tony hỏi: đổi hẳn sang key mới thì có ảnh hưởng bài đăng cũ không (bài cũ
+// nằm ở `user_posts`, khoá theo `user_account_id` — KHÔNG liên quan gì tới key_value/device, nên đổi
+// key mới không xoá/ảnh hưởng bài cũ) — nhưng đổi key mới lại tạo 1 danh tính MỚI nếu dùng
+// `GET /admin/my-key` (user_id khác), tách khỏi lịch sử cũ một cách không cần thiết cho đúng nhu cầu
+// "chỉ đang kẹt vì thiết bị cũ". Route riêng này KHÔNG đổi key_value, KHÔNG đụng user_posts — chỉ
+// dọn sạch `license_key_devices` của ĐÚNG key đang dùng — an toàn hơn hẳn cho đúng use-case "cài lại
+// extension mất device_id cũ, chỉ xài đúng 1 máy". Chặn nếu key đã bị admin suspend/hết hạn (không
+// cho tự gỡ giới hạn để lách suspend — cùng nguyên tắc với registerOrCheckDevice()).
+router.post('/reset-devices', licenseValidateLimiter, asyncHandler(async (req, res) => {
+  const { key, deviceId, deviceLabel } = req.body;
+  if (!key) return res.status(400).json({ ok: false, error: 'Thiếu key' });
+
+  const rows = await query(
+    `SELECT lk.id, lk.status, lk.expires_at, u.is_active AS user_status
+     FROM license_keys lk JOIN users u ON u.id = lk.user_id
+     WHERE lk.key_value = ?`,
+    [String(key).toUpperCase()]
+  );
+  if (!rows.length) return res.status(404).json({ ok: false, error: 'Key không tồn tại' });
+  const k = rows[0];
+  if (k.status !== 'active') return res.status(403).json({ ok: false, error: 'Key đã bị khoá — liên hệ admin, không thể tự đặt lại thiết bị' });
+  if (!k.user_status) return res.status(403).json({ ok: false, error: 'Tài khoản đã bị khóa' });
+  if (k.expires_at && new Date(k.expires_at) < new Date()) {
+    return res.status(403).json({ ok: false, error: 'Key đã hết hạn' });
+  }
+
+  await query('DELETE FROM license_key_devices WHERE license_key_id = ?', [k.id]);
+  if (deviceId) {
+    await query(
+      'INSERT INTO license_key_devices (license_key_id, device_id, device_label) VALUES (?, ?, ?)',
+      [k.id, deviceId, deviceLabel || null]
+    );
+  }
+  res.json({ ok: true });
+}));
+
 // POST /api/user-auth/logout
 router.post('/logout', requireUserAuth, (req, res) => {
   res.json({ ok: true });
 });
 
 // ── Admin routes (yêu cầu admin JWT) ──────────────────────────────────────
+
+// GET /api/user-auth/admin/my-key — admin/super_admin (đăng nhập website) tự lấy license key
+// GroupFlow của CHÍNH tài khoản mình để dùng thử/dùng thật extension bằng danh tính admin. Trước
+// route này, admin/super_admin KHÔNG xuất hiện trong "GroupFlow Users" (danh sách đó lọc cứng
+// `role = 'group_user'`) và không có cách nào lấy key — phải tự đăng ký 1 tài khoản group_user
+// riêng qua form public như khách hàng thường, dù mình chính là người quản trị hệ thống. Tạo mới
+// nếu chưa có (plan 'enterprise' — không giới hạn sát như free/pro, admin cần test nhiều máy),
+// trả nguyên key cũ nếu đã có (không tạo trùng, không có "regenerate" ở v1 — không cần thiết cho
+// nhu cầu hiện tại, tự thêm sau nếu phát sinh).
+router.get('/admin/my-key', authenticate, asyncHandler(async (req, res) => {
+  const [existing] = await query('SELECT key_value, plan, status FROM license_keys WHERE user_id = ?', [req.user.id]);
+  if (existing) return res.json(existing);
+  const keyValue = randomUUID().replace(/-/g, '').slice(0, 32).toUpperCase();
+  await query(
+    'INSERT INTO license_keys (user_id, key_value, plan, status, expires_at) VALUES (?, ?, ?, ?, ?)',
+    [req.user.id, keyValue, 'enterprise', 'active', null]
+  );
+  res.json({ key_value: keyValue, plan: 'enterprise', status: 'active' });
+}));
 
 // GET /api/user-auth/admin/users — danh sách tất cả group_user + key + stats
 router.get('/admin/users', authenticate, asyncHandler(async (req, res) => {
@@ -253,8 +309,14 @@ router.get('/admin/users', authenticate, asyncHandler(async (req, res) => {
      GROUP BY u.id, lk.id
      ORDER BY u.created_at DESC`
   );
+  // Đếm theo thiết bị CÒN HOẠT ĐỘNG (last_seen_at trong DEVICE_STALE_DAYS) — khớp đúng số dùng để
+  // enforce giới hạn thật (registerOrCheckDevice()), không phải tổng lịch sử mọi thiết bị từng kích
+  // hoạt (thiết bị bỏ hoang lâu ngày không còn tính vào giới hạn, xem licenseDeviceService.js).
   const deviceCounts = await query(
-    `SELECT license_key_id, COUNT(*) AS c FROM license_key_devices GROUP BY license_key_id`
+    `SELECT license_key_id, COUNT(*) AS c FROM license_key_devices
+     WHERE last_seen_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+     GROUP BY license_key_id`,
+    [DEVICE_STALE_DAYS]
   );
   const countByKey = new Map(deviceCounts.map((r) => [r.license_key_id, Number(r.c)]));
   res.json(rows.map((r) => ({

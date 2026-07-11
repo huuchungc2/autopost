@@ -2,6 +2,62 @@
 
 > Cập nhật: 2026-07-10
 
+## GroupFlow: nút "Đặt lại thiết bị" không thể bấm tới lúc cần nhất (2026-07-11)
+
+Tony lần lại đúng kịch bản: xoá cài lại extension, active đúng key cũ → thiết bị mới sinh ra bị chặn "vượt giới hạn" ngay từ đầu. Phát hiện: nút reset (v1.0.247) nằm trong Cài đặt, nhưng overlay kích hoạt che kín toàn màn hình — không thể bấm tới Cài đặt được trong chính lúc cần nút đó nhất.
+
+- [x] `sidepanel.html`: thêm `#overlayResetDevicesBtn` ngay trên overlay kích hoạt (ẩn mặc định).
+- [x] `sidepanel.css`: style `.gf-activation-reset` (viền, nhạt hơn nút chính).
+- [x] `sidepanel.js`: refactor thành `resetMyDevicesAndReactivate()` dùng chung cho cả overlay lẫn nút Cài đặt. Overlay chỉ hiện nút reset khi `validate-key` trả `code: 'device_limit_reached'`.
+- [x] Bump `manifest.json` → v1.0.248, cập nhật `CHANGELOG.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: giả lập đúng kịch bản — key đã ở giới hạn (1/1 free) → xoá extension → cài lại → nhập đúng key cũ → bấm "Xác thực key" → phải thấy lỗi "vượt giới hạn thiết bị" VÀ nút "🔄 Đặt lại thiết bị" hiện ra ngay trên overlay → bấm → phải kích hoạt được ngay, không cần thoát ra ngoài.
+
+## Backend + GroupFlow: thiết bị tự hết hạn sau 14 ngày + tự đặt lại thiết bị + admin tự lấy key (2026-07-11)
+
+Tony chỉ ra vấn đề gốc: `device_id` chỉ sống trong `chrome.storage.local`, cài lại extension sinh ID mới — thiết bị cũ chiếm slot vĩnh viễn tới khi admin gỡ tay, dù chỉ xài đúng 1 máy. Cũng hỏi vì sao admin/super_admin không có trong GroupFlow Users, và tạo key mới có ảnh hưởng bài đăng cũ không.
+
+- [x] `licenseDeviceService.js`: `registerOrCheckDevice()` chỉ đếm thiết bị "hoạt động" (`last_seen_at` trong `DEVICE_STALE_DAYS=14` ngày) vào giới hạn plan — thiết bị bỏ hoang tự dọn khi có thiết bị mới cần chỗ. `countDevicesForKey()`/`listDevicesForKey()` cập nhật theo (thêm cờ `stale`).
+- [x] `userAuth.js`: cột "Thiết bị" (`GET /admin/users`) đếm theo cùng công thức active. Thêm `POST /api/user-auth/reset-devices` (gỡ hết thiết bị của 1 key, không đổi key_value/không đụng user_posts) + `GET /api/user-auth/admin/my-key` (admin/super_admin tự tạo/lấy key riêng, plan enterprise).
+- [x] `sidepanel.html`/`sidepanel.js`: nút "🔄 Đặt lại thiết bị" (Cài đặt → Đồng bộ) — gọi reset-devices rồi tự validate-key lại ngay.
+- [x] `UserManagement.jsx`: khu "License key GroupFlow của tôi" (admin tự lấy key); tag "⏳ hết hạn" cho thiết bị stale trong tab chi tiết.
+- [x] Bump `manifest.json` → v1.0.247, cập nhật `CHANGELOG.md`. Frontend build sạch (`npm run build`).
+- [ ] **Cần Tony xác nhận trên máy thật**: (1) trang Quản lý người dùng → nút "Lấy/Tạo key" hiện đúng key mới cho tài khoản admin đang đăng nhập; (2) extension đang bị chặn thiết bị → Cài đặt → Đồng bộ → "Đặt lại thiết bị" → xác nhận → phải kích hoạt lại được ngay trên máy này; (3) `npm run dev` backend (2 file service/route đổi, không có migration mới) rồi thử lại toàn bộ flow kích hoạt/chặn thiết bị.
+
+## Backend + GroupFlow: bài chờ duyệt vẫn hiện "✓ Có thể comment" trong list Comment đồng đội (2026-07-11)
+
+Tony báo dù v1.0.236 đã đảo hướng opt-in cho cross-posts, bài chưa duyệt vẫn còn hiển thị trong danh sách Comment. Root cause: `crossPostsCache` (extension) merge cộng dồn, không tự xoá entry khi server ngừng trả về (bài chuyển từ OK sang chờ duyệt) — `isCommentActionable()` tin cache mãi mãi, không check hạn.
+
+- [x] `userSync.js` (`GET /cross-posts`): thêm `up.pending_checked_at` vào `selectFields`.
+- [x] `sidepanel.js`: thêm `CROSS_POST_CONFIRMED_TTL_MS` (6 giờ, mirror `OK_CONFIRMED_TTL_MS` backend); `isCommentActionable()` cho bài `_source: 'cross'` giờ check `pending_checked_at` còn hạn thay vì `return true` cứng.
+- [x] Bump `manifest.json` → v1.0.246, cập nhật `CHANGELOG.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension → tab Comment → Đồng đội → bài đang bị kẹt "chờ duyệt nhưng vẫn hiện OK" phải biến mất khỏi list (do cache cũ chưa có `pending_checked_at`); đợi chủ bài mở extension để `warmPostAccessCache()` check + báo lại → nếu bài thật sự đã duyệt xong thì phải hiện lại đúng, nếu vẫn chờ duyệt thì tiếp tục ẩn.
+
+## GroupFlow: tự phát hiện key bị khoá/hết hạn qua chu kỳ nền (2026-07-11)
+
+Tony hỏi: admin khoá/hết hạn 1 key thì extension đang chạy sẵn có tự biết/tự đăng xuất không? Xác nhận trước đó KHÔNG — chốt cơ chế check "từ từ, không cần ngay lập tức" (tái dùng chu kỳ nền sẵn có, không cần real-time).
+
+- [x] `background.js`: thêm `GF_BG.recheckLicenseStillValid()` — gọi lại `POST /api/user-auth/validate-key` trong chu kỳ nền `gf_tidien_sync` (throttle riêng 1 giờ/lần qua `licenseRecheckAt`, tách khỏi `tidienAutoSyncMinutes`). Key bị revoke → ghi `licenseInfo.valid=false` (giữ `licenseKey`).
+- [x] `sidepanel.js` (`checkLicenseGate()`): hiện sẵn đúng lý do (`licenseInfo.error`) khi mở lại panel sau khi bị revoke — không cần bấm "Xác thực key" mới thấy vì sao.
+- [x] Bump `manifest.json` → v1.0.245, cập nhật `CHANGELOG.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: activate 1 key bình thường → admin vào Quản lý Users khoá key đó (nút "Khóa key") → đợi tới chu kỳ `gf_tidien_sync` tiếp theo (hoặc restart Chrome để trigger `onStartup`) → mở lại sidepanel phải tự hiện màn hình kích hoạt kèm đúng lý do, không cần tự bấm Thoát trước.
+
+## GroupFlow: màn hình vẫn tự tắt dù đã bật chặn sleep (2026-07-11)
+
+Tony hỏi extension đang chạy nhưng màn hình Windows vẫn tự tắt — tính năng chặn sleep (v1.0.195) chỉ chặn máy vào chế độ ngủ (`requestKeepAwake('system')`), không chặn màn hình tắt theo display-timeout riêng của Windows (lựa chọn có chủ đích lúc đó để đỡ tốn điện).
+
+- [x] `background.js`: đổi `chrome.power.requestKeepAwake('system')` → `chrome.power.requestKeepAwake('display')` — chặn luôn màn hình tắt/dim, không chỉ máy sleep.
+- [x] Bump `manifest.json` → v1.0.244, cập nhật `CHANGELOG.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension, để máy không thao tác qua đúng khoảng display-timeout đã đặt trong Windows Settings → Power → màn hình không được tự tắt/dim nữa (máy vẫn có thể tự sleep nếu user chủ động bấm Sleep/đóng nắp — không đổi).
+
+## GroupFlow: đồng bộ lại 2 chỗ lệch mockup redesign — màu promo card + nút "Lên lịch đã chọn" (2026-07-11)
+
+Tony gửi ảnh so sánh: chip Zalopilot/Đặt xe về quê ở overlay kích hoạt license khác màu với footer chính (gradient đặc + chữ trắng, lệch mockup); nút "Lên lịch đã chọn" ở tab Tạo bài (trắng, đúng mockup) khác màu với nút cùng tên ở tab Comment (xanh đặc).
+
+- [x] `sidepanel.css`: `.gf-promo-card-zalo`/`.gf-promo-card-xe` bỏ gradient/chữ trắng, quay lại đúng token mockup (nền pastel + chữ màu) — dùng chung 1 style cho cả overlay và footer chính.
+- [x] `sidepanel.html`: nút `#btnScheduleComments` (footer tab Comment) đổi từ `.btn.primary` sang `.btn.outline` cho khớp nút cùng tên ở tab Tạo bài.
+- [x] Bump `manifest.json` → v1.0.243, cập nhật `CHANGELOG.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension → mở overlay kích hoạt license và footer chính (mọi tab) → 2 chip Zalopilot/Đặt xe phải cùng 1 tông màu; mở tab Tạo bài và tab Comment → nút "Lên lịch đã chọn" phải cùng kiểu (trắng viền) ở cả 2 nơi.
+
 ## GroupFlow: fix lịch "lặp lại hàng ngày" chạy thật 2 lần (race giữa alarm định kỳ và onStartup) (2026-07-10)
 
 Tony gửi ảnh: 1 bài bị comment lặp đúng 1 dòng 2 lần cách nhau vài phút, đã reload bản vá giãn cách trước đó rồi mà vẫn xảy ra — bài dùng lịch đặt trước, không phải bấm tay.

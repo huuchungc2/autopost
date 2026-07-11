@@ -2812,6 +2812,45 @@ const GF_BG = {
     chrome.alarms.create('gf_tidien_sync', { delayInMinutes: Math.max(0.1, jitterMin), periodInMinutes: mins });
   },
 
+  // v1.0.245 — Tony hỏi: admin khoá/hết hạn 1 key thì extension đang chạy sẵn có tự đăng xuất
+  // không? Trước bản này KHÔNG — `checkLicenseGate()` (sidepanel.js) chỉ đọc lại `licenseInfo.valid`
+  // đã cache từ lần validate-key CUỐI CÙNG, không bao giờ tự gọi lại server. Tony chốt: cơ chế check
+  // "từ từ" là đủ, không cần tức thời — nên tái dùng đúng chu kỳ nền `gf_tidien_sync` sẵn có (mỗi
+  // ~`tidienAutoSyncMinutes` phút) thay vì thêm alarm/kênh riêng. Gọi lại đúng
+  // `POST /api/user-auth/validate-key` (endpoint đã có sẵn cho lúc kích hoạt) với `deviceId` đã lưu
+  // — vì thiết bị này đã đăng ký rồi nên `registerOrCheckDevice()` chỉ update `last_seen_at`, không
+  // tốn thêm slot. Nếu key bị khoá/hết hạn, ghi `licenseInfo.valid=false` (giữ nguyên `licenseKey` để
+  // overlay còn tự điền lại) — lần mở panel kế tiếp `checkLicenseGate()` sẽ tự hiện lại màn hình kích
+  // hoạt kèm đúng lý do, không cần user tự bấm "Thoát" trước. Tự throttle riêng theo
+  // `licenseRecheckAt` (1 giờ/lần, không ăn theo `tidienAutoSyncMinutes` — tránh dồn request vào
+  // `licenseValidateLimiter`, đặc biệt nhiều máy cùng chia 1 IP mạng công ty). Lỗi mạng/parse thì
+  // fail-open (coi như vẫn hợp lệ) — không tự đăng xuất oan chỉ vì mất mạng tạm thời.
+  async recheckLicenseStillValid(auth) {
+    const { licenseRecheckAt } = await chrome.storage.local.get('licenseRecheckAt');
+    const now = Date.now();
+    if (licenseRecheckAt && (now - licenseRecheckAt) < 60 * 60_000) return true;
+    await chrome.storage.local.set({ licenseRecheckAt: now });
+    try {
+      // Không dùng GF.tidienAuth.getDeviceId() ở đây — module đó chỉ được nạp cho sidepanel.html
+      // (context có `window`), KHÔNG nằm trong danh sách bundle cho service worker
+      // (build-sw-bundle.js) nên `GF.tidienAuth` undefined trong background.js. Đọc thẳng đúng key
+      // storage `gfDeviceId` mà getDeviceId() dùng — 2 nơi vẫn thấy cùng 1 giá trị.
+      const { gfDeviceId } = await chrome.storage.local.get('gfDeviceId');
+      const deviceId = gfDeviceId || null;
+      const res = await fetch(`${auth.base}/api/user-auth/validate-key`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: auth.token, deviceId }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!data) return true;
+      await chrome.storage.local.set({ licenseInfo: data });
+      return data.valid !== false;
+    } catch {
+      return true;
+    }
+  },
+
   async syncFromTidien({ force = false, pullDrafts = true, scope = 'auto' } = {}) {
     if (tidienSyncInFlight) return tidienSyncInFlight;
     tidienSyncInFlight = this._syncFromTidienImpl({ force, pullDrafts, scope })
@@ -2822,6 +2861,9 @@ const GF_BG = {
   async _syncFromTidienImpl({ force = false, pullDrafts = true, scope = 'auto' } = {}) {
     const auth = await this.getTidienAuth();
     if (!auth) return { ok: false, skipped: 'no_auth' };
+
+    const stillValid = await this.recheckLicenseStillValid(auth);
+    if (!stillValid) return { ok: false, skipped: 'license_invalid' };
 
     const cfg = await chrome.storage.local.get([
       'tidienAutoSyncEnabled', 'tidienAutoPullDrafts',
@@ -3199,14 +3241,18 @@ async function ensureGroupFlowPeriodicAlarms() {
 
 // v1.0.195 — Tony hỏi "có cách nào không cho máy ngủ khi đang chạy không?" (lịch đăng bài/comment
 // cần chạy không người trông, máy tự sleep giữa chừng thì mọi tác vụ dừng hẳn tới khi user tự đánh
-// thức lại). `chrome.power.requestKeepAwake('system')` chặn Windows tự vào chế độ NGỦ (sleep/suspend)
-// do idle timeout — dùng mức 'system' (không phải 'display') vì chỉ cần MÁY không ngủ để service
-// worker/alarm còn chạy, không cần ép màn hình luôn sáng (tốn điện, gây khó chịu vô ích). Gọi ở top
-// level — chạy lại mỗi khi service worker (re)start (kể cả sau khi bị idle-unload rồi có
-// alarm/message đánh thức lại) nên luôn tự tái khẳng định, không cần release/renew thủ công. KHÔNG
-// chặn được sleep do user chủ động bấm Sleep/đóng nắp laptop — chỉ chặn sleep tự động do không thao
-// tác (idle timer của Windows).
-chrome.power.requestKeepAwake('system');
+// thức lại). `chrome.power.requestKeepAwake()` chặn Windows tự vào chế độ NGỦ (sleep/suspend) do
+// idle timeout. Gọi ở top level — chạy lại mỗi khi service worker (re)start (kể cả sau khi bị
+// idle-unload rồi có alarm/message đánh thức lại) nên luôn tự tái khẳng định, không cần
+// release/renew thủ công. KHÔNG chặn được sleep do user chủ động bấm Sleep/đóng nắp laptop — chỉ
+// chặn sleep tự động do không thao tác (idle timer của Windows).
+// v1.0.244 — đổi mức 'system' → 'display': Tony báo màn hình vẫn tự tắt dù đã bật tính năng này.
+// Đúng như thiết kế ban đầu — mức 'system' CHỈ chặn máy vào sleep, không chặn màn hình tắt theo
+// display timeout riêng của Windows (2 idle timer độc lập). Nhiều máy/policy khi màn hình tắt rồi
+// bật lại sẽ yêu cầu đăng nhập lại (khoá máy), gây gián đoạn tương tự sleep dù JS nền vẫn chạy —
+// Tony ưu tiên màn hình không tắt hơn là tiết kiệm điện. Đổi sang 'display' (bao luôn cả 'system' —
+// theo docs Chrome, mức 'display' ngăn màn hình tắt/dim VÀ ngăn máy sleep do idle).
+chrome.power.requestKeepAwake('display');
 
 console.log('[GroupFlow] service worker ready');
 ensureGroupFlowPeriodicAlarms().catch(() => {});

@@ -20,6 +20,11 @@
     <input type="text" id="overlayLicenseKey" placeholder="Dán key tại đây…" class="gf-activation-input" />
     <button type="button" id="overlayValidateBtn" class="gf-activation-submit">Xác thực key</button>
     <p id="overlayStatus" class="gf-activation-status"></p>
+    <!-- v1.0.248 — chỉ hiện khi validate-key trả code 'device_limit_reached'. Đặt NGAY ở overlay
+         (không phải trong tab Cài đặt) vì overlay che kín toàn màn hình, chặn hết thao tác phía sau
+         — user bị chặn thiết bị mới kích hoạt được lần đầu thì KHÔNG THỂ nào bấm tới nút trong Cài
+         đặt để tự cứu, dù nút đó có tồn tại. -->
+    <button type="button" id="overlayResetDevicesBtn" class="gf-activation-submit gf-activation-reset hidden">🔄 Đặt lại thiết bị (chỉ dùng máy này)</button>
     <p class="gf-activation-hint">Có tài khoản rồi? <a href="#" id="overlayLoginLink">Đăng nhập để xem lại key</a></p>
     <div class="gf-promo-footer gf-promo-footer-overlay">
       <a class="gf-promo-card gf-promo-card-zalo" href="https://www.zalopilot.vn" target="_blank" rel="noopener noreferrer">
@@ -869,6 +874,8 @@
               <button type="button" id="btnLogoutLicense" class="btn danger" style="padding:6px 10px">Thoát</button>
             </div>
           </label>
+          <button type="button" id="btnResetMyDevices" class="btn ghost sm" style="margin:6px 0">🔄 Đặt lại thiết bị</button>
+          <p class="hint" id="resetDevicesHint">Dùng khi bị báo "vượt giới hạn thiết bị" nhưng chỉ đang xài đúng máy này (vd cài lại extension mất dữ liệu máy cũ). Gỡ TẤT CẢ thiết bị khác đang đăng ký key này rồi đăng ký lại đúng máy hiện tại — <strong>giữ nguyên key, không ảnh hưởng bài đã đăng/lịch sử</strong>.</p>
           <label class="settings-inline-field">
             <span class="settings-field-label">URL server</span>
             <input type="url" id="tidienBaseUrl" placeholder="https://tidien.xyz" />
@@ -1001,7 +1008,7 @@
   <footer class="footer footer-global" id="commentFooterGlobal" aria-label="Lên lịch comment">
     <span class="batch-queue-label batch-queue-label-global">Tick bài → Lên lịch</span>
     <button type="button" id="btnCancelSelectedComments" class="btn ghost accent" title="Hủy lịch (1 lần hoặc lặp lại hàng ngày) của các bài đã tick">🗑 Hủy lịch đã chọn</button>
-    <button type="button" id="btnScheduleComments" class="btn primary">Lên lịch đã chọn</button>
+    <button type="button" id="btnScheduleComments" class="btn outline">Lên lịch đã chọn</button>
   </footer>
 
   <!-- Luôn hiện, mọi tab, không tắt theo body.gf-tab-* như 2 footer trên -->

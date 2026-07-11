@@ -141,7 +141,7 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
     )`;
   const selectFields = `up.id, up.post_queue_id, up.group_id, up.group_name,
                 up.post_id, up.noi_dung, up.posted_at, up.updated_at,
-                up.comment_count, up.comment_target,
+                up.comment_count, up.comment_target, up.pending_checked_at,
                 1 AS needs_comment,
                 u.name AS user_name, u.email AS user_email`;
   const rows = since
