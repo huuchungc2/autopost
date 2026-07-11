@@ -273,25 +273,11 @@ router.post('/logout', requireUserAuth, (req, res) => {
 });
 
 // ── Admin routes (yêu cầu admin JWT) ──────────────────────────────────────
-
-// GET /api/user-auth/admin/my-key — admin/super_admin (đăng nhập website) tự lấy license key
-// GroupFlow của CHÍNH tài khoản mình để dùng thử/dùng thật extension bằng danh tính admin. Trước
-// route này, admin/super_admin KHÔNG xuất hiện trong "GroupFlow Users" (danh sách đó lọc cứng
-// `role = 'group_user'`) và không có cách nào lấy key — phải tự đăng ký 1 tài khoản group_user
-// riêng qua form public như khách hàng thường, dù mình chính là người quản trị hệ thống. Tạo mới
-// nếu chưa có (plan 'enterprise' — không giới hạn sát như free/pro, admin cần test nhiều máy),
-// trả nguyên key cũ nếu đã có (không tạo trùng, không có "regenerate" ở v1 — không cần thiết cho
-// nhu cầu hiện tại, tự thêm sau nếu phát sinh).
-router.get('/admin/my-key', authenticate, asyncHandler(async (req, res) => {
-  const [existing] = await query('SELECT key_value, plan, status FROM license_keys WHERE user_id = ?', [req.user.id]);
-  if (existing) return res.json(existing);
-  const keyValue = randomUUID().replace(/-/g, '').slice(0, 32).toUpperCase();
-  await query(
-    'INSERT INTO license_keys (user_id, key_value, plan, status, expires_at) VALUES (?, ?, ?, ?, ?)',
-    [req.user.id, keyValue, 'enterprise', 'active', null]
-  );
-  res.json({ key_value: keyValue, plan: 'enterprise', status: 'active' });
-}));
+// 2026-07-11 — ĐÃ THỬ thêm `GET /admin/my-key` ở đây cho admin tự lấy license key riêng, nhưng phát
+// hiện TRÙNG LẶP với tính năng đã có sẵn từ trước: `GET/POST /api/auth/my-license`
+// (`routes/auth.js`, UI ở `GroupExtensionSettings.jsx` trong trang Cài đặt — "License key của tôi").
+// Route trùng này tạo ra 2 nơi cùng ghi `license_keys` cho cùng 1 user_id với default plan KHÁC
+// nhau (free vs enterprise) — rủi ro thật, đã xoá bỏ hẳn. Dùng `/api/auth/my-license` sẵn có.
 
 // GET /api/user-auth/admin/users — danh sách tất cả group_user + key + stats
 router.get('/admin/users', authenticate, asyncHandler(async (req, res) => {

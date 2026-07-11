@@ -54,13 +54,15 @@ router.get('/my-posts', authenticateLicenseKey, asyncHandler(async (req, res) =>
   const since = req.query.since ? new Date(req.query.since) : null;
   const rows = since
     ? await query(
-        `SELECT id, post_queue_id, group_id, group_name, post_id, noi_dung, posted_at, needs_comment, created_at, updated_at
+        `SELECT id, post_queue_id, group_id, group_name, post_id, noi_dung, posted_at, needs_comment,
+                pending_approval, pending_checked_at, created_at, updated_at
          FROM user_posts WHERE user_account_id = ? AND updated_at > ?
          ORDER BY updated_at ASC LIMIT ?`,
         [req.userAccount.id, since, limit]
       )
     : await query(
-        `SELECT id, post_queue_id, group_id, group_name, post_id, noi_dung, posted_at, needs_comment, created_at, updated_at
+        `SELECT id, post_queue_id, group_id, group_name, post_id, noi_dung, posted_at, needs_comment,
+                pending_approval, pending_checked_at, created_at, updated_at
          FROM user_posts WHERE user_account_id = ?
          ORDER BY updated_at DESC LIMIT ?`,
         [req.userAccount.id, limit]

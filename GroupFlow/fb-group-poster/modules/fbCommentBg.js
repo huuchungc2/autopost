@@ -29,7 +29,14 @@ const POST_ACCESS_CACHE_KEY = 'gf_post_access_cache';
 // nghĩa là mọi entry 'ok' ghi TRƯỚC bản vá này đều không đáng tin, mà 'ok' lại cache vĩnh viễn nên
 // sẽ không bao giờ tự check lại. Bump schema để tự xoá sạch cache cũ đúng 1 lần khi lên bản này —
 // xem readPostAccessCache().
-const POST_ACCESS_CACHE_SCHEMA = 2;
+// v1.0.251 — Tony hỏi "sao không reset DB cho đỡ khổ" — cache này KHÔNG nằm ở DB server, nằm ngay
+// trong chrome.storage.local của máy đang chạy extension, nên không có "lệnh DB" nào xoá được nó.
+// Bump schema lần 2 (2→3) để tự xoá sạch TOÀN BỘ cache cũ ngay khi reload extension lên bản này —
+// đơn giản hơn hẳn việc tự tay gọi force:true qua console cho từng bài — đổi lại mọi bài (không chỉ
+// đúng 1 bài đang lỗi) đều mất cache, phải chờ cron warmPostAccessCache() check lại dần (2 bài/~3
+// phút, hoặc 6 bài ngay khi mở tab Comment) — chấp nhận được vì đây chỉ là cache hiệu năng, không
+// phải dữ liệu thật.
+const POST_ACCESS_CACHE_SCHEMA = 3;
 const POST_ACCESS_CACHE_SCHEMA_KEY = 'gf_post_access_cache_schema';
 
 const FC = globalThis.GF.fbCommentBg = {
@@ -141,6 +148,21 @@ const FC = globalThis.GF.fbCommentBg = {
         return { canComment: false, kind: 'pending', reason: 'Bài đang chờ admin duyệt' };
       }
       if (html.includes('story_title') || html.includes('story_token') || html.includes('likeAction')) {
+        // v1.0.251 — thêm log NGAY CẢ khi khớp marker OK (trước đây chỉ log lúc fail-open, không có
+        // bằng chứng gì khi nghi ngờ marker OK khớp NHẦM trên bài thực ra đang chờ duyệt — Tony báo
+        // bài chờ duyệt vẫn hiện "có thể comment" ở tab Của tôi, cần dữ liệu thật để sửa đúng chỗ
+        // thay vì đoán thêm 1 marker mới không có bằng chứng, như 4-5 lần trước đã làm).
+        const looseHintsOnOk = ['duyệt', 'approv', 'pending', 'chờ', 'review'].filter((kw) => html.toLowerCase().includes(kw));
+        console.info('[GroupFlow] checkPostCommentable — khớp marker OK', {
+          postId, groupId, htmlLength: html.length,
+          matchedStoryTitle: html.includes('story_title'),
+          matchedStoryToken: html.includes('story_token'),
+          matchedLikeAction: html.includes('likeAction'),
+          // Nếu mảng này KHÔNG rỗng — nghĩa là HTML có tín hiệu liên quan chờ duyệt NGAY CẢNH marker
+          // OK, nhưng 3 marker pending/deleted phía trên không khớp được — bằng chứng trực tiếp cho
+          // giả thuyết "chờ duyệt dùng từ khác với marker đang dò", khác hẳn "JS mới dựng banner".
+          looseHintsOnOk,
+        });
         return { canComment: true, kind: 'ok' };
       }
       // Trang tải OK (không 404), khong thay dau hieu bi xoa/pending ro rang - nhung cung khong
@@ -154,8 +176,16 @@ const FC = globalThis.GF.fbCommentBg = {
       // v1.0.229 — log lại khi rơi vào fail-open để có dữ liệu chẩn đoán nếu marker (kể cả sau khi
       // đã normalize NFC) vẫn không khớp được lần nào đó trong tương lai — xem qua
       // chrome://extensions → GroupFlow → "service worker" → Console (không hiện trong Log UI).
+      // v1.0.251 — thêm quét từ khoá RỘNG hơn (không phân biệt hoa/thường, không cần khớp cả cụm) để
+      // phân biệt 2 khả năng: (a) HTML thô THẬT SỰ không mang tín hiệu gì (rất có thể do Facebook
+      // dựng banner "chờ duyệt" bằng JS phía client SAU khi tải trang — fetch() ở đây không chạy JS
+      // nên không bao giờ thấy được, khác hẳn lỗi marker sai chữ) — hay (b) tín hiệu CÓ mặt nhưng
+      // dùng từ khác/cách viết khác với 3 marker cụm đang dò. Không tự đoán thêm marker mới ở đây —
+      // chỉ log, chờ Tony gửi lại đúng đoạn console này để sửa CÓ BẰNG CHỨNG, tránh lặp lại kiểu vá
+      // mù đã làm 4-5 lần (v1.0.219/220/222/229/232) mà không dứt điểm.
+      const looseHints = ['duyệt', 'approv', 'pending', 'chờ', 'review'].filter((kw) => html.toLowerCase().includes(kw));
       console.warn('[GroupFlow] checkPostCommentable fail-open — không khớp marker nào', {
-        postId, groupId, htmlLength: html.length, htmlHead: html.slice(0, 400),
+        postId, groupId, htmlLength: html.length, htmlHead: html.slice(0, 400), looseHints,
       });
       return { canComment: true, kind: 'ok' };
     } catch (e) {

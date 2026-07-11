@@ -2842,8 +2842,17 @@ const GF_BG = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: auth.token, deviceId }),
       });
+      // v1.0.249 — bug thật vừa gặp: HTTP lỗi (vd 429 "Thử lại quá nhiều lần" từ
+      // licenseValidateLimiter khi nhiều request dồn vào trong lúc test) KHÔNG mang thông tin gì về
+      // tình trạng key thật, nhưng trước bản này vẫn bị lấy nguyên ghi đè vào `licenseInfo` —
+      // response đó không có `valid:true`, nên `licenseInfo.valid` thành `undefined` →
+      // checkLicenseGate() coi là "chưa hợp lệ" → tự bật lại màn hình kích hoạt dù key vẫn tốt, chỉ
+      // vì bị rate-limit tạm thời. Chỉ tin (và ghi đè cache) khi HTTP 200 VÀ response có field
+      // `valid` là boolean thật — mọi trường hợp khác (lỗi HTTP, rate-limit, response lạ) fail-open,
+      // không đụng gì tới `licenseInfo` đã cache.
+      if (!res.ok) return true;
       const data = await res.json().catch(() => null);
-      if (!data) return true;
+      if (!data || typeof data.valid !== 'boolean') return true;
       await chrome.storage.local.set({ licenseInfo: data });
       return data.valid !== false;
     } catch {

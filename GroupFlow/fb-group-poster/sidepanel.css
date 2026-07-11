@@ -384,6 +384,13 @@ footer.gf-promo-footer .gf-promo-card {
   text-transform: uppercase;
 }
 
+.brand-version {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+  margin-left: 2px;
+}
+
 .brand-license {
   font-size: 9px;
   color: rgba(255, 255, 255, 0.4);

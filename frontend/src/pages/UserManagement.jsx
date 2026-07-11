@@ -265,49 +265,10 @@ function GroupFlowUsers() {
   );
 }
 
-// Admin/super_admin không có trong "GroupFlow Users" (danh sách đó lọc cứng role=group_user) nên
-// không có cách nào tự lấy license key GroupFlow trước đây — phải đăng ký 1 tài khoản group_user
-// riêng như khách hàng thường. Khu nhỏ này gọi GET /admin/my-key (backend tự tạo nếu chưa có, plan
-// enterprise) để admin tự kích hoạt extension bằng chính tài khoản đang đăng nhập.
-function MyGroupFlowKey() {
-  const [key, setKey] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const { showToast } = useToast();
-
-  const fetchKey = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get('/user-auth/admin/my-key');
-      setKey(res.data);
-    } catch {
-      showToast('Không lấy được license key', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const copy = () => {
-    if (!key?.key_value) return;
-    navigator.clipboard.writeText(key.key_value).then(() => showToast('Đã copy license key', 'success'));
-  };
-
-  return (
-    <div className="card" style={{ marginBottom: 20, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-      <div style={{ flex: 1, minWidth: 220 }}>
-        <div style={{ fontWeight: 600, fontSize: 13 }}>License key GroupFlow của tôi</div>
-        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Kích hoạt extension GroupFlow bằng chính tài khoản admin này (plan Enterprise) — không cần đăng ký tài khoản group_user riêng.</div>
-      </div>
-      {key ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <code style={{ fontSize: 12 }}>{key.key_value}</code>
-          <Button type="button" variant="secondary" style={{ fontSize: 12 }} onClick={copy}>Copy</Button>
-        </div>
-      ) : (
-        <Button type="button" onClick={fetchKey} disabled={loading}>{loading ? 'Đang lấy…' : 'Lấy / Tạo key'}</Button>
-      )}
-    </div>
-  );
-}
+// 2026-07-11 — ĐÃ THỬ thêm 1 khu tự lấy license key ở đây, nhưng phát hiện TRÙNG LẶP với tính năng
+// đã có sẵn: "License key của tôi" trong trang Cài đặt (`GroupExtensionSettings.jsx`, gọi
+// `/api/auth/my-license`) — mọi role (kể cả admin/super_admin) đã tự lấy được key ở đó từ trước.
+// Đã xoá bỏ hẳn phần trùng lặp (component `MyGroupFlowKey` + route `GET /admin/my-key`).
 
 const initialForm = {
   name: '',
@@ -500,8 +461,6 @@ export default function UserManagement() {
         title="Quản lý người dùng"
         description={isSuperAdmin ? 'Super admin gán fanpage và AI provider cho admin/editor.' : 'Quản lý admin và biên tập — gán fanpage, provider.'}
       />
-
-      <MyGroupFlowKey />
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--bg-border)', paddingBottom: 0 }}>
         {[['admin', 'Admin / Biên tập'], ['groupflow', 'GroupFlow Users']].map(([key, label]) => (

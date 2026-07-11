@@ -2,6 +2,45 @@
 
 > Cập nhật: 2026-07-10
 
+## Backend + GroupFlow: gieo lại cache "có thể comment" từ server thay vì check lại từ đầu (2026-07-11)
+
+Tony hỏi đúng trọng tâm: "check 50/100 bài OK báo server rồi, reload extension thì check lại 100 bài từ đầu à?" — đúng, đó là hành vi trước bản này. Cache cục bộ (`gf_post_access_cache`) và xác nhận server (`pending_approval`/`pending_checked_at`) tách biệt hoàn toàn, không liên kết.
+
+- [x] `userSync.js` (`GET /my-posts`, cả 2 nhánh query since/cold-start): thêm `pending_approval`, `pending_checked_at` vào SELECT.
+- [x] `sidepanel.js`: thêm `seedPostAccessCacheFromServerRows()` — gọi trong `pullMyPostsFromServer()`, gieo lại cache cục bộ từ xác nhận server (so mốc thời gian, không ghi đè cache mới hơn).
+- [x] Bump `manifest.json` → v1.0.253, cập nhật `CHANGELOG.md`. Syntax check backend + extension sạch.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension (cache đã bị xoá bởi bump schema v1.0.252) → mở tab Comment → các bài ĐÃ từng được xác nhận OK/pending qua server (kiểm tra bằng `pending_checked_at` trong DB) phải hiện đúng NGAY, không cần đợi cron `warmPostAccessCache()` check lại từ đầu — chỉ bài CHƯA từng có `pending_checked_at` mới cần chờ cron.
+
+## GroupFlow: bài "của tôi" chưa duyệt vẫn hiện "có thể comment" — thêm log chẩn đoán (2026-07-11)
+
+Tony gửi link bài thật (nhóm 2885408438373818, post 4450720991842547) chưa được duyệt nhưng vẫn hiện "có thể comment" ở tab Của tôi — bug tái diễn nhiều lần (v1.0.219/220/222/229/232), mỗi lần vá mù 1 marker mới không có bằng chứng.
+
+- [x] Xác nhận marker hiện tại đã đúng NFC (không phải lỗi cũ) — nghi vấn mới: Facebook dựng banner "chờ duyệt" bằng JS client-side, `fetch()` HTML thô không chạy JS nên không thấy được.
+- [x] `fbCommentBg.js`: thêm log đầy đủ ở cả 3 nhánh check (OK rõ ràng, fail-open, kèm quét từ khoá rộng) — trước chỉ log fail-open.
+- [x] Rebuild `modules/swBundle.js` (bắt buộc vì `fbCommentBg.js` nằm trong bundle service worker).
+- [x] Bump `manifest.json` → v1.0.251, cập nhật `CHANGELOG.md`.
+- [x] Bump `POST_ACCESS_CACHE_SCHEMA` (2→3) — tự xoá sạch cache cũ khi reload extension (Tony hỏi "sao không reset DB" — làm rõ cache này ở local, không phải DB server, nên phải xoá kiểu này). Bump `manifest.json` → v1.0.252.
+- [ ] **Cần Tony lấy log thật rồi gửi lại**: reload extension (tự xoá cache cũ) → chờ cron `warmPostAccessCache` (mỗi ~3 phút) check lại đúng post 4450720991842547 (hoặc kích hoạt sớm hơn bằng cách mở tab Comment, hoặc dùng lệnh console `force:true` đã đưa để ép check ngay không cần chờ) → `chrome://extensions` → GroupFlow → "service worker" → tab Console → tìm dòng `checkPostCommentable` ứng với post này → chụp/copy gửi lại. Có log thật mới sửa CÓ BẰNG CHỨNG được, không đoán mù lần thứ 6.
+
+## Backend + Frontend + GroupFlow: xoá tính năng trùng lặp + hiện version extension (2026-07-11)
+
+Đã thêm nhầm "admin tự lấy license key" mà không tra cứu trước — trùng với `/api/auth/my-license` đã có sẵn (`GroupExtensionSettings.jsx`, trang Cài đặt). Tony cũng yêu cầu extension phải tự ghi rõ version.
+
+- [x] Xoá `GET /api/user-auth/admin/my-key` (`userAuth.js`) + khu `MyGroupFlowKey` (`UserManagement.jsx`) — trùng lặp, nghi là 1 phần nguyên nhân lỗi "hết hạn".
+- [x] Thêm `renderExtensionVersion()` (`sidepanel.js`) — hiện version cạnh "GroupFlow" ở header.
+- [x] Bump `manifest.json` → v1.0.250, cập nhật `CHANGELOG.md`. Frontend build sạch.
+- [ ] **Cần Tony xác nhận trên máy thật**: mở trang Cài đặt (website) → mục "License key của tôi" (không phải Quản lý người dùng nữa) để lấy key admin — kiểm tra key đó còn hạn hay không (nếu vẫn báo hết hạn thì cần soi trực tiếp DB `license_keys` cho đúng `user_id` này, tao không có quyền truy cập DB production để tự kiểm tra).
+- [ ] **Chưa giải quyết dứt điểm**: chưa xác nhận được CHÍNH XÁC vì sao key báo "hết hạn" — cả `/register`, `/my-license`, `/admin/my-key` (đã xoá) đều insert `expires_at: null` mặc định, không nơi nào trong UI hiện tại set expiry về quá khứ. Có thể là dữ liệu cũ từ trước (seed/test), cần soi DB trực tiếp mới biết chắc.
+
+## GroupFlow + Backend: đã kích hoạt vẫn tự bật lại màn hình kích hoạt (2026-07-11)
+
+Tony báo đã active xong, chuyển tab khác lại bị bắt kích hoạt lại. Root cause: `recheckLicenseStillValid()` (v1.0.245) ghi đè `licenseInfo` bằng nguyên response lỗi (429 rate-limit) không mang thông tin key thật, làm mất cờ `valid:true` đang cache.
+
+- [x] `background.js`: `recheckLicenseStillValid()` chỉ ghi đè `licenseInfo` khi HTTP 200 + `data.valid` là boolean thật — lỗi HTTP/rate-limit/response lạ đều fail-open, không đụng cache.
+- [x] `rateLimit.js`: nâng `licenseValidateLimiter` 10 → 30 request/15 phút/IP (đỡ dính oan vì "Đặt lại thiết bị" tốn 2 request/lượt qua cùng limiter).
+- [x] Bump `manifest.json` → v1.0.249, cập nhật `CHANGELOG.md`.
+- [ ] **Cần Tony xác nhận trên máy thật**: restart backend (bộ đếm rate-limit trong bộ nhớ tự reset về 0) + reload extension → active key → để máy chạy qua chu kỳ `gf_tidien_sync` (hoặc đợi >1 giờ cho `recheckLicenseStillValid` chạy) → không còn tự bật lại overlay khi vẫn đang hợp lệ.
+
 ## GroupFlow: nút "Đặt lại thiết bị" không thể bấm tới lúc cần nhất (2026-07-11)
 
 Tony lần lại đúng kịch bản: xoá cài lại extension, active đúng key cũ → thiết bị mới sinh ra bị chặn "vượt giới hạn" ngay từ đầu. Phát hiện: nút reset (v1.0.247) nằm trong Cài đặt, nhưng overlay kích hoạt che kín toàn màn hình — không thể bấm tới Cài đặt được trong chính lúc cần nút đó nhất.

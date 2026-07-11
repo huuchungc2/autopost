@@ -6132,6 +6132,47 @@ async function syncLocalPostsToServer() {
 // (chưa có cursor) vẫn lấy đúng 200 bài mới nhất như hành vi cũ; các lần sau chỉ hỏi "cái gì ĐỔI kể
 // từ cursor" — rẻ hơn nhiều cho cả client lẫn server, và bắt được cả trạng thái `needs_comment` đổi
 // trên bài CŨ (điều `created_at`/không-cursor trước đây bỏ sót vĩnh viễn nếu bài rớt khỏi top-200).
+// v1.0.253 — Tony hỏi đúng trọng tâm: "check 50 bài OK báo lên server rồi, giờ reload extension thì
+// check lại 100 bài từ đầu à?" — Trước bản này ĐÚNG LÀ VẬY: `gf_post_access_cache` (cục bộ) là NƠI
+// DUY NHẤT quyết định "của tôi" hiện được không, hoàn toàn tách biệt khỏi việc CHÍNH MÁY NÀY (hay
+// máy khác) đã từng báo `pending_approval`/`pending_checked_at` lên server qua
+// `reportOwnPendingApproval()` — cache cục bộ mất (reload/cài lại/bump schema như v1.0.252 vừa làm)
+// thì coi như chưa từng check, phải fetch lại Facebook cho TỪNG bài một, dù server đã biết câu trả
+// lời từ trước. Giờ mỗi lần đồng bộ `/my-posts` về, "gieo lại" (seed) cache cục bộ từ đúng
+// `pending_approval`/`pending_checked_at` server trả — chỉ bài NÀO server thật sự CHƯA có xác nhận
+// (`pending_checked_at` null, tức chưa ai check bao giờ) mới cần cron `warmPostAccessCache()` tự
+// check lại từ đầu; bài đã có xác nhận thì dùng lại luôn, không phí công fetch Facebook lần nữa.
+// So sánh mốc thời gian — không ghi đè nếu cache cục bộ đang có SẴN kết quả MỚI HƠN (vd vừa
+// force-check tay xong ngay trước khi sync server chạy).
+async function seedPostAccessCacheFromServerRows(rows) {
+  const confirmed = (rows || []).filter((r) => r.post_id && r.pending_checked_at);
+  if (!confirmed.length) return;
+  const d = await chrome.storage.local.get(['gf_post_access_cache', 'gf_post_access_cache_schema']);
+  const cache = d.gf_post_access_cache || {};
+  // 3 — phải khớp POST_ACCESS_CACHE_SCHEMA (modules/fbCommentBg.js). Không import được hằng số đó ở
+  // đây (module chỉ bundle cho service worker, xem chú thích recheckLicenseStillValid()) nên chép
+  // lại giá trị — nhớ đổi theo nếu fbCommentBg.js bump schema lần nữa.
+  const schema = 3;
+  let changed = false;
+  for (const r of confirmed) {
+    const checkedAtMs = new Date(r.pending_checked_at).getTime();
+    if (!Number.isFinite(checkedAtMs)) continue;
+    const existing = cache[String(r.post_id)];
+    if (existing?.checkedAt && existing.checkedAt >= checkedAtMs) continue;
+    cache[String(r.post_id)] = {
+      canComment: !r.pending_approval,
+      kind: r.pending_approval ? 'pending' : 'ok',
+      reason: r.pending_approval ? 'Chờ duyệt (xác nhận qua đồng bộ)' : undefined,
+      checkedAt: checkedAtMs,
+    };
+    changed = true;
+  }
+  if (changed) {
+    await chrome.storage.local.set({ gf_post_access_cache: cache, gf_post_access_cache_schema: schema });
+    state.postAccessCache = cache;
+  }
+}
+
 async function pullMyPostsFromServer({ force = false } = {}) {
   const { licenseKey } = await chrome.storage.local.get('licenseKey');
   if (!licenseKey) return;
@@ -6157,6 +6198,7 @@ async function pullMyPostsFromServer({ force = false } = {}) {
       serverMyPosts: merged,
       myPostsSyncMeta: { lastAt: now, cursor: newestUpdatedAt || meta.cursor || null },
     });
+    await seedPostAccessCacheFromServerRows(rows);
     state.serverMyPostsIndex = buildServerMyPostsIndex(merged);
     renderPosts();
   } catch { /* best-effort */ }
@@ -6350,8 +6392,20 @@ async function finishInit() {
   pullMyPostsFromServer().catch(() => {});
 }
 
+// Tony: "trong extension phải ghi version chứ" — hiện số version ngay ở header (không phụ thuộc đã
+// kích hoạt hay chưa — header vẫn nằm trong DOM dù overlay kích hoạt che phía trên) để biết đang
+// chạy đúng bản mới nhất sau khi reload extension, không cần mở chrome://extensions để soi.
+function renderExtensionVersion() {
+  const el = $('#brandVersion');
+  if (!el) return;
+  try {
+    el.textContent = `v${chrome.runtime.getManifest().version}`;
+  } catch { /* context invalidated — bỏ qua, không phải lỗi cần báo */ }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   if (!gfRuntimeAlive()) showContextInvalidBanner();
+  renderExtensionVersion();
   document.body.classList.add('gf-tab-create');
   const passed = await checkLicenseGate();
   if (!passed) return;

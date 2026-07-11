@@ -27,9 +27,15 @@ export const syncApiLimiter = rateLimit({
 // Endpoint public, KHÔNG qua license-key auth (dùng để kiểm tra key có hợp lệ hay không — chính vì
 // vậy không thể đòi hỏi key hợp lệ trước khi rate-limit) — chặn chặt hơn hẳn vì đây là bề mặt dò/brute-
 // force license key duy nhất không cần đăng nhập gì trước.
+// 2026-07-11 — nâng 10 → 30/15 phút: từ v1.0.247/248, 1 lượt "Đặt lại thiết bị" tự gọi 2 request
+// liên tiếp (reset-devices rồi validate-key) qua CÙNG limiter này — cộng thêm vài lần bấm "Xác thực
+// key" thử lại khi đang gỡ lỗi thiết bị, 10/15' hết sức dễ dính oan trong lúc dùng bình thường (Tony
+// tự dính khi test). 30 vẫn đủ chặt để chặn spam/DoS (không phải phòng brute-force key thật — key là
+// UUID 32 ký tự hex, ~10^38 khả năng, không ai dò được bằng rate limit nào cả), chỉ nới cho đúng nhu
+// cầu dùng thật.
 export const licenseValidateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 10,
+  limit: 30,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => ipKeyGenerator(req.ip),
