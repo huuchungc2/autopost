@@ -152,8 +152,24 @@ const FC = globalThis.GF.fbCommentBg = {
         // bằng chứng gì khi nghi ngờ marker OK khớp NHẦM trên bài thực ra đang chờ duyệt — Tony báo
         // bài chờ duyệt vẫn hiện "có thể comment" ở tab Của tôi, cần dữ liệu thật để sửa đúng chỗ
         // thay vì đoán thêm 1 marker mới không có bằng chứng, như 4-5 lần trước đã làm).
-        const looseHintsOnOk = ['duyệt', 'approv', 'pending', 'chờ', 'review'].filter((kw) => html.toLowerCase().includes(kw));
-        console.info('[GroupFlow] checkPostCommentable — khớp marker OK', {
+        // v1.0.254 — Tony test thật (post 4450720991842547): matchedStoryTitle:true, HTML ~908KB
+        // (không phải trang rỗng/login wall), nhưng không thấy được `looseHintsOnOk` vì Chrome
+        // console thu gọn object lồng nhau. Giờ trích luôn ĐOẠN VĂN BẢN quanh mỗi từ khoá tìm thấy
+        // (±150 ký tự) in thẳng ra console — không cần bấm mở rộng gì nữa, không cần đoán thêm
+        // marker mới khi chưa thấy đúng câu chữ Facebook dùng.
+        const lowerHtml = html.toLowerCase();
+        const looseHintsOnOk = ['duyệt', 'approv', 'pending', 'chờ', 'review'].filter((kw) => lowerHtml.includes(kw));
+        const hintSnippets = {};
+        for (const kw of looseHintsOnOk) {
+          const idx = lowerHtml.indexOf(kw);
+          hintSnippets[kw] = html.slice(Math.max(0, idx - 150), idx + 150);
+        }
+        // v1.0.255 — Tony copy log từ console nhưng Chrome vẫn thu gọn object lồng nhau (kể cả sau
+        // v1.0.254 thêm hintSnippets) — console.info nhận object thì DevTools luôn hiện dạng cây có
+        // thể thu gọn, copy text thường chỉ lấy được dòng tóm tắt, không lấy được nội dung bên
+        // trong. In thẳng 1 CHUỖI JSON (console.log, không phải console.info(obj)) — không thể thu
+        // gọn được nữa, copy paste là dán được nguyên văn.
+        console.log('[GroupFlow] checkPostCommentable OK-match JSON: ' + JSON.stringify({
           postId, groupId, htmlLength: html.length,
           matchedStoryTitle: html.includes('story_title'),
           matchedStoryToken: html.includes('story_token'),
@@ -162,7 +178,8 @@ const FC = globalThis.GF.fbCommentBg = {
           // OK, nhưng 3 marker pending/deleted phía trên không khớp được — bằng chứng trực tiếp cho
           // giả thuyết "chờ duyệt dùng từ khác với marker đang dò", khác hẳn "JS mới dựng banner".
           looseHintsOnOk,
-        });
+          hintSnippets,
+        }));
         return { canComment: true, kind: 'ok' };
       }
       // Trang tải OK (không 404), khong thay dau hieu bi xoa/pending ro rang - nhung cung khong
@@ -223,7 +240,14 @@ const FC = globalThis.GF.fbCommentBg = {
   async getPostAccess({ groupId, postId, session, isTimeline, force = false }) {
     const cached = force ? null : (await this.readPostAccessCache())[String(postId)];
     if (this.isAccessEntryFresh(cached)) return cached;
-    const result = await this.checkPostCommentable({ groupId, postId, session, isTimeline });
+    // v1.0.258 — đổi sang check bằng tab thật (GF_BG.checkPostCommentableViaTab(), background.js) —
+    // xem chú thích đầy đủ ở đó. `this.checkPostCommentable()` (fetch() HTML thô, KHÔNG BAO GIỜ thấy
+    // được banner "chờ duyệt" do Facebook lược bớt nội dung cho request không phải điều hướng thật)
+    // vẫn giữ nguyên trong file này, không xoá — dùng để so sánh/debug tay qua console nếu cần, xem
+    // docs/GROUPFLOW.md. `GF_BG` tham chiếu được ở đây vì `background.js` (nơi khai báo `const
+    // GF_BG`) và module này (nạp qua `importScripts('modules/swBundle.js')`) chạy CHUNG 1 global
+    // scope của service worker cổ điển (không phải ES module) — không cần `globalThis.GF_BG`.
+    const result = await GF_BG.checkPostCommentableViaTab({ groupId, postId, session, isTimeline });
     const entry = { ...result, checkedAt: Date.now() };
     await this.writePostAccessEntry(postId, entry);
     return entry;

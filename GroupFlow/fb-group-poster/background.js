@@ -95,12 +95,20 @@ const GF_BG = {
   // _claimedAlarms.
   _claimedDailyEntries: new Set(),
 
+  // v1.0.260 — đếm độ sâu "đang chạy TRONG 1 task của _taskQueue" (0 = đang gọi từ ngoài hàng đợi,
+  // vd cron/message handler). checkPostCommentableViaTab() đọc cờ này để quyết định có tự enqueue
+  // lại lần nữa hay không — xem chú thích đầy đủ ở đó (deadlock thật khi enqueueTask() lồng vào
+  // chính nó).
+  _insideQueuedTask: 0,
+
   enqueueTask(taskFn) {
     this._queueLength += 1;
     const run = async () => {
+      this._insideQueuedTask += 1;
       try {
         return await taskFn();
       } finally {
+        this._insideQueuedTask -= 1;
         this._queueLength -= 1;
       }
     };
@@ -1822,15 +1830,34 @@ const GF_BG = {
 
   async runScheduledJob(data, { alarmName } = {}) {
     if (!data?.kind) return false;
-    const snippet = data.kind === 'post'
-      ? (data.payload?.posts?.[0]?.noi_dung || '').slice(0, 80)
-      : '';
+    // v1.0.260 — Tony báo lịch COMMENT (không phải bài đăng) vẫn hiện thông báo "Đăng theo lịch" /
+    // "Bắt đầu đăng bài…" — tiêu đề/message trước đây HARDCODE riêng cho kind:'post', dùng chung
+    // luôn cho cả kind:'comment'/'generate_image' (snippet chỉ tính cho 'post', 2 kind còn lại rơi
+    // vào chuỗi mặc định "Bắt đầu đăng bài…" y hệt post dù không có bài nào được đăng cả). Tách
+    // riêng tiêu đề + nội dung mặc định theo đúng `data.kind`.
+    const scheduleNotice = {
+      post: {
+        title: 'GroupFlow — Đăng theo lịch',
+        snippet: (data.payload?.posts?.[0]?.noi_dung || '').slice(0, 80),
+        fallback: 'Bắt đầu đăng bài…',
+      },
+      comment: {
+        title: 'GroupFlow — Comment theo lịch',
+        snippet: (data.payload?.comment || '').slice(0, 80),
+        fallback: 'Bắt đầu comment…',
+      },
+      generate_image: {
+        title: 'GroupFlow — Tạo ảnh theo lịch',
+        snippet: '',
+        fallback: 'Bắt đầu tạo ảnh…',
+      },
+    }[data.kind] || { title: 'GroupFlow — Lịch', snippet: '', fallback: 'Bắt đầu chạy lịch…' };
     try {
       chrome.notifications.create(`gf_sched_${Date.now()}`, {
         type: 'basic',
         iconUrl: 'icons/icon128.png',
-        title: 'GroupFlow — Đăng theo lịch',
-        message: snippet || 'Bắt đầu đăng bài…',
+        title: scheduleNotice.title,
+        message: scheduleNotice.snippet || scheduleNotice.fallback,
       }).catch(() => {});
       if (data.kind === 'post') {
         const payload = await this.refreshScheduledPostPayload({ ...data.payload });
@@ -3161,7 +3188,110 @@ const GF_BG = {
   // `batchSize` để lượt quét THỦ CÔNG (bấm vào tab Comment — xem `GF_WARM_POST_ACCESS`,
   // chrome.runtime.onMessage bên dưới) check nhiều hơn hẳn 1 lượt so với tick nền định kỳ (vẫn giữ
   // 2 để tránh dồn dập khi chạy im lặng không ai để ý).
+  // v1.0.258 — check "bài này còn comment được không" bằng TAB THẬT thay vì fetch() HTML thô. Tony
+  // tự tay xác nhận bằng "View Page Source": banner "Bài viết đang chờ phê duyệt" CÓ THẬT trong
+  // response HTML — chỉ là fetch() gọi từ JS luôn tự động bị trình duyệt gắn cờ
+  // `Sec-Fetch-Mode: cors` (KHÔNG giả mạo được từ code — do chính trình duyệt quyết định dựa vào
+  // CÁCH request được tạo ra, không phải do header tự set), khiến Facebook trả về 1 phiên bản lược
+  // bớt banner này. Chỉ request kiểu điều hướng thật (`Sec-Fetch-Mode: navigate` — chỉ có khi thật
+  // sự mở tab/gõ URL) mới nhận đủ nội dung — không phải do JS chưa kịp chạy như từng nghi ngờ suốt
+  // v1.0.219→256. Mở tab NỀN (`active:false`, không cướp focus), tái dùng đúng hạ tầng tab đã có
+  // sẵn cho Cổ điển (`getNormalWindowId()`/`waitForTabLoad()`), đọc DOM thật
+  // (`document.body.innerText`, đã qua JS render đầy đủ) rồi đóng tab lại. Bọc trong `enqueueTask()`
+  // (cùng hàng đợi Cổ điển dùng) để không mở 2 tab đá nhau nếu đang có tác vụ đăng bài/comment thật
+  // chạy song song. Nặng hơn hẳn fetch() cũ (phải mở/tải/đóng 1 tab mỗi lần) — chấp nhận đánh đổi vì
+  // đây là cách DUY NHẤT nhận đủ tín hiệu Facebook thật sự trả về. Tìm 1 GraphQL query nhẹ hơn để
+  // thay thế cách này để lại làm sau (Tony chốt làm phần tab thật trước).
+  async checkPostCommentableViaTab({ groupId, postId, session, isTimeline }) {
+    const FC = globalThis.GF?.fbCommentBg;
+    const url = FC.buildPermalink({ groupId, postId, session, isTimeline });
+    const run = async () => {
+      const windowId = await this.getNormalWindowId();
+      if (!windowId) {
+        return { canComment: false, kind: 'pending', reason: 'Không có cửa sổ Chrome thường để mở tab check' };
+      }
+      const tab = await chrome.tabs.create({ url, active: false, windowId });
+      try {
+        await this.waitForTabLoad(tab.id, 20000);
+        // 'complete' chỉ đảm bảo tải xong tài nguyên — banner trạng thái là UI phụ, chờ thêm chút
+        // để chắc đã render xong (đo thực tế trên máy thường ~1-2 giây là đủ).
+        await this.delay(1500);
+        const injected = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => document.body?.innerText || '',
+        });
+        const text = String(injected?.[0]?.result || '').normalize('NFC');
+        if (
+          text.includes("This content isn't available at the moment")
+          || text.includes('Bạn hiện không xem được nội dung này')
+          || text.includes('Nội dung này hiện không có sẵn')
+          || text.includes('đã xóa nội dung')
+        ) {
+          return { canComment: false, kind: 'deleted', reason: 'Bài đã bị xóa hoặc ẩn' };
+        }
+        if (
+          text.includes('Your post is pending approval')
+          || text.includes('đang chờ phê duyệt')
+          || text.includes('đang chờ duyệt')
+          || text.includes('chờ quản trị viên phê duyệt')
+        ) {
+          return { canComment: false, kind: 'pending', reason: 'Bài đang chờ admin duyệt' };
+        }
+        // Không có tín hiệu xấu rõ ràng trên trang ĐÃ RENDER ĐẦY ĐỦ (đáng tin hơn hẳn fetch() cũ,
+        // vốn không bao giờ thấy được banner) — coi là commentable.
+        return { canComment: true, kind: 'ok' };
+      } finally {
+        await chrome.tabs.remove(tab.id).catch(() => {});
+      }
+    };
+    try {
+      // v1.0.260 — DEADLOCK THẬT tìm ra là nguyên nhân "lịch comment tới giờ không chạy": bọc trong
+      // enqueueTask() (v1.0.258) chỉ an toàn khi hàm này được gọi TỪ NGOÀI hàng đợi (cron
+      // warmPostAccessCache() gọi trực tiếp từ onAlarm). Khi gọi từ MỘT TASK ĐANG CHẠY BÊN TRONG
+      // chính hàng đợi đó — đúng đường lịch comment thật: runScheduledJob() → enqueueTask() →
+      // runComment() → commentOnPostBgOrClassic() → FC.commentOnPost() → getPostAccess() →
+      // checkPostCommentableViaTab() → enqueueTask() LẦN NỮA — `_taskQueue` là 1 chuỗi Promise tuần
+      // tự DUY NHẤT: task ngoài (runScheduledJob) chưa resolve (đang await đúng lệnh enqueueTask lồng
+      // này) nên task trong không bao giờ tới lượt chạy, mà task ngoài lại đang chờ task trong →
+      // kẹt cứng vĩnh viễn, không throw gì cả (chỉ treo). Notification "Bắt đầu…" đã bắn ra trước đó
+      // (chạy trước khi vào chỗ kẹt) nên trông như "đã bắt đầu" nhưng comment thật không bao giờ xảy
+      // ra — đúng hiện tượng Tony báo. Cờ `_insideQueuedTask` (background.js, tăng/giảm trong
+      // enqueueTask()) đánh dấu đang ở trong 1 task của hàng đợi — nếu đã ở trong rồi thì chắc chắn
+      // không ai khác đang giữ tab đăng bài/comment song song (hàng đợi tuần tự, 1 task/thời điểm),
+      // chạy thẳng không cần enqueue lại; chỉ enqueue thật khi gọi từ ngoài (cron 3 phút, force-check
+      // tay qua message riêng không đi qua enqueueTask trước đó).
+      if (this._insideQueuedTask) return await run();
+      return await this.enqueueTask(run);
+    } catch (e) {
+      return { canComment: false, kind: 'pending', reason: e.message || 'Lỗi kiểm tra bài (mở tab)' };
+    }
+  },
+
+  // v1.0.259 — Tony báo thấy tab check mở liên tục không nghỉ. Lỗ hổng có sẵn từ trước bản
+  // checkPostCommentableViaTab() (v1.0.258): hàm này không có gì chặn 2 lượt gọi CHỒNG LÊN NHAU —
+  // cron `gf_check_post_access` (mỗi 3 phút) và `GF_WARM_POST_ACCESS` (bắn mỗi lần mở tab Comment)
+  // đều có thể gọi cùng lúc, mỗi lượt tự đọc lại `cache`/tính `stale` riêng mà KHÔNG biết lượt kia
+  // đang xử lý dở — nếu backlog nhiều bài (Tony có ~15-20 bài chờ check), 2 lượt cùng thấy y hệt 1
+  // tập "còn stale" (vì lượt trước chưa kịp ghi kết quả xong) rồi cùng xếp việc check qua
+  // enqueueTask() → hàng đợi dồn cục, tab mở nối đuôi liên tục không nghỉ. Trước bản v1.0.258
+  // (check bằng fetch(), gần như tức thì) lỗ hổng này VÔ HÌNH — giờ mỗi check là 1 tab thật hiện ra
+  // vài giây nên lộ rõ. Thêm cờ `_warmPostAccessInFlight` — lượt gọi nào tới khi đã có lượt khác
+  // đang chạy thì bỏ qua êm (không xếp thêm), để đúng 1 lượt xử lý xong hẳn (bao gồm cả delay giữa
+  // các bài) rồi lượt sau mới được chạy — giống pattern `tidienSyncInFlight` đã dùng cho
+  // syncFromTidien().
+  _warmPostAccessInFlight: false,
+
   async warmPostAccessCache({ batchSize = 2 } = {}) {
+    if (this._warmPostAccessInFlight) return;
+    this._warmPostAccessInFlight = true;
+    try {
+      return await this._warmPostAccessCacheImpl({ batchSize });
+    } finally {
+      this._warmPostAccessInFlight = false;
+    }
+  },
+
+  async _warmPostAccessCacheImpl({ batchSize = 2 } = {}) {
     const FC = globalThis.GF?.fbCommentBg;
     const S = globalThis.GF?.fbSessionBg;
     if (!FC || !S) return;
@@ -3356,7 +3486,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // lớn hơn tick nền 3 phút/2 bài) thay vì bắt user ngồi đợi cron — không await lâu (không
         // block UI): bắn đi rồi trả lời ngay, panel tự loadComments() lại sau vài giây để thấy kết
         // quả (xem bindEvents(), sidepanel.js).
-        GF_BG.warmPostAccessCache({ batchSize: 6 }).catch((e) => {
+        // v1.0.259 — giảm 6 → 3: từ v1.0.258 mỗi check là 1 tab thật hiện ra vài giây (trước đây
+        // fetch() vô hình) — dồn 6 tab liên tiếp mỗi lần mở tab Comment nhấp nháy nhiều, giảm bớt
+        // cho đỡ rối mắt (vẫn nhanh hơn hẳn tick nền 3 phút/2 bài).
+        GF_BG.warmPostAccessCache({ batchSize: 3 }).catch((e) => {
           console.warn('[GroupFlow] manual warm post access:', e.message);
         });
         sendResponse({ ok: true });

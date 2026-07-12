@@ -1,6 +1,15 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-07-10
+> Cập nhật: 2026-07-12
+
+## GroupFlow: lịch comment tới giờ không chạy + thông báo sai "Đăng theo lịch" (2026-07-12)
+
+Tony báo 2 hiện tượng: tới giờ lịch comment chỉ thấy thông báo "Bắt đầu…" rồi im luôn (comment không lên Facebook), và lịch comment vẫn hiện thông báo "Đăng theo lịch"/"Bắt đầu đăng bài…" dù không có bài nào cả. Root cause hiện tượng đầu: deadlock thật do v1.0.258 tạo ra — `checkPostCommentableViaTab()` tự `enqueueTask()` lồng vào chính task đang chạy trong cùng hàng đợi (đường lịch comment thật), khiến cả 2 kẹt cứng vĩnh viễn không throw lỗi gì. Root cause hiện tượng sau: `runScheduledJob()` hardcode tiêu đề thông báo riêng cho `kind:'post'`, dùng chung cho mọi kind.
+
+- [x] `background.js`: thêm cờ đếm `_insideQueuedTask` (tăng/giảm trong `enqueueTask()`); `checkPostCommentableViaTab()` chỉ tự enqueue khi gọi từ NGOÀI hàng đợi, chạy thẳng nếu đã ở trong 1 task của hàng đợi rồi.
+- [x] `background.js`: `runScheduledJob()` tách tiêu đề/message thông báo riêng theo `data.kind` (post/comment/generate_image) thay vì hardcode chung 1 kiểu cho post.
+- [x] Bump `manifest.json` → v1.0.260, cập nhật `CHANGELOG.md`. Syntax check sạch (`node --check background.js`). Không đụng `fbCommentBg.js` nên không cần rebuild `swBundle.js`.
+- [ ] **Cần Tony xác nhận trên máy thật**: đặt 1 lịch comment "1 lần cụ thể" cho 1 bài CHƯA có trong cache (`gf_post_access_cache` — hoặc bấm "Đánh dấu chờ duyệt"... à đã bỏ nút đó, đơn giản nhất là chọn bài mới toanh chưa từng check) vào ~2 phút tới → xác nhận: (1) thông báo đầu tiên hiện đúng "GroupFlow — Comment theo lịch" (không phải "Đăng theo lịch"); (2) tab Facebook thoáng mở lên rồi tự đóng (bước check tab thật); (3) comment thật sự lên bài trên Facebook, không còn treo im lặng.
 
 ## Backend + GroupFlow: gieo lại cache "có thể comment" từ server thay vì check lại từ đầu (2026-07-11)
 
@@ -10,6 +19,52 @@ Tony hỏi đúng trọng tâm: "check 50/100 bài OK báo server rồi, reload 
 - [x] `sidepanel.js`: thêm `seedPostAccessCacheFromServerRows()` — gọi trong `pullMyPostsFromServer()`, gieo lại cache cục bộ từ xác nhận server (so mốc thời gian, không ghi đè cache mới hơn).
 - [x] Bump `manifest.json` → v1.0.253, cập nhật `CHANGELOG.md`. Syntax check backend + extension sạch.
 - [ ] **Cần Tony xác nhận trên máy thật**: reload extension (cache đã bị xoá bởi bump schema v1.0.252) → mở tab Comment → các bài ĐÃ từng được xác nhận OK/pending qua server (kiểm tra bằng `pending_checked_at` trong DB) phải hiện đúng NGAY, không cần đợi cron `warmPostAccessCache()` check lại từ đầu — chỉ bài CHƯA từng có `pending_checked_at` mới cần chờ cron.
+
+## GroupFlow: tab check mở liên tục không nghỉ + bỏ nút đánh dấu tay (2026-07-11)
+
+Tony báo sau v1.0.258 thấy tab check mở liên tục không dừng. Root cause: `warmPostAccessCache()` không chặn 2 lượt gọi chồng nhau (cron + mở tab Comment) — lỗ hổng có sẵn từ trước, vô hình lúc check còn là fetch() tức thì. Đồng thời Tony chốt bỏ nút đánh dấu tay vì check tự động giờ đáng tin rồi.
+
+- [x] `background.js`: thêm cờ `_warmPostAccessInFlight` chặn `warmPostAccessCache()` chạy chồng — lượt gọi tới sau khi đã có lượt đang chạy thì bỏ qua êm.
+- [x] Giảm batch "mở tab Comment" từ 6 → 3 bài/lượt.
+- [x] Xoá nút "🚫 Đánh dấu chờ duyệt" tay (v1.0.257) — `markPostPendingManually()`, `manualPendingToggleHtml()`, kind `manual_pending` trong `isAccessEntryFresh()`.
+- [x] Bump `manifest.json` → v1.0.259, rebuild `swBundle.js`, cập nhật `CHANGELOG.md`. Syntax check sạch.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension → mở tab Comment vài lần liên tiếp trong lúc còn nhiều bài chưa check → xác nhận KHÔNG còn thấy tab mở liên tục dồn dập nữa (chỉ 1 lượt chạy tại 1 thời điểm, tối đa 3 tab/lượt mở tab Comment); nút đánh dấu tay đã biến mất khỏi card.
+
+## GroupFlow: check "chờ duyệt" bằng tab thật thay vì fetch() (2026-07-11)
+
+Tony tự tay xác nhận qua View Page Source: banner "chờ phê duyệt" CÓ THẬT trong HTML — đảo ngược kết luận "JS dựng banner" trước đó. Nguyên nhân thật: fetch() luôn bị gắn Sec-Fetch-Mode: cors (không giả mạo được), Facebook lược bớt nội dung cho request này; chỉ điều hướng thật (mở tab) mới nhận đủ. Tony chốt: làm phần tab thật trước, để GraphQL query nhẹ hơn (phương án 1) làm sau.
+
+- [x] `background.js`: thêm `GF_BG.checkPostCommentableViaTab()` — mở tab nền, tái dùng `getNormalWindowId()`/`waitForTabLoad()`/`enqueueTask()` có sẵn của Cổ điển, đọc `document.body.innerText` qua `executeScript`, đóng tab.
+- [x] `fbCommentBg.js`: `getPostAccess()` đổi sang gọi hàm mới thay vì `checkPostCommentable()` fetch cũ (giữ nguyên hàm cũ, không xoá, để debug/so sánh).
+- [x] Bump `manifest.json` → v1.0.258, rebuild `swBundle.js`, cập nhật `CHANGELOG.md`. Syntax check sạch.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension → tab Comment → Của tôi → bài `4450720991842547` (đang chờ duyệt thật) → đợi cron `warmPostAccessCache` (~3 phút, hoặc mở lại tab Comment cho check batch 6 ngay) → xác nhận: (1) có thấy 1 tab Facebook thoáng mở lên rồi tự đóng (không active/không cướp focus); (2) sau đó bài này TỰ ẨN khỏi "Của tôi" (không cần bấm "Đánh dấu chờ duyệt" tay nữa); (3) không có 2 tab đá nhau nếu đang chạy Cổ điển song song.
+- [ ] **Việc sau (không gấp)**: tìm GraphQL query nhẹ hơn (không cần mở tab) thay thế — cần Tony tự dò Network tab lúc xem 1 bài đang chờ duyệt thật, tìm request GraphQL nào trả về đúng field trạng thái duyệt.
+
+## GroupFlow: nút đánh dấu tay "chờ duyệt" cho bài của mình (2026-07-11)
+
+Tony gửi log thật xác nhận dứt điểm: banner "chờ phê duyệt" của Facebook không tồn tại trong HTML thô — không marker nào vá được nữa, cần user tự đánh dấu tay khi thấy banner đó bằng mắt.
+
+- [x] `sidepanel.js`: `markPostPendingManually()` (gọi lại `POST /api/user-sync/posts` có sẵn) + nút "🚫 Đánh dấu chờ duyệt" / "✅ Đã duyệt xong" trên card Của tôi (`manualPendingToggleHtml()`, `renderComments()`).
+- [x] Cache kind riêng `'manual_pending'` — bền vĩnh viễn (không bị cron `warmPostAccessCache()` ghi đè sau 20 phút như `'pending'` thường). Sửa cả `isPostAccessFresh()` (sidepanel.js, đã tự bền sẵn với kind lạ) và `isAccessEntryFresh()` (`fbCommentBg.js`, service worker — thêm điều kiện mới).
+- [x] Tag hiển thị riêng "🚫 Chờ duyệt (tự đánh dấu)" phân biệt với "⏳ Chờ duyệt" (tự động check).
+- [x] Bump `manifest.json` → v1.0.257, rebuild `swBundle.js`, cập nhật `CHANGELOG.md`. Syntax check sạch.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension → tab Comment → Của tôi → bài `4450720991842547` → bấm "🚫 Đánh dấu chờ duyệt" → card phải biến mất khỏi danh sách (coi như không actionable) → đợi >20 phút, xác nhận KHÔNG tự quay lại "OK" (khác hành vi cũ) → khi Facebook duyệt xong, tìm lại bài đó (có thể cần filter riêng, xem ghi chú dưới) → bấm "✅ Đã duyệt xong" để mở lại.
+- [ ] **Hạn chế đã biết**: bài bị đánh dấu tay sẽ BIẾN MẤT khỏi danh sách "Của tôi" (giống hệt bài pending thật, vì `isCommentActionable()` lọc theo `canComment`) — chưa có filter riêng "hiện cả bài đã tự đánh dấu chờ duyệt" để dễ tìm lại bấm "Đã duyệt xong". Nếu Tony thấy bất tiện, cần thêm filter riêng cho việc này.
+
+## GroupFlow: log chẩn đoán vẫn bị thu gọn, đổi sang in chuỗi JSON (2026-07-11)
+
+Tony copy log console gửi lại nhưng Chrome vẫn thu gọn object lồng nhau (hintSnippets/looseHintsOnOk không đọc được). Đổi log OK-match sang `console.log(JSON.stringify(...))` — in phẳng, không thu gọn được nữa.
+
+- [x] `fbCommentBg.js` + rebuild `swBundle.js`. Bump `manifest.json` → v1.0.256.
+- [ ] **Cần Tony chạy lại đúng lệnh force-check cho post 4450720991842547** (đã đưa nhiều lần ở trên) sau khi reload extension — copy dòng bắt đầu bằng `[GroupFlow] checkPostCommentable OK-match JSON:` gửi lại nguyên văn (giờ là 1 dòng chữ, không phải object thu gọn).
+
+## GroupFlow: tab "Đồng đội" trống trơn dù server trả về bài hợp lệ (2026-07-11)
+
+Tony test bằng 3 tài khoản thật — `/cross-posts` trả đúng 9 bài (status 200) nhưng tab Đồng đội không hiện gì. Root cause: bug tự gây ra ở chính v1.0.246 (fix "bài chờ duyệt hiện sai") — object map `crossItems` (`loadPostedPostsForComment()`) quên chép field `pending_checked_at` mà `isCommentActionable()` cần để check hạn, khiến MỌI bài cross bị coi "chưa xác nhận" và ẩn sạch.
+
+- [x] `sidepanel.js`: thêm `pending_checked_at: cp.pending_checked_at || null` vào object map `crossItems`.
+- [x] Bump `manifest.json` → v1.0.255, cập nhật `CHANGELOG.md`. Syntax check sạch.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension trên cả 3 máy → mở tab Comment → Đồng đội → phải hiện đúng các bài đã confirm OK từ 2 tài khoản kia (không còn trống trơn).
 
 ## GroupFlow: bài "của tôi" chưa duyệt vẫn hiện "có thể comment" — thêm log chẩn đoán (2026-07-11)
 

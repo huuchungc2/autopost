@@ -3517,6 +3517,13 @@ async function loadPostedPostsForComment({ force = false } = {}) {
     // Server giờ trả cả bài đã comment rồi (needs_comment=0) — giữ lại field này để hiện tag
     // "Đã comment" thay vì lọc mất khỏi danh sách như trước.
     _needsComment: cp.needs_comment !== 0,
+    // v1.0.255 — BUG THẬT (Tony test 3 tài khoản, /cross-posts trả đúng 9 bài hợp lệ nhưng tab
+    // Đồng đội trống trơn): v1.0.246 thêm `pending_checked_at` vào SELECT backend + bắt
+    // isCommentActionable() check hạn field này cho bài cross, nhưng QUÊN chép field đó vào object
+    // map ở đây — mọi bài cross đều thiếu `pending_checked_at` nên luôn bị coi "hết hạn"/"chưa xác
+    // nhận", ẩn sạch 100% dù server trả về hợp lệ. Lỗi tự gây ra khi vá lỗi khác, không phải do
+    // logic điều kiện phía server.
+    pending_checked_at: cp.pending_checked_at || null,
     postedGroups: [{
       group_id: cp.group_id,
       group_name: cp.group_name || cp.group_id,
