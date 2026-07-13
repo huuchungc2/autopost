@@ -1,6 +1,66 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-07-12
+> Cập nhật: 2026-07-13
+
+## Backend + GroupFlow: client tự lọc/ngừng check bài quá N ngày đã lỡ nằm sẵn trong cache cục bộ (2026-07-13)
+
+Tony chỉ ra: chặn server không trả bài quá N ngày (mục dưới) là chưa đủ — bài ĐÃ LỠ nằm sẵn trong cache cục bộ (postQueue/serverMyPosts/crossPostsCache) vẫn tiếp tục hiện + bị tự check "vô nghĩa". Quyết định: ẩn hẳn khỏi cả 2 tab (không chỉ ngừng check ngầm), áp đồng nhất luôn cho postQueue.
+
+- [x] `backend/src/routes/userSync.js`: thêm `GET /api/user-sync/config` (license-key auth) trả `posts_sync_lookback_days` cho extension đọc.
+- [x] `background.js`: `getPostsSyncLookbackDays()` (fetch + cache 1h) + `isWithinPostsSyncLookback()` — áp vào `_warmPostAccessCacheImpl()`, bỏ qua bài quá hạn khỏi hàng đợi tự check.
+- [x] `sidepanel.js`: bản sao độc lập của 2 hàm trên — áp vào `loadPostedPostsForComment()`, ẩn hẳn bài quá hạn khỏi `localPosts`/`myServerItems`/`crossItems` (cả 2 tab Của tôi/Đồng đội).
+- [x] Bump `manifest.json` → v1.0.265, cập nhật `CHANGELOG.md`. Syntax check sạch cả 2 file. Không đụng file trong danh sách bundle của `build-sw-bundle.js` nên không cần rebuild `swBundle.js`.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension → mở tab Comment → xác nhận bài cũ hơn N ngày (đổi thử N nhỏ ở Cài đặt website để test nhanh, vd 1 ngày) biến mất khỏi cả "Của tôi" lẫn "Đồng đội"; theo dõi Console service worker vài phút → xác nhận không còn thấy log mở tab check cho các bài đó nữa.
+
+## Backend + Frontend: giới hạn số ngày đồng bộ bài viết GroupFlow, cấu hình từ website (2026-07-13)
+
+Tony muốn bài viết cũ hơn N ngày (mặc định 60, kể từ ngày post) không tải về extension nữa để giảm tải server — trước đây `/cross-posts` hardcode cứng 30 ngày, `/my-posts` không giới hạn gì cả.
+
+- [x] `backend/src/services/appSettingsService.js`: setting mới `posts_sync_lookback_days` (`app_settings`), `getEffectivePostsSyncLookbackDays()` (mặc định 60) + `savePostsSyncLookbackDays()`.
+- [x] `backend/src/routes/userSync.js`: cả `/my-posts` và `/cross-posts` thêm chặn `posted_at > lookbackFloor` (dùng setting động thay hardcode).
+- [x] `backend/src/routes/settings.js`: thêm `posts_sync_lookback_days` vào `GET /settings` + route mới `PUT /settings/posts-sync-lookback` (super_admin).
+- [x] `frontend/src/components/GroupExtensionSettings.jsx`: thêm ô nhập số ngày + nút Lưu, chỉ hiện cho super_admin.
+- [x] Syntax check backend sạch, `npm run build` frontend thành công.
+- [ ] **Cần Tony xác nhận**: vào Cài đặt → Extension (đăng nhập super_admin) → thấy ô "Đồng bộ bài viết cũ hơn (ngày)" mặc định 60 → đổi thử số khác → Lưu → reload trang → xác nhận số đã lưu đúng. Restart backend server để áp dụng route mới.
+
+## Backend + GroupFlow: bài đồng đội đã comment bị ẩn khỏi tổng số + thêm thống kê Của tôi/Đồng đội (2026-07-13)
+
+Tony test 3 máy thật (Tèo, Tony/supperadmin, Trưởng/lau), phát hiện số bài hiện ra cho CÙNG 1 người (Lâu) khác nhau giữa 2 máy xem (24 vs 17). Root cause: `GET /cross-posts` loại hẳn bài mà người xem đã từng tự comment khỏi kết quả (`NOT EXISTS` trong WHERE) — Tony chốt muốn thấy ĐỦ tổng số bài đã duyệt, không bị thu hẹp dần theo lịch sử từng người.
+
+- [x] `backend/src/routes/userSync.js` (`GET /cross-posts`): bỏ `NOT EXISTS (... commenter_user_id)` khỏi WHERE — mọi bài đã duyệt của người khác đều trả về. Đổi `needs_comment` từ hardcode `1` sang tính thật bằng correlated subquery.
+- [x] Xác nhận client (`sidepanel.js`) đã có sẵn hạ tầng xử lý `needs_comment=0` (tag "✓ Đã comment" + nút xác nhận chạy lại để "đẩy bài") — không cần sửa gì thêm phía client cho phần này.
+- [x] `sidepanel.html` + `sidepanel.js`: thêm thống kê "Của tôi (N)"/"Đồng đội (M)" ngay trên 2 nút tab con (`updateCommentSubTabCounts()`).
+- [x] Bump `manifest.json` → v1.0.264, cập nhật `CHANGELOG.md`. Syntax check sạch backend + extension.
+- [ ] **Cần Tony xác nhận trên máy thật (3 máy)**: reload extension cả 3 máy → mở tab Đồng đội → xác nhận cả 3 máy đều thấy TỔNG SỐ bài giống nhau cho cùng 1 người (vd Lâu phải hiện cùng 1 số ở mọi máy, không còn 24 vs 17), bài đã comment vẫn hiện với tag "✓ Đã comment" thay vì biến mất. Riêng vụ máy Trưởng không thấy đồng đội nào — vẫn cần kiểm tra license key/console riêng, KHÔNG liên quan tới bug này (xem mục dưới nếu còn tồn tại sau khi update).
+
+## GroupFlow: 2 bug phát hiện qua code review trước release v1.0.261/262 (2026-07-13)
+
+Tony yêu cầu review lại code trước khi release. Chạy `/code-review` (high effort) trên diff của v1.0.261/262, phát hiện 2 bug thật (ngoài các gợi ý dọn code):
+
+- [x] `background.js` (`retryMissedActivity()`): bỏ việc tự ghi đè `activityUpcoming` bằng snapshot cũ ở cuối hàm — gây race "hồi sinh" lại lịch vừa bị hủy nếu user thao tác trong lúc hàm đang chạy dở (undermine chính fix "hủy không chặn được job" ở v1.0.261).
+- [x] `background.js` (`runScheduledJob()`): chuyển thông báo "Bắt đầu…" vào bên trong closure, sau bước re-check hủy — trước đây bắn trước cả bước check, job bị hủy vẫn hiện thông báo gây hiểu lầm.
+- [x] `sidepanel.js` (`computeStaggeredWhens()`): đổi sang dùng `GF.scheduler.randBetween()` có sẵn thay vì tự viết công thức random (gợi ý dọn code từ review).
+- [x] Bump `manifest.json` → v1.0.263, cập nhật `CHANGELOG.md`. Syntax check sạch cả 3 file.
+- [ ] **Cần Tony xác nhận trên máy thật trước khi release**: đặt 1 lịch, để nó rơi vào lúc hàng đợi đang bận (vd đang chạy tay 1 job khác) rồi thử hủy 1 lịch KHÁC ngay lúc đó — xác nhận lịch bị hủy không tự chạy lại; xác nhận thông báo "Bắt đầu…" chỉ hiện khi job thật sự chạy, không hiện cho job đã hủy.
+
+## GroupFlow: random hoá khoảng cách đăng bài/comment, chống dấu hiệu "chạy đều như máy" (2026-07-13)
+
+Tony chỉ ra khoảng cách cố định giữa các bài (15 phút/bài, 1 tiếng/bài, hoặc lịch lặp lại chạy đúng y 1 giờ mỗi ngày) là dấu hiệu hành vi máy — người thật không đăng cách nhau đúng y 1 khoảng lặp lại.
+
+- [x] `sidepanel.js`: thêm `computeStaggeredWhens()` — random hoá khoảng cách giữa mỗi cặp bài liên tiếp (hệ số 0.7–1.3 lần gapMs, cộng dồn) thay cho `start + i*gap` tuyệt đối. Áp dụng cho `confirmCampaignStagger()` (Tạo bài) và `scheduleSelectedComments()` (Comment).
+- [x] `background.js` (`getSecurityDelays()`) + mirror `modules/scheduler.js` (`DELAYS`): `betweenPosts` đổi từ số cố định (+0-60s khi dùng) sang range thật (fast `[120,300]`, balanced `[300,600]`, safe `[600,1200]`).
+- [x] `background.js` (`tickDailyFixedSchedules()`): thêm `dailyJitter` theo securityLevel (0 tới 5/10/15 phút TRỄ HƠN giờ đặt) thay cho jitter 0-20s cũ cho lịch lặp lại hàng ngày.
+- [x] Bump `manifest.json` → v1.0.262, cập nhật `CHANGELOG.md`. Syntax check sạch (`node --check` cho cả 3 file). Không đụng file nào trong danh sách bundle của `build-sw-bundle.js` nên không cần rebuild `swBundle.js`.
+- [ ] **Cần Tony xác nhận trên máy thật**: "Lên lịch đã chọn" nhiều bài cùng lúc (Tạo bài lẫn Comment) → xác nhận khoảng cách giữa các bài không còn đều tăm tắp (vd đặt 15 phút/bài, 5 bài thì các mốc không còn cách đúng y 15-30-45-60 phút); đặt lịch lặp lại hàng ngày, theo dõi vài ngày → xác nhận giờ chạy thật dao động trễ vài phút quanh giờ đã đặt, không còn đúng y 1 phút mỗi ngày.
+
+## GroupFlow: hủy lịch rồi vẫn tự chạy — race đã enqueue + daily schedule retry vô hạn khi lỗi (2026-07-13)
+
+Tony báo hủy lịch xong bài/comment vẫn tự chạy, cụ thể 1 bài không tham gia được nhóm (không có ô bình luận, timeout thật) cứ chạy lại liên tục. 2 root cause: (1) job đã được claim/enqueue vào `_taskQueue` trước khi user bấm hủy — hủy chỉ xoá storage, không rút lại được closure đã nằm sẵn trong hàng đợi; (2) `tickDailyFixedSchedules()` chỉ mark "đã chạy hôm nay" khi THÀNH CÔNG — job lỗi (kể cả lỗi vĩnh viễn) không mark, service worker restart (rất thường xuyên) làm `recoverStalledDailySchedules()` tưởng nhầm là "bị ngắt giữa chừng" rồi cho chạy lại — lặp vô hạn.
+
+- [x] `background.js`: `runScheduledJob()` (lịch 1 lần) + `tickDailyFixedSchedules()` (lịch lặp lại) re-check storage ngay trước khi chạy thật, bỏ qua nếu đã bị hủy. Thêm `isUpcomingStillActive()`.
+- [x] `background.js`: `tickDailyFixedSchedules()` luôn gọi `markDailyScheduleDone()` dù thành công hay thất bại (trước đây chỉ gọi khi thành công).
+- [x] Bump `manifest.json` → v1.0.261, cập nhật `CHANGELOG.md`. Syntax check sạch (`node --check background.js`). Không đụng `fbCommentBg.js` nên không cần rebuild `swBundle.js`.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension → đặt lại lịch lặp lại hàng ngày cho 1 bài biết chắc sẽ lỗi (vd nhóm chưa tham gia) → xác nhận job chỉ chạy/thất bại ĐÚNG 1 LẦN/NGÀY dù service worker có restart giữa chừng bao nhiêu lần; đặt 1 lịch (1 lần hoặc lặp lại) rồi hủy ngay lúc đang có việc khác chạy trong hàng đợi → xác nhận job KHÔNG chạy sau khi hủy.
 
 ## GroupFlow: lịch comment tới giờ không chạy + thông báo sai "Đăng theo lịch" (2026-07-12)
 

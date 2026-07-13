@@ -3,8 +3,29 @@ import { query } from '../db.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { authenticateLicenseKey } from '../middleware/licenseAuth.js';
 import { upsertUserPost, VISIBLE_AFTER_MAX_MINUTES } from '../services/groupPostService.js';
+import { getEffectivePostsSyncLookbackDays } from '../services/appSettingsService.js';
 
 const router = express.Router();
+
+// 2026-07-13 — Tony: bài viết cũ hơn N ngày (kể từ NGÀY ĐĂNG — posted_at, không phải updated_at)
+// không nên tải về extension nữa (giảm tải server) — N cấu hình qua Cài đặt (super_admin), mặc định
+// 60 ngày (getEffectivePostsSyncLookbackDays(), appSettingsService.js), thay cho hardcode cứng cũ.
+// Áp dụng cho CẢ /my-posts (bài của chính mình) lẫn /cross-posts (bài đồng đội) — vì cả 2 đều là
+// nguồn extension dùng để quyết định bài nào cần tự check "còn comment được không"
+// (warmPostAccessCache(), background.js) — bài không được sync về thì tự nhiên không nằm trong
+// hàng đợi check nữa, không cần thêm điều kiện lọc riêng ở phía check.
+function getPostsSyncLookbackFloor() {
+  return new Date(Date.now() - getEffectivePostsSyncLookbackDays() * 24 * 60 * 60 * 1000);
+}
+
+// GET /api/user-sync/config — extension đọc lại đúng số ngày N đang cấu hình (Cài đặt website) để
+// tự áp CÙNG luật ẩn/không-check ở phía client cho những bài ĐÃ LỠ nằm sẵn trong cache cục bộ
+// (postQueue/serverMyPosts/crossPostsCache — merge cộng dồn, server ngừng trả bài cũ không tự xoá
+// được các bài đã cache trước đó) — không có route này, extension không có cách nào biết N hiện tại
+// đang là bao nhiêu để tự lọc theo cùng ngưỡng.
+router.get('/config', authenticateLicenseKey, asyncHandler(async (req, res) => {
+  res.json({ posts_sync_lookback_days: getEffectivePostsSyncLookbackDays() });
+}));
 
 // POST /api/user-sync/posts — Flow 2 (đồng bộ sau khi đăng bài). Dùng chung upsertUserPost() với
 // POST /group-posts/sync (routes/groupPosts.js) — cùng 1 bảng user_posts, khớp theo
@@ -52,20 +73,26 @@ router.post('/posts', authenticateLicenseKey, asyncHandler(async (req, res) => {
 router.get('/my-posts', authenticateLicenseKey, asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 100, 500);
   const since = req.query.since ? new Date(req.query.since) : null;
+  const lookbackFloor = getPostsSyncLookbackFloor();
+  // COALESCE(posted_at, created_at) — không dùng `posted_at` thô: cột này CÓ THỂ NULL cho bài cũ
+  // (extension cũ chưa gửi kịp trường này, hoặc dữ liệu backfill thiếu — xem pattern y hệt đã dùng
+  // ở groupPostService.js listUserPosts()). Nếu lọc bằng `posted_at > ?` thô, MySQL coi so sánh với
+  // NULL là unknown (loại khỏi kết quả) — bài đó biến mất VĨNH VIỄN khỏi sync dù có thể mới tạo gần
+  // đây (created_at gần), không liên quan gì tới tuổi bài thật.
   const rows = since
     ? await query(
         `SELECT id, post_queue_id, group_id, group_name, post_id, noi_dung, posted_at, needs_comment,
                 pending_approval, pending_checked_at, created_at, updated_at
-         FROM user_posts WHERE user_account_id = ? AND updated_at > ?
+         FROM user_posts WHERE user_account_id = ? AND updated_at > ? AND COALESCE(posted_at, created_at) > ?
          ORDER BY updated_at ASC LIMIT ?`,
-        [req.userAccount.id, since, limit]
+        [req.userAccount.id, since, lookbackFloor, limit]
       )
     : await query(
         `SELECT id, post_queue_id, group_id, group_name, post_id, noi_dung, posted_at, needs_comment,
                 pending_approval, pending_checked_at, created_at, updated_at
-         FROM user_posts WHERE user_account_id = ?
+         FROM user_posts WHERE user_account_id = ? AND COALESCE(posted_at, created_at) > ?
          ORDER BY updated_at DESC LIMIT ?`,
-        [req.userAccount.id, limit]
+        [req.userAccount.id, lookbackFloor, limit]
       );
   res.json(rows);
 }));
@@ -90,9 +117,9 @@ router.get('/my-posts', authenticateLicenseKey, asyncHandler(async (req, res) =>
 // bằng `updated_at` (đã có index `idx_user_posts_updated`) — thiếu chặn này, 1 request cold-start
 // (thiết bị mới/`since` rỗng) hoặc 1 thiết bị lâu ngày chưa mở app (`since` cũ) phải quét TOÀN BỘ
 // lịch sử `user_posts` của MỌI user rồi filesort — chi phí tăng vô hạn theo thời gian hệ thống tồn
-// tại, bất kể user đó có bao nhiêu bài. 30 ngày đủ rộng để không bỏ sót bài thật (bài cũ hơn gần
-// như chắc chắn đã được ai đó comment hoặc hết liên quan) mà vẫn chặn được chi phí tăng vô hạn.
-const CROSS_POSTS_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
+// tại, bất kể user đó có bao nhiêu bài. Số ngày lấy từ getEffectivePostsSyncLookbackDays() (Cài đặt
+// → super_admin, mặc định 60) thay vì hardcode cứng — đủ rộng để không bỏ sót bài thật (bài cũ hơn
+// gần như chắc chắn đã được ai đó comment hoặc hết liên quan) mà vẫn chặn được chi phí tăng vô hạn.
 
 // 2026-07-10 — REVERT hướng "loại bài chờ duyệt" (opt-out) sang "chỉ gửi bài đã CONFIRM" (opt-in).
 // Lý do đảo hẳn hướng: bài "bị hạn chế xem" (không phải chờ duyệt, mà nhóm riêng tư/đã đổi audience/
@@ -115,7 +142,7 @@ const OK_CONFIRMED_TTL_MS = 6 * 60 * 60 * 1000;
 router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
   const requestedSince = req.query.since ? new Date(req.query.since) : null;
-  const lookbackFloor = new Date(Date.now() - CROSS_POSTS_LOOKBACK_MS);
+  const lookbackFloor = getPostsSyncLookbackFloor();
   const okConfirmedFloor = new Date(Date.now() - OK_CONFIRMED_TTL_MS);
   // Bug đã gặp thật: client (fetchCrossPostsFromServer(), sidepanel.js) đẩy cursor `since` = MAX
   // updated_at của các bài ĐÃ THẤY (visible) trong lượt gọi trước — nhưng `visible_after` (độ trễ
@@ -132,19 +159,38 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
     ? new Date(Math.max(Math.min(requestedSince.getTime(), safetyFloor.getTime()), lookbackFloor.getTime()))
     : null;
   const myId = req.userAccount.id;
+  // 2026-07-13 — Tony chốt rõ: "tao có X bài kiểm tra được phép comment thì luôn hiển thị X ở đồng
+  // đội của người khác" — bài ĐÃ được TÔI bình luận rồi vẫn phải tiếp tục hiện (không biến mất khỏi
+  // tổng số), vì mục tiêu là "đẩy bài" (thấy đủ toàn bộ số bài đã duyệt của đồng đội), không phải
+  // danh sách việc-cần-làm thu hẹp dần. TRƯỚC ĐÂY `NOT EXISTS (...)` ở WHERE loại hẳn bài tôi đã
+  // comment khỏi kết quả — khiến tổng số bài hiện ra cho MỖI người xem KHÁC NHAU tuỳ người đó đã tự
+  // comment bao nhiêu bài rồi (đúng con số 24 vs 17 Tony chỉ ra, cùng 1 người nhưng 2 máy thấy 2 số
+  // khác nhau) — gây hiểu lầm tưởng lỗi đồng bộ. Bỏ điều kiện này khỏi WHERE — mọi bài đã duyệt của
+  // MỌI người khác đều luôn trả về, không phụ thuộc người xem đã tự comment hay chưa.
+  // AND COALESCE(up.posted_at, up.created_at) > ? (lookbackFloor) — bài đăng cũ hơn N ngày (kể từ
+  // NGÀY ĐĂNG, không phải lần sửa gần nhất) không còn trả về cho đồng đội nữa, xem
+  // getPostsSyncLookbackFloor() phía trên. Dùng COALESCE(posted_at, created_at) chứ không phải
+  // `posted_at` thô — cột này CÓ THỂ NULL cho bài cũ (extension cũ chưa gửi kịp trường này, dữ liệu
+  // backfill thiếu — cùng pattern đã dùng ở groupPostService.js listUserPosts()); lọc bằng cột NULL
+  // trực tiếp sẽ khiến bài đó biến mất vĩnh viễn khỏi kết quả, không liên quan gì tuổi bài thật.
   const baseWhere = `up.user_account_id != ?
     AND up.visible_after <= NOW()
     AND up.pending_approval = 0
     AND up.pending_checked_at IS NOT NULL
     AND up.pending_checked_at > ?
-    AND NOT EXISTS (
-      SELECT 1 FROM user_post_comments upc
-      WHERE upc.user_post_id = up.id AND upc.commenter_user_id = ?
-    )`;
+    AND COALESCE(up.posted_at, up.created_at) > ?`;
+  // `needs_comment` giờ tính THẬT theo đúng người đang hỏi (myId) thay vì hardcode `1` — client
+  // (`isCommentDone()`, sidepanel.js: `c._source === 'cross' ? c._needsComment === false`) đã có sẵn
+  // hạ tầng đọc field này để đánh dấu tag "✓ Đã comment" mà KHÔNG lọc mất khỏi danh sách/tổng số —
+  // hạ tầng này từng được xây rồi bị bỏ dở dang khi NOT EXISTS ở WHERE làm field này thành vô nghĩa
+  // (luôn ra 1 vì hàng đã bị loại từ WHERE rồi thì querynày không bao giờ thấy hàng needs_comment=0).
   const selectFields = `up.id, up.post_queue_id, up.group_id, up.group_name,
                 up.post_id, up.noi_dung, up.posted_at, up.updated_at,
                 up.comment_count, up.comment_target, up.pending_checked_at,
-                1 AS needs_comment,
+                (NOT EXISTS (
+                  SELECT 1 FROM user_post_comments upc
+                  WHERE upc.user_post_id = up.id AND upc.commenter_user_id = ?
+                )) AS needs_comment,
                 u.name AS user_name, u.email AS user_email`;
   const rows = since
     ? await query(
@@ -154,12 +200,12 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
          WHERE ${baseWhere} AND up.updated_at > ?
          ORDER BY up.comment_count ASC, up.updated_at ASC
          LIMIT ?`,
-        [myId, okConfirmedFloor, myId, since, limit]
+        [myId, myId, okConfirmedFloor, lookbackFloor, since, limit]
       )
     // Cold-start (thiết bị mới, chưa có cursor) — giữ nguyên thứ tự ưu tiên cũ (bài mới nhất
     // trước), chỉ thêm bound `updated_at` (dùng chung idx_user_posts_updated) để tận dụng index
-    // thay vì quét hết bảng — không đổi kết quả trả về với hệ thống mới (mọi bài đều trong 30
-    // ngày), chỉ khác khi hệ thống đã chạy lâu và có bài rất cũ (vốn cũng hiếm khi còn cần comment).
+    // thay vì quét hết bảng — không đổi kết quả trả về so với chỉ lọc bằng posted_at, chỉ khác khi
+    // hệ thống đã chạy lâu và có bài rất cũ (vốn cũng hiếm khi còn cần comment).
     : await query(
         `SELECT ${selectFields}
          FROM user_posts up
@@ -167,7 +213,7 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
          WHERE ${baseWhere} AND up.updated_at > ?
          ORDER BY up.comment_count ASC, up.posted_at DESC
          LIMIT ?`,
-        [myId, okConfirmedFloor, myId, lookbackFloor, limit]
+        [myId, myId, okConfirmedFloor, lookbackFloor, lookbackFloor, limit]
       );
   res.json(rows);
 }));

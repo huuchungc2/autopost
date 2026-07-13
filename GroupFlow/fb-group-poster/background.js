@@ -151,7 +151,7 @@ const GF_BG = {
       const s = await chrome.storage.local.get('securityLevel');
       const delays = await this.getSecurityDelays(s.securityLevel);
       const gapSec = kind === 'post'
-        ? this.randBetween([delays.betweenPosts, delays.betweenPosts + 60])
+        ? this.randBetween(delays.betweenPosts)
         : this.randBetween(delays.betweenComments);
       this._nextJobSlotAt = Date.now() + gapSec * 1000;
     }
@@ -958,10 +958,19 @@ const GF_BG = {
   async getSecurityDelays(level) {
     const s = await chrome.storage.local.get('securityLevel');
     const key = level || s.securityLevel || 'balanced';
+    // 2026-07-13 — Tony: `betweenPosts` trước đây là 1 SỐ CỐ ĐỊNH (180/420/900s) chỉ được cộng
+    // thêm 0-60s ngẫu nhiên lúc dùng (`randBetween([betweenPosts, betweenPosts+60])`) — khoảng dao
+    // động quá hẹp (vd "safe" luôn ra đúng 900-960s, tức 15-16 phút MỌI LẦN) nên bài đăng lúc nào
+    // cũng cách nhau gần như y hệt — đúng dấu hiệu hành vi máy mà Tony chỉ ra. Đổi thành khoảng
+    // (range) rộng hơn thật sự, cùng dạng với `betweenGroups`/`betweenComments` đã có sẵn — vẫn
+    // tương đương tốc độ trung bình cũ nhưng biên độ dao động đủ rộng để không lộ chu kỳ cố định.
+    // `dailyJitter` — độ trễ ngẫu nhiên (giây, chỉ TRỄ HƠN, không bao giờ sớm hơn) áp cho đúng
+    // mốc giờ user đặt của lịch "lặp lại hàng ngày" (xem tickDailyFixedSchedules()) — tránh chạy
+    // đúng y 1 phút mỗi ngày (vd luôn đúng 8:00) trông như máy chạy theo cron cố định.
     const map = {
-      fast: { betweenGroups: [5, 60], betweenPosts: 180, betweenComments: [90, 180] },
-      balanced: { betweenGroups: [180, 300], betweenPosts: 420, betweenComments: [180, 300] },
-      safe: { betweenGroups: [420, 600], betweenPosts: 900, betweenComments: [300, 600] },
+      fast: { betweenGroups: [5, 60], betweenPosts: [120, 300], betweenComments: [90, 180], dailyJitter: [0, 300] },
+      balanced: { betweenGroups: [180, 300], betweenPosts: [300, 600], betweenComments: [180, 300], dailyJitter: [0, 600] },
+      safe: { betweenGroups: [420, 600], betweenPosts: [600, 1200], betweenComments: [300, 600], dailyJitter: [0, 900] },
     };
     return map[key] || map.balanced;
   },
@@ -1264,25 +1273,53 @@ const GF_BG = {
       // đợi trùng lặp. CHỈ đánh dấu pendingRunDate — lastRunDate chỉ set sau khi chạy xong thật.
       list[i] = { ...entry, pendingRunDate: today };
       const entryId = entry.id;
-      // Entry đầu tiên trong tick này: jitter nhỏ (0-20s) như cũ — chỉ để tránh bắn đúng giây y hệt
-      // mỗi ngày. Entry thứ 2 trở đi TRONG CÙNG TICK (2026-07-04 — vd nhiều lịch cùng bị lỡ dồn lại
-      // sau khi mở lại máy) dùng đúng betweenPosts/betweenComments theo securityLevel — tránh dồn
-      // cục nhiều tác vụ sát nhau, cùng lý do với retryMissedActivity().
+      // Entry đầu tiên trong tick này: TRƯỚC ĐÂY chỉ jitter 0-20s (gần như đúng y giờ đặt mỗi
+      // ngày — Tony chỉ ra đây là dấu hiệu hành vi máy, "cứ 8h sáng chạy hoài"). Giờ dùng
+      // `dailyJitter` theo securityLevel (0 tới 5/10/15 phút TRỄ HƠN giờ đặt, không bao giờ sớm
+      // hơn — vẫn tôn trọng "không đăng trước giờ user chọn"). Entry thứ 2 trở đi TRONG CÙNG TICK
+      // (2026-07-04 — vd nhiều lịch cùng bị lỡ dồn lại sau khi mở lại máy) dùng đúng
+      // betweenPosts/betweenComments theo securityLevel — tránh dồn cục nhiều tác vụ sát nhau,
+      // cùng lý do với retryMissedActivity().
       const gapMs = dueCount === 0
-        ? Math.floor(Math.random() * 20) * 1000
+        ? this.randBetween(delays.dailyJitter) * 1000
         : (entry.kind === 'post'
-          ? this.randBetween([delays.betweenPosts, delays.betweenPosts + 60]) * 1000
+          ? this.randBetween(delays.betweenPosts) * 1000
           : this.randBetween(delays.betweenComments) * 1000);
       dueCount += 1;
       this.enqueueTask(async () => {
         await this.delay(gapMs);
+        // 2026-07-13 — Tony báo hủy lịch lặp lại hàng ngày xong bài/comment vẫn tự chạy: entry đã
+        // được claim (pendingRunDate) và enqueue ở TRÊN ngay khi tick phát hiện tới giờ, nhưng thực
+        // thi thật có thể trễ vài phút (gapMs + hàng đợi bận việc khác) — trong lúc đó tag lịch vẫn
+        // hiện bình thường trên UI (entry còn nguyên trong dailyFixedSchedules, chỉ thêm
+        // pendingRunDate) nên user bấm Hủy tưởng đã chặn được, nhưng cancelDailyFixedSchedule() chỉ
+        // xoá entry khỏi storage — không rút lại được closure đã nằm sẵn trong _taskQueue. Re-check
+        // ngay trước khi chạy thật: nếu entry đã bị xoá (hủy) thì bỏ qua, không chạy.
+        const stillD = await chrome.storage.local.get('dailyFixedSchedules');
+        if (!(stillD.dailyFixedSchedules || []).some((e) => e.id === entryId)) {
+          console.info('[GroupFlow] daily fixed schedule cancelled before run, skip:', entryId);
+          return;
+        }
         try {
           if (entry.kind === 'post') await this.runPostMatrix(entry.payload);
           else if (entry.kind === 'comment') await this.runComment(entry.payload);
-          await this.markDailyScheduleDone(entryId, today);
         } catch (e) {
+          // 2026-07-13 — Tony báo 1 bài (không tham gia được nhóm, nên KHÔNG BAO GIỜ có ô bình
+          // luận — waitFor() timeout thật) cứ tự chạy lại liên tục trong ngày dù đã hủy lịch. Root
+          // cause: markDailyScheduleDone() trước đây CHỈ được gọi khi chạy THÀNH CÔNG — mọi lỗi (kể
+          // cả lỗi thật vĩnh viễn như bài không xem được) đều bỏ qua, không set lastRunDate. Vì
+          // pendingRunDate vẫn còn "hôm nay" nên tick tiếp theo trong ngày tự bỏ qua — NHƯNG
+          // recoverStalledDailySchedules() (gọi mỗi lúc service worker khởi động lại, xảy ra RẤT
+          // thường xuyên do idle timeout Manifest V3) coi mọi entry có pendingRunDate != lastRunDate
+          // là "job phiên trước bị ngắt giữa chừng" rồi tự xoá pendingRunDate — khiến tick kế tiếp
+          // coi là "chưa chạy hôm nay" và chạy lại TỪ ĐẦU, dù job thực ra đã chạy xong (chỉ là chạy
+          // xong với kết quả LỖI, không phải bị ngắt) — lặp vô hạn nhiều lần/ngày cho bất kỳ bài nào
+          // lỗi cố định (vd nhóm chưa tham gia). Giờ đánh dấu "đã chạy hôm nay" (markDailyScheduleDone)
+          // dù thành công hay thất bại — giữ đúng thiết kế gốc "1 lần/ngày", lỗi thật vẫn tự thử lại
+          // vào ngày mai (đủ, không cần retry dồn dập trong cùng 1 ngày).
           console.warn('[GroupFlow] daily fixed schedule failed:', entryId, e.message);
         }
+        await this.markDailyScheduleDone(entryId, today);
       });
     }
     if (changed) await chrome.storage.local.set({ dailyFixedSchedules: list });
@@ -1828,6 +1865,14 @@ const GF_BG = {
     chrome.runtime.sendMessage({ type: 'GF_ACTIVITY_REFRESH' }).catch(() => {});
   },
 
+  // 2026-07-13 — dùng để re-check ngay trước khi 1 job "1 lần cụ thể" đã enqueue thật sự chạy —
+  // cancelUpcoming() (sidepanel.js) xoá entry khỏi activityUpcoming ngay lập tức khi user bấm Hủy,
+  // nên còn tồn tại trong mảng này tại thời điểm SẮP chạy là tín hiệu đáng tin "vẫn còn muốn chạy".
+  async isUpcomingStillActive(alarmName) {
+    const d = await chrome.storage.local.get('activityUpcoming');
+    return (d.activityUpcoming || []).some((u) => (u.alarmName || u.id) === alarmName);
+  },
+
   async runScheduledJob(data, { alarmName } = {}) {
     if (!data?.kind) return false;
     // v1.0.260 — Tony báo lịch COMMENT (không phải bài đăng) vẫn hiện thông báo "Đăng theo lịch" /
@@ -1852,13 +1897,22 @@ const GF_BG = {
         fallback: 'Bắt đầu tạo ảnh…',
       },
     }[data.kind] || { title: 'GroupFlow — Lịch', snippet: '', fallback: 'Bắt đầu chạy lịch…' };
-    try {
+    // 2026-07-13 — thông báo "Bắt đầu…" trước đây bắn NGAY khi vào hàm này, TRƯỚC cả bước re-check
+    // hủy (`isUpcomingStillActive()`) bên dưới — job đã bị hủy vẫn cứ hiện "Bắt đầu đăng bài…"/
+    // "Bắt đầu comment…" dù không hề chạy, gây hiểu lầm y hệt bug "hủy vẫn chạy" đang cố sửa (khác
+    // biệt duy nhất là lần này không thật sự đăng, nhưng user nhìn thông báo vẫn tưởng có). Chuyển
+    // vào ĐÚNG bên trong từng closure enqueue, ngay SAU khi xác nhận chưa bị hủy — post/comment chỉ
+    // còn thấy thông báo khi job THẬT SỰ sắp chạy. `generate_image` và nhánh mặc định (không có
+    // bước re-check hủy nào) vẫn bắn ngay như cũ.
+    const showScheduleNotice = () => {
       chrome.notifications.create(`gf_sched_${Date.now()}`, {
         type: 'basic',
         iconUrl: 'icons/icon128.png',
         title: scheduleNotice.title,
         message: scheduleNotice.snippet || scheduleNotice.fallback,
       }).catch(() => {});
+    };
+    try {
       if (data.kind === 'post') {
         const payload = await this.refreshScheduledPostPayload({ ...data.payload });
         // Xếp vào hàng đợi tuần tự chung thay vì tự chờ-rồi-báo-lỗi sau 30 phút — lịch đăng bài
@@ -1866,11 +1920,30 @@ const GF_BG = {
         // còn báo "đang bận, thử lại sau" nữa. runSpacedJob() giữ đúng khoảng cách betweenPosts kể
         // từ job LỊCH gần nhất, kể cả khi vào đây từ alarm thật bắn dồn cục (xem chú thích
         // _nextJobSlotAt phía trên).
-        await this.enqueueTask(() => this.runSpacedJob('post', () => this.runPostMatrix(payload)));
+        // 2026-07-13 — Tony báo hủy lịch xong bài vẫn tự đăng: job đã enqueue rồi chỉ chờ tới lượt
+        // (queue có thể đang bận việc khác) — cancelUpcoming() (sidepanel.js) chỉ xoá bản ghi trong
+        // activityUpcoming, không có cách nào rút lại closure đã nằm sẵn trong _taskQueue. Re-check
+        // ngay trước khi chạy thật: nếu đã bị hủy (không còn trong activityUpcoming) thì bỏ qua.
+        await this.enqueueTask(async () => {
+          if (alarmName && !(await this.isUpcomingStillActive(alarmName))) {
+            console.info('[GroupFlow] scheduled post cancelled before run, skip:', alarmName);
+            return;
+          }
+          showScheduleNotice();
+          return this.runSpacedJob('post', () => this.runPostMatrix(payload));
+        });
       } else if (data.kind === 'generate_image') {
+        showScheduleNotice();
         await this.runImageGenerate(data.payload);
       } else if (data.kind === 'comment') {
-        await this.enqueueTask(() => this.runSpacedJob('comment', () => this.runComment(data.payload)));
+        await this.enqueueTask(async () => {
+          if (alarmName && !(await this.isUpcomingStillActive(alarmName))) {
+            console.info('[GroupFlow] scheduled comment cancelled before run, skip:', alarmName);
+            return;
+          }
+          showScheduleNotice();
+          return this.runSpacedJob('comment', () => this.runComment(data.payload));
+        });
       } else {
         return false;
       }
@@ -2216,7 +2289,7 @@ const GF_BG = {
         if (pi < job.posts.length - 1) {
           const auto = this.resolvePostAutomation(post, settings);
           const delays = await this.getSecurityDelays(auto.securityLevel);
-          await this.interruptibleDelay(this.randBetween([delays.betweenPosts, delays.betweenPosts + 60]) * 1000);
+          await this.interruptibleDelay(this.randBetween(delays.betweenPosts) * 1000);
         }
       }
     } catch (e) {
@@ -3138,21 +3211,14 @@ const GF_BG = {
     const d = await chrome.storage.local.get(['activityUpcoming', 'retryMissed']);
     if (d.retryMissed === false) return;
     const now = Date.now();
-    const due = [];
-    const remaining = [];
-    for (const item of d.activityUpcoming || []) {
-      (item.when <= now ? due : remaining).push(item);
-    }
+    const due = (d.activityUpcoming || []).filter((item) => item.when <= now);
     if (!due.length) return;
 
     for (const item of due) {
       const alarmName = item.alarmName || item.id;
       // Alarm thật (gf_cmt_*/gf_job_*) đã tự bắn và đang/vừa xử lý đúng entry này — không giành chạy
       // lại, chỉ giữ trong activityUpcoming (sẽ tự bị removeUpcomingByAlarmName() dọn khi job xong).
-      if (this._claimedAlarms.has(alarmName)) {
-        remaining.push(item);
-        continue;
-      }
+      if (this._claimedAlarms.has(alarmName)) continue;
       this._claimedAlarms.add(alarmName);
       const ok = await this.runScheduledJob(
         { kind: item.kind, payload: item.payload },
@@ -3166,10 +3232,19 @@ const GF_BG = {
         await chrome.storage.local.remove(`alarm_${alarmName}`);
       } else {
         this._claimedAlarms.delete(alarmName);
-        remaining.push(item);
       }
     }
-    await chrome.storage.local.set({ activityUpcoming: remaining });
+    // 2026-07-13 — TRƯỚC ĐÂY hàm này tự gom `remaining` (item chưa tới hạn + item chạy lỗi) rồi
+    // GHI ĐÈ NGUYÊN CỤM `activityUpcoming` bằng snapshot đã đọc TỪ ĐẦU hàm (dòng `d = await
+    // chrome.storage.local.get(...)` phía trên) — nếu user bấm Hủy 1 lịch KHÁC (chưa tới hạn) hoặc
+    // tự đặt thêm 1 lịch mới ngay trong lúc hàm này đang await xử lý các item due (có thể mất vài
+    // giây tới vài phút nếu hàng đợi đang bận việc khác), thay đổi đó bị GHI ĐÈ MẤT bởi lệnh set()
+    // cuối hàm dùng snapshot cũ — lịch vừa hủy bị "hồi sinh" lại y hệt trước khi hủy, vô hiệu hoá
+    // chính cơ chế re-check-trước-khi-chạy vừa thêm ở runScheduledJob()/isUpcomingStillActive().
+    // Fix: bỏ hẳn việc tự ghi lại `activityUpcoming` ở đây — item chạy THÀNH CÔNG đã được
+    // removeUpcomingByAlarmName() (gọi bên trong runScheduledJob() khi `ok`) tự dọn bằng cách đọc-
+    // lọc-ghi storage MỚI NHẤT tại đúng thời điểm đó; item lỗi/chưa tới hạn thì vốn dĩ không ai đụng
+    // vào, cứ để nguyên trong storage — không cần (và không nên) ghi đè lại toàn bộ mảng ở đây nữa.
   },
 
   // v1.0.221 — Tony: "đã check rồi thì khỏi check nữa, bài mới đồng bộ về thì tự check tiếp".
@@ -3281,6 +3356,48 @@ const GF_BG = {
   // syncFromTidien().
   _warmPostAccessInFlight: false,
 
+  // 2026-07-13 — Tony: bài quá N ngày (kể từ ngày post) đã bị website ngừng trả về qua
+  // /my-posts/cross-posts (giảm tải server), nhưng bài ĐÃ LỠ nằm sẵn trong cache cục bộ
+  // (postQueue/serverMyPosts — merge cộng dồn, không tự bị dọn khi server ngừng trả) vẫn cứ tiếp
+  // tục bị quét vào hàng đợi tự check mỗi 3 phút — "kiểm tra cũng vô nghĩa" (Tony chỉ ra đúng). Lấy
+  // lại đúng N đang cấu hình trên website (GET /api/user-sync/config, license-key auth) để tự áp
+  // cùng ngưỡng ở đây — cache 1 giờ/lần (giá trị hiếm khi đổi tay), fail-open về giá trị cache cũ
+  // (hoặc 60 mặc định) nếu mất mạng, không chặn hẳn việc check chỉ vì không lấy được config.
+  POSTS_SYNC_LOOKBACK_CACHE_MS: 60 * 60 * 1000,
+  async getPostsSyncLookbackDays() {
+    const d = await chrome.storage.local.get(['postsSyncLookbackDays', 'postsSyncLookbackFetchedAt']);
+    const cached = parseInt(d.postsSyncLookbackDays, 10);
+    if (Number.isFinite(cached) && cached > 0 && Date.now() - (d.postsSyncLookbackFetchedAt || 0) < this.POSTS_SYNC_LOOKBACK_CACHE_MS) {
+      return cached;
+    }
+    const auth = await this.getTidienAuth();
+    if (!auth) return Number.isFinite(cached) && cached > 0 ? cached : 60;
+    try {
+      const res = await fetch(`${auth.base}/api/user-sync/config`, {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
+      if (!res.ok) return Number.isFinite(cached) && cached > 0 ? cached : 60;
+      const data = await res.json();
+      const days = parseInt(data?.posts_sync_lookback_days, 10);
+      if (Number.isFinite(days) && days > 0) {
+        await chrome.storage.local.set({ postsSyncLookbackDays: days, postsSyncLookbackFetchedAt: Date.now() });
+        return days;
+      }
+      return Number.isFinite(cached) && cached > 0 ? cached : 60;
+    } catch {
+      return Number.isFinite(cached) && cached > 0 ? cached : 60;
+    }
+  },
+
+  // Không có mốc ngày (postQueue cũ từ trước khi có field lastPostedAt, hoặc dữ liệu lỗi) thì coi
+  // như CÒN TRONG hạn — an toàn hơn là lỡ ẩn/bỏ qua nhầm 1 bài hợp lệ chỉ vì thiếu field.
+  isWithinPostsSyncLookback(dateStr, days) {
+    if (!dateStr) return true;
+    const t = new Date(dateStr).getTime();
+    if (!Number.isFinite(t)) return true;
+    return (Date.now() - t) < days * 24 * 60 * 60 * 1000;
+  },
+
   async warmPostAccessCache({ batchSize = 2 } = {}) {
     if (this._warmPostAccessInFlight) return;
     this._warmPostAccessInFlight = true;
@@ -3311,8 +3428,15 @@ const GF_BG = {
       if (targets.has(pid)) return;
       targets.set(pid, { groupId: String(groupId), postId: pid });
     };
-    (d.postQueue || []).forEach((p) => (p.postedGroups || []).forEach((g) => addTarget(g.group_id, g.post_id)));
-    (d.serverMyPosts || []).forEach((sp) => addTarget(sp.group_id, sp.post_id));
+    const lookbackDays = await this.getPostsSyncLookbackDays();
+    (d.postQueue || []).forEach((p) => {
+      if (!this.isWithinPostsSyncLookback(p.lastPostedAt, lookbackDays)) return;
+      (p.postedGroups || []).forEach((g) => addTarget(g.group_id, g.post_id));
+    });
+    (d.serverMyPosts || []).forEach((sp) => {
+      if (!this.isWithinPostsSyncLookback(sp.posted_at, lookbackDays)) return;
+      addTarget(sp.group_id, sp.post_id);
+    });
     if (!targets.size) return;
 
     const cache = await FC.readPostAccessCache();

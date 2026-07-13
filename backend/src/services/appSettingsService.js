@@ -13,6 +13,7 @@ const KEYS = {
   COMPOSIO_DEFAULT_CONNECTED_ACCOUNT_ID: 'composio_default_connected_account_id',
   COMPOSIO_FACEBOOK_TOOLKIT_VERSION: 'composio_facebook_toolkit_version',
   COMPOSIO_AUTO_FALLBACK: 'composio_auto_fallback',
+  POSTS_SYNC_LOOKBACK_DAYS: 'posts_sync_lookback_days',
 };
 
 let cache = {};
@@ -274,4 +275,34 @@ export async function saveComposioSettings(updates = {}) {
   }
 
   return getComposioSettingsStatus();
+}
+
+// 2026-07-13 — Tony: giới hạn tự động số ngày sync bài viết cho GroupFlow (cả "của tôi" lẫn "đồng
+// đội") — trước đây cross-posts hardcode cứng 30 ngày trong userSync.js (CROSS_POSTS_LOOKBACK_MS),
+// còn my-posts (bài của chính mình) KHÔNG giới hạn gì cả — bài viết tồn tại càng lâu, mỗi request
+// cold-start/thiết bị lâu ngày chưa mở càng phải quét nhiều hơn, tải server tăng dần vô hạn theo
+// thời gian hệ thống chạy. Đưa ra Cài đặt (super_admin) thay vì hardcode để tự điều chỉnh được mà
+// không cần sửa code — mặc định 60 ngày (Tony chọn).
+const DEFAULT_POSTS_SYNC_LOOKBACK_DAYS = 60;
+
+export function getEffectivePostsSyncLookbackDays() {
+  const fromDb = parseInt(getCachedSetting(KEYS.POSTS_SYNC_LOOKBACK_DAYS), 10);
+  return Number.isFinite(fromDb) && fromDb > 0 ? fromDb : DEFAULT_POSTS_SYNC_LOOKBACK_DAYS;
+}
+
+export async function savePostsSyncLookbackDays(days) {
+  const n = parseInt(days, 10);
+  if (!Number.isFinite(n) || n <= 0) {
+    const error = new Error('Số ngày phải là số nguyên dương');
+    error.status = 400;
+    throw error;
+  }
+  await query(
+    `INSERT INTO app_settings (setting_key, setting_value)
+     VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+    [KEYS.POSTS_SYNC_LOOKBACK_DAYS, String(n)]
+  );
+  cache[KEYS.POSTS_SYNC_LOOKBACK_DAYS] = String(n);
+  return n;
 }

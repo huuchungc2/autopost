@@ -3345,6 +3345,8 @@ async function confirmCampaignStagger() {
     if (statePost) Object.assign(statePost, fields);
   };
 
+  const whens = computeStaggeredWhens(startWhen, gapMs, posts.length);
+
   if (repeatDaily) {
     const now = Date.now();
     const entries = posts.map((post, i) => {
@@ -3353,7 +3355,7 @@ async function confirmCampaignStagger() {
       return {
         id: `dfs_${now}_${i}_${Math.random().toString(36).slice(2, 6)}`,
         kind: 'post',
-        timeOfDay: avoidNightHHMM(timeOfDayHHMM(startWhen + i * gapMs)),
+        timeOfDay: avoidNightHHMM(timeOfDayHHMM(whens[i])),
         payload: buildSchedulePostPayload([post], settings),
         label: `${campaignLabel} ${i + 1}/${posts.length} — ${(post.noi_dung || '').slice(0, 40)}`,
         lastRunDate: null,
@@ -3366,7 +3368,7 @@ async function confirmCampaignStagger() {
     const pad = (n) => String(n).padStart(2, '0');
     for (let i = 0; i < posts.length; i += 1) {
       const post = posts[i];
-      const when = avoidNightTime(startWhen + i * gapMs);
+      const when = avoidNightTime(whens[i]);
       const d = new Date(when);
       post.ngay_dang = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
       post.gio_dang = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -3480,9 +3482,18 @@ async function loadPostedPostsForComment({ force = false } = {}) {
   // mỗi lần tải list Comment để tag trạng thái + chặn nút Chạy/Lên lịch luôn dùng dữ liệu mới nhất.
   state.postAccessCache = d.gf_post_access_cache || {};
 
+  // 2026-07-13 — Tony: bài quá N ngày (kể từ ngày post, cấu hình ở website) không nên hiện ra ở
+  // CẢ 2 tab "Của tôi"/"Đồng đội" nữa — áp đồng nhất cho mọi nguồn (postQueue tự tạo cục bộ lẫn
+  // serverMyPosts/crossPostsCache lấy từ server), vì "kiểm tra bài quá cũ cũng vô nghĩa" (đúng như
+  // Tony chỉ ra — không có lý do gì để vẫn hiện/vẫn tự check bài mà chính sách đã coi là hết hạn).
+  // Website đã ngừng TRẢ VỀ bài quá hạn qua /my-posts, /cross-posts (xem CHANGELOG) — nhưng cache
+  // cục bộ merge CỘNG DỒN không tự dọn bài đã lỡ tải về trước đó, nên vẫn cần lọc lại ở đây.
+  const lookbackDays = await getPostsSyncLookbackDays();
+
   const localPosts = queue
     .filter((p) => p.postStatus === 'posted'
-      && p.postedGroups?.some((g) => g.post_id && /^\d+$/.test(String(g.post_id))))
+      && p.postedGroups?.some((g) => g.post_id && /^\d+$/.test(String(g.post_id)))
+      && isWithinPostsSyncLookback(p.lastPostedAt, lookbackDays))
     .sort((a, b) => (b.lastPostedAt || '').localeCompare(a.lastPostedAt || ''))
     .map((p) => ({ ...p, _source: 'local' }));
 
@@ -3491,7 +3502,8 @@ async function loadPostedPostsForComment({ force = false } = {}) {
     localPosts.flatMap((p) => (p.postedGroups || []).map((g) => `${g.group_id}_${g.post_id}`))
   );
   const myServerItems = serverMyPosts
-    .filter((sp) => !localPostIds.has(`${sp.group_id}_${sp.post_id}`))
+    .filter((sp) => !localPostIds.has(`${sp.group_id}_${sp.post_id}`)
+      && isWithinPostsSyncLookback(sp.posted_at, lookbackDays))
     .map((sp) => ({
       id: `server_${sp.id}`,
       _serverId: sp.id,
@@ -3507,7 +3519,9 @@ async function loadPostedPostsForComment({ force = false } = {}) {
     }));
 
   const crossPosts = await fetchCrossPostsFromServer({ force });
-  const crossItems = crossPosts.map((cp) => ({
+  const crossItems = crossPosts
+    .filter((cp) => isWithinPostsSyncLookback(cp.posted_at, lookbackDays))
+    .map((cp) => ({
     id: `cross_${cp.id}`,
     _serverId: cp.id,
     _source: 'cross',
@@ -3536,6 +3550,7 @@ async function loadPostedPostsForComment({ force = false } = {}) {
   await autoFillMissingCommentDrafts();
   state.commentScheduleMap = await loadCommentScheduleMap();
   populateCommentFilterPersonOptions();
+  updateCommentSubTabCounts();
   // Badge chỉ đếm bài còn CẦN chú ý (chưa comment VÀ còn làm được — không tính bài đã biết chắc
   // chờ duyệt/đã xóa, cùng luật ẩn với isCommentActionable() dùng cho list) — áp dụng chung cho cả
   // bài của mình lẫn bài đồng đội qua isCommentDone(), không tính bài đã xong (server/postedGroups
@@ -3856,6 +3871,26 @@ function staggerGapMs(value, unit) {
   return Math.max(0, Number(value) || 0) * (STAGGER_UNIT_MS[unit] || STAGGER_UNIT_MS.minute);
 }
 
+// 2026-07-13 — Tony: giãn cách TUYỆT ĐỐI CỐ ĐỊNH (start + i*gap, y hệt nhau giữa mọi cặp bài
+// liên tiếp) là 1 kiểu vân tay dễ bị Facebook nhận ra là bot — người thật không bao giờ đăng bài
+// cách nhau đúng y 1 khoảng thời gian lặp lại nhiều lần. Random hoá KHOẢNG CÁCH GIỮA MỖI CẶP bài
+// liên tiếp (không random tuyệt đối theo index, để tránh 2 bài bị đảo thứ tự) — mỗi lượt nhân
+// gapMs với 1 hệ số ngẫu nhiên 0.7–1.3 lần rồi cộng dồn từ mốc bắt đầu: giữ đúng tốc độ đăng
+// TRUNG BÌNH mà user chọn (vd "15 phút/bài") nhưng không còn khoảng cách y hệt nhau. Mốc đầu tiên
+// (index 0) giữ nguyên đúng giờ user chọn — không jitter, vì đó là lựa chọn tường minh. gapMs=0
+// (user chủ đích đăng dồn cùng lúc) thì giữ nguyên 0, không tự thêm giãn cách.
+function computeStaggeredWhens(startWhen, gapMs, count) {
+  const whens = [startWhen];
+  for (let i = 1; i < count; i += 1) {
+    // Dùng lại GF.scheduler.randBetween() (đã load sẵn cho sidepanel qua modules/scheduler.js,
+    // cùng helper mà scheduleCommentJobsOnce() dùng cho betweenComments) thay vì tự viết công thức
+    // random riêng — cùng 1 kiểu random cho toàn bộ sidepanel.
+    const jitter = gapMs > 0 ? GF.scheduler.randBetween([Math.round(gapMs * 0.7), Math.round(gapMs * 1.3)]) : 0;
+    whens.push(whens[i - 1] + jitter);
+  }
+  return whens;
+}
+
 function gapUnitLabel(unit) {
   return unit === 'hour' ? 'giờ' : unit === 'day' ? 'ngày' : 'phút';
 }
@@ -4039,6 +4074,25 @@ function populateCommentFilterPersonOptions() {
   if (!validValues.has(state.commentFilterPerson || 'all')) state.commentFilterPerson = 'all';
   const active = state.commentPersonOptions.find((o) => o.value === state.commentFilterPerson);
   input.value = active ? active.label : '';
+}
+
+// 2026-07-13 — Tony yêu cầu: thống kê tổng số bài "Của tôi"/"Đồng đội" ngay trên 2 nút tab con,
+// khớp đúng con số list thật sẽ hiện ra (cùng điều kiện isCommentActionable() với getFilteredComments()
+// — gồm CẢ bài đã comment rồi, vì giờ danh sách không còn ẩn bài đã comment nữa, xem cross-posts
+// backend). Giúp so sánh nhanh "tao có X bài" giữa các máy mà không cần đếm tay từng dòng.
+function updateCommentSubTabCounts() {
+  const mineEl = $('#commentSubMineCount');
+  const teamEl = $('#commentSubTeamCount');
+  if (!mineEl && !teamEl) return;
+  let mine = 0;
+  let team = 0;
+  state.comments.forEach((c) => {
+    if (!isCommentActionable(c)) return;
+    if (c._source === 'cross') team += 1;
+    else mine += 1;
+  });
+  if (mineEl) mineEl.textContent = mine ? `(${mine})` : '';
+  if (teamEl) teamEl.textContent = team ? `(${team})` : '';
 }
 
 // Gõ tự do vào input — khớp chính xác (không phân biệt hoa/thường) thì áp filter ngay; khớp DUY
@@ -4450,13 +4504,15 @@ async function scheduleSelectedComments() {
     : `Lên lịch ${itemJobGroups.length} bài, cách nhau ${gapValue} ${gapUnitLabel(gapUnit)}?`;
   if (!window.confirm(confirmMsg)) return;
 
+  const whens = computeStaggeredWhens(startWhen, gapMs, itemJobGroups.length);
+
   if (repeatDaily) {
     const settings = await GF.storage.getSettings();
     const actorId = state.activeActorId || settings.activeActorId;
     const now = Date.now();
     const entries = [];
     itemJobGroups.forEach((jobs, i) => {
-      const timeOfDay = avoidNightHHMM(timeOfDayHHMM(startWhen + i * gapMs));
+      const timeOfDay = avoidNightHHMM(timeOfDayHHMM(whens[i]));
       jobs.forEach((job, gi) => {
         entries.push({
           id: `dfs_${now}_${i}_${gi}_${Math.random().toString(36).slice(2, 6)}`,
@@ -4472,7 +4528,7 @@ async function scheduleSelectedComments() {
     await addDailyFixedSchedules(entries);
   } else {
     for (let i = 0; i < itemJobGroups.length; i += 1) {
-      await scheduleCommentJobsOnce(itemJobGroups[i], startWhen + i * gapMs);
+      await scheduleCommentJobsOnce(itemJobGroups[i], whens[i]);
     }
   }
   $('#commentStaggerPanel')?.classList.add('hidden');
@@ -6084,6 +6140,49 @@ function bindEvents() {
 async function getUserSyncBase() {
   const s = await GF.storage.getSettings();
   return (s?.tidienBaseUrl || 'https://tidien.xyz').replace(/\/$/, '');
+}
+
+// 2026-07-13 — Tony: bài quá N ngày (kể từ ngày post) không nên hiện trong list Comment nữa (đã
+// ngừng tải về từ server, nhưng cache cục bộ merge cộng dồn không tự dọn bài đã lỡ có sẵn từ
+// trước) — cần biết đúng N đang cấu hình ở website để tự lọc lại. Cache 1 giờ/lần (giá trị hiếm khi
+// đổi tay); fail-open về giá trị cache cũ/mặc định 60 nếu mất mạng — không chặn hẳn danh sách chỉ
+// vì không lấy được config. Giữ bản sao độc lập với `getPostsSyncLookbackDays()` (background.js) —
+// 2 context khác nhau (sidepanel vs service worker), cùng pattern mirror đã dùng cho
+// modules/scheduler.js.
+const POSTS_SYNC_LOOKBACK_CACHE_MS = 60 * 60 * 1000;
+async function getPostsSyncLookbackDays() {
+  const d = await chrome.storage.local.get(['postsSyncLookbackDays', 'postsSyncLookbackFetchedAt', 'licenseKey']);
+  const cached = parseInt(d.postsSyncLookbackDays, 10);
+  const cachedValid = Number.isFinite(cached) && cached > 0;
+  if (cachedValid && Date.now() - (d.postsSyncLookbackFetchedAt || 0) < POSTS_SYNC_LOOKBACK_CACHE_MS) {
+    return cached;
+  }
+  if (!d.licenseKey) return cachedValid ? cached : 60;
+  try {
+    const base = await getUserSyncBase();
+    const res = await fetch(`${base}/api/user-sync/config`, {
+      headers: { Authorization: `Bearer ${d.licenseKey}` },
+    });
+    if (!res.ok) return cachedValid ? cached : 60;
+    const data = await res.json();
+    const days = parseInt(data?.posts_sync_lookback_days, 10);
+    if (Number.isFinite(days) && days > 0) {
+      await chrome.storage.local.set({ postsSyncLookbackDays: days, postsSyncLookbackFetchedAt: Date.now() });
+      return days;
+    }
+    return cachedValid ? cached : 60;
+  } catch {
+    return cachedValid ? cached : 60;
+  }
+}
+
+// Không có mốc ngày (dữ liệu cũ/lỗi thiếu field) thì coi như CÒN TRONG hạn — an toàn hơn lỡ ẩn
+// nhầm 1 bài hợp lệ chỉ vì thiếu field ngày.
+function isWithinPostsSyncLookback(dateStr, days) {
+  if (!dateStr) return true;
+  const t = new Date(dateStr).getTime();
+  if (!Number.isFinite(t)) return true;
+  return (Date.now() - t) < days * 24 * 60 * 60 * 1000;
 }
 
 // v1.0.222-ext (audit đồng bộ 2026-07-06) — hàm này chạy VÔ ĐIỀU KIỆN mỗi lần mở panel

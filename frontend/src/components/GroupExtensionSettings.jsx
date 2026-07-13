@@ -3,10 +3,12 @@ import { Copy, RefreshCw, KeyRound } from 'lucide-react';
 import api from '../services/api';
 import Button from './ui/Button';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../services/authContext';
 import { formatDateTime } from '../utils/date';
 
 export default function GroupExtensionSettings() {
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
@@ -15,6 +17,13 @@ export default function GroupExtensionSettings() {
   const [licenseLoading, setLicenseLoading] = useState(true);
   const [licenseCreating, setLicenseCreating] = useState(false);
   const [showLicense, setShowLicense] = useState(false);
+  // 2026-07-13 — Tony: giới hạn số ngày (kể từ ngày đăng) GroupFlow còn đồng bộ bài viết về
+  // extension (cả bài của mình lẫn đồng đội) — bài cũ hơn không tải về/không check nữa, giảm tải
+  // server. Cấu hình super_admin, mặc định 60 ngày (xem appSettingsService.js).
+  const [lookbackDays, setLookbackDays] = useState('');
+  const [lookbackLoading, setLookbackLoading] = useState(true);
+  const [lookbackSaving, setLookbackSaving] = useState(false);
+  const canEditLookback = user?.role === 'super_admin';
 
   const load = async () => {
     setLoading(true);
@@ -40,10 +49,43 @@ export default function GroupExtensionSettings() {
     }
   };
 
+  const loadLookback = async () => {
+    if (user && user.role !== 'super_admin') { setLookbackLoading(false); return; }
+    setLookbackLoading(true);
+    try {
+      const res = await api.get('/settings');
+      setLookbackDays(String(res.data?.config?.posts_sync_lookback_days ?? 60));
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Không tải được cấu hình đồng bộ', 'error');
+    } finally {
+      setLookbackLoading(false);
+    }
+  };
+
   useEffect(() => {
     load();
     loadLicense();
-  }, []);
+    loadLookback();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role]);
+
+  const handleSaveLookback = async () => {
+    const days = parseInt(lookbackDays, 10);
+    if (!Number.isFinite(days) || days <= 0) {
+      showToast('Số ngày phải là số nguyên dương', 'error');
+      return;
+    }
+    setLookbackSaving(true);
+    try {
+      const res = await api.put('/settings/posts-sync-lookback', { days });
+      setLookbackDays(String(res.data.posts_sync_lookback_days));
+      showToast('Đã lưu số ngày đồng bộ', 'success');
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Lưu thất bại', 'error');
+    } finally {
+      setLookbackSaving(false);
+    }
+  };
 
   const handleCreateLicense = async () => {
     setLicenseCreating(true);
@@ -189,6 +231,37 @@ export default function GroupExtensionSettings() {
               )}
             </label>
           </div>
+
+          {canEditLookback && (
+            <>
+              <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid var(--bg-border)' }} />
+              <div className="settings-groupflow-grid">
+                <label>
+                  Đồng bộ bài viết cũ hơn (ngày, tính từ ngày đăng)
+                  {lookbackLoading ? (
+                    <p className="text-muted" style={{ margin: '4px 0 0' }}>Đang tải…</p>
+                  ) : (
+                    <div className="input-with-actions">
+                      <input
+                        type="number"
+                        min="1"
+                        className="input"
+                        style={{ maxWidth: 120 }}
+                        value={lookbackDays}
+                        onChange={(e) => setLookbackDays(e.target.value)}
+                      />
+                      <Button type="button" onClick={handleSaveLookback} disabled={lookbackSaving}>
+                        {lookbackSaving ? 'Đang lưu…' : 'Lưu'}
+                      </Button>
+                    </div>
+                  )}
+                  <span className="field-hint">
+                    Bài đăng cũ hơn số ngày này (kể từ ngày đăng) sẽ không tải về extension nữa (cả bài của mình lẫn đồng đội) — giảm tải server khi hệ thống tích luỹ nhiều bài. Mặc định 60 ngày.
+                  </span>
+                </label>
+              </div>
+            </>
+          )}
 
           <ol className="field-hint" style={{ marginTop: 16, paddingLeft: 20 }}>
             <li>Cài extension từ thư mục <code>GroupFlow/fb-group-poster/</code> (Chrome → Extensions → Load unpacked).</li>

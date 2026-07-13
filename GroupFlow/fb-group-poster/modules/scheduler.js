@@ -1,10 +1,14 @@
 window.GF = window.GF || {};
 
 GF.scheduler = {
+  // 2026-07-13 — giữ ĐỒNG BỘ với map tương ứng trong `background.js` (`getSecurityDelays()`) —
+  // 2 bản sao độc lập (context sidepanel vs service worker), nhớ đổi cả 2 nếu sửa lại lần nữa.
+  // `betweenPosts` đổi từ số cố định sang range thật — khoảng cách +0-60s cũ quá hẹp, dễ lộ chu
+  // kỳ đăng bài đều đặn giống máy chạy tự động.
   DELAYS: {
-    fast: { betweenGroups: [5, 60], betweenPosts: 180, betweenComments: [90, 180] },
-    balanced: { betweenGroups: [180, 300], betweenPosts: 420, betweenComments: [180, 300] },
-    safe: { betweenGroups: [420, 600], betweenPosts: 900, betweenComments: [300, 600] },
+    fast: { betweenGroups: [5, 60], betweenPosts: [120, 300], betweenComments: [90, 180], dailyJitter: [0, 300] },
+    balanced: { betweenGroups: [180, 300], betweenPosts: [300, 600], betweenComments: [180, 300], dailyJitter: [0, 600] },
+    safe: { betweenGroups: [420, 600], betweenPosts: [600, 1200], betweenComments: [300, 600], dailyJitter: [0, 900] },
   },
 
   async getDelays(level) {

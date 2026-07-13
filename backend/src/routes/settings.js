@@ -16,6 +16,8 @@ import {
   saveComposioSettings,
   getEffectiveDriveOAuth2Config,
   getEffectiveComposioApiKey,
+  getEffectivePostsSyncLookbackDays,
+  savePostsSyncLookbackDays,
 } from '../services/appSettingsService.js';
 import { testDriveConnection } from '../services/googleDriveService.js';
 import {
@@ -79,6 +81,7 @@ router.get('/', asyncHandler(async (req, res) => {
       image_schedule: imageSchedule,
       page_image_schedules_enabled: pageImageSchedules,
       composio: composioWithConnection,
+      posts_sync_lookback_days: getEffectivePostsSyncLookbackDays(),
     },
   });
 }));
@@ -212,6 +215,18 @@ router.post('/composio/connect-link', requireRole('super_admin'), asyncHandler(a
   res.json({
     message: 'Mở link để hoàn tất kết nối Facebook trên Composio',
     ...link,
+  });
+}));
+
+// 2026-07-13 — Tony: giới hạn số ngày (kể từ ngày đăng) GroupFlow còn đồng bộ bài viết về extension
+// (cả /user-sync/my-posts lẫn /user-sync/cross-posts, xem userSync.js) — bài cũ hơn N ngày không
+// còn tải về/không còn nằm trong hàng đợi tự check "còn comment được không" nữa, giảm tải server
+// khi hệ thống chạy lâu ngày tích luỹ nhiều bài. Mặc định 60 ngày (Tony chọn).
+router.put('/posts-sync-lookback', requireRole('super_admin'), asyncHandler(async (req, res) => {
+  const days = await savePostsSyncLookbackDays(req.body?.days);
+  res.json({
+    message: 'Đã lưu số ngày đồng bộ bài viết',
+    posts_sync_lookback_days: days,
   });
 }));
 
