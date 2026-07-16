@@ -134,20 +134,27 @@ router.get('/my-posts', authenticateLicenseKey, asyncHandler(async (req, res) =>
 // cả bài chờ duyệt — chỉ khác 1 banner nhỏ) — nên đảo lại: CHỦ BÀI check + báo kết quả lên server
 // (piggyback POST /posts, upsertUserPost()) cho MỌI kết quả (cả 'ok' lẫn 'pending', không chỉ
 // 'pending' như thiết kế opt-out cũ) — GET /cross-posts giờ CHỈ gửi bài đã có `pending_approval=0`
-// VÀ `pending_checked_at` còn tươi (chủ bài đã tự confirm KHÔNG chờ duyệt) — bài chưa được chủ bài
+// VÀ `pending_checked_at` (chủ bài đã tự confirm KHÔNG chờ duyệt) — bài chưa được chủ bài
 // check tới (dù có thể thực ra bình thường) tạm thời KHÔNG hiện cho đồng đội cho tới khi chủ bài
 // check xong — đánh đổi "chậm lộ diện hơn" lấy "không bao giờ hiện sai nữa" (đúng yêu cầu: "check
-// được bài nào thì hiện bài đó, còn lại để đó, cứ check dần theo cron"). TTL 6 giờ (khớp
-// OK_ACCESS_TTL_MS phía extension, modules/fbCommentBg.js) — nếu chủ bài không mở lại extension,
-// xác nhận cũ tự hết hạn thay vì tin mãi mãi (đề phòng bài sau đó bị xóa/đổi audience mà chủ bài
-// không còn active để phát hiện lại).
-const OK_CONFIRMED_TTL_MS = 6 * 60 * 60 * 1000;
-
+// được bài nào thì hiện bài đó, còn lại để đó, cứ check dần theo cron").
+//
+// 2026-07-15 — BỎ HẲN hạn 6 giờ (`OK_CONFIRMED_TTL_MS`/`okConfirmedFloor` cũ). Tony chốt lại: "thằng
+// Lâu đã tự duyệt 26 bài OK đồng bộ lên website thì mọi người ở phần đồng đội phải thấy 26 bài —
+// bài nào đã duyệt thì mọi người phải được đồng bộ về nếu nó chưa quá N ngày". Trước đó hạn 6h khiến
+// máy chủ bài tắt quá 6 tiếng là TOÀN BỘ bài của người đó biến mất khỏi tab Đồng đội của mọi người
+// (và là lý do số đếm mỗi máy mỗi khác — 20 vs 24). Giờ: xác nhận OK 1 lần là hiện cho tới khi quá
+// N ngày (lookbackFloor). Nhiệm vụ thứ 2 của hạn 6h cũ (gỡ bài ĐÃ TỪNG OK nhưng sau đó chuyển
+// xấu — chủ bài recheck thấy chờ duyệt/khoá) được thay bằng cơ chế chính xác hơn: nhánh sync TĂNG
+// DẦN (`since`) trả CẢ bài `pending_approval = 1` (SELECT thêm field này) — client
+// (fetchCrossPostsFromServer(), sidepanel.js) nhận được là tự gỡ khỏi cache, thay vì đoán mò theo
+// tuổi xác nhận. Nhánh cold-start (thiết bị mới, cache trống) vẫn chỉ trả bài OK — bài xấu không có
+// gì để gỡ. Lưới an toàn cuối: máy đồng đội comment trúng bài xấu (chủ bài offline chưa kịp báo)
+// thì timeout 1 lần là tự đánh dấu bỏ qua cục bộ (v1.0.267).
 router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
   const requestedSince = req.query.since ? new Date(req.query.since) : null;
   const lookbackFloor = getPostsSyncLookbackFloor();
-  const okConfirmedFloor = new Date(Date.now() - OK_CONFIRMED_TTL_MS);
   // Bug đã gặp thật: client (fetchCrossPostsFromServer(), sidepanel.js) đẩy cursor `since` = MAX
   // updated_at của các bài ĐÃ THẤY (visible) trong lượt gọi trước — nhưng `visible_after` (độ trễ
   // ngẫu nhiên 5-60', xem randomVisibleAfter() ở trên) không đồng bộ với updated_at. Nếu 1 bài A
@@ -177,11 +184,11 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
   // `posted_at` thô — cột này CÓ THỂ NULL cho bài cũ (extension cũ chưa gửi kịp trường này, dữ liệu
   // backfill thiếu — cùng pattern đã dùng ở groupPostService.js listUserPosts()); lọc bằng cột NULL
   // trực tiếp sẽ khiến bài đó biến mất vĩnh viễn khỏi kết quả, không liên quan gì tuổi bài thật.
+  // `pending_approval = 0` CHỈ nằm ở nhánh cold-start (ghép thêm bên dưới) — nhánh incremental cố ý
+  // trả cả bài vừa chuyển pending để client gỡ khỏi cache (xem chú thích 2026-07-15 phía trên).
   const baseWhere = `up.user_account_id != ?
     AND up.visible_after <= NOW()
-    AND up.pending_approval = 0
     AND up.pending_checked_at IS NOT NULL
-    AND up.pending_checked_at > ?
     AND COALESCE(up.posted_at, up.created_at) > ?`;
   // `needs_comment` giờ tính THẬT theo đúng người đang hỏi (myId) thay vì hardcode `1` — client
   // (`isCommentDone()`, sidepanel.js: `c._source === 'cross' ? c._needsComment === false`) đã có sẵn
@@ -191,9 +198,12 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
   // `up.fb_user_id AS user_fb_id` (2026-07-15) — FB uid của TÁC GIẢ bài (ghi lúc extension sync
   // bài lên, migration 039) — extension dùng để render tên tác giả thành link mở thẳng profile
   // Facebook (tag ↔ trên card Comment + Lịch sử), có thể NULL với bài cũ/extension cũ chưa gửi.
+  // `up.pending_approval` trong SELECT (2026-07-15) — client cần field này để phân biệt "bài OK"
+  // với "bài vừa chuyển chờ duyệt" trong cùng 1 response incremental (xem chú thích đầu route).
   const selectFields = `up.id, up.post_queue_id, up.group_id, up.group_name,
                 up.post_id, up.noi_dung, up.posted_at, up.updated_at,
                 up.comment_count, up.comment_target, up.pending_checked_at,
+                up.pending_approval,
                 up.fb_user_id AS user_fb_id,
                 (NOT EXISTS (
                   SELECT 1 FROM user_post_comments upc
@@ -208,20 +218,21 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
          WHERE ${baseWhere} AND up.updated_at > ?
          ORDER BY up.comment_count ASC, up.updated_at ASC
          LIMIT ?`,
-        [myId, myId, okConfirmedFloor, lookbackFloor, since, limit]
+        [myId, myId, lookbackFloor, since, limit]
       )
     // Cold-start (thiết bị mới, chưa có cursor) — giữ nguyên thứ tự ưu tiên cũ (bài mới nhất
     // trước), chỉ thêm bound `updated_at` (dùng chung idx_user_posts_updated) để tận dụng index
     // thay vì quét hết bảng — không đổi kết quả trả về so với chỉ lọc bằng posted_at, chỉ khác khi
-    // hệ thống đã chạy lâu và có bài rất cũ (vốn cũng hiếm khi còn cần comment).
+    // hệ thống đã chạy lâu và có bài rất cũ (vốn cũng hiếm khi còn cần comment). Chỉ nhánh này lọc
+    // `pending_approval = 0` — cache đang trống, bài xấu không có gì để gỡ, trả về chỉ tốn băng thông.
     : await query(
         `SELECT ${selectFields}
          FROM user_posts up
          JOIN users u ON u.id = up.user_account_id
-         WHERE ${baseWhere} AND up.updated_at > ?
+         WHERE ${baseWhere} AND up.pending_approval = 0 AND up.updated_at > ?
          ORDER BY up.comment_count ASC, up.posted_at DESC
          LIMIT ?`,
-        [myId, myId, okConfirmedFloor, lookbackFloor, lookbackFloor, limit]
+        [myId, myId, lookbackFloor, lookbackFloor, limit]
       );
   res.json(rows);
 }));

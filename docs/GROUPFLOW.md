@@ -1,5 +1,16 @@
 # GroupFlow — Chrome Extension FB Group
 
+**Backend + GroupFlow v1.0.269 — Bỏ hạn xác nhận 6h: bài đã check OK hiện cho đồng đội tới khi quá N ngày, kể cả khi máy chủ bài tắt (2026-07-15):** Tony hỏi "không chạy thằng Lâu lên thì extension không thấy nó" rồi chốt rule mới: *"thằng Lâu đã tự duyệt 26 bài OK đồng bộ lên website thì mọi người ở phần đồng đội phải thấy 26 bài — bài nào đã duyệt thì mọi người phải được đồng bộ về nếu nó chưa quá N ngày"*. Xác nhận lại bằng ví dụ 3 máy: A check OK 10, B check 15, C check 20 → A thấy Đồng đội 35 (B15+C20), B thấy 30, C thấy 25 — số phải ổn định, không phụ thuộc máy ai đang bật.
+
+Trước bản này KHÔNG được vậy: xác nhận OK chỉ có giá trị 6 tiếng (`OK_CONFIRMED_TTL_MS` server + `CROSS_POST_CONFIRMED_TTL_MS` client, từ v1.0.236/246) — máy chủ bài tắt quá 6h là TOÀN BỘ bài người đó rớt khỏi tab Đồng đội của mọi người; số đếm mỗi máy lệch nhau theo thời điểm sync (đúng hiện tượng "Lâu (20) vs (24)" đã giải thích ở v1.0.268). Hạn 6h khi đó kiêm 2 nhiệm vụ: (a) chống tin mãi xác nhận cũ, (b) gián tiếp gỡ bài TỪNG OK nhưng sau đó chuyển xấu (chờ duyệt/khoá) khỏi cache cộng dồn của máy đồng đội (bug thật v1.0.246).
+
+Fix — bỏ hạn 6h, thay nhiệm vụ (b) bằng cơ chế chính xác thay vì đoán theo tuổi:
+1. **Backend `GET /cross-posts`** (`userSync.js`): bỏ `OK_CONFIRMED_TTL_MS`/`okConfirmedFloor` — điều kiện còn lại: `pending_checked_at IS NOT NULL` (chủ bài đã confirm ít nhất 1 lần) + `visible_after` + quá N ngày thì ẩn (`lookbackFloor`). `pending_approval = 0` CHUYỂN từ `baseWhere` xuống riêng nhánh cold-start — nhánh sync TĂNG DẦN (`since`) cố ý trả CẢ bài `pending_approval = 1` (SELECT thêm field này) làm TÍN HIỆU GỠ cho client; cold-start vẫn chỉ trả bài OK (cache trống, không có gì để gỡ).
+2. **Client** (`sidepanel.js`): `fetchCrossPostsFromServer()` sau merge lọc bỏ mọi entry `pending_approval = 1` (bản ghi mới từ server thắng bản cũ trong cache nhờ merge theo id — bài chuyển xấu bị gỡ NGAY lượt sync sau khi chủ bài recheck); `isCommentActionable()` bài cross đổi từ "còn trong hạn 6h" thành chỉ cần `Boolean(pending_checked_at)`; xoá hằng `CROSS_POST_CONFIRMED_TTL_MS`.
+3. **Lưới an toàn cuối** (đã có sẵn từ v1.0.267, không phải sửa gì): chủ bài offline lâu chưa kịp báo bài chuyển xấu → máy đồng đội comment trúng sẽ timeout 1 lần rồi tự đánh dấu 'pending' cục bộ, các lịch sau bỏ qua êm.
+
+Hệ quả phụ tốt: số đếm "Đồng đội (N)"/"Lâu (N)" giờ ỔN ĐỊNH và giống nhau giữa mọi máy (sau khi các máy sync đủ) — không còn nhảy múa theo cửa sổ 6h trôi. Máy chủ bài giờ chỉ cần bật để: đăng bài mới + confirm bài mới đăng + báo bài chuyển xấu — không cần "trực" để giữ bài cũ hiện diện nữa.
+
 **Backend + GroupFlow v1.0.268 — Tag tác giả (bấm mở FB) trên card Comment + Lịch sử, bỏ tag "✓ Có thể comment" thừa, đổi chỗ nút Lên lịch/Hủy lịch (2026-07-15):** Tony gửi 2 ảnh chụp 2 máy và yêu cầu 4 thay đổi UI (kèm câu hỏi "Lâu (20) vs (24)" — xem đoạn cuối mục này):
 
 1. **Đổi chỗ nút footer (cả Tạo bài + Comment, `sidepanel.html`)**: hành động chính "Lên lịch đã chọn" chuyển sang TRÁI, "🗑 Hủy lịch đã chọn" sang PHẢI — trước đây ngược lại, nút hủy (phá) đứng trước nút chính.

@@ -2,6 +2,15 @@
 
 > Cập nhật: 2026-07-15
 
+## Backend + GroupFlow v1.0.269: bỏ hạn xác nhận 6h cho bài đồng đội (2026-07-15)
+
+Rule Tony chốt: bài chủ đã check OK → mọi người thấy tới khi quá N ngày, không phụ thuộc máy chủ bài đang bật hay tắt (A check 10/B 15/C 20 → Đồng đội của A luôn là 35). Chi tiết `docs/GROUPFLOW.md`.
+
+- [x] `userSync.js` `GET /cross-posts`: bỏ `OK_CONFIRMED_TTL_MS`/`okConfirmedFloor`; `pending_approval = 0` chỉ còn ở nhánh cold-start; nhánh incremental trả cả bài `pending_approval = 1` + SELECT thêm field làm tín hiệu gỡ.
+- [x] `sidepanel.js`: `fetchCrossPostsFromServer()` lọc bỏ entry `pending_approval = 1` sau merge; `isCommentActionable()` cross chỉ cần `pending_checked_at` có giá trị; xoá `CROSS_POST_CONFIRMED_TTL_MS`.
+- [x] Bump `manifest.json` → v1.0.269, cập nhật `CHANGELOG.md` + `docs/GROUPFLOW.md`. Syntax check sạch. Không cần rebuild `swBundle.js`.
+- [ ] **Cần Tony xác nhận trên máy thật**: (1) restart backend + reload extension các máy; (2) tắt hẳn máy Lâu >6 tiếng → máy khác bấm Làm mới tab Comment → bài Lâu VẪN hiện đủ; (3) số "Lâu (N)" trên các máy giống nhau sau khi cùng Làm mới; (4) test gỡ bài xấu: trên máy chủ bài để 1 bài chuyển chờ duyệt, đợi cron chủ bài check lại báo server (hoặc bấm mở tab Comment cho check ngay) → máy đồng đội sync lượt sau thì bài đó biến mất khỏi list.
+
 ## Backend + GroupFlow v1.0.268: tag tác giả + link FB, bỏ tag thừa, đổi chỗ nút (2026-07-15)
 
 4 yêu cầu UI của Tony (kèm giải thích "Lâu 20 vs 24" — không phải bug, xem `docs/GROUPFLOW.md`).

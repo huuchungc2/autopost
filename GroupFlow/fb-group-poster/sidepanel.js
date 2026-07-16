@@ -3704,14 +3704,15 @@ async function cancelSelectedCommentSchedules() {
 // `gf_post_access_cache` (chrome.storage.local, dùng chung mọi context extension) rồi tự áp lại
 // đúng luật hết hạn ở đây thay vì gọi sang background hỏi.
 const POST_ACCESS_PENDING_TTL_MS = 20 * 60 * 1000;
-// v1.0.246 — mirror đúng OK_CONFIRMED_TTL_MS (backend, userSync.js) — server chỉ trả về bài đồng
-// đội đã CONFIRM OK trong vòng 6 giờ gần nhất, nhưng `crossPostsCache` ở đây là merge CỘNG DỒN
-// (mergeUserPostsById()/runFlow1BackgroundSync()), không bao giờ tự xoá entry khi server ngừng trả
-// về nó (vd bài chuyển sang chờ duyệt sau khi đã từng OK) — Tony báo bài chờ duyệt vẫn hiện "✓ Có
-// thể comment" trong list Comment. Thêm hạn dùng ở phía client, tính lại từ `pending_checked_at`
-// server trả kèm mỗi bài — bài cache cũ quá hạn tự coi như "chưa xác nhận", ẩn khỏi list, thay vì
-// tin cache mãi mãi.
-const CROSS_POST_CONFIRMED_TTL_MS = 6 * 60 * 60 * 1000;
+// 2026-07-15 — BỎ `CROSS_POST_CONFIRMED_TTL_MS` (hạn 6h phía client, thêm ở v1.0.246): Tony chốt
+// lại rule "bài nào chủ đã check OK thì mọi người phải thấy tới khi quá N ngày" — hạn 6h khiến máy
+// chủ bài tắt quá 6 tiếng là toàn bộ bài người đó biến mất khỏi tab Đồng đội của mọi người, và số
+// đếm mỗi máy mỗi khác (20 vs 24) theo thời điểm sync. Vấn đề gốc mà hạn 6h từng giải quyết (bài
+// TỪNG OK nhưng sau đó chuyển chờ duyệt, cache cộng dồn không tự gỡ) giờ được xử lý CHÍNH XÁC thay
+// vì đoán theo tuổi: server (nhánh sync incremental của GET /cross-posts) trả cả bài
+// `pending_approval = 1` như tín hiệu gỡ — fetchCrossPostsFromServer() lọc bỏ khỏi cache ngay khi
+// nhận. Lưới an toàn cuối cho ca chủ bài offline chưa kịp báo: comment trúng bài xấu timeout 1 lần
+// là máy này tự đánh dấu bỏ qua cục bộ (v1.0.267).
 
 // Cache 'ok'/'deleted' coi là bền (không hết hạn); 'pending' (chờ duyệt, hoặc tín hiệu mơ hồ như
 // lỗi mạng/404) chỉ tin trong 20 phút — quá hạn thì coi như "chưa check", không chặn gì cả.
@@ -3758,12 +3759,11 @@ function splitGroupsByAccess(groups) {
 function isCommentActionable(c) {
   if (isCommentDone(c)) return true;
   if (c._source === 'cross') {
-    // v1.0.246 — không còn tin thẳng nữa (xem chú thích CROSS_POST_CONFIRMED_TTL_MS) — chỉ coi là
-    // actionable nếu bản cache còn trong hạn xác nhận của CHÍNH bài đó (`pending_checked_at` server
-    // trả kèm), không tin theo tuổi của lần fetch cục bộ.
-    if (!c.pending_checked_at) return false;
-    const checkedAtMs = new Date(c.pending_checked_at).getTime();
-    return Number.isFinite(checkedAtMs) && (Date.now() - checkedAtMs) < CROSS_POST_CONFIRMED_TTL_MS;
+    // 2026-07-15 — bài đồng đội: chỉ cần ĐÃ ĐƯỢC CHỦ BÀI XÁC NHẬN ít nhất 1 lần
+    // (`pending_checked_at` có giá trị) là comment được, KHÔNG còn xét tuổi xác nhận (hạn 6h cũ —
+    // xem chú thích chỗ khai báo POST_ACCESS_PENDING_TTL_MS vì sao bỏ). Bài chuyển xấu sau khi
+    // từng OK đã bị fetchCrossPostsFromServer() gỡ khỏi cache từ tín hiệu server, không tới được đây.
+    return Boolean(c.pending_checked_at);
   }
   const validGroups = (c.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
   if (!validGroups.length) return false;
@@ -6449,7 +6449,13 @@ async function fetchCrossPostsFromServer({ force = false } = {}) {
     const rows = await res.json();
     if (!Array.isArray(rows)) return cache;
     const newestUpdatedAt = rows.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), meta.cursor || '');
+    // 2026-07-15 — server (nhánh incremental) giờ trả CẢ bài `pending_approval = 1` (bài TỪNG OK
+    // nhưng chủ bài recheck thấy đã chuyển chờ duyệt/khoá) — đây là tín hiệu GỠ, không phải bài
+    // mới: merge để bản ghi mới nhất thắng rồi LỌC BỎ khỏi cache. Thay cho cơ chế hạn-6h cũ
+    // (CROSS_POST_CONFIRMED_TTL_MS — đã bỏ): bài đã xác nhận OK giờ hiện tới khi quá N ngày, kể cả
+    // khi máy chủ bài tắt lâu (rule Tony chốt: "Lâu check OK 26 bài thì mọi người phải thấy 26 bài").
     const merged = mergeUserPostsById(cache, rows)
+      .filter((r) => Number(r.pending_approval || 0) !== 1)
       .sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0))
       .slice(0, 500);
     await chrome.storage.local.set({
