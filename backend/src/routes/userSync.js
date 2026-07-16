@@ -272,8 +272,8 @@ router.post('/activity', authenticateLicenseKey, asyncHandler(async (req, res) =
     try {
       await query(
         `INSERT IGNORE INTO user_activity_log
-           (user_account_id, client_entry_id, type, ok, snippet, group_id, group_name, post_id, url, error, occurred_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (user_account_id, client_entry_id, type, ok, snippet, group_id, group_name, post_id, author_name, author_fb_id, url, error, occurred_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           req.userAccount.id,
           String(e.client_entry_id).slice(0, 64),
@@ -283,6 +283,8 @@ router.post('/activity', authenticateLicenseKey, asyncHandler(async (req, res) =
           e.group_id ? String(e.group_id).slice(0, 64) : null,
           e.group_name ? String(e.group_name).slice(0, 255) : null,
           e.post_id ? String(e.post_id).slice(0, 64) : null,
+          e.author_name ? String(e.author_name).slice(0, 255) : null,
+          e.author_fb_id ? String(e.author_fb_id).slice(0, 64) : null,
           e.url ? String(e.url).slice(0, 500) : null,
           e.error ? String(e.error).slice(0, 800) : null,
           new Date(e.occurred_at),
@@ -299,7 +301,7 @@ router.get('/activity', authenticateLicenseKey, asyncHandler(async (req, res) =>
   const limit = Math.min(parseInt(req.query.limit) || 100, 300);
   const since = req.query.since ? new Date(req.query.since) : null;
   const rows = await query(
-    `SELECT id, type, ok, snippet, group_id, group_name, post_id, url, error, occurred_at, created_at
+    `SELECT id, type, ok, snippet, group_id, group_name, post_id, author_name, author_fb_id, url, error, occurred_at, created_at
      FROM user_activity_log WHERE user_account_id = ?${since ? ' AND created_at > ?' : ''}
      ORDER BY occurred_at DESC LIMIT ?`,
     since ? [req.userAccount.id, since, limit] : [req.userAccount.id, limit]

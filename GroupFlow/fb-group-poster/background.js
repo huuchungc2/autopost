@@ -2751,6 +2751,10 @@ const GF_BG = {
       group_id: e.group_id ? String(e.group_id) : null,
       group_name: e.group_name || null,
       post_id: e.post_id ? String(e.post_id) : null,
+      // 2026-07-16 — tác giả bài (có từ v1.0.268 trên entry comment cục bộ) — thiếu 2 field này ở
+      // đây là lý do Log kéo về từ server/máy khác không có tên tác giả (migration 045).
+      author_name: e.author_name || null,
+      author_fb_id: e.author_fb_id || null,
       url: e.url || null,
       error: e.error || null,
       occurred_at: e.at,
@@ -2787,6 +2791,8 @@ const GF_BG = {
         group_id: r.group_id,
         group_name: r.group_name,
         post_id: r.post_id,
+        author_name: r.author_name || null,
+        author_fb_id: r.author_fb_id || null,
         url: r.url,
         error: r.error,
         at: r.occurred_at,

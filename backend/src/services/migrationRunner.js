@@ -661,3 +661,11 @@ export async function ensureLicenseKeyDevices() {
   if (!(await tableExists('license_keys'))) return;
   await runMigrationFile('044_license_key_devices.sql', 'Migration 044 applied: license_key_devices ready');
 }
+
+// 2026-07-16 — Log/Lịch sử ghi kèm tác giả bài (extension ghi cục bộ từ v1.0.268, nhưng đường đồng
+// bộ Log qua server cắt mất field vì bảng thiếu cột) — xem 045_user_activity_log_author.sql.
+export async function ensureUserActivityLogAuthor() {
+  if (!(await tableExists('user_activity_log'))) return;
+  if (await columnExists('user_activity_log', 'author_name')) return;
+  await runMigrationFile('045_user_activity_log_author.sql', 'Migration 045 applied: user_activity_log.author_name/author_fb_id ready');
+}

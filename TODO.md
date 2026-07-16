@@ -1,6 +1,17 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-07-15
+> Cập nhật: 2026-07-16
+
+## Backend + GroupFlow v1.0.270: Log hiện tên tác giả cho mọi entry (2026-07-16)
+
+Tony gửi ảnh tab Log không có tên tác giả. Nguyên nhân: entry cũ không có field + đường đồng bộ Log qua server cắt mất field (bảng thiếu cột). Chi tiết `docs/GROUPFLOW.md`.
+
+- [x] Migration `045_user_activity_log_author.sql` (2 cột `author_name`/`author_fb_id`) + `ensureUserActivityLogAuthor()` (`migrationRunner.js`) + nối vào chuỗi startup `app.js` (đủ 3 bước theo pattern migration).
+- [x] `userSync.js`: `POST /activity` ghi 2 field, `GET /activity` trả 2 field.
+- [x] `background.js`: `pushUnsyncedActivityToServer()` gửi kèm, `pullActivityFromServer()` map lại.
+- [x] `sidepanel.js`: `buildActivityAuthorIndex()` — fallback tra `post_id → tên/uid` từ `crossPostsCache`/`postQueue`/`serverMyPosts` cho entry cũ không có field; render Lịch sử ưu tiên field trên entry rồi mới tới map.
+- [x] Bump `manifest.json` → v1.0.270, cập nhật `CHANGELOG.md` + `docs/GROUPFLOW.md`. Syntax check sạch. Không cần rebuild `swBundle.js`.
+- [ ] **Cần Tony xác nhận trên máy thật**: (1) restart backend (migration 045 tự chạy lúc khởi động — check log "Migration 045 applied") + reload extension; (2) mở tab Log → entry comment cũ (như 2 entry Timeout 17:18/19:24 hôm 15-07) giờ hiện `👤 tên` nhờ fallback; (3) chạy 1 comment mới → entry mới có tag tác giả, bấm tên mở FB; (4) mở máy khác cùng license → kéo Log về → entry từ máy kia cũng có tên tác giả.
 
 ## Backend + GroupFlow v1.0.269: bỏ hạn xác nhận 6h cho bài đồng đội (2026-07-15)
 

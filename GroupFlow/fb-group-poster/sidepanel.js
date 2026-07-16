@@ -4925,10 +4925,35 @@ function formatProgressLogLine(data) {
   return `<div class="${cls}"><span style="opacity:.65">${esc(time)}</span> ${esc(parts.join(' · '))}${errHtml}</div>`;
 }
 
+// 2026-07-16 — Tony: "trong menu log tao muốn có tên tác giả". Entry comment ghi từ v1.0.268 đã
+// mang sẵn author_name/author_fb_id, nhưng entry CŨ hơn (và entry từ job lên lịch trước v1.0.268 —
+// payload đông lạnh không có field) thì không có gì để hiện. Tra ngược theo post_id từ các cache
+// đã có sẵn (crossPostsCache = bài đồng đội kèm tên/uid tác giả; postQueue/serverMyPosts = bài của
+// mình) — dựng 1 lần mỗi lượt tải Log, render đọc map thay vì quét 3 mảng cho từng dòng.
+async function buildActivityAuthorIndex() {
+  const d = await chrome.storage.local.get(['crossPostsCache', 'postQueue', 'serverMyPosts']);
+  const map = new Map();
+  (d.crossPostsCache || []).forEach((cp) => {
+    if (cp.post_id) map.set(String(cp.post_id), { name: cp.user_name || cp.user_email || 'Đồng đội', fbId: cp.user_fb_id || null });
+  });
+  // Bài của mình set SAU để thắng nếu trùng post_id (thực tế không trùng — server không trả bài
+  // của chính mình trong cross-posts, chỉ là phòng hờ).
+  (d.serverMyPosts || []).forEach((sp) => {
+    if (sp.post_id) map.set(String(sp.post_id), { name: 'Của tôi', fbId: null });
+  });
+  (d.postQueue || []).forEach((p) => {
+    (p.postedGroups || []).forEach((g) => {
+      if (g.post_id) map.set(String(g.post_id), { name: 'Của tôi', fbId: null });
+    });
+  });
+  return map;
+}
+
 async function refreshActivityFromStorage({ preferHistory = false, forceHistorySub = false } = {}) {
   const d = await chrome.storage.local.get(['activityUpcoming', 'activityHistory']);
   const history = d.activityHistory || [];
   const upcoming = d.activityUpcoming || [];
+  state.activityAuthorIndex = await buildActivityAuthorIndex();
   renderActivity(upcoming, history);
   updateHistoryBadge(history.length);
   if (forceHistorySub || (preferHistory && history.length > 0)) {
@@ -4992,12 +5017,16 @@ function renderActivity(upcoming, history) {
     const linkLabel = pending ? 'Mở nhóm (chờ duyệt)' : (h.ok ? 'Mở bài trên FB' : 'Mở nhóm');
     const time = formatHistoryTime(h.at);
     // 2026-07-15 — Tony: Lịch sử phải ghi rõ bài của AI (comment chéo chạy nhiều người dễ lẫn),
-    // tên bấm được để mở profile FB nếu job có mang author_fb_id (entry cũ trước bản này không có
-    // 2 field author_* — không hiện tag, không lỗi).
-    const authorTag = h.author_name
-      ? (h.author_fb_id
-        ? `<a class="tag web" href="https://www.facebook.com/${escAttr(h.author_fb_id)}" target="_blank" rel="noopener noreferrer" title="Mở trang Facebook của ${escAttr(h.author_name)}">👤 ${esc(h.author_name)}</a>`
-        : `<span class="tag web" title="Tác giả bài">👤 ${esc(h.author_name)}</span>`)
+    // tên bấm được để mở profile FB nếu có author_fb_id. Entry cũ (trước v1.0.268) không mang
+    // field author_* — fallback tra theo post_id từ cache bài (buildActivityAuthorIndex(), 2026-07-16)
+    // nên phần lớn entry cũ vẫn hiện được tên; bài đã rơi khỏi mọi cache thì đành để trống.
+    const fallbackAuthor = (!h.author_name && h.post_id) ? state.activityAuthorIndex?.get(String(h.post_id)) : null;
+    const authorName = h.author_name || fallbackAuthor?.name || '';
+    const authorFbId = h.author_fb_id || fallbackAuthor?.fbId || null;
+    const authorTag = authorName
+      ? (authorFbId
+        ? `<a class="tag web" href="https://www.facebook.com/${escAttr(authorFbId)}" target="_blank" rel="noopener noreferrer" title="Mở trang Facebook của ${escAttr(authorName)}">👤 ${esc(authorName)}</a>`
+        : `<span class="tag web" title="Tác giả bài">👤 ${esc(authorName)}</span>`)
       : '';
     return `
     <div class="list-item history-item">
