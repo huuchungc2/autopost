@@ -45,11 +45,25 @@ function inferTargetType(url) {
   return match ? match[1] : 'unknown';
 }
 
-function sanitizeBody(body) {
-  if (!body || typeof body !== 'object') return body;
-  const copy = { ...body };
-  ['password', 'api_key', 'page_token', 'old_password', 'new_password'].forEach((key) => {
-    if (copy[key]) copy[key] = '[REDACTED]';
-  });
+// Che mọi trường nhạy cảm trước khi ghi vào activity_logs. Đệ quy vì payload ghi log gói cả `response`
+// lồng bên trong (vd POST /my-license trả về key_value, Settings trả về client_secret/refresh_token...).
+const SENSITIVE_KEYS = new Set([
+  'password', 'old_password', 'new_password', 'current_password',
+  'api_key', 'apikey', 'page_token', 'composio_page_token', 'composio_api_key',
+  'key', 'key_value', 'token', 'access_token', 'refresh_token', 'secret', 'client_secret',
+  'google_drive_client_secret', 'google_drive_refresh_token',
+]);
+
+function sanitizeBody(value, depth = 0) {
+  if (depth > 6 || !value || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map((v) => sanitizeBody(v, depth + 1));
+  const copy = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (SENSITIVE_KEYS.has(k.toLowerCase()) && v) {
+      copy[k] = '[REDACTED]';
+    } else {
+      copy[k] = sanitizeBody(v, depth + 1);
+    }
+  }
   return copy;
 }

@@ -1,6 +1,49 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-07-13
+> Cập nhật: 2026-07-15
+
+## Backend + GroupFlow v1.0.268: tag tác giả + link FB, bỏ tag thừa, đổi chỗ nút (2026-07-15)
+
+4 yêu cầu UI của Tony (kèm giải thích "Lâu 20 vs 24" — không phải bug, xem `docs/GROUPFLOW.md`).
+
+- [x] `sidepanel.html`: 2 footer (Tạo bài + Comment) đổi chỗ — "Lên lịch đã chọn" trái, "🗑 Hủy lịch đã chọn" phải.
+- [x] `userSync.js`: `GET /cross-posts` trả thêm `user_fb_id`; `POST /posts` nhận `fb_user_id` optional → `upsertUserPost()` (đã hỗ trợ sẵn).
+- [x] `sidepanel.js`: card Comment tag `👤 tên tác giả` link mở profile FB (khi có uid); bỏ tag "✓ Có thể comment" (giữ ⏳ Chờ duyệt/✕ Đã xóa); job comment mang `author_name`/`author_fb_id`; Lịch sử render tag tác giả; `syncLocalPostsToServer()` gửi kèm uid actor.
+- [x] `background.js`: `appendHistory()` (4 entry comment) ghi tác giả; `reportOwnPendingApproval()` gửi kèm uid nuôi bài cũ trên server.
+- [x] Bump `manifest.json` → v1.0.268, cập nhật `CHANGELOG.md` + `docs/GROUPFLOW.md`. Syntax check sạch. Không cần rebuild `swBundle.js`.
+- [ ] **Cần Tony xác nhận trên máy thật**: (1) restart backend (migration không đổi, chỉ cần code mới) + reload extension cả 2 máy; (2) footer 2 tab đã đổi chỗ nút; (3) card Đồng đội hiện `👤 tên` — bài MỚI đăng sau bản này bấm tên mở được FB (bài cũ chỉ hiện tên, uid sẽ tự đầy dần nhờ cron check); (4) tab Comment không còn tag "✓ Có thể comment"; (5) Log → Lịch sử: lượt comment mới có tag `👤 tên`/"Của tôi".
+
+## GroupFlow v1.0.267: comment timeout 1 lần → tự loại bài khỏi list/lịch (2026-07-15)
+
+Tony gửi log 2 lần `Timeout chờ` ô bình luận cho cùng 1 bài (cách nhau 2h) — chốt yêu cầu: "1 bài lỗi thì phải có chức năng loại bỏ". Root cause: comment thật timeout không ghi ngược vào `gf_post_access_cache`, bài vẫn 'ok' nên lịch sau vẫn mở tab chạy lại (chi tiết trong `docs/GROUPFLOW.md`).
+
+- [x] `background.js` (`commentOnPostBgOrClassic()`, nhánh timeout Cổ điển): ghi đè cache access bài thành `'pending'` + `reportOwnPendingApproval()` cho bài của mình (job không có `crossServerId`) — list ẩn bài, chặn Chạy/Lên lịch, lịch đã đặt "Bỏ qua" êm không mở tab; tự hồi sau 20 phút qua cron check nền.
+- [x] Bump `manifest.json` → v1.0.267, cập nhật `CHANGELOG.md` + `docs/GROUPFLOW.md`. Không cần rebuild `swBundle.js`.
+- [ ] **Cần Tony xác nhận trên máy thật**: để 1 lịch comment chạy vào bài chưa comment được (vd bài chờ duyệt) → lượt đầu báo "Bỏ qua — Timeout chờ..." → bài BIẾN MẤT khỏi list Comment (tag chuyển "chờ duyệt") → đặt thêm lịch/để lịch cũ tới giờ → thấy "Bỏ qua" ngay, KHÔNG mở tab nữa; sau khi admin duyệt bài + quá 20 phút → bài tự quay lại list và comment được bình thường.
+
+## GroupFlow v1.0.266: "tắt hết lịch vẫn chạy" — vá nốt 3 đường hủy lịch còn sót sau v1.0.261 (2026-07-15)
+
+Tony báo lại đúng hiện tượng cũ: đã tắt/hủy hết lịch mà bài vẫn tự đăng. Root cause: v1.0.261 mới xoá `ngay_dang`/`gio_dang` ở đường hủy HÀNG LOẠT — 3 đường còn lại vẫn để sót tàn dư cho `reconcileQueueSchedules()`/alarm cũ tự chạy lại (chi tiết trong `docs/GROUPFLOW.md`).
+
+- [x] `sidepanel.js`: nâng cấp hàm mồ côi `cancelPostScheduleAlarms(postId)` thành điểm dọn lịch "1 lần" dùng chung (alarm + payload `alarm_<tên>` + entry `activityUpcoming` kể cả `generate_image` + `ngay_dang`/`gio_dang` trên bài); `cancelUpcoming()` (Hủy từng lịch, tab Hoạt động) đi qua helper này.
+- [x] `sidepanel.js`: modal sửa bài — giờ hẹn thay đổi thì dọn lịch cũ + bắn `GF_RECONCILE_SCHEDULES` đăng ký lại ngay; 2 đường xoá bài (`data-del-post`, `bulkDeletePosts()`) dọn cả lịch 1 lần lẫn daily (`removeDailySchedulesForPost()` mới); `rescheduleUpcoming()` đồng bộ giờ mới ngược vào bài.
+- [x] `background.js`: nhánh chạy bù `when <= now` của `reconcileQueueSchedules()` đổi từ `runScheduledJob()` không `alarmName` (né re-check hủy) sang `registerPostScheduleFromQueue(post, now)` — luôn qua `isUpcomingStillActive()`.
+- [x] Bump `manifest.json` → v1.0.266, cập nhật `CHANGELOG.md` + `docs/GROUPFLOW.md`. Không đụng file trong bundle nên không cần rebuild `swBundle.js`.
+- [ ] **Cần Tony xác nhận trên máy thật**: (1) đặt lịch 1 bài → Hủy ở tab Hoạt động → chờ quá giờ hẹn 2-3 phút → bài KHÔNG được đăng, tag lịch không tự mọc lại; (2) đặt lịch → sửa bài xoá trống ngày/giờ → lưu → chờ qua giờ cũ → không đăng; (3) đặt lịch → xoá hẳn bài khỏi hàng đợi → chờ qua giờ → không đăng (cả lịch thường lẫn "lặp lại hàng ngày"); (4) "Sửa giờ" 1 lịch ở tab Hoạt động → tag trên card hiện đúng giờ MỚI; (5) lịch KHÔNG hủy vẫn chạy đúng giờ như cũ.
+
+## Backend: vá 7 vấn đề bảo mật phát hiện qua review website (2026-07-15)
+
+Tony nhờ review lại code website. Rà backend + frontend, tìm và sửa các lỗ hổng thật (không đụng schema, không đụng GroupFlow extension — không cần bump `manifest.json`).
+
+- [x] `middleware/auth.js`: `authenticate` từ chối token `type:'user_account'` (chặn group_user leo thang quyền qua route admin).
+- [x] `routes/userAuth.js`: thêm `canManageUsers` vào cả 5 route `/admin/*`; validate `plan`/`key_status`/`expires_at` trong `PATCH /admin/users/:id`; thêm `authLimiter` vào `/register` + `/login`.
+- [x] `services/mediaStorage.js`: `resolveLocalImagePath()` chặn path traversal (bắt buộc file nằm trong `publicRoot`).
+- [x] `app.js`: `NODE_ENV=production` mà thiếu/để mặc định `JWT_SECRET` → `process.exit(1)`.
+- [x] `middleware/rateLimit.js`: thêm `authLimiter` (20 req/15'/IP); áp vào `routes/auth.js` (`/api/auth/login`).
+- [x] `routes/upload.js`: `fileFilter` whitelist mimetype, đuôi file suy từ mimetype, `limits.fileSize`, xoá file khi validate fail, tên file chống trùng.
+- [x] `middleware/activityLog.js`: redact đệ quy + mở rộng danh sách field nhạy cảm.
+- [x] Syntax check (`node --check`) sạch cả 8 file. Cập nhật `CHANGELOG.md` + `docs/README.md` (thêm ghi chú bảo mật).
+- [ ] **Cần Tony xác nhận trên máy thật**: (1) đăng nhập admin website vẫn bình thường; (2) đăng nhập user GroupFlow (`/user/login`) + dashboard vẫn bình thường; (3) thử gọi `GET /api/user-auth/admin/users` bằng token user thường → phải bị 401/403; (4) `GET /api/media/image?ref=../backend/.env` → phải 404, không tải được file; (5) đặt `NODE_ENV=production` mà bỏ trống `JWT_SECRET` → backend phải thoát ngay khi khởi động; (6) upload 1 file `.html` đổi tên `.png` → phải bị từ chối.
 
 ## Backend + GroupFlow: client tự lọc/ngừng check bài quá N ngày đã lỡ nằm sẵn trong cache cục bộ (2026-07-13)
 

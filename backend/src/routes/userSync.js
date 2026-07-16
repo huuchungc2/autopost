@@ -51,6 +51,10 @@ router.post('/posts', authenticateLicenseKey, asyncHandler(async (req, res) => {
         noi_dung: p.noi_dung || null,
         posted_at: p.posted_at || null,
         post_queue_id: p.post_queue_id || '',
+        // FB uid của tài khoản/Fanpage đã đăng bài (extension gửi kèm từ 2026-07-15) — nuôi cột
+        // `fb_user_id` để /cross-posts trả `user_fb_id` cho tag tác giả bấm-mở-profile; optional,
+        // thiếu thì COALESCE giữ giá trị cũ (upsertUserPost).
+        fb_user_id: p.fb_user_id ? String(p.fb_user_id) : undefined,
         // "Báo hộ" trạng thái chờ duyệt cho đồng đội (xem GET /cross-posts) — optional, chỉ
         // extension của CHÍNH CHỦ bài mới gửi field này (đã tự check quyền comment trên bài của
         // mình). `undefined` khi client không gửi (mọi lần sync thường) → upsertUserPost() giữ
@@ -184,9 +188,13 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
   // hạ tầng đọc field này để đánh dấu tag "✓ Đã comment" mà KHÔNG lọc mất khỏi danh sách/tổng số —
   // hạ tầng này từng được xây rồi bị bỏ dở dang khi NOT EXISTS ở WHERE làm field này thành vô nghĩa
   // (luôn ra 1 vì hàng đã bị loại từ WHERE rồi thì querynày không bao giờ thấy hàng needs_comment=0).
+  // `up.fb_user_id AS user_fb_id` (2026-07-15) — FB uid của TÁC GIẢ bài (ghi lúc extension sync
+  // bài lên, migration 039) — extension dùng để render tên tác giả thành link mở thẳng profile
+  // Facebook (tag ↔ trên card Comment + Lịch sử), có thể NULL với bài cũ/extension cũ chưa gửi.
   const selectFields = `up.id, up.post_queue_id, up.group_id, up.group_name,
                 up.post_id, up.noi_dung, up.posted_at, up.updated_at,
                 up.comment_count, up.comment_target, up.pending_checked_at,
+                up.fb_user_id AS user_fb_id,
                 (NOT EXISTS (
                   SELECT 1 FROM user_post_comments upc
                   WHERE upc.user_post_id = up.id AND upc.commenter_user_id = ?

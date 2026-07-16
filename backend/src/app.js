@@ -34,6 +34,16 @@ import { getDbCharsetInfo } from './db.js';
 
 dotenv.config();
 
+// Bảo mật: JWT_SECRET có giá trị fallback mặc định ('replace_with_strong_secret') rải ở nhiều file để
+// dev chạy được ngay. Nếu deploy production mà quên đặt secret thật, bất kỳ ai cũng tự ký được token
+// super_admin. Chặn khởi động luôn thay vì âm thầm chạy với secret ai cũng biết.
+if (process.env.NODE_ENV === 'production'
+    && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'replace_with_strong_secret')) {
+  console.error('FATAL: JWT_SECRET chưa được đặt (hoặc còn là giá trị mặc định) khi NODE_ENV=production. '
+    + 'Đặt JWT_SECRET mạnh trong backend/.env rồi khởi động lại.');
+  process.exit(1);
+}
+
 const app = express();
 // Cần để req.protocol đọc đúng https khi chạy sau nginx reverse proxy (X-Forwarded-Proto) —
 // dùng để tự detect redirect URI cho Google Drive OAuth2 (routes/driveAuth.js).

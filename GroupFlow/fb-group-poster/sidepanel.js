@@ -245,6 +245,12 @@ async function bulkDeletePosts() {
     if (state.editingQueuePostId === id) clearComposerEditMode();
     state.assignPostIds.delete(id);
     await GF.postMediaStore?.delete(id);
+    // 2026-07-15 — xoá bài mà không dọn lịch thì alarm/entry cũ vẫn bắn đúng giờ và đăng bài "ma"
+    // từ payload đông lạnh (refreshScheduledPostPayload() fallback về stub khi bài không còn trong
+    // queue), lịch daily cũng vậy (payload tự chứa nguyên bài). clearQueueFields: false — bài sắp
+    // bị xoá khỏi state.posts ngay bên dưới, không còn field nào để dọn.
+    await cancelPostScheduleAlarms(id, { clearQueueFields: false });
+    await removeDailySchedulesForPost(id);
   }
   state.posts = state.posts.filter((p) => !ids.has(p.id));
   await savePosts();
@@ -1732,11 +1738,24 @@ async function saveComposePostToQueue({ selectOnly = false } = {}) {
       clearComposerEditMode();
       throw new Error('Bài đang sửa không còn trong queue');
     }
+    const prevSchedule = `${post.ngay_dang || ''}|${post.gio_dang || ''}`;
     applyComposerToQueuePost(post);
     if (selectOnly) {
       state.posts.forEach((p) => { p.selected = p.id === post.id; });
     }
     await savePosts();
+    // 2026-07-15 — đổi/xoá giờ hẹn ngay trong modal sửa bài trước đây CHỈ ghi 2 field lên bài:
+    // alarm + entry activityUpcoming cũ vẫn giữ nguyên GIỜ CŨ với payload đông lạnh — tới giờ cũ
+    // alarm vẫn bắn, và re-check hủy isUpcomingStillActive() (v1.0.261) vẫn thấy entry còn đó
+    // (chưa ai dọn) nên bài vẫn đăng theo lịch user tưởng đã bỏ. Dọn lịch "1 lần" cũ mỗi khi giờ
+    // hẹn thay đổi (clearQueueFields: false — 2 field VỪA mang giá trị mới, không được xoá); nếu
+    // đặt giờ mới thì gọi reconcile ngay để lịch mới đăng ký liền, không đợi tick 1 phút.
+    if (`${post.ngay_dang || ''}|${post.gio_dang || ''}` !== prevSchedule) {
+      await cancelPostScheduleAlarms(post.id, { clearQueueFields: false });
+      if (post.ngay_dang && post.gio_dang) {
+        await gfSendMessage({ type: 'GF_RECONCILE_SCHEDULES' }).catch(() => {});
+      }
+    }
     renderPosts();
     rememberPostModePreference();
     return post;
@@ -2764,6 +2783,9 @@ function renderPosts() {
       state.assignPostIds.delete(id);
       if (state.editingQueuePostId === id) clearComposerEditMode();
       await GF.postMediaStore?.delete(id);
+      // 2026-07-15 — dọn lịch của bài bị xoá (xem chú thích cùng ngày ở bulkDeletePosts()).
+      await cancelPostScheduleAlarms(id, { clearQueueFields: false });
+      await removeDailySchedulesForPost(id);
       await savePosts();
       renderPosts();
       renderGroupsTab();
@@ -3154,14 +3176,54 @@ async function gfScheduleAlarm({ name, when, data }) {
   return res;
 }
 
-async function cancelPostScheduleAlarms(postId) {
+// 2026-07-15 — nâng cấp từ hàm cũ cùng tên (vốn KHÔNG được ai gọi, và cũng không persist kết quả
+// filter) thành điểm dọn lịch "1 lần cụ thể" DÙNG CHUNG cho MỌI đường bỏ lịch của 1 bài: Hủy ở tab
+// Hoạt động (cancelUpcoming), đổi/xoá giờ trong modal sửa bài (saveComposePostToQueue), xoá bài
+// khỏi hàng đợi (data-del-post / bulkDeletePosts). Dọn ĐỦ CẢ 3 dấu vết:
+//   1. alarm thật + payload alarm_<tên> (GF_CANCEL_ALARM) — kể cả entry 'generate_image' xuất ảnh
+//      tự động gắn theo bài (giống cancelSelectedPostSchedules() đã làm);
+//   2. entry trong activityUpcoming (persist lại ngay);
+//   3. ngay_dang/gio_dang trên chính bài trong postQueue (trừ khi clearQueueFields: false — dùng
+//      khi bài sắp bị xoá hẳn, hoặc khi 2 field VỪA được ghi giá trị mới trong modal sửa bài).
+// Bước 3 chính là chỗ mọi bản vá trước (v1.0.261) còn sót: chỉ xoá alarm/entry mà giữ nguyên 2
+// field này thì reconcileQueueSchedules() (background.js — chạy mỗi phút qua gf_retry_missed + mỗi
+// lần service worker khởi động) thấy "bài có giờ hẹn nhưng không có lịch khớp" rồi TỰ DỰNG LẠI
+// lịch — tệ nhất là giờ hẹn đã QUA thì đăng NGAY lập tức — đúng hiện tượng "tắt hết lịch vẫn chạy".
+async function cancelPostScheduleAlarms(postId, { clearQueueFields = true } = {}) {
+  if (!postId) return;
   const d = await chrome.storage.local.get('activityUpcoming');
   const upcoming = d.activityUpcoming || [];
-  for (const item of upcoming.filter((u) => u.kind === 'post' && u.postId === postId)) {
+  const match = (u) => u.postId === postId && (u.kind === 'post' || u.kind === 'generate_image');
+  for (const item of upcoming.filter(match)) {
     const name = item.alarmName || item.id;
     if (name) await gfSendMessage({ type: 'GF_CANCEL_ALARM', name }).catch(() => {});
   }
-  return upcoming.filter((u) => !(u.kind === 'post' && u.postId === postId));
+  const remaining = upcoming.filter((u) => !match(u));
+  if (remaining.length !== upcoming.length) {
+    await chrome.storage.local.set({ activityUpcoming: remaining });
+  }
+  if (clearQueueFields) {
+    const post = state.posts.find((p) => p.id === postId);
+    if (post && (post.ngay_dang || post.gio_dang)) {
+      post.ngay_dang = '';
+      post.gio_dang = '';
+      await savePosts();
+    }
+  }
+}
+
+// Xoá entry "lặp lại hàng ngày" gắn với 1 bài — payload của entry là bản ĐÔNG LẠNH của bài
+// (buildSchedulePostPayload() lúc đặt lịch), nên bài đã xoá khỏi hàng đợi mà entry còn thì
+// tickDailyFixedSchedules() (background.js) vẫn cứ đăng lại bài "ma" đó mỗi ngày từ payload cũ.
+// Chỉ gọi khi XOÁ BÀI khỏi hàng đợi; hủy lịch daily chủ động vẫn đi qua cancelDailyFixedSchedule().
+async function removeDailySchedulesForPost(postId) {
+  if (!postId) return;
+  const d = await chrome.storage.local.get('dailyFixedSchedules');
+  const list = d.dailyFixedSchedules || [];
+  const remaining = list.filter((e) => !(e.kind === 'post' && e.payload?.posts?.[0]?.id === postId));
+  if (remaining.length !== list.length) {
+    await chrome.storage.local.set({ dailyFixedSchedules: remaining });
+  }
 }
 
 async function handleComposePostAction() {
@@ -3406,18 +3468,22 @@ async function confirmCampaignStagger() {
 }
 
 async function cancelUpcoming(item) {
+  // 2026-07-15 — bài đăng đi qua cancelPostScheduleAlarms() để dọn LUÔN ngay_dang/gio_dang trên
+  // bài trong queue: trước đây nút Hủy ở tab Hoạt động chỉ xoá entry + alarm, 2 field còn sót khiến
+  // reconcileQueueSchedules() tự dựng lại lịch (hoặc đăng NGAY nếu giờ hẹn đã qua) trong ≤1 phút —
+  // cùng gốc bug đã vá cho đường hủy hàng loạt ở v1.0.261 (cancelSelectedPostSchedules()) nhưng
+  // đường hủy TỪNG lịch này bị bỏ sót.
+  if (item.kind === 'post' && item.postId) {
+    await cancelPostScheduleAlarms(item.postId);
+    loadState();
+    return;
+  }
   const alarmName = item.alarmName || item.id;
   if (alarmName?.startsWith('gf_job_') || alarmName?.startsWith('gf_img_') || alarmName?.startsWith('gf_cmt_')) {
     await gfSendMessage({ type: 'GF_CANCEL_ALARM', name: alarmName });
   }
   const d = await chrome.storage.local.get('activityUpcoming');
-  let upcoming = (d.activityUpcoming || []).filter((u) => u.id !== item.id);
-  if (item.kind === 'post' && item.postId) {
-    upcoming = upcoming.filter((u) => !(u.kind === 'generate_image' && u.postId === item.postId));
-    for (const img of (d.activityUpcoming || []).filter((u) => u.kind === 'generate_image' && u.postId === item.postId)) {
-      if (img.alarmName) await gfSendMessage({ type: 'GF_CANCEL_ALARM', name: img.alarmName });
-    }
-  }
+  const upcoming = (d.activityUpcoming || []).filter((u) => u.id !== item.id);
   await chrome.storage.local.set({ activityUpcoming: upcoming });
   loadState();
 }
@@ -3469,6 +3535,19 @@ async function rescheduleUpcoming(item) {
         : item.label,
   });
   await chrome.storage.local.set({ activityUpcoming: upcoming });
+  // 2026-07-15 — đồng bộ giờ MỚI ngược vào ngay_dang/gio_dang trên bài (cancelUpcoming() phía trên
+  // vừa xoá trắng 2 field này): thiếu bước này thì tag trên card hiện "+ Hẹn giờ" như chưa có lịch
+  // dù lịch mới vẫn còn, và trước bản này còn tệ hơn — 2 field giữ nguyên GIỜ CŨ, lệch hẳn với giờ
+  // mới trong activityUpcoming.
+  if (kind === 'post' && item.postId) {
+    const statePost = state.posts.find((p) => p.id === item.postId);
+    if (statePost) {
+      const nd = new Date(when);
+      statePost.ngay_dang = `${nd.getFullYear()}-${pad(nd.getMonth() + 1)}-${pad(nd.getDate())}`;
+      statePost.gio_dang = `${pad(nd.getHours())}:${pad(nd.getMinutes())}`;
+      await savePosts();
+    }
+  }
   loadState();
 }
 
@@ -3528,6 +3607,9 @@ async function loadPostedPostsForComment({ force = false } = {}) {
     noi_dung: cp.noi_dung || '',
     lastPostedAt: cp.posted_at || '',
     _userLabel: cp.user_name || cp.user_email || 'User',
+    // FB uid của tác giả (server trả `user_fb_id` — có thể null với bài cũ) — để tag tên tác giả
+    // trên card + Lịch sử bấm vào mở thẳng profile Facebook.
+    _userFbId: cp.user_fb_id || null,
     // Server giờ trả cả bài đã comment rồi (needs_comment=0) — giữ lại field này để hiện tag
     // "Đã comment" thay vì lọc mất khỏi danh sách như trước.
     _needsComment: cp.needs_comment !== 0,
@@ -3698,19 +3780,20 @@ function isCommentActionable(c) {
 // state.postAccessCache (máy này không tự check bài của người khác nữa, xem isCommentActionable()),
 // vì có mặt trong danh sách tức là server đã xác nhận chủ bài confirm OK rồi.
 function commentAccessTagHtml(validGroups, isCross = false) {
-  if (isCross) return '<span class="tag ready">✓ Có thể comment</span>';
+  // 2026-07-15 — Tony: "bỏ phần có thể comment đi vì bài nào comment được mới hiển thị rồi" — từ
+  // v1.0.224/236 danh sách CHỈ hiện bài đã xác nhận comment được (isCommentActionable), nên tag
+  // "✓ Có thể comment" xanh là thừa 100% (mọi bài hiện ra đều mang nó). Bỏ tag xanh ở CẢ 2 nguồn;
+  // GIỮ tag cảnh báo (⏳ Chờ duyệt / ✕ Đã xóa) — vẫn cần cho bài đã-comment-xong (được giữ lại
+  // trong list nhờ isCommentDone) mà sau đó bài gốc chuyển trạng thái xấu.
+  if (isCross) return '';
   if (!validGroups?.length) return '';
-  const { ready, blocked } = splitGroupsByAccess(validGroups);
+  const { blocked } = splitGroupsByAccess(validGroups);
   if (blocked.length) {
     const entry = state.postAccessCache[String(blocked[0].post_id)];
     const isDeleted = entry?.kind === 'deleted';
     return `<span class="tag error" title="${escAttr(blocked[0]._accessReason)}">${isDeleted ? '✕ Đã xóa' : '⏳ Chờ duyệt'}</span>`;
   }
-  const allChecked = ready.length && ready.every((g) => {
-    const entry = state.postAccessCache[String(g.post_id)];
-    return isPostAccessFresh(entry) && entry.canComment === true;
-  });
-  return allChecked ? '<span class="tag ready">✓ Có thể comment</span>' : '';
+  return '';
 }
 
 // Bài đã được comment xong hay chưa — dùng chung cho tag "✓ Đã comment" và filter Bình luận, áp
@@ -4178,7 +4261,14 @@ function renderComments() {
     // Đổi format cho gọn (dùng chung formatScheduleWhen() — "YYYY-MM-DD HH:MM", bỏ giây) + thêm
     // tiền tố/tooltip để tách rõ khỏi tag lịch ngay cạnh nó.
     const postedAt = c.lastPostedAt ? formatScheduleWhen(new Date(c.lastPostedAt).getTime()) : '';
-    const crossLabel = c._source === 'cross' ? `<span class="tag web">↔ ${esc(c._userLabel || 'cross')}</span>` : '';
+    // 2026-07-15 — Tony: tên tác giả phải rõ trên từng bài + "nếu biết link fb theo tên bấm vào
+    // thì tốt" — có FB uid (server trả user_fb_id, có thể null với bài cũ) thì tag thành link mở
+    // thẳng profile Facebook của tác giả.
+    const crossLabel = c._source === 'cross'
+      ? (c._userFbId
+        ? `<a class="tag web" href="https://www.facebook.com/${escAttr(c._userFbId)}" target="_blank" rel="noopener noreferrer" title="Mở trang Facebook của ${escAttr(c._userLabel || '')}">👤 ${esc(c._userLabel || 'cross')}</a>`
+        : `<span class="tag web" title="Tác giả bài">👤 ${esc(c._userLabel || 'cross')}</span>`)
+      : '';
     const accessTag = commentAccessTagHtml(validGroups, c._source === 'cross');
     // Bài đã comment xong không bị lọc mất khỏi danh sách (dù của mình hay đồng đội) — chỉ gắn tag
     // để biết trạng thái, dùng chung isCommentDone() cho cả 2 nguồn.
@@ -4363,6 +4453,9 @@ async function runComment(id) {
           post_id: g.post_id,
           comment,
           crossServerId: c._source === 'cross' ? c._serverId : null,
+          // Cùng cặp field tác giả như buildRawJobsForOneComment() — cho Lịch sử ghi bài của ai.
+          author_name: c._source === 'cross' ? (c._userLabel || 'Đồng đội') : 'Của tôi',
+          author_fb_id: c._source === 'cross' ? (c._userFbId || null) : null,
           actorId,
         },
       });
@@ -4411,6 +4504,10 @@ function buildRawJobsForOneComment(id, { alertOnEmpty = true } = {}) {
     post_id: g.post_id,
     comment: state.commentDrafts[id] || '',
     crossServerId: c._source === 'cross' ? c._serverId : null,
+    // 2026-07-15 — mang theo tác giả bài để Lịch sử (appendHistory, background.js) ghi rõ comment
+    // này chạy vào bài CỦA AI + link FB (bài của mình ghi "Của tôi" cho đồng nhất cột tác giả).
+    author_name: c._source === 'cross' ? (c._userLabel || 'Đồng đội') : 'Của tôi',
+    author_fb_id: c._source === 'cross' ? (c._userFbId || null) : null,
     label: (c.noi_dung || g.group_name || 'Comment').slice(0, 60),
   }));
 }
@@ -4894,10 +4991,19 @@ function renderActivity(upcoming, history) {
     const pending = h.post_id === 'pending' || h.status === 'pending_approval';
     const linkLabel = pending ? 'Mở nhóm (chờ duyệt)' : (h.ok ? 'Mở bài trên FB' : 'Mở nhóm');
     const time = formatHistoryTime(h.at);
+    // 2026-07-15 — Tony: Lịch sử phải ghi rõ bài của AI (comment chéo chạy nhiều người dễ lẫn),
+    // tên bấm được để mở profile FB nếu job có mang author_fb_id (entry cũ trước bản này không có
+    // 2 field author_* — không hiện tag, không lỗi).
+    const authorTag = h.author_name
+      ? (h.author_fb_id
+        ? `<a class="tag web" href="https://www.facebook.com/${escAttr(h.author_fb_id)}" target="_blank" rel="noopener noreferrer" title="Mở trang Facebook của ${escAttr(h.author_name)}">👤 ${esc(h.author_name)}</a>`
+        : `<span class="tag web" title="Tác giả bài">👤 ${esc(h.author_name)}</span>`)
+      : '';
     return `
     <div class="list-item history-item">
       <div class="post-meta">
         <span class="tag ${h.ok ? 'ready' : 'error'}">${h.ok ? (pending ? 'Chờ duyệt' : 'OK') : 'Lỗi'}</span>
+        ${authorTag}
         ${h.mode ? `<span class="tag pending">${esc(formatHistoryMode(h.mode))}</span>` : ''}
         ${time ? `<span class="tag">${esc(time)}</span>` : ''}
       </div>
@@ -6195,9 +6301,16 @@ function isWithinPostsSyncLookback(dateStr, days) {
 // server xác nhận nhận (res.ok) — thất bại (mất mạng, server lỗi) thì KHÔNG đánh dấu, lần mở panel
 // sau tự thử lại đúng những item đó, không mất/không gửi trùng.
 async function syncLocalPostsToServer() {
-  const { licenseKey, postQueue } = await chrome.storage.local.get(['licenseKey', 'postQueue']);
+  const { licenseKey, postQueue, activeActorId, fbUser } = await chrome.storage.local.get([
+    'licenseKey', 'postQueue', 'activeActorId', 'fbUser',
+  ]);
   if (!licenseKey) return;
   const queue = postQueue || [];
+  // 2026-07-15 — gửi kèm FB uid của tài khoản/Fanpage đang đăng (actor active, fallback fbUser) để
+  // server nuôi cột user_posts.fb_user_id → tag tác giả trên card Comment/Lịch sử của ĐỒNG ĐỘI bấm
+  // vào mở được profile FB. postQueue không lưu actor theo từng bài nên lấy actor hiện tại — sync
+  // chạy ngay mỗi lần mở panel (thường liền sau khi đăng) nên sai lệch hiếm, field chỉ để hiển thị.
+  const posterFbId = String(activeActorId || fbUser?.id || '') || null;
   const posts = [];
   const touched = [];
   for (const item of queue) {
@@ -6212,6 +6325,7 @@ async function syncLocalPostsToServer() {
         post_id: String(g.post_id),
         noi_dung: item.noi_dung || '',
         posted_at: g.posted_at || item.lastPostedAt || null,
+        fb_user_id: posterFbId,
       });
       touched.push(g);
     }

@@ -15,6 +15,13 @@ export async function authenticate(req, res, next) {
   }
   try {
     const payload = jwt.verify(token, jwtSecret);
+    // Token của tài khoản GroupFlow tự đăng ký (role='group_user') được ký với type='user_account'
+    // và CHỈ dùng cho /api/user-auth/* (requireUserAuth). Nó dùng chung JWT_SECRET + bảng `users`,
+    // nên nếu không chặn ở đây, 1 group_user tự đăng ký free có thể mang token này gọi thẳng vào các
+    // route admin dùng authenticate (leo thang quyền). Từ chối dứt khoát ở tầng này.
+    if (payload.type === 'user_account') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     const users = await query(
       'SELECT id, name, username, email, role, is_active, must_change_password FROM users WHERE id = ?',
       [payload.userId]

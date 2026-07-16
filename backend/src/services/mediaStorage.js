@@ -84,7 +84,11 @@ export function parseImageRef(imageUrl) {
 export function resolveLocalImagePath(imageUrl) {
   if (!imageUrl || imageUrl.startsWith('http') || imageUrl.startsWith('gdrive://')) return null;
   const relative = imageUrl.replace(/^\//, '');
-  const fullPath = path.join(publicRoot, relative);
+  const fullPath = path.resolve(publicRoot, relative);
+  // Chặn path traversal: `ref` đến từ query người dùng (routes/media.js) — nếu chứa `../` thì
+  // path.resolve có thể trỏ ra NGOÀI publicRoot (đọc được .env, mã nguồn...). Chỉ cho phép file
+  // nằm gọn trong publicRoot.
+  if (fullPath !== publicRoot && !fullPath.startsWith(publicRoot + path.sep)) return null;
   return fs.existsSync(fullPath) ? fullPath : null;
 }
 

@@ -6,10 +6,11 @@ import { authenticateUser, signToken, setPassword, verifyPassword } from '../ser
 import { getUserPages, isSuperAdmin } from '../services/pageAccessService.js';
 import { getUserProviders } from '../services/providerAccessService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { authLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
-router.post('/login', asyncHandler(async (req, res) => {
+router.post('/login', authLimiter, asyncHandler(async (req, res) => {
   const login = req.body.login || req.body.email || req.body.username;
   const { password } = req.body;
   if (!login || !password) {

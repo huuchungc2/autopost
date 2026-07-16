@@ -41,3 +41,16 @@ export const licenseValidateLimiter = rateLimit({
   keyGenerator: (req) => ipKeyGenerator(req.ip),
   message: { error: 'Thử lại quá nhiều lần — chờ vài phút rồi thử lại' },
 });
+
+// Đăng nhập/đăng ký (website admin lẫn GroupFlow user) — trước đây KHÔNG có limiter nào, để lộ 2 bề
+// mặt tấn công: brute-force mật khẩu admin và spam đăng ký hàng loạt (mỗi lượt còn insert thêm dòng
+// license_keys). 20 request/15 phút/IP đủ rộng cho người gõ nhầm mật khẩu vài lần rồi thử lại, vẫn
+// chặn được bot dò mật khẩu/đăng ký ồ ạt. Khoá theo IP (login chưa có token/key để khoá riêng).
+export const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  message: { error: 'Đăng nhập/đăng ký quá nhiều lần — chờ vài phút rồi thử lại' },
+});

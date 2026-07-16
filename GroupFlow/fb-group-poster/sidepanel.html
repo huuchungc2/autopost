@@ -983,8 +983,9 @@
 
   <footer class="footer footer-global" id="batchFooterGlobal" aria-label="Lên lịch hàng loạt">
     <span class="batch-queue-label batch-queue-label-global" id="batchFooterLabel">Tick bài → Lên lịch</span>
-    <button type="button" id="btnCancelSelectedPosts" class="btn ghost accent" title="Hủy lịch (1 lần hoặc lặp lại hàng ngày) của các bài đã tick">🗑 Hủy lịch đã chọn</button>
+    <!-- 2026-07-15 — Tony yêu cầu đổi chỗ: hành động chính "Lên lịch" bên TRÁI, "Hủy lịch" bên PHẢI (cả 2 footer Tạo bài + Comment). -->
     <button type="button" id="btnScheduleCampaign" class="btn outline" title="Lên lịch các bài đã chọn">Lên lịch đã chọn</button>
+    <button type="button" id="btnCancelSelectedPosts" class="btn ghost accent" title="Hủy lịch (1 lần hoặc lặp lại hàng ngày) của các bài đã tick">🗑 Hủy lịch đã chọn</button>
   </footer>
 
   <div id="commentStaggerPanel" class="comment-schedule-panel hidden" style="margin: 0 12px 8px">
@@ -1007,8 +1008,8 @@
   </div>
   <footer class="footer footer-global" id="commentFooterGlobal" aria-label="Lên lịch comment">
     <span class="batch-queue-label batch-queue-label-global">Tick bài → Lên lịch</span>
-    <button type="button" id="btnCancelSelectedComments" class="btn ghost accent" title="Hủy lịch (1 lần hoặc lặp lại hàng ngày) của các bài đã tick">🗑 Hủy lịch đã chọn</button>
     <button type="button" id="btnScheduleComments" class="btn outline">Lên lịch đã chọn</button>
+    <button type="button" id="btnCancelSelectedComments" class="btn ghost accent" title="Hủy lịch (1 lần hoặc lặp lại hàng ngày) của các bài đã tick">🗑 Hủy lịch đã chọn</button>
   </footer>
 
   <!-- Luôn hiện, mọi tab, không tắt theo body.gf-tab-* như 2 footer trên -->

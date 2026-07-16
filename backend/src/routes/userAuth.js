@@ -5,8 +5,12 @@ import { randomUUID } from 'crypto';
 import { query } from '../db.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { authenticate } from '../middleware/auth.js';
+import { canManageUsers } from '../middleware/rbac.js';
 import { usernameFromEmail } from '../services/userUsernameService.js';
-import { licenseValidateLimiter } from '../middleware/rateLimit.js';
+import { licenseValidateLimiter, authLimiter } from '../middleware/rateLimit.js';
+
+const VALID_PLANS = new Set(['free', 'pro', 'enterprise']);
+const VALID_KEY_STATUSES = new Set(['active', 'suspended']);
 import { registerOrCheckDevice, listDevicesForKey, getDeviceLimit, removeDevice, DEVICE_STALE_DAYS } from '../services/licenseDeviceService.js';
 
 // Số điện thoại VN thông dụng: 0 + 9 số, hoặc +84 + 9 số — chỉ chặn rác rõ ràng (chữ cái, quá
@@ -52,7 +56,7 @@ async function generateUniqueUsername(email) {
 // người dùng thật (Tony: "public xài free đổi lại là số điện thoại"). Không unique — không muốn
 // chặn nhầm người dùng chung số điện thoại gia đình/công ty, chỉ cần thu thập được, không phải
 // khoá 1-số-1-tài-khoản.
-router.post('/register', asyncHandler(async (req, res) => {
+router.post('/register', authLimiter, asyncHandler(async (req, res) => {
   const { email, password, name, phone } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email và mật khẩu là bắt buộc' });
   if (password.length < 6) return res.status(400).json({ error: 'Mật khẩu tối thiểu 6 ký tự' });
@@ -84,7 +88,7 @@ router.post('/register', asyncHandler(async (req, res) => {
 }));
 
 // POST /api/user-auth/login
-router.post('/login', asyncHandler(async (req, res) => {
+router.post('/login', authLimiter, asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email và mật khẩu là bắt buộc' });
 
@@ -280,7 +284,7 @@ router.post('/logout', requireUserAuth, (req, res) => {
 // nhau (free vs enterprise) — rủi ro thật, đã xoá bỏ hẳn. Dùng `/api/auth/my-license` sẵn có.
 
 // GET /api/user-auth/admin/users — danh sách tất cả group_user + key + stats
-router.get('/admin/users', authenticate, asyncHandler(async (req, res) => {
+router.get('/admin/users', authenticate, canManageUsers, asyncHandler(async (req, res) => {
   const rows = await query(
     `SELECT u.id, u.email, u.phone, u.name, IF(u.is_active, 'active', 'suspended') AS status, u.created_at,
             lk.id AS license_key_id, lk.key_value, lk.plan, lk.status AS key_status,
@@ -313,7 +317,7 @@ router.get('/admin/users', authenticate, asyncHandler(async (req, res) => {
 }));
 
 // GET /api/user-auth/admin/users/:id/detail — groups + recent posts + thiết bị đang dùng key của 1 user
-router.get('/admin/users/:id/detail', authenticate, asyncHandler(async (req, res) => {
+router.get('/admin/users/:id/detail', authenticate, canManageUsers, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const groups = await query(
     `SELECT group_id, group_name, COUNT(*) AS post_count, MAX(posted_at) AS last_posted_at
@@ -335,7 +339,7 @@ router.get('/admin/users/:id/detail', authenticate, asyncHandler(async (req, res
 // DELETE /api/user-auth/admin/users/:id/devices/:deviceRowId — gỡ 1 thiết bị khỏi key của user,
 // nhường chỗ cho thiết bị mới kích hoạt (không tự ngắt phiên đang chạy của thiết bị bị gỡ — thiết
 // bị đó chỉ bị chặn ở lần validate-key TIẾP THEO, xem chú thích ở registerOrCheckDevice()).
-router.delete('/admin/users/:id/devices/:deviceRowId', authenticate, asyncHandler(async (req, res) => {
+router.delete('/admin/users/:id/devices/:deviceRowId', authenticate, canManageUsers, asyncHandler(async (req, res) => {
   const { id, deviceRowId } = req.params;
   const [lk] = await query('SELECT id FROM license_keys WHERE user_id = ? LIMIT 1', [id]);
   if (!lk) return res.status(404).json({ error: 'User chưa có license key' });
@@ -344,9 +348,19 @@ router.delete('/admin/users/:id/devices/:deviceRowId', authenticate, asyncHandle
 }));
 
 // PATCH /api/user-auth/admin/users/:id — cập nhật status / plan / expires_at
-router.patch('/admin/users/:id', authenticate, asyncHandler(async (req, res) => {
+router.patch('/admin/users/:id', authenticate, canManageUsers, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status, plan, expires_at, key_status } = req.body;
+
+  if (plan && !VALID_PLANS.has(plan)) {
+    return res.status(400).json({ error: 'plan không hợp lệ (free/pro/enterprise)' });
+  }
+  if (key_status && !VALID_KEY_STATUSES.has(key_status)) {
+    return res.status(400).json({ error: 'key_status không hợp lệ (active/suspended)' });
+  }
+  if (expires_at !== undefined && expires_at !== null && expires_at !== '' && Number.isNaN(new Date(expires_at).getTime())) {
+    return res.status(400).json({ error: 'expires_at không hợp lệ' });
+  }
 
   if (status) {
     await query(`UPDATE users SET is_active = ? WHERE id = ? AND role = 'group_user'`, [status === 'active' ? 1 : 0, id]);
@@ -366,7 +380,7 @@ router.patch('/admin/users/:id', authenticate, asyncHandler(async (req, res) => 
 }));
 
 // DELETE /api/user-auth/admin/users/:id
-router.delete('/admin/users/:id', authenticate, asyncHandler(async (req, res) => {
+router.delete('/admin/users/:id', authenticate, canManageUsers, asyncHandler(async (req, res) => {
   await query(`DELETE FROM users WHERE id = ? AND role = 'group_user'`, [req.params.id]);
   res.json({ ok: true });
 }));

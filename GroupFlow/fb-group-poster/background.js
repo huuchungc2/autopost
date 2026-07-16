@@ -1841,14 +1841,17 @@ const GF_BG = {
       }
 
       if (when <= now) {
-        console.info('[GroupFlow] missed queue schedule — run now:', post.id);
-        const payload = {
-          posts: [this.stripMediaFromPayload({ ...post })],
-          sync: true,
-          postMode: settings.postMode || 'classic',
-          actorId: settings.activeActorId,
-        };
-        await this.runScheduledJob({ kind: 'post', payload });
+        // 2026-07-15 — TRƯỚC ĐÂY nhánh này gọi thẳng runScheduledJob() KHÔNG kèm alarmName — tức
+        // bỏ qua hoàn toàn bước re-check hủy isUpcomingStillActive() (v1.0.261): chỉ cần 2 field
+        // ngay_dang/gio_dang còn sót trên bài (mọi đường hủy ngoài cancelSelectedPostSchedules()
+        // đều từng để sót — vá ở sidepanel.js cùng bản này) là bài tự đăng NGAY, không gì cản
+        // được — nguồn chính của "tắt hết lịch vẫn chạy". Giờ đăng ký qua
+        // registerPostScheduleFromQueue() với when = now: job đi ĐÚNG đường lịch chuẩn (entry
+        // activityUpcoming + alarm thật, luôn có alarmName) nên mọi lần chạy đều qua re-check hủy.
+        // Vẫn chạy bù ngay trong cùng tick: retryMissedActivity() await reconcile này XONG mới đọc
+        // activityUpcoming, nên entry when<=now vừa tạo được nhặt luôn ở vòng for bên đó.
+        console.info('[GroupFlow] missed queue schedule — enqueue run now:', post.id);
+        await this.registerPostScheduleFromQueue(post, now, settings);
       } else {
         await this.registerPostScheduleFromQueue(post, when, settings);
       }
@@ -2396,6 +2399,35 @@ const GF_BG = {
       // do khác — Log ghi "Bỏ qua" thay vì lặp lại báo lỗi mỗi phút.
       if (/^Timeout chờ/i.test(e.message || '')) {
         e.skippedNotReady = true;
+        // v1.0.267 — Tony: "nếu 1 bài lỗi thì phải có chức năng loại bỏ chứ" — trước đây kết quả
+        // comment THẬT bị timeout không được ghi ngược vào gf_post_access_cache: bài vẫn mang
+        // trạng thái 'ok' (fail-open của check tab thật — banner không hiện không có nghĩa là ô
+        // bình luận sẽ hiện), nên vẫn nằm trong list Comment và MỌI lịch sau cho đúng bài đó lại
+        // mở tab chạy thật rồi timeout y hệt. Comment thật chính là lần kiểm tra ĐÁNG TIN NHẤT —
+        // ghi đè cache thành 'pending' ngay tại đây: list Comment ẩn bài (isCommentActionable,
+        // sidepanel.js), nút Chạy/Lên lịch bị chặn, và lịch ĐÃ đặt sẵn cho bài này sẽ bị
+        // getPostAccess() chặn từ sớm ("chờ admin duyệt" → skippedNotReady → Bỏ qua) không mở tab
+        // nữa. KHÔNG phải loại bỏ vĩnh viễn: 'pending' hết hạn sau PENDING_ACCESS_TTL_MS (20') —
+        // cron warmPostAccessCache() tự check lại nền, bài được duyệt/vào được nhóm thì tự quay
+        // lại list như thiết kế sẵn có.
+        if (validPostId && FC) {
+          await FC.writePostAccessEntry(job.post_id, {
+            canComment: false,
+            kind: 'pending',
+            // Chuỗi reason PHẢI khớp regex noDomFallback phía trên ("không thể comment"/"chờ admin")
+            // — getPostAccess() ở lịch sau trả entry này, commentOnPost() throw đúng reason, nhánh
+            // noDomFallback mới nhận ra là "chưa sẵn sàng" để Bỏ qua êm thay vì rớt xuống Cổ điển
+            // mở tab chạy lại lần nữa.
+            reason: 'Không thể comment — lần comment trước ô bình luận không xuất hiện (timeout): bài chờ admin duyệt/khoá bình luận/chưa tham gia nhóm',
+            checkedAt: Date.now(),
+          }).catch(() => {});
+          // Bài CỦA MÌNH (không phải bài đồng đội — job chéo luôn mang crossServerId) thì báo hộ
+          // lên server luôn, để /cross-posts loại bài này khỏi list của đồng đội ngay thay vì đợi
+          // cron check lại — cùng cơ chế reportOwnPendingApproval() của warmPostAccessCache().
+          if (!job.crossServerId) {
+            await this.reportOwnPendingApproval(job.group_id, job.post_id, true);
+          }
+        }
       }
       throw e;
     }
@@ -2418,6 +2450,8 @@ const GF_BG = {
         group_id: job.group_id,
         group_name: job.group_name,
         post_id: job.post_id,
+        author_name: job.author_name,
+        author_fb_id: job.author_fb_id,
         snippet: comment.slice(0, 80),
         error: e.skippedNotReady ? `Bỏ qua — ${e.message}` : e.message,
       });
@@ -2437,6 +2471,8 @@ const GF_BG = {
       group_id: job.group_id,
       group_name: job.group_name,
       post_id: job.post_id,
+      author_name: job.author_name,
+      author_fb_id: job.author_fb_id,
       comment_id: res.commentId,
       snippet: comment.slice(0, 80),
       error: res.warning,
@@ -2468,6 +2504,8 @@ const GF_BG = {
         skipped: Boolean(e.skippedNotReady),
         group_id: job.group_id,
         post_id: job.post_id,
+        author_name: job.author_name,
+        author_fb_id: job.author_fb_id,
         snippet: comment.slice(0, 80),
         error: e.skippedNotReady ? `Bỏ qua — ${e.message}` : e.message,
       });
@@ -2486,6 +2524,8 @@ const GF_BG = {
       group_id: job.group_id,
       group_name: job.group_name,
       post_id: job.post_id,
+      author_name: job.author_name,
+      author_fb_id: job.author_fb_id,
       comment_id: res.commentId,
       snippet: comment.slice(0, 80),
       error: res.warning,
@@ -3474,11 +3514,16 @@ const GF_BG = {
     const auth = await this.getTidienAuth();
     if (!auth) return;
     try {
+      // 2026-07-15 — gửi kèm FB uid (actor active/fbUser) nuôi cột user_posts.fb_user_id cho cả
+      // bài ĐÃ có sẵn trên server (đường sync chính chỉ chạy cho bài chưa sync) — server COALESCE
+      // giữ giá trị cũ nếu đã có, xem upsertUserPost().
+      const d = await chrome.storage.local.get(['activeActorId', 'fbUser']);
+      const posterFbId = String(d.activeActorId || d.fbUser?.id || '') || null;
       await fetch(`${auth.base}/api/user-sync/posts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
         body: JSON.stringify({
-          posts: [{ group_id: groupId, post_id: postId, pending_approval: pendingApproval }],
+          posts: [{ group_id: groupId, post_id: postId, pending_approval: pendingApproval, fb_user_id: posterFbId }],
         }),
       });
     } catch { /* best-effort — lượt cron kế tiếp tự thử lại nếu access cache còn stale */ }
