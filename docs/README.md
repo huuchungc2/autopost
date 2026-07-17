@@ -12,6 +12,7 @@
 | [WEBSITE_BLOG.md](./WEBSITE_BLOG.md) | Tạo bài blog SEO website, tỷ lệ nội dung fanpage 70/20/10, getProjectContext |
 | [WEBSITE_PUBLISH_API.md](./WEBSITE_PUBLISH_API.md) | Spec API đẩy bài blog lên CMS website thật (đưa cho dev website) |
 | [GROUPFLOW.md](./GROUPFLOW.md) | Chrome extension FB Group, API sync, đăng/comment nền, cài extension |
+| [GROUPFLOW_FEATURES.md](./GROUPFLOW_FEATURES.md) | Mô tả TÍNH NĂNG GroupFlow theo góc nhìn người dùng — nguồn chuẩn để viết bài giới thiệu/hướng dẫn và làm lại menu Hướng dẫn trong extension |
 | [../GroupFlow/fb-group-poster/README.md](../GroupFlow/fb-group-poster/README.md) | Cài load unpacked, SW, side panel, troubleshooting |
 | [../DEPLOY.md](../DEPLOY.md) | Deploy VPS, PM2, Nginx, migration, smoke test, lỗi production |
 | [../TODO.md](../TODO.md) | Đã làm / còn lại |

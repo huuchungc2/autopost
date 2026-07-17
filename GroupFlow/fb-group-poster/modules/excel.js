@@ -37,6 +37,19 @@ GF.excel = {
     return GF.importTextNormalize?.normalize(text) ?? String(text ?? '').trim();
   },
 
+  normalizeDateFormat(dateStr) {
+    const trimmed = String(dateStr || '').trim();
+    // Chuẩn hóa DD-MM-YYYY → YYYY-MM-DD (nội bộ)
+    const ddmmyyyy = trimmed.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (ddmmyyyy) {
+      return `${ddmmyyyy[3]}-${ddmmyyyy[2].padStart(2, '0')}-${ddmmyyyy[1].padStart(2, '0')}`;
+    }
+    // Đã là YYYY-MM-DD, giữ nguyên
+    const yyyymmdd = trimmed.match(/^\d{4}-\d{2}-\d{2}$/);
+    if (yyyymmdd) return trimmed;
+    return trimmed; // Format khác, trả về nguyên văn (có thể invalid)
+  },
+
   readSheetRow(sheet, rowIndex, colCount) {
     const cells = [];
     for (let col = 0; col < colCount; col += 1) {
@@ -71,7 +84,7 @@ GF.excel = {
       source: 'excel',
       noi_dung: norm.noi_dung || '',
       prompt_anh: norm.prompt_anh || '',
-      ngay_dang: norm.ngay_dang || '',
+      ngay_dang: this.normalizeDateFormat(norm.ngay_dang) || '',
       gio_dang: norm.gio_dang || '',
       groupIds: [],
       imageStatus: 'pending',
@@ -182,20 +195,60 @@ GF.excel = {
       throw new Error('Thư viện XLSX chưa load — reload extension rồi thử lại');
     }
     const headers = Object.keys(this.HEADER_ALIASES);
-    const example = [
-      'Ví dụ nội dung bài viết — xóa dòng này trước khi import',
-      '',
-      '2026-07-10',
+    const example1 = [
+      'Bài viết 1 nội dung — Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
+      'A beautiful sunset over the mountains, golden hour light, cinematic photography',
+      '20-07-2026',
       '08:30',
       '1',
       '',
       '',
     ];
-    const aoa = [headers, example];
+    const example2 = [
+      'Bài viết 2 — Nội dung khác — Có thể để trống prompt_anh nếu không dùng ảnh AI',
+      '',
+      '21-07-2026',
+      '14:00',
+      '',
+      '',
+      '',
+    ];
+    const aoa = [headers, example1, example2];
     const sheet = XLSX.utils.aoa_to_sheet(aoa);
     sheet['!cols'] = headers.map((h) => ({ wch: Math.max(18, h.length + 4) }));
+
+    // Sheet hướng dẫn
+    const guideAoa = [
+      ['HƯỚNG DẪN IMPORT BÀI VIẾT'],
+      [],
+      ['CỘT CẦN CÓ (bắt buộc):'],
+      ['noi_dung', 'Nội dung bài viết (text, spintax {chữ 1|chữ 2})'],
+      ['prompt_anh', 'Prompt tạo ảnh AI (để trống = chỉ text, không tạo ảnh)'],
+      ['ngay_dang', 'Ngày đăng (DD-MM-YYYY, vd: 20-07-2026)'],
+      ['gio_dang', 'Giờ đăng (HH:MM, vd: 08:30)'],
+      [],
+      ['CỘT TÙYCHỌN:'],
+      ['auto_generate_image', 'Tự tạo ảnh từ prompt? (1/0, mặc định: 1)'],
+      ['anh_ngay_dang', 'Ngày tạo ảnh riêng (nếu khác ngày đăng)'],
+      ['anh_gio_dang', 'Giờ tạo ảnh riêng (nếu khác giờ đăng)'],
+      [],
+      ['CÁCH DÙNG:'],
+      ['1. Điền nội dung bài viết vào cột noi_dung'],
+      ['2. Nếu dùng ảnh AI, điền prompt vào prompt_anh'],
+      ['3. Khi import, mỗi bài sẽ có nút 📋 Copy prompt để copy prompt ảnh dán vào chỗ khác'],
+      ['4. Chọn nhóm đăng, chọn ngày/giờ, rồi bấm Đăng hoặc Lên lịch'],
+      [],
+      ['LƯU Ý:'],
+      ['- Format ngày/giờ sai → có thể báo lỗi hoặc đặt mặc định'],
+      ['- Prompt ảnh để trống = chỉ đăng text, không tạo ảnh'],
+      ['- Xóa các dòng ví dụ trước khi điền dữ liệu thật'],
+    ];
+    const guideSheet = XLSX.utils.aoa_to_sheet(guideAoa);
+    guideSheet['!cols'] = [{ wch: 25 }, { wch: 60 }];
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, sheet, 'Import');
+    XLSX.utils.book_append_sheet(wb, guideSheet, 'Hướng dẫn');
     return wb;
   },
 

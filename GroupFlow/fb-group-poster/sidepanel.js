@@ -2671,6 +2671,7 @@ function renderPosts() {
         <button type="button" class="btn primary sm" data-post-now="${p.id}" ${noGroups || isPostingThis ? 'disabled' : ''} title="${noGroups ? 'Chọn nhóm trước' : 'Chỉ đăng bài này'}">${isPostingThis ? 'Đang đăng…' : 'Đăng'}</button>
         <button type="button" class="btn ghost sm accent" data-toggle-groups="${p.id}">${state.inlineGroupPickerPostId === p.id ? 'Đóng nhóm' : 'Chọn nhóm'}</button>
         <button type="button" class="btn ghost sm" data-edit-post="${p.id}">${isEditingInCompose ? 'Tiếp tục sửa ↑' : 'Sửa'}</button>
+        ${p.prompt_anh ? `<button type="button" class="btn ghost sm" data-copy-prompt="${p.id}" title="Copy prompt ảnh" style="background: #f0f2f5;">📋</button>` : ''}
         ${!hasMedia && p.prompt_anh ? `<button type="button" class="btn ghost sm accent" data-gen="${p.id}">Xuất ảnh</button>` : ''}
         <button type="button" class="btn ghost sm" data-del-post="${p.id}">Xóa</button>
         ${postAutoImageToggleHtml(p, hasMedia)}
@@ -2737,6 +2738,25 @@ function renderPosts() {
   });
   box.querySelectorAll('[data-goto-groups-batch]').forEach((btn) => {
     btn.addEventListener('click', () => gotoGroupsTab(btn.dataset.gotoGroupsBatch));
+  });
+  box.querySelectorAll('[data-copy-prompt]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const postId = btn.dataset.copyPrompt;
+      const post = state.posts.find((p) => p.id === postId);
+      if (post?.prompt_anh) {
+        navigator.clipboard.writeText(post.prompt_anh).then(() => {
+          const oldText = btn.textContent;
+          btn.textContent = '✓';
+          btn.style.background = '#90EE90';
+          setTimeout(() => {
+            btn.textContent = oldText;
+            btn.style.background = '#f0f2f5';
+          }, 1500);
+          showToast('Đã copy prompt ảnh', 'success', 2000);
+        }).catch(() => showToast('Copy thất bại', 'error', 2000));
+      }
+    });
   });
   bindInlineGroupChecks(box);
   bindPostedGroupActions(box);
@@ -3104,13 +3124,20 @@ async function scheduleImageAlarm(post, imageWhen, upcoming) {
   });
 }
 
-async function generateOne(postId) {
+async function generateOne(postId, { silent = false } = {}) {
   const post = state.posts.find((p) => p.id === postId);
-  if (postHasMedia(post)) return alert('Bài đã có ảnh/video — xóa media trong Sửa nếu muốn generate lại');
-  if (!post?.prompt_anh) return alert('Thiếu prompt ảnh');
+  if (postHasMedia(post)) {
+    if (!silent) alert('Bài đã có ảnh/video — xóa media trong Sửa nếu muốn generate lại');
+    return;
+  }
+  if (!post?.prompt_anh) {
+    if (!silent) alert('Thiếu prompt ảnh');
+    return;
+  }
   const s = await GF.storage.getSettings();
   if (!(await aiImageReady())) {
-    return alert('Chọn Image provider trong Cài đặt hoặc nhập 9Router API key');
+    if (!silent) alert('Chọn Image provider trong Cài đặt hoặc nhập 9Router API key');
+    return;
   }
   try {
     post.imageStatus = 'generating';
@@ -3129,16 +3156,45 @@ async function generateOne(postId) {
     }
     await savePosts();
     renderPosts();
+    if (!silent) showToast('✓ Xuất ảnh thành công', 'success', 2000);
   } catch (e) {
     post.imageStatus = 'error';
     renderPosts();
-    alert(e.message);
+    const logMsg = `❌ Xuất ảnh lỗi: "${post.noi_dung?.slice(0, 60) || 'post'}" — ${e.message}`;
+    console.error('[GroupFlow] ' + logMsg);
+    if (!silent) {
+      alert(e.message);
+    } else {
+      // Auto-generate mode: ghi log, không alert, continue
+      chrome.runtime.sendMessage({
+        type: 'GF_ENGINE_LOG',
+        data: {
+          level: 'error',
+          message: logMsg,
+          phase: 'image-gen',
+        },
+      }).catch(() => {});
+    }
   }
 }
 
 async function generateAll() {
-  for (const p of state.posts.filter((x) => x.selected === true && !x.imageBase64 && !x.videoBase64)) {
-    await generateOne(p.id);
+  const toGenerate = state.posts.filter((x) => x.selected === true && !x.imageBase64 && !x.videoBase64);
+  let success = 0;
+  let failed = 0;
+  for (const p of toGenerate) {
+    try {
+      await generateOne(p.id, { silent: true });
+      if (p.imageStatus === 'ready') success += 1;
+      else if (p.imageStatus === 'error') failed += 1;
+    } catch (e) {
+      failed += 1;
+    }
+  }
+  // 2026-07-17 — auto-generate: skip bài fail, ghi log, tiếp tục batch
+  if (success > 0 || failed > 0) {
+    const msg = `Xuất ảnh: ${success} thành công${failed > 0 ? `, ${failed} bỏ qua (lỗi)` : ''}`;
+    showToast(msg, failed > 0 ? 'warn' : 'success', 3000);
   }
 }
 
@@ -3633,6 +3689,7 @@ async function loadPostedPostsForComment({ force = false } = {}) {
   state.commentScheduleMap = await loadCommentScheduleMap();
   populateCommentFilterPersonOptions();
   updateCommentSubTabCounts();
+  updateCommentApprovalStats();
   // Badge chỉ đếm bài còn CẦN chú ý (chưa comment VÀ còn làm được — không tính bài đã biết chắc
   // chờ duyệt/đã xóa, cùng luật ẩn với isCommentActionable() dùng cho list) — áp dụng chung cho cả
   // bài của mình lẫn bài đồng đội qua isCommentDone(), không tính bài đã xong (server/postedGroups
@@ -4176,6 +4233,43 @@ function updateCommentSubTabCounts() {
   });
   if (mineEl) mineEl.textContent = mine ? `(${mine})` : '';
   if (teamEl) teamEl.textContent = team ? `(${team})` : '';
+}
+
+// 2026-07-17 — Hiển thị stats duyệt: Đã duyệt(x) | Chưa duyệt(y) | Chưa check(z)
+// "Của tôi" = bài của extension user chỉ hiển thị bài đã duyệt (kind='ok')
+// Update ngay khi cache thay đổi
+function updateCommentApprovalStats() {
+  const cache = state.postAccessCache || {};
+  let approved = 0;      // kind='ok'
+  let pending = 0;       // kind='pending' or 'manual_pending'
+  let unchecked = 0;     // không có entry trong cache
+
+  state.comments.forEach((c) => {
+    // Chỉ đếm bài của TÔI (c._source !== 'cross'), không đếm bài đồng đội
+    if (c._source === 'cross') return;
+
+    const postId = c.postedGroups?.[0]?.post_id;
+    if (!postId) return;
+
+    const entry = cache[String(postId)];
+    const kind = entry?.kind;
+
+    if (kind === 'ok') {
+      approved += 1;
+    } else if (kind === 'pending' || kind === 'manual_pending') {
+      pending += 1;
+    } else if (!entry) {
+      // Bài chưa check = không có entry
+      unchecked += 1;
+    }
+  });
+
+  const approvedEl = $('#statsApproved');
+  const pendingEl = $('#statsPending');
+  const uncheckedEl = $('#statsUnchecked');
+  if (approvedEl) approvedEl.textContent = approved;
+  if (pendingEl) pendingEl.textContent = pending;
+  if (uncheckedEl) uncheckedEl.textContent = unchecked;
 }
 
 // Gõ tự do vào input — khớp chính xác (không phân biệt hoa/thường) thì áp filter ngay; khớp DUY
@@ -5563,7 +5657,7 @@ function bindEvents() {
     }
   });
 
-  $('#btnAddManual').addEventListener('click', async () => {
+  $('#btnAddManual')?.addEventListener('click', async () => {
     try {
       const wasEditing = Boolean(state.editingQueuePostId);
       await saveComposePostToQueue();
@@ -5622,7 +5716,7 @@ function bindEvents() {
     });
   });
 
-  $('#btnGenAll').addEventListener('click', generateAll);
+  $('#btnGenAll')?.addEventListener('click', generateAll);
 
   $('#selectAllPosts')?.addEventListener('change', (e) => {
     const checked = e.target.checked;
@@ -5664,7 +5758,7 @@ function bindEvents() {
     renderPosts();
   });
 
-  $('#btnPullWeb').addEventListener('click', async () => {
+  $('#btnPullWeb')?.addEventListener('click', async () => {
     try {
       const res = await GF.tidienSync.pullDraftsFromWebsite();
       const pulled = res.data || [];
@@ -5796,7 +5890,7 @@ function bindEvents() {
   });
 
   $('#btnComposePostNow')?.addEventListener('click', handleComposePostAction);
-  $('#btnScheduleCampaign').addEventListener('click', toggleCampaignStaggerPanel);
+  $('#btnScheduleCampaign')?.addEventListener('click', toggleCampaignStaggerPanel);
   $('#btnCancelSelectedPosts')?.addEventListener('click', () => cancelSelectedPostSchedules());
   $('#btnConfirmCampaignStagger')?.addEventListener('click', confirmCampaignStagger);
   bindGapUnitDefaultReset('#campaignStaggerGapUnit', '#campaignStaggerGapValue');
@@ -5825,26 +5919,30 @@ function bindEvents() {
       btn.textContent = 'AI';
     }
   });
-  $('#btnRefreshComments').addEventListener('click', async (e) => {
-    // Audit đồng bộ 2026-07-06 — trước đây không có disabled-guard nào, khác hẳn
-    // runTidienSyncNow() (nút "↻ Đồng bộ ngay" ở Cài đặt) đã tự chặn bấm dồn dập. `force: true` ở
-    // đây bỏ qua hẳn throttle 30s (USER_SYNC_MIN_INTERVAL_MS) — bấm nhanh nhiều lần bắn ra nhiều
-    // request `force` chồng lên nhau, không request nào bị chặn.
+  // v1.0.275 — xóa nút "Làm mới" khỏi Comment tab (auto-sync từ storage listener)
+  $('#btnCheckNow')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget;
     if (btn.disabled) return;
     const label = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Đang tải…';
+    btn.textContent = '🔄 Đang kiểm tra…';
     try {
-      await syncLocalPostsToServer().catch(() => {});
-      await pullMyPostsFromServer({ force: true }).catch(() => {});
-      await loadComments({ force: true });
+      // Trigger check bài từ background service worker (cron warmPostAccessCache)
+      const response = await chrome.runtime.sendMessage({
+        type: 'GF_CHECK_POSTS_NOW',
+        data: { batchSize: 6 }
+      }).catch(() => ({}));
+      // Chờ tí để check xong, rồi update UI
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await loadPostedPostsForComment();
+    } catch (e) {
+      console.error('Check posts failed:', e);
     } finally {
       btn.disabled = false;
       btn.textContent = label;
     }
   });
-  $('#btnScheduleComments').addEventListener('click', () => toggleCommentSchedulePanel());
+  $('#btnScheduleComments')?.addEventListener('click', () => toggleCommentSchedulePanel());
   $('#btnCancelSelectedComments')?.addEventListener('click', () => cancelSelectedCommentSchedules());
   $('#btnConfirmCommentSchedule')?.addEventListener('click', () => scheduleSelectedComments());
   $('#commentSelectAll')?.addEventListener('change', (e) => {
@@ -5853,7 +5951,7 @@ function bindEvents() {
   bindCommentFilters();
   bindCommentSubTabs();
 
-  $('#btnRadarSave').addEventListener('click', async () => {
+  $('#btnRadarSave')?.addEventListener('click', async () => {
     const interval = Number($('#radarInterval').value) || 15;
     const maxGroupsPerScan = Number($('#radarMaxGroupsPerScan')?.value) || 10;
     const radarIds = state.radarGroupIds.size
@@ -5891,7 +5989,7 @@ function bindEvents() {
   $('#btnLeadExportCsv')?.addEventListener('click', () => exportLeadsCsv());
   $('#btnLeadExportJson')?.addEventListener('click', () => exportLeadsJson());
   $('#btnLeadClearAll')?.addEventListener('click', () => clearAllLeads());
-  $('#btnRadarScan').addEventListener('click', () => gfSendMessage({ type: 'GF_RADAR_SCAN' }).catch(() => {}));
+  $('#btnRadarScan')?.addEventListener('click', () => gfSendMessage({ type: 'GF_RADAR_SCAN' }).catch(() => {}));
 
   $$('.activity-sub-tabs [data-sub]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -5949,7 +6047,7 @@ function bindEvents() {
       if (btn) { btn.disabled = false; btn.textContent = originalText || '🔄 Đặt lại thiết bị'; }
     }
   });
-  $('#btnSaveSettings').addEventListener('click', saveSettingsForm);
+  $('#btnSaveSettings')?.addEventListener('click', saveSettingsForm);
   $('#btnSaveActiveProviders')?.addEventListener('click', () => saveActiveProviders().catch((e) => alert(e.message)));
   $('#btnSaveProvider')?.addEventListener('click', () => saveProviderForm().catch((e) => alert(e.message)));
   $('#btnCancelProvider')?.addEventListener('click', resetProviderForm);
@@ -6269,7 +6367,26 @@ function bindEvents() {
       mergePostsFromStorage(mapPostsFromQueue(changes.postQueue.newValue || []));
       scheduleRenderPosts();
     }
+    // 2026-07-16 — Tony: "thấy nó bật lên kiểm tra nhưng phần Của tôi không lên" — cron nền check
+    // xong ghi kết quả vào gf_post_access_cache nhưng panel đang mở KHÔNG vẽ lại gì (list Comment,
+    // số "Của tôi (N)"/"Đồng đội (N)", badge) cho tới khi user tự bấm Làm mới/đổi tab — bài mới
+    // check OK xong mà số cứ đứng nguyên. Nghe thay đổi của cache rồi nạp lại (debounce 1.5s để
+    // gom nhiều lượt check sát nhau — batch mở tab Comment check 3 bài liền — thành 1 lần vẽ).
+    if (changes.gf_post_access_cache) {
+      schedulePostAccessRefresh();
+    }
   });
+}
+
+let postAccessRefreshTimer = null;
+function schedulePostAccessRefresh() {
+  if (postAccessRefreshTimer) clearTimeout(postAccessRefreshTimer);
+  postAccessRefreshTimer = setTimeout(() => {
+    postAccessRefreshTimer = null;
+    // loadPostedPostsForComment() tự cập nhật badge + số tab con, và chỉ render list khi tab
+    // Comment đang mở — panel đứng ở tab khác thì chỉ số liệu đổi, không đụng DOM tab hiện tại.
+    loadPostedPostsForComment().catch(() => {});
+  }, 1500);
 }
 
 async function getUserSyncBase() {

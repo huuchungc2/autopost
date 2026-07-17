@@ -382,9 +382,13 @@
           <div class="card-title">
             <span class="card-title-text">Comment chéo</span>
           </div>
-          <button type="button" id="btnRefreshComments" class="btn ghost sm">Làm mới</button>
+          <button type="button" id="btnCheckNow" class="btn sm" title="Check bài chưa duyệt" style="margin-left: auto;">🔍 Check</button>
         </div>
-        <p class="hint">Danh sách là các bài đã đăng qua GroupFlow. Nhập spintax <code>{nội dung 1|nội dung 2}</code> hoặc chọn mẫu từ dropdown — để trống cũng <strong>Chạy</strong>/<strong>Lên lịch</strong> được, tự random mẫu ở <strong>Settings → Comment mẫu</strong>. Lên lịch (1 lần hoặc lặp lại hàng ngày) hoàn toàn do bạn tự chọn — không có gì tự động cả. Giãn cách trong nhóm theo <strong>Settings → Giãn cách</strong>.</p>
+        <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-weight: 500; color: var(--color-text-primary); padding: 0 16px;">
+          <span>Đã duyệt(<span id="statsApproved">0</span>)</span>
+          <span>Chưa duyệt(<span id="statsPending">0</span>)</span>
+          <span>Chưa check(<span id="statsUnchecked">0</span>)</span>
+        </div>
         <div class="segmented comment-sub-tabs">
           <button type="button" data-comment-sub="mine" class="segmented-btn active">Của tôi <span id="commentSubMineCount"></span></button>
           <button type="button" data-comment-sub="team" class="segmented-btn">Đồng đội <span id="commentSubTeamCount"></span></button>

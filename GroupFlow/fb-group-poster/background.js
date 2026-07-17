@@ -2068,8 +2068,35 @@ const GF_BG = {
               snippet: 'Xuất ảnh trước khi đăng…',
             },
           }).catch(() => {});
-          post = await PM.ensurePostMedia(post, mediaSettings);
-          job.posts[pi] = post;
+          try {
+            // 2026-07-17 — auto-generate: nếu fail → log + skip bài, không dừng job
+            post = await PM.ensurePostMedia(post, mediaSettings);
+            job.posts[pi] = post;
+          } catch (imgError) {
+            const msg = `❌ Xuất ảnh lỗi: "${post.noi_dung?.slice(0, 60) || 'post'}" — ${String(imgError?.message || imgError).slice(0, 100)}`;
+            console.error('[GroupFlow] ' + msg);
+            chrome.runtime.sendMessage({
+              type: 'GF_ENGINE_LOG',
+              data: {
+                level: 'error',
+                message: msg,
+                phase: 'image-gen',
+              },
+            }).catch(() => {});
+            // Bỏ qua bài này, tiếp tục bài tiếp theo
+            bumpPostResult(post.id, 'fail');
+            chrome.runtime.sendMessage({
+              type: 'GF_PROGRESS',
+              data: {
+                phase: 'skip',
+                done: done + 1,
+                total,
+                post: post.noi_dung?.slice(0, 40) || '',
+                snippet: `Bỏ qua (xuất ảnh lỗi) — tiếp tục…`,
+              },
+            }).catch(() => {});
+            continue; // Skip bài này, đi tới bài tiếp theo
+          }
         }
 
         const groups = this.resolvePostGroups(post, job, groupsMap);
@@ -3468,20 +3495,25 @@ const GF_BG = {
     // CHỈ gửi về bài mà CHỦ BÀI đã tự confirm OK (xem userSync.js) — đồng đội không cần và không
     // nên tự check lại bài không phải của mình nữa, chỉ cần check ĐÚNG bài của chính mình (nguồn
     // duy nhất đáng tin — Facebook luôn cho chủ bài xem thật) rồi báo hộ lên server.
-    const addTarget = (groupId, postId) => {
+    const addTarget = (groupId, postId, label, groupName) => {
       const pid = String(postId || '');
       if (!groupId || !/^\d+$/.test(pid)) return;
       if (targets.has(pid)) return;
-      targets.set(pid, { groupId: String(groupId), postId: pid });
+      targets.set(pid, {
+        groupId: String(groupId),
+        postId: pid,
+        label: String(label || '').slice(0, 60),
+        groupName: groupName || '',
+      });
     };
     const lookbackDays = await this.getPostsSyncLookbackDays();
     (d.postQueue || []).forEach((p) => {
       if (!this.isWithinPostsSyncLookback(p.lastPostedAt, lookbackDays)) return;
-      (p.postedGroups || []).forEach((g) => addTarget(g.group_id, g.post_id));
+      (p.postedGroups || []).forEach((g) => addTarget(g.group_id, g.post_id, p.noi_dung, g.group_name));
     });
     (d.serverMyPosts || []).forEach((sp) => {
       if (!this.isWithinPostsSyncLookback(sp.posted_at, lookbackDays)) return;
-      addTarget(sp.group_id, sp.post_id);
+      addTarget(sp.group_id, sp.post_id, sp.noi_dung, sp.group_name);
     });
     if (!targets.size) return;
 
@@ -3499,9 +3531,30 @@ const GF_BG = {
     const batch = stale.slice(0, batchSize);
     for (const t of batch) {
       try {
+        const prevKind = cache[t.postId]?.kind;
         const result = await FC.getPostAccess({ groupId: t.groupId, postId: t.postId, session, isTimeline: false });
         if (result?.kind === 'pending' || result?.kind === 'ok') {
           await this.reportOwnPendingApproval(t.groupId, t.postId, result.kind === 'pending');
+        }
+        // 2026-07-16 — Tony: "thấy nó bật lên kiểm tra nhưng phần Của tôi không lên, chả hiểu lý
+        // do" — kết quả check trước đây chỉ nằm trong console service worker, user không có chỗ
+        // nào nhìn thấy VÌ SAO bài không vào (hay rớt khỏi) list Comment. Ghi vào Nhật ký (tab
+        // Log) — CHỈ khi trạng thái ĐỔI so với lần check trước (lần đầu check cũng tính là đổi),
+        // re-check định kỳ ra y kết quả cũ thì im lặng, không spam 26 dòng/6h.
+        if (result?.kind && result.kind !== prevKind) {
+          const kindLabel = {
+            ok: '✓ Comment được — đã vào danh sách "Của tôi"',
+            pending: '⏳ Chờ duyệt/chưa sẵn sàng — chưa vào danh sách',
+            deleted: '✕ Đã xóa hoặc không xem được — loại khỏi danh sách',
+          }[result.kind] || result.kind;
+          await this.appendEngineLog({
+            level: result.kind === 'ok' ? 'ok' : result.kind === 'deleted' ? 'error' : 'warn',
+            phase: 'check',
+            message: `Check bài${t.label ? ` «${t.label}»` : ''}: ${kindLabel}${result.reason ? ` (${result.reason})` : ''}`,
+            group: t.groupName,
+            groupId: t.groupId,
+            postId: t.postId,
+          });
         }
       } catch (e) {
         console.warn('[GroupFlow] warmPostAccessCache: check lỗi', t.postId, e.message);
@@ -3666,6 +3719,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // cho đỡ rối mắt (vẫn nhanh hơn hẳn tick nền 3 phút/2 bài).
         GF_BG.warmPostAccessCache({ batchSize: 3 }).catch((e) => {
           console.warn('[GroupFlow] manual warm post access:', e.message);
+        });
+        sendResponse({ ok: true });
+        return;
+      }
+      if (msg.type === 'GF_CHECK_POSTS_NOW') {
+        // 2026-07-17 — User bấm nút "Check bài" để check bài chưa duyệt ngay thay vì đợi auto-check 3 phút
+        const batchSize = msg.data?.batchSize || 6;
+        GF_BG.warmPostAccessCache({ batchSize }).catch((e) => {
+          console.warn('[GroupFlow] manual check posts:', e.message);
         });
         sendResponse({ ok: true });
         return;
