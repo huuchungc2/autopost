@@ -975,9 +975,10 @@ router.put('/:id', asyncHandler(async (req, res) => {
     finalSeoMeta = JSON.stringify({ ...existingSeoMeta, ...seoMetaInput });
   }
 
+  const clearImageJobStatus = finalImageUrl && (!post.image_url || image_url !== undefined);
   await query(
     `UPDATE posts SET page_id = ?, topic = ?, content = ?, image_url = ?, image_prompt = ?, auto_generate_image = ?, save_image_local = ?, video_prompt = ?,
-     video_url = ?, video_thumb_url = ?, media_type = ?, scheduled_at = ?, status = ?, seo_meta = ? WHERE id = ?`,
+     video_url = ?, video_thumb_url = ?, media_type = ?, scheduled_at = ?, status = ?, seo_meta = ?${clearImageJobStatus ? ', image_job_status = ?, error_message = ?' : ''} WHERE id = ?`,
     [
       targetPageId,
       finalTopic,
@@ -993,6 +994,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
       finalScheduledAt,
       resolvedStatus,
       finalSeoMeta,
+      ...(clearImageJobStatus ? ['done', null] : []),
       req.params.id,
     ]
   );

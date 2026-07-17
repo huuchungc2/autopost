@@ -1,6 +1,29 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-07-16
+> Cập nhật: 2026-07-17
+
+## Backend: Clear image_job_status khi upload ảnh thay thế generate fail (2026-07-17)
+
+Fix: `PUT /posts/:id` tự động clear `image_job_status = 'done'` + `error_message = null` khi upload ảnh bằy tay. Tránh UI hiển thị error cũ sau khi bài đã có ảnh.
+
+- [x] Fix `routes/posts.js` PUT route (clear status khi set `image_url`)
+- [x] Update `CHANGELOG.md`
+
+## docs/GROUPFLOW_FEATURES.md — mô tả tính năng cho người dùng (2026-07-16)
+
+Tony cần file .md tổng hợp tính năng GroupFlow làm nguồn cho: (1) skill viết bài giới thiệu, (2) làm lại menu Hướng dẫn trong extension.
+
+- [x] Viết `docs/GROUPFLOW_FEATURES.md` (12 mục, bám UI thật v1.0.271) + link vào `docs/README.md` + bullet CHANGELOG.
+- [ ] **Việc tiếp theo khi Tony yêu cầu**: làm lại menu Hướng dẫn (`tab-help`, `sidepanel.html`) theo đúng file này — menu hiện tại lỗi thời (còn nhắc "tab Activity" đã bỏ, thiếu comment chéo/kiểm tra bài/Radar/an toàn); và tạo skill viết bài lấy file này làm context.
+
+## GroupFlow v1.0.271: check xong tự cập nhật "Của tôi" + kết quả check hiện trong Nhật ký (2026-07-16)
+
+Tony báo "thấy nó bật lên kiểm tra nhưng phần Của tôi không lên, chả hiểu lý do". Root cause: panel không nghe `gf_post_access_cache` nên check xong UI đứng nguyên; kết quả check chỉ nằm ở console. Chi tiết `docs/GROUPFLOW.md`.
+
+- [x] `sidepanel.js`: `storage.onChanged` nghe thêm `gf_post_access_cache` → `schedulePostAccessRefresh()` (debounce 1.5s) → `loadPostedPostsForComment()` tự cập nhật list/số/badge.
+- [x] `background.js`: `_warmPostAccessCacheImpl()` ghi Nhật ký khi trạng thái bài đổi (✓ vào danh sách / ⏳ chưa vào / ✕ loại khỏi, kèm snippet + nhóm + lý do); target mang kèm label/groupName.
+- [x] Bump `manifest.json` → v1.0.271, cập nhật `CHANGELOG.md` + `docs/GROUPFLOW.md`. Syntax check sạch. Không cần rebuild `swBundle.js`.
+- [ ] **Cần Tony xác nhận trên máy thật**: reload extension → đăng 1 bài mới vào nhóm KHÔNG cần duyệt → đợi vài phút thấy tab check mở → số "Của tôi" tự +1 không cần bấm Làm mới, tab Log có dòng "Check bài «…»: ✓ Comment được"; đăng 1 bài vào nhóm CẦN duyệt → tab Log có dòng "⏳ Chờ duyệt — chưa vào danh sách" (giải thích đúng ca "check mà số không lên").
 
 ## Backend + GroupFlow v1.0.270: Log hiện tên tác giả cho mọi entry (2026-07-16)
 
