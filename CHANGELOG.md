@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **GroupFlow v1.0.283 — Lọc theo trạng thái đăng ở tab Tạo bài + báo rõ khi sync bài thất bại (2026-07-15)**: Tony yêu cầu tab Tạo bài phải lọc được bài **đã đăng / chưa đăng**. Thêm select `#postFilterStatus` (Tất cả / Chưa đăng / Đã đăng / Chờ duyệt / Đăng một phần / Lỗi đăng) — "Chưa đăng" bắt cả bài `postStatus` undefined (bài mới soạn chưa từng đăng). Thanh lọc giờ 4 select chia 2/hàng. Đồng thời vá chỗ **nuốt lỗi im lặng**: `pullMyPostsFromServer()`/`fetchCrossPostsFromServer()` trước đây `if (!res.ok) return;` — server lỗi thì user chỉ thấy danh sách TRỐNG, không biết vì sao (đã gặp thật: thiếu bảng `user_post_categories` làm `/my-posts` + `/cross-posts` trả 500, bài cũ vẫn nguyên trong DB nhưng extension không hiện gì). Thêm `warnSyncFailed()` — log console + toast (throttle 2 phút) nói rõ "không tải được … (lỗi 500), bài cũ vẫn còn".
+
 ### Fixed
 - **Backend — "Unknown column 'd.category_ids'": bug parse file SQL làm migration 048 không bao giờ chạy (2026-07-15)**: Tony báo lỗi vẫn còn sau khi đã vá chuỗi migration. Root cause thật KHÔNG phải chuỗi migration đứt mà là `parseSqlStatements()` (`migrationRunner.js`) **split theo `;` TRƯỚC rồi mới bỏ comment**. Migration `048_group_post_drafts_category.sql` có dấu `;` nằm GIỮA một dòng comment (`...ở list draft; extension pull về...`) — split cắt ngay đó, phần chữ đứng sau dấu `;` trên cùng dòng mất tiền tố `--` nên không bị strip, rồi dính vào câu `ALTER` thành SQL rác (`extension pull về → postQueue ALTER TABLE ...`) → MySQL báo lỗi cú pháp, migration ném lỗi mỗi lần khởi động và cột `category_ids` không bao giờ được tạo. Fix: đảo thứ tự — **bỏ comment trước, split `;` sau** (dấu `;` trong comment biến mất cùng comment). Đã rà toàn bộ migration: không file nào khác đổi kết quả parse. Dọn luôn dấu `;` khỏi comment của 046/047/048 cho chắc.
 

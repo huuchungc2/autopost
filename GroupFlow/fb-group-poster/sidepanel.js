@@ -55,6 +55,7 @@ const state = {
   postFilterGroup: 'all',
   postFilterImage: 'all',
   postFilterCategory: 'all',
+  postFilterStatus: 'all',
   commentFilterCategory: 'all',
   categories: [],
   composeCategoryIds: new Set(),
@@ -2765,6 +2766,10 @@ function getFilteredPosts() {
   else if (state.postFilterImage === 'none') posts = posts.filter((p) => !postHasMedia(p) && !p.mediaCached);
   if (state.postFilterCategory === 'none') posts = posts.filter((p) => !itemCategoryIds(p).length);
   else if (state.postFilterCategory !== 'all') posts = posts.filter((p) => itemCategoryIds(p).includes(String(state.postFilterCategory)));
+  // Lọc theo trạng thái đăng. Bài chưa từng đăng có thể KHÔNG có postStatus (undefined) — coi như 'queue'.
+  const st = state.postFilterStatus || 'all';
+  if (st === 'queue') posts = posts.filter((p) => !p.postStatus || p.postStatus === 'queue');
+  else if (st !== 'all') posts = posts.filter((p) => p.postStatus === st);
   return posts;
 }
 
@@ -6007,6 +6012,11 @@ function bindEvents() {
     state.postsPage = 0;
     renderPosts();
   });
+  $('#postFilterStatus')?.addEventListener('change', (e) => {
+    state.postFilterStatus = e.target.value;
+    state.postsPage = 0;
+    renderPosts();
+  });
 
   $('#btnBulkStatus')?.addEventListener('click', async () => {
     const status = $('#postsBulkStatus')?.value;
@@ -6836,6 +6846,18 @@ async function syncPostCategoryToServer(post) {
   } catch { /* best-effort */ }
 }
 
+// Báo rõ khi kéo bài từ server thất bại — trước đây `if (!res.ok) return;` nuốt lỗi im lặng, user chỉ
+// thấy danh sách TRỐNG mà không biết vì sao (đã gặp thật: thiếu bảng user_post_categories làm
+// /my-posts + /cross-posts trả 500, bài cũ vẫn còn nguyên trong DB nhưng extension không hiện gì).
+// Throttle 1 toast/2 phút để không spam khi server lỗi kéo dài.
+let lastSyncWarnAt = 0;
+function warnSyncFailed(what, status) {
+  console.warn(`[GroupFlow] Sync ${what} thất bại — HTTP ${status}`);
+  if (Date.now() - lastSyncWarnAt < 120000) return;
+  lastSyncWarnAt = Date.now();
+  showToast(`Không tải được ${what} từ server (lỗi ${status}) — bài cũ vẫn còn, thử lại sau hoặc báo admin`, 'error', 9000);
+}
+
 // v1.0.185 — cursor theo `updated_at` (`myPostsSyncMeta.cursor`) + merge-upsert vào `serverMyPosts`
 // đã có, thay vì gọi `?limit=200` trần rồi GHI ĐÈ toàn bộ cache mỗi lần như trước (tải lại y hệt
 // 200 bài mới nhất dù phần lớn đã tải ở lần gọi trước — xem ghi chú đầu docs/GROUPFLOW.md). Lần đầu
@@ -6897,7 +6919,7 @@ async function pullMyPostsFromServer({ force = false } = {}) {
     const res = await fetch(`${base}/api/user-sync/my-posts?${qs}`, {
       headers: { Authorization: `Bearer ${licenseKey}` },
     });
-    if (!res.ok) return;
+    if (!res.ok) { warnSyncFailed('bài của tôi', res.status); return; }
     const rows = await res.json();
     if (!Array.isArray(rows)) return;
     const newestUpdatedAt = rows.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), meta.cursor || '');
@@ -6935,7 +6957,7 @@ async function fetchCrossPostsFromServer({ force = false } = {}) {
     const res = await fetch(`${base}/api/user-sync/cross-posts?${qs}`, {
       headers: { Authorization: `Bearer ${licenseKey}` },
     });
-    if (!res.ok) return cache;
+    if (!res.ok) { warnSyncFailed('bài đồng đội', res.status); return cache; }
     const rows = await res.json();
     if (!Array.isArray(rows)) return cache;
     const newestUpdatedAt = rows.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), meta.cursor || '');

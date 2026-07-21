@@ -2,6 +2,12 @@
 
 > Cập nhật: 2026-07-18
 
+## GroupFlow v1.0.283: Lọc trạng thái đăng ở tab Tạo bài + báo rõ khi sync lỗi (2026-07-15)
+
+- [x] `#postFilterStatus` (Tất cả/Chưa đăng/Đã đăng/Chờ duyệt/Đăng một phần/Lỗi đăng) — "Chưa đăng" bắt cả bài `postStatus` undefined. Thanh lọc 4 select chia 2/hàng.
+- [x] `warnSyncFailed()`: `pullMyPostsFromServer`/`fetchCrossPostsFromServer` hết nuốt lỗi im lặng — log + toast khi server trả lỗi (throttle 2 phút). Bump v1.0.283.
+- [ ] **Cần Tony xác nhận**: tab Tạo bài lọc "Đã đăng"/"Chưa đăng" ra đúng bài; khi server lỗi thì thấy toast báo thay vì danh sách trống không lý do.
+
 ## Backend: fix "Unknown column 'd.category_ids'" — bug parse file SQL (2026-07-15)
 
 Lỗi vẫn còn sau khi vá chuỗi migration. Root cause thật: `parseSqlStatements()` split `;` TRƯỚC rồi mới bỏ comment — dấu `;` giữa dòng comment của migration 048 làm câu ALTER dính chữ rác → lỗi cú pháp → cột không bao giờ tạo.

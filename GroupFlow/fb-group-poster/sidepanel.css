@@ -1828,11 +1828,11 @@ video.thumb {
   min-width: 0;
 }
 
-/* 3 select lọc (Nhóm/Ảnh/Ngành) chia đều 1 hàng dưới ô tìm kiếm — không cắt chữ, không tràn ngang
-   trong side panel hẹp (trước đây max-width:110px + không wrap khiến ô thứ 4 tràn ra ngoài). */
+/* 4 select lọc (Nhóm/Ảnh/Ngành/Trạng thái) chia 2 mỗi hàng dưới ô tìm kiếm — không cắt chữ, không tràn
+   ngang trong side panel hẹp (trước đây max-width:110px + không wrap khiến ô thứ 4 tràn ra ngoài). */
 .post-filter-bar .gf-select-sm {
-  flex: 1 1 calc(33.333% - 6px);
-  min-width: 96px;
+  flex: 1 1 calc(50% - 3px);
+  min-width: 120px;
   max-width: none;
 }
 

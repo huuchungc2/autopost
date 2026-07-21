@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GroupFlow — FB Group Auto Poster",
-  "version": "1.0.282",
+  "version": "1.0.283",
   "incognito": "not_allowed",
   "description": "Đăng bài FB Group, AI local, comment chéo, Radar — tuỳ chọn sync tidien.xyz",
   "permissions": [
