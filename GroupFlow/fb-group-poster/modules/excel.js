@@ -11,6 +11,9 @@ GF.excel = {
     auto_generate_image: ['auto_generate_image', 'auto_generate', 'tu_xuat_anh'],
     anh_ngay_dang: ['anh_ngay_dang', 'image_date'],
     anh_gio_dang: ['anh_gio_dang', 'image_time'],
+    // Cột ngành nghề (tùy chọn) — tên ngành cách nhau dấu phẩy. Thiếu cột → bài coi như chưa gán ngành.
+    // Tên ngành được khớp sang id ở sidepanel (state.categories) sau khi parse.
+    nganh_nghe: ['nganh_nghe', 'nganh', 'category', 'nganhnghe'],
   },
 
   normalizeHeader(cell) {
@@ -94,6 +97,9 @@ GF.excel = {
       autoGenerateImage: norm.auto_generate_image !== '0' && norm.auto_generate_image !== 'false',
       anh_ngay_dang: norm.anh_ngay_dang || '',
       anh_gio_dang: norm.anh_gio_dang || '',
+      categories: [],
+      // Tên ngành thô từ cột "Ngành nghề" (nếu có) — sidepanel khớp sang id ngành. Thiếu → [].
+      _categoryNames: String(norm.nganh_nghe || '').split(/[,;]/).map((s) => s.trim()).filter(Boolean),
       selected: false,
     };
   },
@@ -203,12 +209,14 @@ GF.excel = {
       '1',
       '',
       '',
+      'Bất động sản, Du lịch',
     ];
     const example2 = [
       'Bài viết 2 — Nội dung khác — Có thể để trống prompt_anh nếu không dùng ảnh AI',
       '',
       '21-07-2026',
       '14:00',
+      '',
       '',
       '',
       '',
@@ -231,6 +239,7 @@ GF.excel = {
       ['auto_generate_image', 'Tự tạo ảnh từ prompt? (1/0, mặc định: 1)'],
       ['anh_ngay_dang', 'Ngày tạo ảnh riêng (nếu khác ngày đăng)'],
       ['anh_gio_dang', 'Giờ tạo ảnh riêng (nếu khác giờ đăng)'],
+      ['nganh_nghe', 'Ngành nghề (tên, cách nhau dấu phẩy) — để trống = chưa gán. Tên phải khớp danh mục trong extension'],
       [],
       ['CÁCH DÙNG:'],
       ['1. Điền nội dung bài viết vào cột noi_dung'],

@@ -22,7 +22,18 @@ export default function GroupDrafts() {
   const [scope, setScope] = useState('mine');
   const [loading, setLoading] = useState(true);
   const [editDraft, setEditDraft] = useState(null);
+  const [selected, setSelected] = useState(() => new Set());
+  const [categories, setCategories] = useState([]);
+  const [assignCats, setAssignCats] = useState(() => new Set());
   const { showToast } = useToast();
+
+  useEffect(() => {
+    api.get('/group-categories').then((r) => setCategories(r.data || [])).catch(() => {});
+  }, []);
+
+  const catName = (id) => categories.find((c) => String(c.id) === String(id))?.name || '';
+  const draftCatNames = (csv) => String(csv || '').split(',').map((s) => s.trim()).filter(Boolean)
+    .map(catName).filter(Boolean);
 
   const load = async (page = 1) => {
     setLoading(true);
@@ -32,10 +43,57 @@ export default function GroupDrafts() {
       });
       setData(res.data.data || []);
       setPagination(res.data.pagination || { page: 1, pages: 1, total: 0 });
+      setSelected(new Set());
     } catch (err) {
       showToast(err.response?.data?.error || 'Tải drafts thất bại', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deletableIds = data.filter((r) => r.can_delete).map((r) => r.id);
+  const allSelected = deletableIds.length > 0 && deletableIds.every((id) => selected.has(id));
+  const toggleOne = (id) => setSelected((s) => {
+    const n = new Set(s);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+  const toggleAll = () => setSelected(() => (allSelected ? new Set() : new Set(deletableIds)));
+
+  const handleBulkDelete = async () => {
+    const ids = [...selected];
+    if (!ids.length) return;
+    if (!window.confirm(`Xoá ${ids.length} draft đã chọn?`)) return;
+    try {
+      const res = await api.post('/group-posts/drafts/bulk-delete', { draft_ids: ids });
+      showToast(`Đã xoá ${res.data.deleted} draft`, 'success');
+      setSelected(new Set());
+      load(pagination.page);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Xoá thất bại', 'error');
+    }
+  };
+
+  const toggleAssignCat = (id) => setAssignCats((s) => {
+    const n = new Set(s);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+
+  const handleBulkCategory = async () => {
+    const ids = [...selected];
+    if (!ids.length) return;
+    try {
+      const res = await api.post('/group-posts/drafts/bulk-category', {
+        draft_ids: ids,
+        category_ids: [...assignCats],
+      });
+      showToast(`Đã gán ngành cho ${res.data.updated} draft`, 'success');
+      setSelected(new Set());
+      setAssignCats(new Set());
+      load(pagination.page);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Gán ngành thất bại', 'error');
     }
   };
 
@@ -100,8 +158,41 @@ export default function GroupDrafts() {
           </>
         )}
         <Button variant="secondary" onClick={() => navigate('/groups/import')}>+ Import</Button>
+        {selected.size > 0 && (
+          <Button variant="destructive" onClick={handleBulkDelete}>
+            <Trash2 size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+            Xóa đã chọn ({selected.size})
+          </Button>
+        )}
         <span className="text-muted" style={{ marginLeft: 'auto' }}>{pagination.total} draft</span>
       </div>
+
+      {selected.size > 0 && categories.length > 0 && (
+        <div className="card" style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          <span className="text-muted">Gán ngành cho {selected.size} draft đã chọn:</span>
+          {categories.map((c) => {
+            const on = assignCats.has(String(c.id));
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => toggleAssignCat(String(c.id))}
+                style={{
+                  border: `1px solid ${on ? '#4f46e5' : 'var(--bg-border)'}`,
+                  background: on ? '#4f46e5' : 'transparent',
+                  color: on ? '#fff' : 'inherit',
+                  borderRadius: 999, padding: '3px 12px', fontSize: 13, cursor: 'pointer',
+                }}
+              >
+                {c.name}
+              </button>
+            );
+          })}
+          <Button onClick={handleBulkCategory} style={{ marginLeft: 'auto' }}>
+            {assignCats.size ? `Gán ${assignCats.size} ngành` : 'Gỡ hết ngành'}
+          </Button>
+        </div>
+      )}
 
       {loading ? (
         <p>Đang tải…</p>
@@ -114,10 +205,20 @@ export default function GroupDrafts() {
           <table className="data-table">
             <thead>
               <tr>
+                <th style={{ width: 32 }}>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    disabled={deletableIds.length === 0}
+                    title="Chọn tất cả (bài xoá được)"
+                  />
+                </th>
                 <th>Loại</th>
                 <th>Trạng thái</th>
                 <th>Người tạo</th>
                 <th>Nội dung</th>
+                <th>Ngành</th>
                 <th>Prompt ảnh</th>
                 <th>Lịch</th>
                 <th>Tạo lúc</th>
@@ -128,6 +229,15 @@ export default function GroupDrafts() {
             <tbody>
               {data.map((row) => (
                 <tr key={row.id}>
+                  <td>
+                    {row.can_delete && (
+                      <input
+                        type="checkbox"
+                        checked={selected.has(row.id)}
+                        onChange={() => toggleOne(row.id)}
+                      />
+                    )}
+                  </td>
                   <td>
                     {row.is_shared ? <Badge>Shared</Badge> : <span className="text-muted">Cá nhân</span>}
                   </td>
@@ -140,6 +250,13 @@ export default function GroupDrafts() {
                   <td>{row.creator_name || '—'}</td>
                   <td style={{ maxWidth: 200 }} title={row.noi_dung}>
                     {row.noi_dung?.slice(0, 60)}{(row.noi_dung?.length > 60) ? '…' : ''}
+                  </td>
+                  <td style={{ maxWidth: 140 }}>
+                    {draftCatNames(row.category_ids).length
+                      ? draftCatNames(row.category_ids).map((n) => (
+                          <Badge key={n} style={{ marginRight: 4 }}>{n}</Badge>
+                        ))
+                      : <span className="text-muted">—</span>}
                   </td>
                   <td style={{ maxWidth: 140 }} title={row.prompt_anh}>
                     {row.prompt_anh ? `${row.prompt_anh.slice(0, 30)}…` : '—'}

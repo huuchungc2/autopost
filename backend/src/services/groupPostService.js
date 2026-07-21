@@ -21,6 +21,15 @@ function draftEligibilitySql(alias = 'd') {
   return `((${alias}.user_id = ? AND ${alias}.is_shared = 0) OR ${alias}.is_shared = 1)`;
 }
 
+// Chuẩn hoá tập ngành (mảng id hoặc chuỗi CSV) về chuỗi CSV id dương duy nhất, hoặc null nếu rỗng.
+function normalizeCategoryIdsCsv(input) {
+  let arr = input;
+  if (typeof input === 'string') arr = input.split(',');
+  if (!Array.isArray(arr)) return null;
+  const clean = [...new Set(arr.map((x) => parseInt(x, 10)).filter((n) => Number.isInteger(n) && n > 0))];
+  return clean.length ? clean.join(',') : null;
+}
+
 export async function getExtensionKeyInfo(userId) {
   const rows = await query(
     `SELECT api_key, fb_user_id, fb_user_name, created_at, updated_at
@@ -133,6 +142,10 @@ export async function upsertUserPost(userAccountId, post) {
   const pendingApprovalVal = hasPendingUpdate ? (post.pending_approval ? 1 : 0) : null;
   const pendingCheckedAtVal = hasPendingUpdate ? toMysqlDatetime(new Date()) : null;
 
+  // Ngành nghề nhiều-nhiều (đồng bộ đầy đủ): client gửi `category_ids` = MẢNG id ngành (có thể rỗng
+  // để gỡ hết). `undefined` (client không gửi field này) → giữ nguyên tập ngành cũ, không đụng.
+  const hasCategoryUpdate = Array.isArray(post.category_ids);
+
   const existing = await query(
     'SELECT id FROM user_posts WHERE user_account_id = ? AND group_id = ? AND post_id = ?',
     [userAccountId, group_id, post_id]
@@ -165,6 +178,7 @@ export async function upsertUserPost(userAccountId, post) {
         existing[0].id,
       ]
     );
+    if (hasCategoryUpdate) await replacePostCategories(existing[0].id, post.category_ids);
     return { id: existing[0].id, updated: true };
   }
 
@@ -198,7 +212,19 @@ export async function upsertUserPost(userAccountId, post) {
       pendingCheckedAtVal,
     ]
   );
+  if (hasCategoryUpdate) await replacePostCategories(result.insertId, post.category_ids);
   return { id: result.insertId, updated: false };
+}
+
+// Ghi lại toàn bộ tập ngành của 1 bài (nhiều-nhiều): xoá sạch rồi chèn tập mới — đơn giản, idempotent.
+export async function replacePostCategories(userPostId, categoryIds) {
+  await query('DELETE FROM user_post_categories WHERE user_post_id = ?', [userPostId]);
+  const clean = [...new Set((categoryIds || []).map(Number).filter((n) => Number.isFinite(n) && n > 0))];
+  if (!clean.length) return;
+  const placeholders = clean.map(() => '(?, ?)').join(', ');
+  const params = [];
+  for (const cid of clean) params.push(userPostId, cid);
+  await query(`INSERT IGNORE INTO user_post_categories (user_post_id, category_id) VALUES ${placeholders}`, params);
 }
 
 export async function syncGroupPost(userId, body) {
@@ -372,14 +398,17 @@ export async function createGroupPostDrafts(userId, rows, options = {}) {
   for (const row of rows) {
     const noi_dung = String(row.noi_dung || '').trim();
     if (!noi_dung) continue;
+    // Ngành nghề (nếu import có gửi) — mảng id hoặc CSV; thiếu → null (coi như chưa gán).
+    const categoryIds = normalizeCategoryIdsCsv(row.category_ids ?? row.categories);
     const result = await query(
-      `INSERT INTO group_post_drafts (user_id, is_shared, noi_dung, prompt_anh, ngay_dang, gio_dang)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO group_post_drafts (user_id, is_shared, noi_dung, prompt_anh, category_ids, ngay_dang, gio_dang)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         userId,
         isShared ? 1 : 0,
         noi_dung,
         row.prompt_anh || null,
+        categoryIds,
         row.ngay_dang || null,
         row.gio_dang || null,
       ]
@@ -410,6 +439,7 @@ function mapDraftRow(row) {
     is_shared: Boolean(row.is_shared),
     noi_dung: row.noi_dung,
     prompt_anh: row.prompt_anh,
+    category_ids: row.category_ids || '',
     ngay_dang: row.ngay_dang,
     gio_dang: row.gio_dang,
     status: effectiveStatus,
@@ -447,7 +477,7 @@ export async function listGroupPostDrafts(userId, filters = {}, userRole = 'edit
     const where = `WHERE ${conditions.join(' AND ')}`;
     countSql = `SELECT COUNT(*) AS total FROM group_post_drafts d ${where}`;
     countParams = params;
-    listSql = `SELECT d.id, d.user_id, d.is_shared, d.noi_dung, d.prompt_anh, d.ngay_dang, d.gio_dang,
+    listSql = `SELECT d.id, d.user_id, d.is_shared, d.noi_dung, d.prompt_anh, d.category_ids, d.ngay_dang, d.gio_dang,
             d.status, d.pulled_at, d.created_at,
             u.name AS creator_name,
             NULL AS my_pull_user_id,
@@ -483,7 +513,7 @@ export async function listGroupPostDrafts(userId, filters = {}, userRole = 'edit
      LEFT JOIN group_post_draft_pulls p ON p.draft_id = d.id AND p.user_id = ?
      ${where}`;
     countParams = params;
-    listSql = `SELECT d.id, d.user_id, d.is_shared, d.noi_dung, d.prompt_anh, d.ngay_dang, d.gio_dang,
+    listSql = `SELECT d.id, d.user_id, d.is_shared, d.noi_dung, d.prompt_anh, d.category_ids, d.ngay_dang, d.gio_dang,
             d.status, d.pulled_at, d.created_at,
             u.name AS creator_name,
             p.user_id AS my_pull_user_id,
@@ -531,13 +561,36 @@ export async function pullDraftsForExtension(userId, { limit: rawLimit, afterDra
   const limit = parseLimit(rawLimit, 20, 30);
 
   const rows = await query(
-    `SELECT d.id, d.is_shared, d.noi_dung, d.prompt_anh, d.ngay_dang, d.gio_dang, d.created_at
+    `SELECT d.id, d.is_shared, d.noi_dung, d.prompt_anh, d.category_ids, d.ngay_dang, d.gio_dang, d.created_at
      FROM group_post_drafts d
      WHERE d.id > ? AND ${draftEligibilitySql('d')}
      ORDER BY d.id ASC
      LIMIT ?`,
     [afterDraft, userId, limit]
   );
+
+  // 2026-07-15 — Trước đây pull CHỈ đọc theo cursor (d.id > afterDraft) mà KHÔNG đánh dấu draft đã tải,
+  // nên cột "Trạng thái" trên website mãi hiện "Chờ tải" dù extension đã tải về (Tony hỏi đúng chỗ này).
+  // Giờ mark pulled ngay khi trả: draft CÁ NHÂN → status='pulled' + pulled_at; draft SHARED → ghi 1 dòng
+  // group_post_draft_pulls cho user này (INSERT IGNORE — PK draft_id+user_id, gọi lại vô hại).
+  const personalIds = rows.filter((r) => !r.is_shared).map((r) => r.id);
+  const sharedIds = rows.filter((r) => r.is_shared).map((r) => r.id);
+  if (personalIds.length) {
+    await query(
+      `UPDATE group_post_drafts SET status = 'pulled', pulled_at = NOW()
+       WHERE user_id = ? AND is_shared = 0 AND status = 'pending' AND id IN (${personalIds.map(() => '?').join(',')})`,
+      [userId, ...personalIds]
+    );
+  }
+  if (sharedIds.length) {
+    const values = sharedIds.map(() => '(?, ?)').join(', ');
+    const params = [];
+    for (const id of sharedIds) params.push(id, userId);
+    await query(
+      `INSERT IGNORE INTO group_post_draft_pulls (draft_id, user_id) VALUES ${values}`,
+      params
+    );
+  }
 
   const remainRows = await query(
     `SELECT COUNT(*) AS n FROM group_post_drafts d
@@ -551,6 +604,7 @@ export async function pullDraftsForExtension(userId, { limit: rawLimit, afterDra
       id: String(r.id),
       noi_dung: r.noi_dung,
       prompt_anh: r.prompt_anh,
+      category_ids: r.category_ids || '',
       ngay_dang: r.ngay_dang,
       gio_dang: r.gio_dang,
       created_at: r.created_at,
@@ -651,20 +705,48 @@ export async function updateGroupPostDraft(userId, userRole, draftId, body) {
     throw err;
   }
 
+  // category_ids optional: chỉ update khi body có gửi field này (undefined → giữ nguyên).
+  const hasCategory = body.category_ids !== undefined || body.categories !== undefined;
+  const categoryIds = hasCategory ? normalizeCategoryIdsCsv(body.category_ids ?? body.categories) : null;
+
   await query(
     `UPDATE group_post_drafts
-     SET noi_dung = ?, prompt_anh = ?, ngay_dang = ?, gio_dang = ?
+     SET noi_dung = ?, prompt_anh = ?, ngay_dang = ?, gio_dang = ?,
+         category_ids = CASE WHEN ? = 1 THEN ? ELSE category_ids END
      WHERE id = ?`,
     [
       noi_dung,
       body.prompt_anh || null,
       body.ngay_dang || null,
       body.gio_dang || null,
+      hasCategory ? 1 : 0,
+      categoryIds,
       draftId,
     ]
   );
 
   return { success: true };
+}
+
+// Gán ngành cho NHIỀU draft cùng lúc (checkbox chọn trên list draft). Áp đúng quyền như sửa draft:
+// cá nhân — chủ + còn 'pending'; shared — admin. Bỏ qua draft không đủ quyền.
+export async function setGroupPostDraftsCategory(userId, userRole, draftIds, categoryInput) {
+  const ids = [...new Set((draftIds || []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  if (!ids.length) return { updated: 0 };
+  const isAdmin = ['super_admin', 'admin'].includes(userRole);
+  const categoryIds = normalizeCategoryIdsCsv(categoryInput);
+  const placeholders = ids.map(() => '?').join(',');
+
+  const personal = await query(
+    `UPDATE group_post_drafts SET category_ids = ?
+     WHERE id IN (${placeholders}) AND is_shared = 0 AND user_id = ? AND status = 'pending'`,
+    [categoryIds, ...ids, userId]
+  );
+  const shared = isAdmin
+    ? await query(`UPDATE group_post_drafts SET category_ids = ? WHERE id IN (${placeholders}) AND is_shared = 1`, [categoryIds, ...ids])
+    : { affectedRows: 0 };
+
+  return { updated: (personal.affectedRows || 0) + (shared.affectedRows || 0) };
 }
 
 export async function repullGroupPostDraft(userId, draftId) {
@@ -738,4 +820,26 @@ export async function deleteGroupPostDraft(userId, userRole, draftId) {
     throw err;
   }
   return { success: true };
+}
+
+// Xoá NHIỀU draft cùng lúc (checkbox chọn hàng loạt trên website). Áp đúng ràng buộc quyền như xoá đơn:
+// draft cá nhân — chỉ chủ + còn 'pending' (chưa tải); draft shared — admin xoá mọi cái, user thường chỉ
+// xoá của mình. Bỏ qua âm thầm draft không đủ quyền (chỉ xoá cái được phép, trả về số đã xoá thật).
+export async function deleteGroupPostDrafts(userId, userRole, draftIds) {
+  const ids = [...new Set((draftIds || []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  if (!ids.length) return { deleted: 0 };
+  const isAdmin = ['super_admin', 'admin'].includes(userRole);
+  const placeholders = ids.map(() => '?').join(',');
+
+  const personal = await query(
+    `DELETE FROM group_post_drafts
+     WHERE id IN (${placeholders}) AND is_shared = 0 AND user_id = ? AND status = 'pending'`,
+    [...ids, userId]
+  );
+
+  const shared = isAdmin
+    ? await query(`DELETE FROM group_post_drafts WHERE id IN (${placeholders}) AND is_shared = 1`, [...ids])
+    : await query(`DELETE FROM group_post_drafts WHERE id IN (${placeholders}) AND is_shared = 1 AND user_id = ?`, [...ids, userId]);
+
+  return { deleted: (personal.affectedRows || 0) + (shared.affectedRows || 0) };
 }

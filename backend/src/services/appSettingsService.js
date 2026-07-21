@@ -14,7 +14,16 @@ const KEYS = {
   COMPOSIO_FACEBOOK_TOOLKIT_VERSION: 'composio_facebook_toolkit_version',
   COMPOSIO_AUTO_FALLBACK: 'composio_auto_fallback',
   POSTS_SYNC_LOOKBACK_DAYS: 'posts_sync_lookback_days',
+  // Thông báo website → extension (1 thông báo hiện hành). `_at` là mốc thời gian (ms) tự bump mỗi
+  // lần lưu — extension so với mốc đã thấy để chỉ toast khi có thông báo MỚI.
+  GF_ANNOUNCE_MESSAGE: 'groupflow_announcement_message',
+  GF_ANNOUNCE_LEVEL: 'groupflow_announcement_level',
+  GF_ANNOUNCE_AT: 'groupflow_announcement_at',
+  GF_ANNOUNCE_ENABLED: 'groupflow_announcement_enabled',
+  GF_LATEST_VERSION: 'groupflow_latest_version',
 };
+
+const GF_ANNOUNCE_LEVELS = new Set(['info', 'warning', 'critical']);
 
 let cache = {};
 
@@ -305,4 +314,56 @@ export async function savePostsSyncLookbackDays(days) {
   );
   cache[KEYS.POSTS_SYNC_LOOKBACK_DAYS] = String(n);
   return n;
+}
+
+// ── Thông báo GroupFlow (website → extension) ────────────────────────────────
+// Trả về khối để đưa cho extension (chỉ khi bật + có nội dung) + latest_version để cảnh báo bản mới.
+export function getEffectiveGroupflowAnnouncement() {
+  const enabled = getCachedSetting(KEYS.GF_ANNOUNCE_ENABLED) === '1';
+  const message = getCachedSetting(KEYS.GF_ANNOUNCE_MESSAGE) || '';
+  const levelRaw = getCachedSetting(KEYS.GF_ANNOUNCE_LEVEL) || 'info';
+  const level = GF_ANNOUNCE_LEVELS.has(levelRaw) ? levelRaw : 'info';
+  const at = parseInt(getCachedSetting(KEYS.GF_ANNOUNCE_AT), 10) || 0;
+  const latestVersion = getCachedSetting(KEYS.GF_LATEST_VERSION) || '';
+  return {
+    enabled,
+    message,
+    level,
+    at,
+    latest_version: latestVersion,
+    // Chỉ đẩy cho extension khi bật + có nội dung; null nếu không có gì để báo.
+    announcement: enabled && message ? { at, level, message } : null,
+  };
+}
+
+export async function saveGroupflowAnnouncement(updates = {}) {
+  const message = String(updates.message ?? '').trim();
+  const levelRaw = String(updates.level ?? 'info');
+  const level = GF_ANNOUNCE_LEVELS.has(levelRaw) ? levelRaw : 'info';
+  const enabled = updates.enabled === true || updates.enabled === 1 || updates.enabled === '1';
+  const latestVersion = String(updates.latest_version ?? '').trim();
+  if (message.length > 500) {
+    const error = new Error('Nội dung thông báo tối đa 500 ký tự');
+    error.status = 400;
+    throw error;
+  }
+  const at = String(Date.now()); // bump mỗi lần lưu → extension coi là thông báo mới, toast lại
+
+  const rows = [
+    [KEYS.GF_ANNOUNCE_MESSAGE, message],
+    [KEYS.GF_ANNOUNCE_LEVEL, level],
+    [KEYS.GF_ANNOUNCE_ENABLED, enabled ? '1' : '0'],
+    [KEYS.GF_ANNOUNCE_AT, at],
+    [KEYS.GF_LATEST_VERSION, latestVersion],
+  ];
+  for (const [key, value] of rows) {
+    await query(
+      `INSERT INTO app_settings (setting_key, setting_value)
+       VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+      [key, value]
+    );
+    cache[key] = value;
+  }
+  return getEffectiveGroupflowAnnouncement();
 }

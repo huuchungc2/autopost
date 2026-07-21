@@ -222,6 +222,11 @@
             <span>Tự xuất ảnh khi đăng</span>
           </label>
           <p class="hint">Chưa có file ảnh → đến giờ đăng extension <strong>tự generate</strong> rồi mới đăng.</p>
+          <div class="gf-category-row">
+            <label class="field-label">Ngành nghề (chọn 1 hoặc nhiều)</label>
+            <div id="manualCategoryChips" class="gf-cat-chip-row"></div>
+            <span class="hint gf-category-hint">Để lọc/nhóm bài theo ngành ở tab Tạo bài &amp; Comment. Có thể gán/đổi ngành ngay trên card kể cả sau khi đăng. Danh mục do admin quản lý ở website.</span>
+          </div>
           <div class="gf-first-comment-compact">
             <button type="button" id="btnChipFirstComment" class="gpp-chip-toggle" aria-pressed="false">Bình luận đầu tiên</button>
             <div id="manualCommentPanel" class="gpp-comment-panel hidden">
@@ -288,6 +293,10 @@
               <option value="failed">Lỗi đăng</option>
             </select>
             <button type="button" id="btnBulkStatus" class="btn ghost sm">Áp dụng</button>
+            <select id="postsBulkCategory" class="gf-select-sm" aria-label="Gán ngành hàng loạt">
+              <option value="">— Gán ngành —</option>
+            </select>
+            <button type="button" id="btnBulkCategory" class="btn ghost sm">Áp dụng ngành</button>
             <button type="button" id="btnBulkDelete" class="btn ghost sm posts-bulk-delete-btn">Xóa đã chọn</button>
             <button type="button" id="btnBulkClearSel" class="btn ghost sm">Bỏ chọn</button>
           </div>
@@ -310,6 +319,9 @@
             <option value="all">Ảnh: Tất cả</option>
             <option value="has">Có ảnh</option>
             <option value="none">Chưa có ảnh</option>
+          </select>
+          <select id="postFilterCategory" class="gf-select-sm">
+            <option value="all">Ngành: Tất cả</option>
           </select>
         </div>
         <div id="postList" class="list"></div>
@@ -412,6 +424,9 @@
             <option value="all">Bình luận: Tất cả</option>
             <option value="pending">Chưa comment</option>
             <option value="done">Đã comment</option>
+          </select>
+          <select id="commentFilterCategory" class="gf-select-sm">
+            <option value="all">Ngành: Tất cả</option>
           </select>
         </div>
         <label class="select-all" id="commentSelectAllWrap" style="margin-bottom: 8px">
@@ -587,6 +602,7 @@
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-media">Ảnh &amp; Comment</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-ai">AI</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-skills">Skill</button>
+          <button type="button" class="settings-nav-btn" data-settings-pane="settings-categories">Ngành nghề</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-sync">Đồng bộ</button>
           <button type="button" class="settings-nav-btn" data-settings-pane="settings-advanced">Nâng cao</button>
         </nav>
@@ -854,6 +870,22 @@
               <input type="number" id="groupImageScheduleInterval" min="5" max="60" value="10" />
             </label>
           </div>
+        </div>
+      </div>
+
+      <div class="card settings-card settings-pane-hidden" id="settings-categories">
+        <header class="settings-card-head">
+          <span class="settings-card-icon" aria-hidden="true">🏷</span>
+          <div class="settings-card-head-text">
+            <h3 class="settings-card-title">Ngành nghề</h3>
+            <p class="settings-card-desc">Danh mục ngành dùng CHUNG toàn hệ thống — <strong>admin quản lý trên website</strong> (Cài đặt → Extension → Danh mục ngành nghề). Ở đây chỉ xem; gán ngành cho bài khi soạn hoặc ngay trên card (Tạo bài), lọc theo ngành ở tab Tạo bài &amp; Comment.</p>
+          </div>
+        </header>
+        <div class="settings-block">
+          <div class="gf-cat-add-row">
+            <button type="button" id="btnReloadCategories" class="btn outline sm">↻ Tải lại danh mục từ website</button>
+          </div>
+          <div id="categoryList" class="gf-cat-list"></div>
         </div>
       </div>
 

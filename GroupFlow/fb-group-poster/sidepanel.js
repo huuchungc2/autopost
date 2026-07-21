@@ -54,6 +54,11 @@ const state = {
   postSearch: '',
   postFilterGroup: 'all',
   postFilterImage: 'all',
+  postFilterCategory: 'all',
+  commentFilterCategory: 'all',
+  categories: [],
+  composeCategoryIds: new Set(),
+  inlineCategoryPickerPostId: null,
   postedGroupsOpenIds: new Set(),
 };
 
@@ -73,6 +78,155 @@ function mergeUserPostsById(existing, incoming) {
   const byId = new Map((existing || []).map((p) => [String(p.id), p]));
   for (const row of incoming || []) byId.set(String(row.id), row);
   return [...byId.values()];
+}
+
+// ── Ngành nghề (category) — LỌC/NHÓM bài theo ngành ở tab Tạo bài VÀ tab Comment (để lên lịch seeding
+// dễ hơn). Danh mục dùng CHUNG toàn hệ thống: admin quản lý trên website (routes/groupCategories.js),
+// extension KÉO VỀ (GET /api/user-sync/categories) — read-only, chỉ hiển thị + cache. Mỗi bài postQueue
+// mang MẢNG `categories` = [id ngành] (1 bài thuộc nhiều ngành); bài đã đăng đồng bộ tập ngành lên server
+// (user_post_categories) → lọc chạy cả trên nhiều máy lẫn tab Đồng đội.
+const GF_CATEGORIES_CACHE_KEY = 'gf_categories_cache';
+
+// Chuẩn hoá tập ngành của 1 item về mảng id dạng chuỗi. postQueue giữ `categories` (mảng); item
+// server/cross giữ `category_ids` (chuỗi CSV "3,7" từ GROUP_CONCAT) → parse ra mảng.
+function itemCategoryIds(item) {
+  if (Array.isArray(item?.categories)) return item.categories.map(String).filter(Boolean);
+  if (item?.category_ids != null && item.category_ids !== '') {
+    return String(item.category_ids).split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+async function loadCategories() {
+  const cached = await chrome.storage.local.get(GF_CATEGORIES_CACHE_KEY);
+  if (Array.isArray(cached[GF_CATEGORIES_CACHE_KEY])) {
+    state.categories = cached[GF_CATEGORIES_CACHE_KEY];
+  }
+  // Kéo mới từ server (danh mục chung do admin quản lý ở website). Lỗi mạng/chưa kích hoạt → giữ cache.
+  try {
+    const { licenseKey } = await chrome.storage.local.get('licenseKey');
+    if (!licenseKey) return state.categories;
+    const base = await getUserSyncBase();
+    const res = await fetch(`${base}/api/user-sync/categories`, {
+      headers: { Authorization: `Bearer ${licenseKey}` },
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows)) {
+        state.categories = rows.map((r) => ({ id: String(r.id), name: r.name }));
+        await chrome.storage.local.set({ [GF_CATEGORIES_CACHE_KEY]: state.categories });
+      }
+    }
+  } catch { /* giữ cache */ }
+  return state.categories;
+}
+
+function categoryNameById(id) {
+  if (id == null || id === '') return '';
+  return state.categories.find((c) => String(c.id) === String(id))?.name || '';
+}
+
+// Khớp danh sách TÊN ngành (từ cột Excel / draft) sang id ngành trong danh mục (không phân biệt hoa
+// thường). Tên lạ (không có trong danh mục) bị bỏ qua → coi như chưa gán ngành đó.
+function resolveCategoryNamesToIds(names) {
+  const byName = new Map(state.categories.map((c) => [String(c.name).toLowerCase(), String(c.id)]));
+  return [...new Set((names || []).map((n) => byName.get(String(n).trim().toLowerCase())).filter(Boolean))];
+}
+
+// Tag ngành (nhiều) cho card — mỗi ngành 1 chip nhỏ; bỏ id "mồ côi" (ngành đã bị admin xoá).
+function categoryTagsHtml(item) {
+  return itemCategoryIds(item)
+    .map((id) => categoryNameById(id))
+    .filter(Boolean)
+    .map((name) => `<span class="tag gf-cat-tag">🏷 ${esc(name)}</span>`)
+    .join('');
+}
+
+// Panel gán ngành inline trên card bài (Tạo bài) — dùng được cả TRƯỚC lẫn SAU khi đăng. Chips multi-
+// toggle, click là gán/gỡ ngay. Bài đã đăng đổi ngành → tự đồng bộ tập ngành lên server (xem
+// syncPostCategoryToServer). Chỉ mở cho đúng 1 card 1 lúc (state.inlineCategoryPickerPostId).
+function inlineCategoryPickerHtml(p) {
+  if (state.inlineCategoryPickerPostId !== p.id) return '';
+  if (!state.categories.length) {
+    return '<div class="inline-cat-picker"><p class="hint">Chưa có ngành — admin thêm ở website (Cài đặt → Extension → Danh mục ngành nghề).</p></div>';
+  }
+  const sel = new Set(itemCategoryIds(p));
+  const chips = state.categories.map((c) => {
+    const on = sel.has(String(c.id));
+    return `<button type="button" class="gf-cat-chip ${on ? 'active' : ''}" data-card-cat="${esc(String(c.id))}" data-card-cat-post="${p.id}">${esc(c.name)}</button>`;
+  }).join('');
+  return `<div class="inline-cat-picker"><p class="hint">Chọn 1 hoặc nhiều ngành cho bài này:</p><div class="gf-cat-chip-row">${chips}</div></div>`;
+}
+
+// Đổ options cho các select LỌC: tab Tạo bài (#postFilterCategory) + tab Comment (#commentFilterCategory).
+function renderCategoryOptions() {
+  const opts = state.categories
+    .map((c) => `<option value="${esc(String(c.id))}">${esc(c.name)}</option>`)
+    .join('');
+  for (const [sel, stateKey] of [['#postFilterCategory', 'postFilterCategory'], ['#commentFilterCategory', 'commentFilterCategory']]) {
+    const el = $(sel);
+    if (!el) continue;
+    const cur = state[stateKey];
+    el.innerHTML = `<option value="all">Ngành: Tất cả</option><option value="none">Chưa gán ngành</option>${opts}`;
+    el.value = cur === 'none' || state.categories.some((c) => String(c.id) === String(cur)) ? cur : 'all';
+    state[stateKey] = el.value;
+  }
+  // Ô "Gán ngành" hàng loạt trên thanh chọn — chỉ danh mục thật, không có Tất cả/Chưa gán.
+  const bulk = $('#postsBulkCategory');
+  if (bulk) {
+    const cur = bulk.value;
+    bulk.innerHTML = `<option value="">— Gán ngành —</option>${opts}`;
+    if (cur && state.categories.some((c) => String(c.id) === String(cur))) bulk.value = cur;
+  }
+  renderComposeCategoryChips();
+}
+
+// Gán 1 ngành cho TẤT CẢ bài đang chọn (thêm vào tập ngành, không ghi đè ngành khác). Bài đã đăng thì
+// đồng bộ tập ngành mới lên server.
+async function applyBulkCategory() {
+  const sel = $('#postsBulkCategory');
+  const catId = String(sel?.value || '');
+  if (!catId) { showToast('Chọn ngành cần gán', 'warn'); return; }
+  const checked = getCheckedPosts();
+  if (!checked.length) { showToast('Chưa chọn bài nào', 'warn'); return; }
+  let applied = 0;
+  for (const p of checked) {
+    const set = new Set(itemCategoryIds(p));
+    if (!set.has(catId)) { set.add(catId); p.categories = [...set]; applied++; }
+  }
+  await savePosts();
+  renderPosts();
+  checked.forEach((p) => { if (p.postStatus === 'posted') syncPostCategoryToServer(p).catch(() => {}); });
+  const name = categoryNameById(catId);
+  showToast(applied ? `Đã gán ngành "${name}" cho ${applied} bài` : `Các bài đã có ngành "${name}"`, 'success');
+}
+
+// Chips multi-toggle chọn ngành khi SOẠN bài (tập chọn giữ trong state.composeCategoryIds).
+function renderComposeCategoryChips() {
+  const box = $('#manualCategoryChips');
+  if (!box) return;
+  if (!state.categories.length) {
+    box.innerHTML = '<span class="hint">Chưa có ngành — admin thêm ở website.</span>';
+    return;
+  }
+  box.innerHTML = state.categories.map((c) => {
+    const on = state.composeCategoryIds.has(String(c.id));
+    return `<button type="button" class="gf-cat-chip ${on ? 'active' : ''}" data-compose-cat="${esc(String(c.id))}">${esc(c.name)}</button>`;
+  }).join('');
+}
+
+// Danh sách ngành trong tab Cài đặt → Ngành nghề (extension chỉ ĐỌC — quản lý ở website).
+function renderCategoryManager() {
+  const box = $('#categoryList');
+  if (!box) return;
+  if (!state.categories.length) {
+    box.innerHTML = '<p class="hint">Chưa có ngành nghề nào. Admin thêm tại website: Cài đặt → Extension → Danh mục ngành nghề.</p>';
+    return;
+  }
+  box.innerHTML = state.categories.map((c) => {
+    const count = state.posts.filter((p) => itemCategoryIds(p).includes(String(c.id))).length;
+    return `<div class="gf-cat-item"><span class="gf-cat-name-ro">${esc(c.name)}</span><span class="tag" title="Số bài trên máy này đang gán ngành">${count} bài</span></div>`;
+  }).join('');
 }
 
 function gfRuntimeAlive() {
@@ -162,6 +316,7 @@ function mapPostsFromQueue(queue, legacyGroupIds = []) {
       post.groupIds = legacyGroupIds.length ? [...legacyGroupIds] : [];
     }
     if (post.autoGenerateImage === undefined) post.autoGenerateImage = true;
+    if (!Array.isArray(post.categories)) post.categories = [];
     post.selected = post.selected === true;
     if (post.ngay_dang && post.gio_dang) post.selected = false;
     return post;
@@ -1756,6 +1911,9 @@ async function saveComposePostToQueue({ selectOnly = false } = {}) {
         await gfSendMessage({ type: 'GF_RECONCILE_SCHEDULES' }).catch(() => {});
       }
     }
+    // Sửa ngành cho bài ĐÃ đăng qua modal compose → đồng bộ tập ngành lên server (bài chưa đăng thì
+    // syncLocalPostsToServer sẽ gửi kèm ở lần sync đầu sau khi đăng).
+    if (post.postStatus === 'posted') syncPostCategoryToServer(post).catch(() => {});
     renderPosts();
     rememberPostModePreference();
     return post;
@@ -1783,6 +1941,7 @@ async function saveComposePostToQueue({ selectOnly = false } = {}) {
     gio_dang: '',
     campaignName: '',
     campaignId: '',
+    categories: [...state.composeCategoryIds],
     backgroundColor: bg,
     firstComment: $('#manualFirstComment')?.value.trim() || '',
     firstCommentEnabled: $('#manualFirstCommentOn')?.checked === true,
@@ -1813,6 +1972,8 @@ async function saveComposePostToQueue({ selectOnly = false } = {}) {
 async function resetComposeFormAfterSave() {
   GF.composer?.clearAll();
   $('#manualPrompt').value = '';
+  state.composeCategoryIds = new Set();
+  renderComposeCategoryChips();
   $('#manualFirstComment').value = '';
   syncFirstCommentChipUI(false);
   if ($('#editScheduleDate')) $('#editScheduleDate').value = '';
@@ -1967,6 +2128,8 @@ async function openQueuePostForEdit(postId) {
 
   if ($('#manualPrompt')) $('#manualPrompt').value = post.prompt_anh || '';
   if ($('#manualAutoImage')) $('#manualAutoImage').checked = post.autoGenerateImage !== false;
+  state.composeCategoryIds = new Set(itemCategoryIds(post));
+  renderComposeCategoryChips();
   if ($('#editScheduleDate')) $('#editScheduleDate').value = post.ngay_dang || '';
   if ($('#editScheduleTime')) $('#editScheduleTime').value = post.gio_dang || '';
   if ($('#manualFirstComment')) $('#manualFirstComment').value = post.firstComment || '';
@@ -2033,6 +2196,7 @@ function applyComposerToQueuePost(post) {
   }
   post.campaignName = post.campaignName || '';
   post.campaignId = post.campaignId || '';
+  post.categories = [...state.composeCategoryIds];
   post.backgroundColor = bg;
   post.firstComment = $('#manualFirstComment')?.value.trim() || '';
   post.firstCommentEnabled = $('#manualFirstCommentOn')?.checked === true;
@@ -2599,6 +2763,8 @@ function getFilteredPosts() {
   else if (state.postFilterGroup === 'none') posts = posts.filter((p) => !p.groupIds?.length);
   if (state.postFilterImage === 'has') posts = posts.filter((p) => postHasMedia(p) || p.mediaCached);
   else if (state.postFilterImage === 'none') posts = posts.filter((p) => !postHasMedia(p) && !p.mediaCached);
+  if (state.postFilterCategory === 'none') posts = posts.filter((p) => !itemCategoryIds(p).length);
+  else if (state.postFilterCategory !== 'all') posts = posts.filter((p) => itemCategoryIds(p).includes(String(state.postFilterCategory)));
   return posts;
 }
 
@@ -2652,6 +2818,7 @@ function renderPosts() {
         ${isEditingInCompose ? '<span class="tag ready">Đang sửa ↑</span>' : ''}
         <span class="tag ${p.groupIds.length ? 'web' : 'pending'}">${esc(postGroupSummary(p))}</span>
         ${p.campaignName ? `<span class="tag web">${esc(p.campaignName)}</span>` : ''}
+        ${categoryTagsHtml(p)}
         ${p.variations?.length > 1 ? `<span class="tag">${p.variations.length} biến thể</span>` : ''}
         ${p.backgroundColor && p.backgroundColor !== '#18191A' ? '<span class="tag">Nền màu</span>' : ''}
         ${p.firstCommentEnabled ? '<span class="tag ready">1st cmt</span>' : ''}
@@ -2667,9 +2834,11 @@ function renderPosts() {
       </div>
       ${renderPostedGroupsBlock(p)}
       ${inlineGroupPickerHtml(p)}
+      ${inlineCategoryPickerHtml(p)}
       <div class="post-actions">
         <button type="button" class="btn primary sm" data-post-now="${p.id}" ${noGroups || isPostingThis ? 'disabled' : ''} title="${noGroups ? 'Chọn nhóm trước' : 'Chỉ đăng bài này'}">${isPostingThis ? 'Đang đăng…' : 'Đăng'}</button>
         <button type="button" class="btn ghost sm accent" data-toggle-groups="${p.id}">${state.inlineGroupPickerPostId === p.id ? 'Đóng nhóm' : 'Chọn nhóm'}</button>
+        <button type="button" class="btn ghost sm" data-toggle-cat="${p.id}" title="Gán ngành nghề (dùng được cả sau khi đăng)">${state.inlineCategoryPickerPostId === p.id ? 'Đóng ngành' : '🏷 Ngành'}</button>
         <button type="button" class="btn ghost sm" data-edit-post="${p.id}">${isEditingInCompose ? 'Tiếp tục sửa ↑' : 'Sửa'}</button>
         ${p.prompt_anh ? `<button type="button" class="btn ghost sm" data-copy-prompt="${p.id}" title="Copy prompt ảnh" style="background: #f0f2f5;">📋</button>` : ''}
         ${!hasMedia && p.prompt_anh ? `<button type="button" class="btn ghost sm accent" data-gen="${p.id}">Xuất ảnh</button>` : ''}
@@ -2717,6 +2886,28 @@ function renderPosts() {
       state.inlineGroupPickerPostId = state.inlineGroupPickerPostId === id ? null : id;
       state.inlineGroupSearch = '';
       renderPosts();
+    });
+  });
+  box.querySelectorAll('[data-toggle-cat]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.toggleCat;
+      state.inlineCategoryPickerPostId = state.inlineCategoryPickerPostId === id ? null : id;
+      renderPosts();
+    });
+  });
+  box.querySelectorAll('[data-card-cat]').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const catId = String(btn.dataset.cardCat);
+      const post = state.posts.find((x) => x.id === btn.dataset.cardCatPost);
+      if (!post) return;
+      const set = new Set(itemCategoryIds(post));
+      if (set.has(catId)) set.delete(catId); else set.add(catId);
+      post.categories = [...set];
+      await savePosts();
+      renderPosts();
+      // Bài đã đăng: đẩy tập ngành mới lên server ngay để lọc chạy cả ở máy khác / tab Đồng đội.
+      if (post.postStatus === 'posted') syncPostCategoryToServer(post).catch(() => {});
     });
   });
   box.querySelectorAll('[data-toggle-posted-groups]').forEach((btn) => {
@@ -3607,7 +3798,7 @@ async function rescheduleUpcoming(item) {
   loadState();
 }
 
-async function loadPostedPostsForComment({ force = false } = {}) {
+async function loadPostedPostsForComment({ force = false, skipUnchangedRender = false } = {}) {
   const d = await chrome.storage.local.get(['postQueue', 'serverMyPosts', 'commentedRecords', 'gf_post_access_cache']);
   const queue = d.postQueue || [];
   const serverMyPosts = d.serverMyPosts || [];
@@ -3645,6 +3836,7 @@ async function loadPostedPostsForComment({ force = false } = {}) {
       _source: 'server',
       noi_dung: sp.noi_dung || '',
       lastPostedAt: sp.posted_at || '',
+      category_ids: sp.category_ids || null,
       postedGroups: [{
         group_id: sp.group_id,
         group_name: sp.group_name || sp.group_id,
@@ -3676,6 +3868,7 @@ async function loadPostedPostsForComment({ force = false } = {}) {
     // nhận", ẩn sạch 100% dù server trả về hợp lệ. Lỗi tự gây ra khi vá lỗi khác, không phải do
     // logic điều kiện phía server.
     pending_checked_at: cp.pending_checked_at || null,
+    category_ids: cp.category_ids || null,
     postedGroups: [{
       group_id: cp.group_id,
       group_name: cp.group_name || cp.group_id,
@@ -3698,7 +3891,15 @@ async function loadPostedPostsForComment({ force = false } = {}) {
   const badge = $('#commentBadge');
   const pendingCount = state.comments.filter((c) => !isCommentDone(c) && isCommentActionable(c)).length;
   if (badge) badge.textContent = pendingCount ? String(pendingCount) : '';
-  if ($('#tab-comment')?.classList.contains('active')) renderComments();
+  // v1.0.277 — path check nền (storage.onChanged của gf_post_access_cache, xem schedulePostAccessRefresh)
+  // truyền skipUnchangedRender: số đếm/badge ở trên ĐÃ cập nhật, nhưng nếu tập bài hiển thị không đổi
+  // so với lần vẽ trước thì KHÔNG blow-away DOM list (giữ cuộn trang + con trỏ đang gõ). Các path
+  // khác (mở tab, force, sau thao tác) vẫn vẽ lại bình thường.
+  if ($('#tab-comment')?.classList.contains('active')) {
+    const unchanged = skipUnchangedRender && lastCommentRenderSig !== null
+      && commentRenderSigFrom(getFilteredComments()) === lastCommentRenderSig;
+    if (!unchanged) renderComments();
+  }
 }
 
 // Gom trạng thái lịch hiện có (alarm 1 lần trong activityUpcoming + lặp lại hàng ngày giờ cố
@@ -4162,9 +4363,25 @@ function getFilteredComments() {
   const status = state.commentFilterStatus || 'all';
   if (status === 'done') list = list.filter((c) => isCommentDone(c));
   else if (status === 'pending') list = list.filter((c) => !isCommentDone(c));
+  const cat = state.commentFilterCategory || 'all';
+  if (cat === 'none') list = list.filter((c) => !itemCategoryIds(c).length);
+  else if (cat !== 'all') list = list.filter((c) => itemCategoryIds(c).includes(String(cat)));
   list = list.filter(isCommentActionable);
   return list;
 }
+
+// v1.0.277 — "chữ ký" tập bài đang hiển thị (id + trạng thái access + đã-comment). Dùng để BỎ QUA
+// vẽ lại list khi cache access đổi nhưng tập bài hiện ra KHÔNG đổi (Tony: "chỉ đổi thông số, đừng
+// vẽ lại nguyên panel") — tránh reset cuộn trang / con trỏ đang gõ. Chỉ vẽ lại khi có bài mới
+// vào/rớt khỏi list (getFilteredComments đã lọc isCommentActionable) hoặc đổi tag trạng thái.
+function commentRenderSigFrom(filtered) {
+  return (filtered || []).map((c) => {
+    const g = (c.postedGroups || [])[0];
+    const entry = g ? state.postAccessCache[String(g.post_id)] : null;
+    return `${c.id}:${entry?.kind || '-'}:${isCommentDone(c) ? 'd' : ''}`;
+  }).join('|');
+}
+let lastCommentRenderSig = null;
 
 function commentSubTabHasPersonFilter() {
   return state.commentSubTab === 'team';
@@ -4314,6 +4531,8 @@ function bindCommentFilters() {
 function renderComments() {
   const box = $('#commentList');
   const filtered = getFilteredComments();
+  // Lưu chữ ký của đúng những gì sắp vẽ — path check nền so lại để quyết định có cần vẽ lại không.
+  lastCommentRenderSig = commentRenderSigFrom(filtered);
   if (!filtered.length) {
     // So với state.comments.length (tổng cả 2 tab) thay vì chỉ trong tab hiện tại — tab "Của tôi"
     // rỗng trong khi tab "Đồng đội" có bài (hay ngược lại) trước đây báo nhầm "Không có bài khớp bộ
@@ -5384,6 +5603,7 @@ function showSettingsPane(paneId) {
     'settings-media',
     'settings-ai',
     'settings-skills',
+    'settings-categories',
     'settings-sync',
     'settings-advanced',
   ];
@@ -5399,6 +5619,9 @@ function showSettingsPane(paneId) {
   if (id === 'settings-skills') {
     loadLocalSkillSelects();
     renderLocalSkillList();
+  }
+  if (id === 'settings-categories') {
+    renderCategoryManager();
   }
   const body = document.querySelector('.settings-shell-body');
   if (body) body.scrollTop = 0;
@@ -5563,8 +5786,37 @@ function closeSidePanel() {
   }
 }
 
+// Ngành nghề trong extension: danh mục do admin quản lý ở WEBSITE, extension chỉ đọc. Bind: nút tải
+// lại danh mục, chips chọn ngành khi soạn, và 2 select lọc (Tạo bài + Comment).
+function initCategoryUI() {
+  $('#btnReloadCategories')?.addEventListener('click', async () => {
+    await loadCategories();
+    renderCategoryOptions();
+    renderCategoryManager();
+    renderPosts();
+    showToast('Đã tải lại danh mục ngành từ website', 'success');
+  });
+
+  // Chips chọn ngành khi SOẠN bài (multi-toggle) — delegation vì chips render lại theo danh mục.
+  $('#manualCategoryChips')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-compose-cat]');
+    if (!btn) return;
+    const id = String(btn.dataset.composeCat);
+    if (state.composeCategoryIds.has(id)) state.composeCategoryIds.delete(id);
+    else state.composeCategoryIds.add(id);
+    renderComposeCategoryChips();
+  });
+
+  $('#commentFilterCategory')?.addEventListener('change', (e) => {
+    state.commentFilterCategory = e.target.value;
+    state.commentsPage = 0;
+    renderComments();
+  });
+}
+
 function bindEvents() {
   initSettingsNav();
+  initCategoryUI();
   $('#btnPopout')?.addEventListener('click', closeSidePanel);
 
   $$('#tabBar button').forEach((btn) => {
@@ -5648,6 +5900,11 @@ function bindEvents() {
       const rows = await GF.excel.parseFile(file);
       rows.forEach((r) => {
         ensurePostGroups(r);
+        // Cột "Ngành nghề" trong file (tên) → id ngành. Thiếu/tên lạ → chưa gán.
+        if (Array.isArray(r._categoryNames) && r._categoryNames.length) {
+          r.categories = resolveCategoryNamesToIds(r._categoryNames);
+        }
+        delete r._categoryNames;
         state.posts.push(r);
       });
       await savePosts();
@@ -5745,12 +6002,18 @@ function bindEvents() {
     state.postsPage = 0;
     renderPosts();
   });
+  $('#postFilterCategory')?.addEventListener('change', (e) => {
+    state.postFilterCategory = e.target.value;
+    state.postsPage = 0;
+    renderPosts();
+  });
 
   $('#btnBulkStatus')?.addEventListener('click', async () => {
     const status = $('#postsBulkStatus')?.value;
     if (!status) return alert('Chọn trạng thái cần áp dụng');
     await bulkSetPostStatus(status);
   });
+  $('#btnBulkCategory')?.addEventListener('click', () => { applyBulkCategory(); });
 
   $('#btnBulkClearSel')?.addEventListener('click', () => {
     state.posts.forEach((p) => { p.selected = false; });
@@ -5779,6 +6042,8 @@ function bindEvents() {
           anh_gio_dang: row.anh_gio_dang || '',
           ngay_dang: row.ngay_dang,
           gio_dang: row.gio_dang,
+          // Ngành nghề gán từ website (CSV id ngành — cùng id server, khớp thẳng state.categories).
+          categories: String(row.category_ids || '').split(',').map((s) => s.trim()).filter(Boolean),
           groupIds: [],
           imageStatus: 'pending',
           imageBase64: null,
@@ -6385,7 +6650,9 @@ function schedulePostAccessRefresh() {
     postAccessRefreshTimer = null;
     // loadPostedPostsForComment() tự cập nhật badge + số tab con, và chỉ render list khi tab
     // Comment đang mở — panel đứng ở tab khác thì chỉ số liệu đổi, không đụng DOM tab hiện tại.
-    loadPostedPostsForComment().catch(() => {});
+    // v1.0.277 — skipUnchangedRender: nếu tập bài hiển thị không đổi (chỉ mốc thời gian check đổi,
+    // không có bài mới vào/rớt) thì chỉ cập nhật số đếm, không vẽ lại list (giữ cuộn/con trỏ).
+    loadPostedPostsForComment({ skipUnchangedRender: true }).catch(() => {});
   }, 1500);
 }
 
@@ -6425,6 +6692,52 @@ async function getPostsSyncLookbackDays() {
     return cachedValid ? cached : 60;
   } catch {
     return cachedValid ? cached : 60;
+  }
+}
+
+// So version dạng "1.0.279": trả true nếu a MỚI HƠN b.
+function isVersionNewer(a, b) {
+  const pa = String(a).split('.').map((n) => parseInt(n, 10) || 0);
+  const pb = String(b).split('.').map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
+    const x = pa[i] || 0;
+    const y = pb[i] || 0;
+    if (x !== y) return x > y;
+  }
+  return false;
+}
+
+// Thông báo website → extension (xem appSettingsService.getEffectiveGroupflowAnnouncement + userSync
+// /config). Chỉ TOAST (theo lựa chọn): (1) thông báo admin đặt — toast 1 lần cho mỗi lần admin lưu
+// (so `at` với mốc đã thấy); (2) cảnh báo bản mới — toast 1 lần cho mỗi version mới. Fail êm nếu lỗi
+// mạng/chưa kích hoạt — không chặn gì.
+async function checkGroupflowAnnouncement() {
+  const d = await chrome.storage.local.get(['licenseKey', 'gfAnnounceSeenAt', 'gfVersionNoticeShown']);
+  if (!d.licenseKey) return;
+  let data;
+  try {
+    const base = await getUserSyncBase();
+    const res = await fetch(`${base}/api/user-sync/config`, {
+      headers: { Authorization: `Bearer ${d.licenseKey}` },
+    });
+    if (!res.ok) return;
+    data = await res.json();
+  } catch { return; }
+
+  const ann = data?.announcement;
+  if (ann && ann.message && Number(ann.at || 0) > Number(d.gfAnnounceSeenAt || 0)) {
+    const type = ann.level === 'critical' ? 'error' : (ann.level === 'warning' ? 'warn' : 'info');
+    showToast(`📢 ${ann.message}`, type, ann.level === 'critical' ? 15000 : 9000);
+    await chrome.storage.local.set({ gfAnnounceSeenAt: Number(ann.at || 0) });
+  }
+
+  const latest = data?.latest_version;
+  if (latest) {
+    const cur = chrome.runtime.getManifest().version;
+    if (isVersionNewer(latest, cur) && d.gfVersionNoticeShown !== latest) {
+      showToast(`⬆ Đã có bản GroupFlow mới v${latest} (đang chạy v${cur}) — tải lại extension để cập nhật`, 'warn', 12000);
+      await chrome.storage.local.set({ gfVersionNoticeShown: latest });
+    }
   }
 }
 
@@ -6472,6 +6785,8 @@ async function syncLocalPostsToServer() {
         noi_dung: item.noi_dung || '',
         posted_at: g.posted_at || item.lastPostedAt || null,
         fb_user_id: posterFbId,
+        // Tập ngành nghề của bài (nhiều-nhiều) — server thay toàn bộ set trong user_post_categories.
+        category_ids: itemCategoryIds(item).map(Number).filter(Boolean),
       });
       touched.push(g);
     }
@@ -6490,6 +6805,35 @@ async function syncLocalPostsToServer() {
       await chrome.storage.local.set({ postQueue: queue });
     }
   } catch { /* best-effort — chưa đánh dấu synced, lần mở panel sau tự gửi lại */ }
+}
+
+// Đẩy RIÊNG tập ngành của 1 bài ĐÃ ĐĂNG lên server (khi user đổi ngành trên card sau khi đăng) — không
+// gate theo tidienSynced như syncLocalPostsToServer (nhóm đã synced rồi vẫn phải cập nhật lại ngành).
+async function syncPostCategoryToServer(post) {
+  const { licenseKey, activeActorId, fbUser } = await chrome.storage.local.get(['licenseKey', 'activeActorId', 'fbUser']);
+  if (!licenseKey || post?.postStatus !== 'posted') return;
+  const posterFbId = String(activeActorId || fbUser?.id || '') || null;
+  const category_ids = itemCategoryIds(post).map(Number).filter(Boolean);
+  const posts = (post.postedGroups || [])
+    .filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)))
+    .map((g) => ({
+      post_queue_id: post.id || '',
+      group_id: String(g.group_id || ''),
+      group_name: g.group_name || '',
+      post_id: String(g.post_id),
+      posted_at: g.posted_at || post.lastPostedAt || null,
+      fb_user_id: posterFbId,
+      category_ids,
+    }));
+  if (!posts.length) return;
+  try {
+    const base = await getUserSyncBase();
+    await fetch(`${base}/api/user-sync/posts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${licenseKey}` },
+      body: JSON.stringify({ posts }),
+    });
+  } catch { /* best-effort */ }
 }
 
 // v1.0.185 — cursor theo `updated_at` (`myPostsSyncMeta.cursor`) + merge-upsert vào `serverMyPosts`
@@ -6750,6 +7094,8 @@ async function finishInit() {
   bindEvents();
   await loadSettingsForm();
   initManualPostSettingsForm(await GF.storage.getSettings());
+  await loadCategories();
+  renderCategoryOptions();
   await loadState();
   await refreshProfiles(true);
   if (!state.profiles?.personal?.id) await fallbackFbUser();
@@ -6762,6 +7108,7 @@ async function finishInit() {
   } catch { /* ignore */ }
   syncLocalPostsToServer().catch(() => {});
   pullMyPostsFromServer().catch(() => {});
+  checkGroupflowAnnouncement().catch(() => {});
 }
 
 // Tony: "trong extension phải ghi version chứ" — hiện số version ngay ở header (không phụ thuộc đã

@@ -18,6 +18,8 @@ import {
   getEffectiveComposioApiKey,
   getEffectivePostsSyncLookbackDays,
   savePostsSyncLookbackDays,
+  getEffectiveGroupflowAnnouncement,
+  saveGroupflowAnnouncement,
 } from '../services/appSettingsService.js';
 import { testDriveConnection } from '../services/googleDriveService.js';
 import {
@@ -82,6 +84,9 @@ router.get('/', asyncHandler(async (req, res) => {
       page_image_schedules_enabled: pageImageSchedules,
       composio: composioWithConnection,
       posts_sync_lookback_days: getEffectivePostsSyncLookbackDays(),
+      groupflow_announcement: ['super_admin', 'admin'].includes(req.user.role)
+        ? getEffectiveGroupflowAnnouncement()
+        : null,
     },
   });
 }));
@@ -228,6 +233,13 @@ router.put('/posts-sync-lookback', requireRole('super_admin'), asyncHandler(asyn
     message: 'Đã lưu số ngày đồng bộ bài viết',
     posts_sync_lookback_days: days,
   });
+}));
+
+// Thông báo GroupFlow (website → extension). super_admin/admin đặt — extension đọc qua
+// GET /api/user-sync/config, hiện toast khi có thông báo mới hoặc có bản extension mới hơn.
+router.put('/groupflow-announcement', requireRole('super_admin', 'admin'), asyncHandler(async (req, res) => {
+  const saved = await saveGroupflowAnnouncement(req.body || {});
+  res.json({ message: 'Đã lưu thông báo GroupFlow', groupflow_announcement: saved });
 }));
 
 export default router;

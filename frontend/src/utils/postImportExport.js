@@ -6,6 +6,9 @@ const HEADER_ALIASES = {
   prompt_anh: ['prompt_anh', 'prompt', 'image_prompt', 'prompt_anh'],
   ngay_dang: ['ngay_dang', 'scheduled_date', 'ngay', 'noi_dang'],
   gio_dang: ['gio_dang', 'scheduled_time', 'gio'],
+  // Cột ngành nghề (tùy chọn) cho import draft GroupFlow — tên ngành, cách nhau dấu phẩy. Thiếu cột
+  // → coi như bài chưa gán ngành.
+  category: ['nganh_nghe', 'nganh', 'category', 'nganhnghe', 'nganh_nghe_'],
 };
 
 export const WEBSITE_HEADER_ALIASES = {

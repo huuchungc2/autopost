@@ -18,11 +18,15 @@ const PENDING_ACCESS_TTL_MS = 20 * 60 * 1000;
 // browser navigation, hoặc trang render phần lỗi bằng JS sau khi tải chứ không có sẵn trong HTML
 // gốc) — checkPostCommentable() rơi vào nhánh fail-open ("không xác định được thì coi là OK").
 // Kiểu lỗi string-match kiểu này đã tái diễn nhiều lần (v1.0.219/220/222) mỗi khi Facebook đổi
-// cách hiển thị — thay vì tiếp tục vá từng chuỗi (dễ vỡ lại), 'ok' KHÔNG còn cache vĩnh viễn nữa:
-// hết hạn sau `OK_ACCESS_TTL_MS` để tự check lại định kỳ — false positive (nếu marker vẫn không
-// khớp được) tự bị giới hạn phạm vi theo thời gian thay vì tin sai mãi mãi, thay vì phải chờ user
-// phát hiện + báo cáo thủ công như lần này.
-const OK_ACCESS_TTL_MS = 6 * 60 * 60 * 1000;
+// cách hiển thị — thay vì tiếp tục vá từng chuỗi (dễ vỡ lại), 'ok' từng KHÔNG còn cache vĩnh viễn:
+// hết hạn sau 6h để tự check lại định kỳ, giới hạn phạm vi false positive theo thời gian.
+// v1.0.276 (2026-07-18) — Tony: "check OK rồi thì không check nữa chứ". Từ v1.0.258 check bằng TAB
+// THẬT (đọc document.body.innerText, đáng tin như user thật nhìn) nên lý do gốc của TTL 6h (fetch()
+// fail-open sai) KHÔNG CÒN — bỏ hẳn hằng `OK_ACCESS_TTL_MS`, 'ok' lại BỀN vô thời hạn như 'deleted'
+// (khớp `isPostAccessFresh()` bên sidepanel.js vốn đã coi 'ok' vĩnh viễn; trước đây 2 bên lệch nhau
+// khiến service worker cứ mở tab re-check bài mà panel đã coi là xong — "3 tab nhấp nháy không đổi
+// gì"). Bài từng OK mà sau hóa xấu (admin gỡ/khoá) → lưới an toàn v1.0.267 tự loại (comment timeout
+// 1 lần → ghi đè 'pending').
 const POST_ACCESS_CACHE_KEY = 'gf_post_access_cache';
 // v1.0.222 — bug ở buildPermalink() (dùng route `/permalink/` thay vì `/posts/` thật) khiến
 // checkPostCommentable() gần như LUÔN fail-open ("ok") bất kể bài thật có xem được hay không —
@@ -228,9 +232,11 @@ const FC = globalThis.GF.fbCommentBg = {
 
   isAccessEntryFresh(entry) {
     if (!entry) return false;
-    if (entry.kind === 'deleted') return true;
-    const ttl = entry.kind === 'pending' ? PENDING_ACCESS_TTL_MS : OK_ACCESS_TTL_MS;
-    return Date.now() - (entry.checkedAt || 0) < ttl;
+    // v1.0.276 — 'ok'/'deleted' BỀN vô thời hạn (không re-check bài đã OK — xem khối chú thích chỗ
+    // gỡ `OK_ACCESS_TTL_MS` đầu file); chỉ 'pending' (chờ duyệt / tín hiệu mơ hồ 404/lỗi mạng) còn
+    // hết hạn 20 phút để tự check lại. Khớp đúng `isPostAccessFresh()` bên sidepanel.js.
+    if (entry.kind !== 'pending') return true;
+    return Date.now() - (entry.checkedAt || 0) < PENDING_ACCESS_TTL_MS;
   },
 
   // Bọc checkPostCommentable() bằng cache theo post_id — dùng chung cho cả luồng comment thật

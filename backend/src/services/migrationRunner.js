@@ -379,6 +379,22 @@ export async function ensureGroupPostDraftsTable() {
   await runMigrationFile('025_group_post_drafts.sql', 'Migration 025 applied: group_post_drafts');
 }
 
+export async function ensureGroupPostCategories() {
+  if (await tableExists('group_post_categories')) return;
+  await runMigrationFile('046_group_post_categories.sql', 'Migration 046 applied: group_post_categories (ngành nghề)');
+}
+
+export async function ensureUserPostCategories() {
+  if (await tableExists('user_post_categories')) return;
+  await runMigrationFile('047_user_post_categories.sql', 'Migration 047 applied: user_post_categories (ngành nghề nhiều-nhiều)');
+}
+
+export async function ensureGroupPostDraftsCategory() {
+  if (!(await tableExists('group_post_drafts'))) return;
+  if (await columnExists('group_post_drafts', 'category_ids')) return;
+  await runMigrationFile('048_group_post_drafts_category.sql', 'Migration 048 applied: group_post_drafts.category_ids');
+}
+
 export async function ensureGroupPostNameSharedDrafts() {
   if (!(await tableExists('group_posts'))) return;
   if (!(await columnExists('group_posts', 'group_name'))) {

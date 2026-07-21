@@ -1,6 +1,49 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-07-17
+> Cập nhật: 2026-07-18
+
+## Backend + Frontend + GroupFlow v1.0.280-281: Thông báo website→extension + Ngành nghề trong luồng draft/import (2026-07-15)
+
+- [x] **Thông báo (v1.0.280)**: `appSettingsService` getter/saver + `/config` trả `announcement`+`latest_version` + `PUT /api/settings/groupflow-announcement`; `GroupExtensionSettings.jsx` khu thông báo (bật/tắt, mức, nội dung, bản mới); extension `checkGroupflowAnnouncement()` toast khi mở panel + cảnh báo bản mới.
+- [x] **Ngành trong draft/import (v1.0.281)**: migration 048 (`group_post_drafts.category_ids`) + guard + wire; create/update/list/pull draft mang `category_ids`; `setGroupPostDraftsCategory()` + `POST /drafts/bulk-category`. `GroupImport.jsx` chips chọn ngành cả lô + đọc cột "Ngành nghề" + preview; `GroupDrafts.jsx` cột Ngành + gán hàng loạt; extension `excel.js` cột `nganh_nghe` + parse; `resolveCategoryNamesToIds()`; draft pull → `categories`.
+- [x] Syntax check backend + extension sạch; frontend build sạch. Không rebuild `swBundle.js` (không đụng file bundle).
+- [ ] **Cần Tony xác nhận trên máy thật**: `git pull` + restart backend (migration 048 tự chạy) + `npm run build` + reload extension. Test: (1) super_admin bật thông báo ở Cài đặt → Extension → mở panel extension thấy toast; đặt "Bản mới nhất" > version đang chạy → thấy toast nhắc cập nhật; (2) website Import draft → chọn ngành (chips) hoặc điền cột "Ngành nghề" → Group Drafts thấy cột Ngành đúng; (3) tick draft → "Gán ngành cho N draft" đổi ngành; (4) extension tải file mẫu → thấy cột nganh_nghe; điền tên ngành đúng danh mục → import thấy tag ngành trên card; (5) extension "Tải web" draft đã gán ngành → card có tag ngành.
+
+## Backend + Frontend + GroupFlow v1.0.279: Xóa hàng loạt draft + fix trạng thái "Đã tải" + gán ngành hàng loạt + fix tràn thanh lọc (2026-07-15)
+
+Tony xem trang Group Drafts + thanh lọc extension, báo 3 việc:
+
+- [x] **Trạng thái draft không đổi**: `pullDraftsForExtension()` (`groupPostService.js`) chỉ đọc theo cursor, không đánh dấu đã tải → cột Trạng thái mãi "Chờ Tải". Fix: mark pulled sau khi trả (cá nhân `status='pulled'`+`pulled_at`; shared `INSERT IGNORE group_post_draft_pulls`).
+- [x] **Xóa hàng loạt draft**: `deleteGroupPostDrafts()` + route `POST /api/group-posts/drafts/bulk-delete` + `GroupDrafts.jsx` checkbox/chọn-tất-cả/nút "Xóa đã chọn (N)".
+- [x] **Gán ngành hàng loạt (extension)**: ô "— Gán ngành —" + nút "Áp dụng ngành" trong `#postsBulkBar` — gán 1 ngành cho mọi bài đang chọn (bài đã đăng tự sync). **Fix lỗi UI**: `.post-filter-bar` thiếu `flex-wrap` → thêm ô lọc "Ngành" thứ 4 bị tràn/cắt chữ; giờ ô tìm full hàng, 3 select chia đều hàng dưới. Bump `manifest.json` → v1.0.279.
+- [x] Syntax check backend + extension sạch; frontend build sạch.
+- [ ] **Cần Tony xác nhận trên máy thật**: (1) bấm "Tải web" trong extension → trang Group Drafts (reload) cột Trạng thái đổi "Chờ Tải" → "Đã tải"; (2) tick vài draft → "Xóa đã chọn" xoá đúng; (3) tab Tạo bài extension: thanh lọc không còn tràn/cắt chữ, tick vài bài → "Áp dụng ngành" gán đúng.
+
+## Backend + Frontend + GroupFlow v1.0.278: Ngành nghề (category) cho bài — nhiều ngành, lọc Tạo bài & Comment, đồng bộ đầy đủ (2026-07-15)
+
+Tony muốn phân loại bài theo ngành nghề để lên lịch seeding dễ hơn. Chốt: danh mục quản lý tập trung (website) + đồng nhất toàn hệ thống + đồng bộ server; 1 bài nhiều ngành (nhiều-nhiều); lọc ở cả tab Tạo bài lẫn Comment; gán ngành cả khi soạn lẫn sau khi đăng.
+
+- [x] Backend migration `046_group_post_categories.sql` (danh mục dùng chung, seed 14 ngành gồm "Vận tải - Đặt xe" cho datxeveque.vn + "Phần mềm - Công nghệ"/"Marketing" cho zalopilot.vn) + `047_user_post_categories.sql` (bảng nối nhiều-nhiều) + guard + wire `app.js`.
+- [x] Route `routes/groupCategories.js` (CRUD `/api/group-categories`, admin JWT) + mount. `userSync.js`: `GET /categories` (license-key) + `POST /posts` nhận `category_ids[]` + `/my-posts`,`/cross-posts` trả `category_ids`. `upsertUserPost()` + `replacePostCategories()`.
+- [x] Frontend `GroupExtensionSettings.jsx`: khu quản lý danh mục ngành (admin/super_admin). `npm run build` sạch.
+- [x] Extension: pull danh mục từ server (read-only + nút Tải lại), chips multi-toggle khi soạn, gán ngành inline trên card (cả sau khi đăng, tự sync), tag ngành, lọc theo ngành tab Tạo bài + Comment, sync `category_ids`. Bump `manifest.json` → v1.0.278. Không đụng file bundle → không rebuild `swBundle.js`.
+- [x] Syntax check backend + extension sạch; frontend build sạch. Cập nhật CHANGELOG + docs/GROUPFLOW.md.
+- [ ] **Cần Tony xác nhận trên máy thật**: `git pull` + restart backend (2 migration mới tự chạy) + `npm run build` frontend + reload extension. Test: (1) Website Cài đặt → Extension → thêm/sửa/xoá ngành (admin); (2) extension mở panel → thấy danh mục kéo về, soạn bài chọn nhiều ngành bằng chips; (3) card bài đã đăng bấm "🏷 Ngành" gán ngành → lọc tab Tạo bài đúng; (4) qua tab Comment → lọc theo ngành ra đúng bài; (5) máy đồng đội (license khác) → tab Đồng đội lọc theo ngành thấy bài đã gán (kiểm tra đồng bộ server); (6) xoá 1 ngành trên website → bài vẫn còn, chỉ mất ngành đó.
+
+## GroupFlow v1.0.277: Check nền không vẽ lại list khi tập bài không đổi (2026-07-18)
+
+Tony: "sao phải vẽ lại nguyên panel, mình chỉ đổi thông số thôi". Guard nhỏ an toàn (không rewrite incremental — giữ rebuild `state.comments` để không sót bài mới đăng). Chi tiết `docs/GROUPFLOW.md`.
+
+- [x] `sidepanel.js`: thêm `commentRenderSigFrom()` + `lastCommentRenderSig`; `loadPostedPostsForComment({ skipUnchangedRender })` bỏ qua `renderComments()` khi chữ ký tập bài không đổi (số đếm/badge vẫn cập nhật); `schedulePostAccessRefresh()` gọi với `skipUnchangedRender: true`.
+- [x] Bump `manifest.json` → v1.0.277, cập nhật `CHANGELOG.md` + `docs/GROUPFLOW.md`. Syntax check sạch. Không cần rebuild `swBundle.js`.
+
+## GroupFlow v1.0.276: "Check OK rồi thì thôi" — bỏ TTL 6h re-check bài đã OK (2026-07-18)
+
+Tony hỏi tại sao nút "🔍 Check" mở 3 tab nhưng "Của tôi" không đổi/không báo gì, và "check OK rồi thì không check nữa chứ". Root cause: service worker cho bài `'ok'` hết hạn 6h (`OK_ACCESS_TTL_MS`) nên re-check, còn sidepanel coi `'ok'` vĩnh viễn → re-check vô hình. Tony chốt "OK rồi thì thôi". Chi tiết `docs/GROUPFLOW.md`.
+
+- [x] `fbCommentBg.js`: bỏ hằng `OK_ACCESS_TTL_MS`; `isAccessEntryFresh()` → `if (entry.kind !== 'pending') return true;` ('ok'/'deleted' bền vô thời hạn, chỉ 'pending' TTL 20 phút).
+- [x] Rebuild `modules/swBundle.js` (`node build-sw-bundle.js`) — fbCommentBg.js nằm trong bundle. Syntax check sạch.
+- [x] Bump `manifest.json` → v1.0.276, cập nhật `CHANGELOG.md` + `docs/GROUPFLOW.md`.
 
 ## Backend: Clear image_job_status khi upload ảnh thay thế generate fail (2026-07-17)
 

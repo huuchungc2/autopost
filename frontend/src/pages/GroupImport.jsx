@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, Upload } from 'lucide-react';
 import Button from '../components/ui/Button';
@@ -18,15 +18,42 @@ export default function GroupImport() {
   const [errors, setErrors] = useState([]);
   const [saving, setSaving] = useState(false);
   const [shared, setShared] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [batchCats, setBatchCats] = useState(() => new Set()); // id ngành áp cho CẢ lô import
+
+  useEffect(() => {
+    api.get('/group-categories').then((r) => setCategories(r.data || [])).catch(() => {});
+  }, []);
+
+  const toggleBatchCat = (id) => setBatchCats((s) => {
+    const n = new Set(s);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+
+  // Tên ngành (từ cột template, cách nhau dấu phẩy) → id, khớp không phân biệt hoa/thường; tên lạ bỏ qua.
+  const resolveCategoryNames = (namesStr) => {
+    if (!namesStr) return [];
+    return String(namesStr).split(/[,;]/).map((s) => s.trim().toLowerCase()).filter(Boolean)
+      .map((name) => categories.find((c) => c.name.toLowerCase() === name)?.id)
+      .filter((id) => id != null)
+      .map(String);
+  };
 
   const validRows = useMemo(
-    () => rows.map(({ noi_dung, prompt_anh, ngay_dang, gio_dang }) => ({
-      noi_dung,
-      prompt_anh: prompt_anh || '',
-      ngay_dang: ngay_dang || null,
-      gio_dang: gio_dang || null,
-    })),
-    [rows]
+    () => rows.map(({ noi_dung, prompt_anh, ngay_dang, gio_dang, category }) => {
+      // Ngành của bài = ngành chọn cho cả lô + ngành ghi trong cột template (nếu có). Thiếu → chưa gán.
+      const ids = [...new Set([...batchCats, ...resolveCategoryNames(category)].map(String))];
+      return {
+        noi_dung,
+        prompt_anh: prompt_anh || '',
+        ngay_dang: ngay_dang || null,
+        gio_dang: gio_dang || null,
+        category_ids: ids,
+      };
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, batchCats, categories]
   );
 
   const handleFile = (event) => {
@@ -108,6 +135,37 @@ export default function GroupImport() {
           </ul>
         )}
 
+        {categories.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <p className="field-hint" style={{ marginBottom: 6 }}>
+              <strong>Ngành nghề</strong> — chọn áp cho tất cả bài trong lô này (hoặc điền cột "Ngành nghề" trong file). Có thể sửa lại từng bài sau khi import.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {categories.map((c) => {
+                const on = batchCats.has(String(c.id));
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => toggleBatchCat(String(c.id))}
+                    style={{
+                      border: `1px solid ${on ? '#4f46e5' : 'var(--bg-border)'}`,
+                      background: on ? '#4f46e5' : 'transparent',
+                      color: on ? '#fff' : 'inherit',
+                      borderRadius: 999,
+                      padding: '3px 12px',
+                      fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {c.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {validRows.length > 0 && (
           <>
             {isAdmin && (
@@ -128,20 +186,27 @@ export default function GroupImport() {
                   <th>#</th>
                   <th>Nội dung</th>
                   <th>Prompt ảnh</th>
+                  <th>Ngành</th>
                   <th>Lịch</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.slice(0, 10).map((row, i) => (
+                {rows.slice(0, 10).map((row, i) => {
+                  const names = (validRows[i]?.category_ids || [])
+                    .map((id) => categories.find((c) => String(c.id) === String(id))?.name)
+                    .filter(Boolean);
+                  return (
                   <tr key={row._line || i}>
                     <td>{row._line || i + 1}</td>
                     <td>{(row.noi_dung || '').slice(0, 50)}{(row.noi_dung?.length > 50) ? '…' : ''}</td>
                     <td>{(row.prompt_anh || '—').slice(0, 40)}</td>
+                    <td>{names.length ? names.join(', ') : '—'}</td>
                     <td>
                       {row.ngay_dang ? `${row.ngay_dang} ${row.gio_dang || ''}`.trim() : '—'}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             {rows.length > 10 && (

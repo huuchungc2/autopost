@@ -3,7 +3,7 @@ import { query } from '../db.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { authenticateLicenseKey } from '../middleware/licenseAuth.js';
 import { upsertUserPost, VISIBLE_AFTER_MAX_MINUTES } from '../services/groupPostService.js';
-import { getEffectivePostsSyncLookbackDays } from '../services/appSettingsService.js';
+import { getEffectivePostsSyncLookbackDays, getEffectiveGroupflowAnnouncement } from '../services/appSettingsService.js';
 
 const router = express.Router();
 
@@ -24,7 +24,22 @@ function getPostsSyncLookbackFloor() {
 // được các bài đã cache trước đó) — không có route này, extension không có cách nào biết N hiện tại
 // đang là bao nhiêu để tự lọc theo cùng ngưỡng.
 router.get('/config', authenticateLicenseKey, asyncHandler(async (req, res) => {
-  res.json({ posts_sync_lookback_days: getEffectivePostsSyncLookbackDays() });
+  const ann = getEffectiveGroupflowAnnouncement();
+  res.json({
+    posts_sync_lookback_days: getEffectivePostsSyncLookbackDays(),
+    // Thông báo website → extension (null nếu admin không bật) + latest_version để cảnh báo bản mới.
+    announcement: ann.announcement,
+    latest_version: ann.latest_version || null,
+  });
+}));
+
+// GET /api/user-sync/categories — extension kéo danh mục ngành nghề dùng chung (quản lý trên website,
+// xem routes/groupCategories.js) để hiện dropdown gán ngành + bộ lọc. Read-only phía extension.
+router.get('/categories', authenticateLicenseKey, asyncHandler(async (req, res) => {
+  const rows = await query(
+    'SELECT id, name FROM group_post_categories ORDER BY sort_order ASC, name ASC'
+  ).catch(() => []);
+  res.json(rows);
 }));
 
 // POST /api/user-sync/posts — Flow 2 (đồng bộ sau khi đăng bài). Dùng chung upsertUserPost() với
@@ -60,6 +75,9 @@ router.post('/posts', authenticateLicenseKey, asyncHandler(async (req, res) => {
         // mình). `undefined` khi client không gửi (mọi lần sync thường) → upsertUserPost() giữ
         // nguyên giá trị cũ, không tự xoá cờ.
         pending_approval: typeof p.pending_approval === 'boolean' ? p.pending_approval : undefined,
+        // Ngành nghề nhiều-nhiều (đồng bộ đầy đủ, 2026-07-15) — MẢNG id ngành. Có gửi (kể cả [] để gỡ
+        // hết) → thay toàn bộ tập ngành của bài; `undefined` (client cũ không gửi) → giữ nguyên.
+        category_ids: Array.isArray(p.category_ids) ? p.category_ids : undefined,
       });
       inserted++;
     } catch { /* best-effort, tiếp tục bài khác */ }
@@ -86,14 +104,16 @@ router.get('/my-posts', authenticateLicenseKey, asyncHandler(async (req, res) =>
   const rows = since
     ? await query(
         `SELECT id, post_queue_id, group_id, group_name, post_id, noi_dung, posted_at, needs_comment,
-                pending_approval, pending_checked_at, created_at, updated_at
+                pending_approval, pending_checked_at, created_at, updated_at,
+                (SELECT GROUP_CONCAT(category_id) FROM user_post_categories WHERE user_post_id = user_posts.id) AS category_ids
          FROM user_posts WHERE user_account_id = ? AND updated_at > ? AND COALESCE(posted_at, created_at) > ?
          ORDER BY updated_at ASC LIMIT ?`,
         [req.userAccount.id, since, lookbackFloor, limit]
       )
     : await query(
         `SELECT id, post_queue_id, group_id, group_name, post_id, noi_dung, posted_at, needs_comment,
-                pending_approval, pending_checked_at, created_at, updated_at
+                pending_approval, pending_checked_at, created_at, updated_at,
+                (SELECT GROUP_CONCAT(category_id) FROM user_post_categories WHERE user_post_id = user_posts.id) AS category_ids
          FROM user_posts WHERE user_account_id = ? AND COALESCE(posted_at, created_at) > ?
          ORDER BY updated_at DESC LIMIT ?`,
         [req.userAccount.id, lookbackFloor, limit]
@@ -201,6 +221,7 @@ router.get('/cross-posts', authenticateLicenseKey, asyncHandler(async (req, res)
   // `up.pending_approval` trong SELECT (2026-07-15) — client cần field này để phân biệt "bài OK"
   // với "bài vừa chuyển chờ duyệt" trong cùng 1 response incremental (xem chú thích đầu route).
   const selectFields = `up.id, up.post_queue_id, up.group_id, up.group_name,
+                (SELECT GROUP_CONCAT(upc2.category_id) FROM user_post_categories upc2 WHERE upc2.user_post_id = up.id) AS category_ids,
                 up.post_id, up.noi_dung, up.posted_at, up.updated_at,
                 up.comment_count, up.comment_target, up.pending_checked_at,
                 up.pending_approval,

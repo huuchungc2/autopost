@@ -20,6 +20,8 @@ import {
   updateGroupPostDraft,
   repullGroupPostDraft,
   deleteGroupPostDraft,
+  deleteGroupPostDrafts,
+  setGroupPostDraftsCategory,
 } from '../services/groupPostService.js';
 import {
   extensionGenerateImage,
@@ -228,6 +230,20 @@ router.patch('/drafts/:id', authenticate, asyncHandler(async (req, res) => {
 
 router.post('/drafts/:id/repull', authenticate, asyncHandler(async (req, res) => {
   const result = await repullGroupPostDraft(req.user.id, req.params.id);
+  res.json(result);
+}));
+
+/** Website: xoá hàng loạt draft — checkbox chọn nhiều trên trang /groups/drafts */
+router.post('/drafts/bulk-delete', authenticate, asyncHandler(async (req, res) => {
+  const result = await deleteGroupPostDrafts(req.user.id, req.user.role, req.body.draft_ids || req.body.ids);
+  res.json(result);
+}));
+
+/** Website: gán ngành nghề hàng loạt cho draft đã chọn */
+router.post('/drafts/bulk-category', authenticate, asyncHandler(async (req, res) => {
+  const result = await setGroupPostDraftsCategory(
+    req.user.id, req.user.role, req.body.draft_ids || req.body.ids, req.body.category_ids
+  );
   res.json(result);
 }));
 
