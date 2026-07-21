@@ -1,8 +1,8 @@
 -- Ngành nghề của TỪNG bài — quan hệ NHIỀU-NHIỀU (1 bài thuộc 1 hoặc nhiều ngành). Bảng nối thay cho
--- cột đơn: extension gán tập ngành khi soạn, push lên qua POST /api/user-sync/posts (category_ids[]);
--- /my-posts + /cross-posts trả GROUP_CONCAT(category_id) để lọc theo ngành cả ở tab Tạo bài lẫn
--- tab Comment (seeding). Không FK cứng tới user_posts/group_post_categories để tránh rủi ro migration;
--- xoá 1 ngành → route xoá tự DELETE các dòng nối (routes/groupCategories.js).
+-- cột đơn. Extension gán tập ngành khi soạn, push lên qua POST /api/user-sync/posts (category_ids).
+-- /my-posts và /cross-posts trả GROUP_CONCAT(category_id) để lọc theo ngành cả ở tab Tạo bài lẫn
+-- tab Comment (seeding). Không FK cứng tới user_posts/group_post_categories để tránh rủi ro migration.
+-- Xoá 1 ngành thì route xoá tự DELETE các dòng nối (routes/groupCategories.js).
 CREATE TABLE IF NOT EXISTS user_post_categories (
   user_post_id INT NOT NULL,
   category_id INT NOT NULL,

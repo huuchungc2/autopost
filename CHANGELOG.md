@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Backend — "Unknown column 'd.category_ids'": bug parse file SQL làm migration 048 không bao giờ chạy (2026-07-15)**: Tony báo lỗi vẫn còn sau khi đã vá chuỗi migration. Root cause thật KHÔNG phải chuỗi migration đứt mà là `parseSqlStatements()` (`migrationRunner.js`) **split theo `;` TRƯỚC rồi mới bỏ comment**. Migration `048_group_post_drafts_category.sql` có dấu `;` nằm GIỮA một dòng comment (`...ở list draft; extension pull về...`) — split cắt ngay đó, phần chữ đứng sau dấu `;` trên cùng dòng mất tiền tố `--` nên không bị strip, rồi dính vào câu `ALTER` thành SQL rác (`extension pull về → postQueue ALTER TABLE ...`) → MySQL báo lỗi cú pháp, migration ném lỗi mỗi lần khởi động và cột `category_ids` không bao giờ được tạo. Fix: đảo thứ tự — **bỏ comment trước, split `;` sau** (dấu `;` trong comment biến mất cùng comment). Đã rà toàn bộ migration: không file nào khác đổi kết quả parse. Dọn luôn dấu `;` khỏi comment của 046/047/048 cho chắc.
+
 ### Changed
 - **Frontend + GroupFlow v1.0.282 — Chuyển "Ngành nghề" và "Thông báo extension" từ Cài đặt hệ thống sang menu Group (2026-07-15)**: Tony chỉ ra đúng — 2 mục này thuộc GroupFlow, không phải cấu hình hệ thống, nhét vào Cài đặt là sai chỗ. Tách khỏi `GroupExtensionSettings.jsx` thành 2 trang riêng: `GroupCategories.jsx` (`/groups/categories`) + `GroupAnnouncement.jsx` (`/groups/announcement`), thêm vào `navConfig.js` mục Group ("Ngành nghề" 🏷 + "Thông báo extension" 📣, admin/super_admin) + route trong `App.jsx` + tiêu đề trang. Lời nhắc trong extension đổi trỏ "menu Group → Ngành nghề". Bump `manifest.json` → v1.0.282.
 

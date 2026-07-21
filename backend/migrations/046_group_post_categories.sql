@@ -1,6 +1,6 @@
--- Danh mục ngành nghề dùng chung cho GroupFlow (đồng nhất toàn hệ thống). Admin quản lý trên website;
--- extension kéo về qua GET /api/user-sync/categories (license-key auth) để hiện dropdown gán ngành +
--- bộ lọc. Global (không per-user) — mọi group_user dùng chung 1 vocabulary.
+-- Danh mục ngành nghề dùng chung cho GroupFlow (đồng nhất toàn hệ thống). Admin quản lý trên website
+-- (menu Group → Ngành nghề). Extension kéo về qua GET /api/user-sync/categories (license-key auth)
+-- để hiện dropdown gán ngành + bộ lọc. Global (không per-user) — mọi group_user dùng chung 1 vocabulary.
 CREATE TABLE IF NOT EXISTS group_post_categories (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(60) NOT NULL,

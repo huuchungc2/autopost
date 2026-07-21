@@ -2,6 +2,14 @@
 
 > Cập nhật: 2026-07-18
 
+## Backend: fix "Unknown column 'd.category_ids'" — bug parse file SQL (2026-07-15)
+
+Lỗi vẫn còn sau khi vá chuỗi migration. Root cause thật: `parseSqlStatements()` split `;` TRƯỚC rồi mới bỏ comment — dấu `;` giữa dòng comment của migration 048 làm câu ALTER dính chữ rác → lỗi cú pháp → cột không bao giờ tạo.
+
+- [x] `migrationRunner.js`: đảo thứ tự — bỏ comment trước, split `;` sau. Rà toàn bộ migration: không file nào khác đổi kết quả parse.
+- [x] Dọn dấu `;` khỏi comment của migration 046/047/048.
+- [ ] **Cần Tony**: `git pull` + **restart backend** → log phải có `Migration 048 applied: group_post_drafts.category_ids`, hết lỗi ở trang Drafts + "Tải web" của extension. (Hoặc chạy tay: `ALTER TABLE group_post_drafts ADD COLUMN category_ids VARCHAR(255) NULL DEFAULT NULL AFTER prompt_anh;`)
+
 ## Frontend + GroupFlow v1.0.282: Chuyển Ngành nghề + Thông báo sang menu Group (2026-07-15)
 
 Tony: 2 mục này thuộc GroupFlow, không phải Cài đặt hệ thống.

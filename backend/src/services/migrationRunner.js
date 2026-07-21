@@ -15,11 +15,17 @@ async function tableExists(tableName) {
   }
 }
 
+// BỎ COMMENT TRƯỚC rồi mới split theo `;` — thứ tự này quan trọng. Trước đây split trước, strip comment
+// sau: chỉ cần 1 dấu `;` nằm GIỮA dòng comment là phần chữ đứng sau nó trên cùng dòng mất tiền tố `--`,
+// không bị strip nữa, rồi dính vào câu lệnh kế tiếp thành SQL rác → migration ném lỗi cú pháp và âm thầm
+// không chạy (đã gặp thật với 048: cột group_post_drafts.category_ids không bao giờ được tạo →
+// "Unknown column 'd.category_ids'"). Strip trước thì dấu `;` trong comment biến mất cùng comment.
 function parseSqlStatements(filePath) {
   const raw = fs.readFileSync(filePath, 'utf8');
   return raw
+    .replace(/--[^\n]*/g, '')
     .split(';')
-    .map((part) => part.replace(/--[^\n]*/g, '').trim())
+    .map((part) => part.trim())
     .filter(Boolean);
 }
 
