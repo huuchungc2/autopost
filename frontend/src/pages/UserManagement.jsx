@@ -279,12 +279,14 @@ const initialForm = {
   is_active: true,
   page_ids: [],
   provider_ids: [],
+  website_ids: [],
 };
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [allPages, setAllPages] = useState([]);
   const [allProviders, setAllProviders] = useState([]);
+  const [allWebsites, setAllWebsites] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
   const [migrationWarning, setMigrationWarning] = useState('');
@@ -332,10 +334,20 @@ export default function UserManagement() {
     }
   };
 
+  const loadWebsites = async () => {
+    try {
+      const response = await api.get('/websites');
+      setAllWebsites(response.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     loadUsers();
     loadPages();
     loadProviders();
+    loadWebsites();
   }, []);
 
   const resetForm = () => {
@@ -367,6 +379,16 @@ export default function UserManagement() {
     }));
   };
 
+  const toggleWebsite = (websiteId) => {
+    const id = Number(websiteId);
+    setForm((prev) => ({
+      ...prev,
+      website_ids: prev.website_ids.some((x) => Number(x) === id)
+        ? prev.website_ids.filter((x) => Number(x) !== id)
+        : [...prev.website_ids, id],
+    }));
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     try {
@@ -378,6 +400,7 @@ export default function UserManagement() {
         is_active: form.is_active,
         page_ids: form.role === 'super_admin' ? [] : form.page_ids.map(Number).filter(Boolean),
         provider_ids: form.role === 'super_admin' ? [] : form.provider_ids.map(Number).filter(Boolean),
+        website_ids: form.role === 'super_admin' ? [] : form.website_ids.map(Number).filter(Boolean),
       };
       if (editingId) {
         const response = await api.put(`/users/${editingId}`, payload);
@@ -409,8 +432,10 @@ export default function UserManagement() {
     setEditingId(user.id);
     await loadPages();
     await loadProviders();
+    await loadWebsites();
     let pageIds = [];
     let providerIds = [];
+    let websiteIds = [];
     if (user.role !== 'super_admin') {
       try {
         const pagesRes = await api.get(`/users/${user.id}/pages`);
@@ -425,6 +450,12 @@ export default function UserManagement() {
       } catch {
         providerIds = [];
       }
+      try {
+        const websitesRes = await api.get(`/users/${user.id}/websites`);
+        websiteIds = websitesRes.data.map((w) => Number(w.id)).filter(Boolean);
+      } catch {
+        websiteIds = [];
+      }
     }
     setForm({
       name: user.name || '',
@@ -435,6 +466,7 @@ export default function UserManagement() {
       is_active: !!user.is_active,
       page_ids: pageIds,
       provider_ids: providerIds,
+      website_ids: websiteIds,
     });
   };
 
@@ -534,6 +566,19 @@ export default function UserManagement() {
                     {page.name} <small>({page.page_id})</small>
                   </label>
                 ))}
+              </div>
+            </div>
+            <div className="page-assign-block">
+              <h3>Gán website (blog)</h3>
+              <p className="text-muted">Tick website rồi bấm <strong>Cập nhật</strong>. User chỉ thấy/sửa bài blog của website đã tick — chưa tick website nào thì không thấy bài blog nào.</p>
+              <div className="page-assign-grid">
+                {allWebsites.map((website) => (
+                  <label key={website.id} className="checkbox-label page-assign-item">
+                    <input type="checkbox" checked={form.website_ids.some((id) => Number(id) === Number(website.id))} onChange={() => toggleWebsite(website.id)} />
+                    {website.name} <small>({website.domain})</small>
+                  </label>
+                ))}
+                {!allWebsites.length && <p>Chưa có website. Tạo ở mục Cấu hình Website trước.</p>}
               </div>
             </div>
             <div className="page-assign-block">

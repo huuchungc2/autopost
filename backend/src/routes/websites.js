@@ -3,6 +3,12 @@ import { query } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { canManageWebsites } from '../middleware/rbac.js';
 import { assertProviderAccess } from '../services/providerAccessService.js';
+import {
+  getAccessibleWebsiteIds,
+  assertWebsiteAccess,
+  assignWebsiteToUser,
+  websiteIdInClause,
+} from '../services/websiteAccessService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 const router = express.Router();
@@ -13,15 +19,20 @@ function normalizeOptionalId(value) {
   return Number.isFinite(id) && id > 0 ? id : null;
 }
 
+// Chỉ trả website user được gán (user_websites, migration 049); super_admin thấy tất cả.
 router.get('/', authenticate, asyncHandler(async (req, res) => {
+  const accessibleIds = await getAccessibleWebsiteIds(req.user);
+  const accessFilter = websiteIdInClause(accessibleIds, 'id');
   const websites = await query(
     `SELECT id, name, domain, skill_id, text_provider_id, image_provider_id, publish_url, is_active, created_at
-     FROM websites ORDER BY name ASC`
+     FROM websites WHERE 1=1${accessFilter.clause} ORDER BY name ASC`,
+    accessFilter.params
   );
   res.json(websites);
 }));
 
 router.get('/:id', authenticate, asyncHandler(async (req, res) => {
+  await assertWebsiteAccess(req.user, req.params.id);
   const rows = await query(
     `SELECT id, name, domain, skill_id, text_provider_id, image_provider_id, publish_url, api_key, is_active, created_at
      FROM websites WHERE id = ?`,
@@ -56,6 +67,9 @@ router.post('/', authenticate, canManageWebsites, asyncHandler(async (req, res) 
       is_active !== false,
     ]
   );
+  // Tự gán website vừa tạo cho chính người tạo (nếu không phải super_admin) — nếu không, admin tạo
+  // xong sẽ KHÔNG thấy website của mình nữa vì list đã lọc theo user_websites.
+  await assignWebsiteToUser(req.user, result.insertId);
   res.status(201).json({ id: result.insertId, name: name.trim(), domain, is_active });
 }));
 

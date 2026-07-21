@@ -20,6 +20,11 @@ import {
   pageIdInClause,
 } from '../services/pageAccessService.js';
 import {
+  getAccessibleWebsiteIds,
+  assertWebsiteAccess,
+  websiteIdInClause,
+} from '../services/websiteAccessService.js';
+import {
   buildImportTemplateXlsx,
   parseExcelBuffer,
   parseCsvText,
@@ -87,22 +92,30 @@ router.get('/', asyncHandler(async (req, res) => {
   const conditions = [];
   const params = [];
 
-  // Website posts không có page_id (gắn website_id riêng, không qua user_pages) — bỏ filter
-  // theo quyền fanpage cho các bài này; mọi user đăng nhập đều thấy được (chưa có user_websites).
+  // Phân quyền 2 trục độc lập: bài fanpage theo user_pages (page_id), bài website theo user_websites
+  // (website_id, migration 049). Trước đây bài platform='website' KHÔNG bị lọc gì — mọi user đăng nhập
+  // đều thấy hết, kể cả ở nhánh platform='all' (`posts.platform = 'website' OR ...` cho qua vô điều kiện).
+  const accessibleWebsiteIds = await getAccessibleWebsiteIds(req.user);
+  const websiteAccess = websiteIdInClause(accessibleWebsiteIds, 'posts.website_id');
+  const accessibleIds = await getAccessiblePageIds(req.user);
+  const fanpageAccess = pageIdInClause(accessibleIds, 'posts.page_id');
+  // '' (super_admin, không giới hạn) → dùng 1=1 để ghép biểu thức OR bên dưới cho gọn.
+  const webCond = websiteAccess.clause ? websiteAccess.clause.replace(/^ AND /, '') : '1=1';
+  const fanCond = fanpageAccess.clause ? fanpageAccess.clause.replace(/^ AND /, '') : '1=1';
+
   if (platform === 'website') {
-    // không filter theo fanpage
-  } else {
-    const accessibleIds = await getAccessiblePageIds(req.user);
-    const accessFilter = pageIdInClause(accessibleIds, 'posts.page_id');
-    if (accessFilter.clause) {
-      const fanpageAccessClause = accessFilter.clause.replace(/^ AND /, '');
-      conditions.push(
-        platform === 'all'
-          ? `(posts.platform = 'website' OR (${fanpageAccessClause}))`
-          : fanpageAccessClause
-      );
-      params.push(...accessFilter.params);
+    if (websiteAccess.clause) {
+      conditions.push(webCond);
+      params.push(...websiteAccess.params);
     }
+  } else if (platform === 'all') {
+    if (websiteAccess.clause || fanpageAccess.clause) {
+      conditions.push(`((posts.platform = 'website' AND ${webCond}) OR (posts.platform <> 'website' AND ${fanCond}))`);
+      params.push(...websiteAccess.params, ...fanpageAccess.params);
+    }
+  } else if (fanpageAccess.clause) {
+    conditions.push(fanCond);
+    params.push(...fanpageAccess.params);
   }
 
   if (pageFilter) {
@@ -110,7 +123,11 @@ router.get('/', asyncHandler(async (req, res) => {
     conditions.push('posts.page_id = ?');
     params.push(pageFilter);
   }
-  if (websiteFilter) { conditions.push('posts.website_id = ?'); params.push(websiteFilter); }
+  if (websiteFilter) {
+    await assertWebsiteAccess(req.user, websiteFilter);
+    conditions.push('posts.website_id = ?');
+    params.push(websiteFilter);
+  }
   if (status) { conditions.push('posts.status = ?'); params.push(status); }
   if (media_type) { conditions.push('posts.media_type = ?'); params.push(media_type); }
   if (date) { conditions.push('DATE(posts.scheduled_at) = ?'); params.push(date); }

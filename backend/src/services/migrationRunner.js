@@ -395,6 +395,12 @@ export async function ensureUserPostCategories() {
   await runMigrationFile('047_user_post_categories.sql', 'Migration 047 applied: user_post_categories (ngành nghề nhiều-nhiều)');
 }
 
+export async function ensureUserWebsitesTable() {
+  if (!(await tableExists('websites'))) return;
+  if (await tableExists('user_websites')) return;
+  await runMigrationFile('049_user_websites.sql', 'Migration 049 applied: user_websites (phân quyền website)');
+}
+
 export async function ensureGroupPostDraftsCategory() {
   if (!(await tableExists('group_post_drafts'))) return;
   if (await columnExists('group_post_drafts', 'category_ids')) return;

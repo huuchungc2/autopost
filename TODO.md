@@ -2,6 +2,27 @@
 
 > Cập nhật: 2026-07-18
 
+## Backend + Frontend: phân quyền website (user_websites) + siết CORS (2026-07-15)
+
+Đóng nốt 2 điểm bảo mật còn hở từ đợt review đầu.
+
+- [x] Migration `049_user_websites.sql` + guard `ensureUserWebsitesTable()` + wire `app.js`. Service mới `websiteAccessService.js`.
+- [x] Áp quyền: `assertPostAccess()` (bài website), `GET /posts` cả 3 nhánh (website/all/fanpage), filter `?website_id=`, `GET /websites` + `/websites/:id`. Endpoint `GET/PUT /users/:id/websites` + `website_ids` trong POST/PUT user + `/auth/me` trả `assigned_websites`.
+- [x] UI "Gán website (blog)" trong `UserManagement.jsx`. Admin tạo website tự được gán (không thì mất quyền xem chính nó).
+- [x] CORS đọc `CORS_ORIGINS` (.env) — opt-in, để trống giữ hành vi cũ; luôn cho qua `chrome-extension://` + request không Origin.
+- [x] Backend syntax sạch, frontend build sạch.
+- [ ] **Cần Tony xác nhận**: restart backend (migration 049 tự chạy) → Quản lý người dùng thấy khu "Gán website (blog)"; user thường chưa gán website thì KHÔNG thấy bài blog nào; gán rồi thì thấy đúng bài của website đó; super_admin vẫn thấy tất cả. Nếu muốn siết CORS thì thêm `CORS_ORIGINS=https://tidien.xyz` vào .env rồi restart (kiểm tra extension vẫn chạy bình thường).
+
+### Chưa làm, để sau (có spec sẵn)
+- **Thống kê hiệu quả bài đăng (Insights)** — Tony chốt "nào cần hãy làm". Đã khảo sát codebase và
+  viết spec đầy đủ (schema, service, cron, route, frontend, ràng buộc thật như quyền `read_insights`,
+  rate limit, token hết hạn) tại **[docs/INSIGHTS_PLAN.md](docs/INSIGHTS_PLAN.md)** — lúc làm cứ theo
+  đó, không phải dò lại hạ tầng.
+- **Lịch dạng calendar** (tuần/tháng, kéo-thả đổi giờ) — chưa có spec.
+
+### Ghi chú: đề nghị "cảnh báo token fanpage sắp hết hạn" — ĐÃ CÓ SẴN
+Rà lại `scheduler.js` `checkPageTokens()` (dòng ~299): đã tạo notification `warning`/`error` khi token chuyển `expiring`/`expired`, và `routes/notifications.js` có trả cả thông báo chung (`user_id IS NULL`). Tính năng hoạt động đầy đủ — đề nghị trước của tôi là thừa, KHÔNG xây trùng.
+
 ## GroupFlow v1.0.283: Lọc trạng thái đăng ở tab Tạo bài + báo rõ khi sync lỗi (2026-07-15)
 
 - [x] `#postFilterStatus` (Tất cả/Chưa đăng/Đã đăng/Chờ duyệt/Đăng một phần/Lỗi đăng) — "Chưa đăng" bắt cả bài `postStatus` undefined. Thanh lọc 4 select chia 2/hàng.

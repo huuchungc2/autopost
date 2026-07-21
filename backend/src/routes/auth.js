@@ -5,6 +5,7 @@ import { authenticate } from '../middleware/auth.js';
 import { authenticateUser, signToken, setPassword, verifyPassword } from '../services/authService.js';
 import { getUserPages, isSuperAdmin } from '../services/pageAccessService.js';
 import { getUserProviders } from '../services/providerAccessService.js';
+import { getUserWebsites } from '../services/websiteAccessService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { authLimiter } from '../middleware/rateLimit.js';
 
@@ -38,7 +39,8 @@ router.post('/logout', authenticate, (req, res) => {
 router.get('/me', authenticate, asyncHandler(async (req, res) => {
   const assigned_pages = isSuperAdmin(req.user) ? null : await getUserPages(req.user.id);
   const assigned_providers = isSuperAdmin(req.user) ? null : await getUserProviders(req.user.id);
-  res.json({ ...req.user, assigned_pages, assigned_providers });
+  const assigned_websites = isSuperAdmin(req.user) ? null : await getUserWebsites(req.user.id);
+  res.json({ ...req.user, assigned_pages, assigned_providers, assigned_websites });
 }));
 
 router.post('/change-password', authenticate, asyncHandler(async (req, res) => {

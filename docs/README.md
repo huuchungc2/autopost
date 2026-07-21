@@ -7,6 +7,7 @@
 | Doc | Khi nào đọc |
 |-----|-------------|
 | [SECURITY.md](./SECURITY.md) | Mô hình xác thực (3 loại token), rate limit, guard bắt buộc khi thêm route/upload/log — đọc trước khi đụng middleware auth |
+| [INSIGHTS_PLAN.md](./INSIGHTS_PLAN.md) | **CHƯA LÀM** — kế hoạch thống kê hiệu quả bài đăng (Graph API insights): hạ tầng đã có, schema/service/cron/route đề xuất, ràng buộc thật |
 | [TOKENS_AND_COMPOSIO.md](./TOKENS_AND_COMPOSIO.md) | Token FB manual + Composio, dual token, kiểm tra hiệu lực, đăng bài |
 | [GOOGLE_DRIVE.md](./GOOGLE_DRIVE.md) | Drive OAuth2, folder gốc, folder riêng từng fanpage |
 | [WEBSITE_BLOG.md](./WEBSITE_BLOG.md) | Tạo bài blog SEO website, tỷ lệ nội dung fanpage 70/20/10, getProjectContext |

@@ -1,4 +1,5 @@
 import { query } from '../db.js';
+import { assertWebsiteAccess } from './websiteAccessService.js';
 
 export function isSuperAdmin(user) {
   return user?.role === 'super_admin';
@@ -44,9 +45,19 @@ export async function assertPostAccess(user, postId) {
     error.status = 404;
     throw error;
   }
-  // Bài platform='website' gắn website_id, không page_id — chưa có user_websites
-  // để phân quyền theo từng website, nên cho phép mọi user đăng nhập truy cập.
-  if (post.platform === 'website') return post;
+  // Bài platform='website' gắn website_id (không page_id) — phân quyền theo bảng user_websites
+  // (migration 049). Bài chưa gắn website_id nào thì chỉ super_admin đụng được (không có gì để đối
+  // chiếu quyền). Trước đây mọi user đăng nhập đều qua được vì chưa có bảng phân quyền website.
+  if (post.platform === 'website') {
+    if (isSuperAdmin(user)) return post;
+    if (!post.website_id) {
+      const error = new Error('Forbidden: no access to this post');
+      error.status = 403;
+      throw error;
+    }
+    await assertWebsiteAccess(user, post.website_id);
+    return post;
+  }
   await assertPageAccess(user, post.page_id);
   return post;
 }

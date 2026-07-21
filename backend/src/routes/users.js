@@ -16,6 +16,10 @@ import {
   getAssignedProviderIds,
 } from '../services/providerAccessService.js';
 import {
+  setUserWebsites,
+  getUserWebsites,
+} from '../services/websiteAccessService.js';
+import {
   normalizeUsername,
   usernameFromEmail,
   assertUsernameAvailable,
@@ -133,7 +137,7 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 router.post('/', asyncHandler(async (req, res) => {
-  const { name, email, password, role = 'editor', page_ids = [], provider_ids = [] } = req.body;
+  const { name, email, password, role = 'editor', page_ids = [], provider_ids = [], website_ids = [] } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'Thiếu tên, email hoặc mật khẩu' });
   const username = resolveUsernameInput(req.body, email);
   await assertUsernameAvailable(username);
@@ -158,6 +162,7 @@ router.post('/', asyncHandler(async (req, res) => {
       result.insertId,
       await resolveProviderIdsForAssignment(req, null, provider_ids)
     );
+    const savedWebsiteIds = await setUserWebsites(result.insertId, website_ids).catch(() => []);
     return res.status(201).json({
       id: result.insertId,
       name,
@@ -166,6 +171,7 @@ router.post('/', asyncHandler(async (req, res) => {
       role: resolvedRole,
       assigned_page_count: savedPageIds.length,
       assigned_provider_count: savedProviderIds.length,
+      assigned_website_count: savedWebsiteIds.length,
     });
   }
   res.status(201).json({ id: result.insertId, name, username, email, role: resolvedRole });
@@ -215,6 +221,26 @@ router.put('/:id/pages', asyncHandler(async (req, res) => {
   res.json({ message: 'Page assignments updated', page_ids: pageIds });
 }));
 
+router.get('/:id/websites', asyncHandler(async (req, res) => {
+  const user = await getUserById(req.params.id);
+  assertCanAccessTargetUser(req, user);
+  if (user.role === 'super_admin') {
+    const all = await query('SELECT id, name, domain FROM websites ORDER BY name');
+    return res.json(all.map((w) => ({ ...w, assigned: true })));
+  }
+  res.json(await getUserWebsites(req.params.id));
+}));
+
+router.put('/:id/websites', asyncHandler(async (req, res) => {
+  const user = await getUserById(req.params.id);
+  assertCanAccessTargetUser(req, user);
+  if (user.role === 'super_admin') {
+    return res.status(400).json({ error: 'Super admin has access to all websites' });
+  }
+  const websiteIds = await setUserWebsites(req.params.id, req.body.website_ids || []);
+  res.json({ message: 'Website assignments updated', website_ids: websiteIds });
+}));
+
 router.put('/:id/providers', asyncHandler(async (req, res) => {
   const user = await getUserById(req.params.id);
   assertCanAccessTargetUser(req, user);
@@ -229,7 +255,7 @@ router.put('/:id/providers', asyncHandler(async (req, res) => {
 }));
 
 router.put('/:id', asyncHandler(async (req, res) => {
-  const { name, email, role, is_active, page_ids, provider_ids } = req.body;
+  const { name, email, role, is_active, page_ids, provider_ids, website_ids } = req.body;
   const existing = await getUserById(req.params.id);
   assertCanAccessTargetUser(req, existing);
   const resolvedRole = resolveRoleForRequester(req, role, existing.role);
@@ -259,17 +285,23 @@ router.put('/:id', asyncHandler(async (req, res) => {
         await resolveProviderIdsForAssignment(req, req.params.id, provider_ids)
       );
     }
+    if (Array.isArray(website_ids)) {
+      await setUserWebsites(req.params.id, website_ids);
+    }
   }
   if (resolvedRole === 'super_admin') {
     await query('DELETE FROM user_pages WHERE user_id = ?', [req.params.id]);
     await query('DELETE FROM user_providers WHERE user_id = ?', [req.params.id]);
+    await query('DELETE FROM user_websites WHERE user_id = ?', [req.params.id]).catch(() => {});
   }
   const assigned_pages = resolvedRole === 'super_admin' ? [] : await getUserPages(req.params.id);
   const assigned_providers = resolvedRole === 'super_admin' ? [] : await getUserProviders(req.params.id);
+  const assigned_websites = resolvedRole === 'super_admin' ? [] : await getUserWebsites(req.params.id);
   res.json({
     message: 'User updated',
     assigned_page_count: assigned_pages.length,
     assigned_provider_count: assigned_providers.length,
+    assigned_website_count: assigned_websites.length,
     assigned_page_ids: assigned_pages.map((p) => p.id),
   });
 }));
