@@ -148,7 +148,7 @@ function categoryTagsHtml(item) {
 function inlineCategoryPickerHtml(p) {
   if (state.inlineCategoryPickerPostId !== p.id) return '';
   if (!state.categories.length) {
-    return '<div class="inline-cat-picker"><p class="hint">Chưa có ngành — admin thêm ở website (Cài đặt → Extension → Danh mục ngành nghề).</p></div>';
+    return '<div class="inline-cat-picker"><p class="hint">Chưa có ngành — admin thêm ở website (menu Group → Ngành nghề).</p></div>';
   }
   const sel = new Set(itemCategoryIds(p));
   const chips = state.categories.map((c) => {
@@ -220,7 +220,7 @@ function renderCategoryManager() {
   const box = $('#categoryList');
   if (!box) return;
   if (!state.categories.length) {
-    box.innerHTML = '<p class="hint">Chưa có ngành nghề nào. Admin thêm tại website: Cài đặt → Extension → Danh mục ngành nghề.</p>';
+    box.innerHTML = '<p class="hint">Chưa có ngành nghề nào. Admin thêm tại website: menu Group → Ngành nghề.</p>';
     return;
   }
   box.innerHTML = state.categories.map((c) => {

@@ -2,6 +2,13 @@
 
 > Cập nhật: 2026-07-18
 
+## Frontend + GroupFlow v1.0.282: Chuyển Ngành nghề + Thông báo sang menu Group (2026-07-15)
+
+Tony: 2 mục này thuộc GroupFlow, không phải Cài đặt hệ thống.
+
+- [x] Tách `GroupCategories.jsx` (`/groups/categories`) + `GroupAnnouncement.jsx` (`/groups/announcement`) khỏi `GroupExtensionSettings.jsx`; thêm nav Group (admin) + route + tiêu đề. Extension đổi lời nhắc trỏ "menu Group → Ngành nghề". Bump v1.0.282. Frontend build sạch.
+- [ ] **Cần Tony xác nhận**: menu Group thấy 2 mục mới "Ngành nghề" + "Thông báo extension" (đăng nhập admin); Cài đặt → Extension không còn 2 khu đó.
+
 ## Backend + Frontend + GroupFlow v1.0.280-281: Thông báo website→extension + Ngành nghề trong luồng draft/import (2026-07-15)
 
 - [x] **Thông báo (v1.0.280)**: `appSettingsService` getter/saver + `/config` trả `announcement`+`latest_version` + `PUT /api/settings/groupflow-announcement`; `GroupExtensionSettings.jsx` khu thông báo (bật/tắt, mức, nội dung, bản mới); extension `checkGroupflowAnnouncement()` toast khi mở panel + cảnh báo bản mới.

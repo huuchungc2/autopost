@@ -14,6 +14,8 @@ import {
   Settings,
   UsersRound,
   FolderOpen,
+  Tag,
+  Megaphone,
 } from 'lucide-react';
 
 export const navGroups = [
@@ -51,6 +53,8 @@ export const navGroups = [
       { to: '/groups', label: 'Bài đã đăng', icon: UsersRound, roles: ['super_admin', 'admin', 'editor'] },
       { to: '/groups/import', label: 'Import Excel', icon: Upload, roles: ['super_admin', 'admin', 'editor'] },
       { to: '/groups/drafts', label: 'Drafts', icon: FolderOpen, roles: ['super_admin', 'admin', 'editor'] },
+      { to: '/groups/categories', label: 'Ngành nghề', icon: Tag, roles: ['super_admin', 'admin'] },
+      { to: '/groups/announcement', label: 'Thông báo extension', icon: Megaphone, roles: ['super_admin', 'admin'] },
     ],
   },
   {
@@ -81,6 +85,8 @@ export function getPageTitle(pathname) {
   if (pathname === '/posts/import-website-blog') return 'Import Excel — Website Blog';
   if (pathname === '/groups/import') return 'Import Group';
   if (pathname === '/groups/drafts') return 'Group Drafts';
+  if (pathname === '/groups/categories') return 'Ngành nghề GroupFlow';
+  if (pathname === '/groups/announcement') return 'Thông báo extension';
   if (pathname.startsWith('/groups')) return 'Group';
   if (/^\/posts\/\d+\/edit$/.test(pathname)) return 'Sửa bài viết';
   if (/^\/website-posts\/\d+\/edit$/.test(pathname)) return 'Sửa bài Website Blog';

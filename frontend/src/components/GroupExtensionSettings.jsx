@@ -25,19 +25,6 @@ export default function GroupExtensionSettings() {
   const [lookbackSaving, setLookbackSaving] = useState(false);
   const canEditLookback = user?.role === 'super_admin';
 
-  // Danh mục ngành nghề GroupFlow (dùng chung toàn hệ thống — extension kéo về). Admin/super_admin quản lý.
-  const canManageCategories = ['super_admin', 'admin'].includes(user?.role);
-  const [categories, setCategories] = useState([]);
-  const [catLoading, setCatLoading] = useState(true);
-  const [newCatName, setNewCatName] = useState('');
-  const [catBusy, setCatBusy] = useState(false);
-
-  // Thông báo GroupFlow (website → extension) — admin/super_admin đặt, extension hiện toast.
-  const canManageAnnouncement = ['super_admin', 'admin'].includes(user?.role);
-  const [ann, setAnn] = useState({ enabled: false, level: 'info', message: '', latest_version: '' });
-  const [annLoading, setAnnLoading] = useState(true);
-  const [annSaving, setAnnSaving] = useState(false);
-
   const load = async () => {
     setLoading(true);
     try {
@@ -75,97 +62,12 @@ export default function GroupExtensionSettings() {
     }
   };
 
-  const loadCategories = async () => {
-    if (user && !['super_admin', 'admin'].includes(user.role)) { setCatLoading(false); return; }
-    setCatLoading(true);
-    try {
-      const res = await api.get('/group-categories');
-      setCategories(res.data || []);
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Không tải được danh mục ngành', 'error');
-    } finally {
-      setCatLoading(false);
-    }
-  };
-
-  const loadAnnouncement = async () => {
-    if (user && !['super_admin', 'admin'].includes(user.role)) { setAnnLoading(false); return; }
-    setAnnLoading(true);
-    try {
-      const res = await api.get('/settings');
-      const a = res.data?.config?.groupflow_announcement;
-      if (a) setAnn({ enabled: !!a.enabled, level: a.level || 'info', message: a.message || '', latest_version: a.latest_version || '' });
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Không tải được thông báo', 'error');
-    } finally {
-      setAnnLoading(false);
-    }
-  };
-
   useEffect(() => {
     load();
     loadLicense();
     loadLookback();
-    loadCategories();
-    loadAnnouncement();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.role]);
-
-  const handleSaveAnnouncement = async () => {
-    setAnnSaving(true);
-    try {
-      const res = await api.put('/settings/groupflow-announcement', ann);
-      const a = res.data?.groupflow_announcement;
-      if (a) setAnn({ enabled: !!a.enabled, level: a.level || 'info', message: a.message || '', latest_version: a.latest_version || '' });
-      showToast('Đã lưu thông báo GroupFlow', 'success');
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Lưu thất bại', 'error');
-    } finally {
-      setAnnSaving(false);
-    }
-  };
-
-  const updateCatName = (id, name) => setCategories((cs) => cs.map((c) => (c.id === id ? { ...c, name } : c)));
-
-  const handleAddCategory = async () => {
-    const name = newCatName.trim();
-    if (!name) return;
-    setCatBusy(true);
-    try {
-      await api.post('/group-categories', { name });
-      setNewCatName('');
-      await loadCategories();
-      showToast('Đã thêm ngành nghề', 'success');
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Thêm ngành thất bại', 'error');
-    } finally {
-      setCatBusy(false);
-    }
-  };
-
-  const handleRenameCategory = async (id, name) => {
-    if (!name.trim()) { showToast('Tên ngành không được trống', 'error'); return; }
-    try {
-      await api.put(`/group-categories/${id}`, { name: name.trim() });
-      showToast('Đã lưu tên ngành', 'success');
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Lưu thất bại', 'error');
-    }
-  };
-
-  const handleDeleteCategory = async (id, name, count) => {
-    const msg = count
-      ? `Xóa ngành "${name}"? ${count} bài đang gán sẽ bị gỡ ngành này (không xoá bài).`
-      : `Xóa ngành "${name}"?`;
-    if (!window.confirm(msg)) return;
-    try {
-      await api.delete(`/group-categories/${id}`);
-      await loadCategories();
-      showToast('Đã xóa ngành', 'success');
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Xóa thất bại', 'error');
-    }
-  };
 
   const handleSaveLookback = async () => {
     const days = parseInt(lookbackDays, 10);
@@ -356,125 +258,6 @@ export default function GroupExtensionSettings() {
                   <span className="field-hint">
                     Bài đăng cũ hơn số ngày này (kể từ ngày đăng) sẽ không tải về extension nữa (cả bài của mình lẫn đồng đội) — giảm tải server khi hệ thống tích luỹ nhiều bài. Mặc định 60 ngày.
                   </span>
-                </label>
-              </div>
-            </>
-          )}
-
-          {canManageCategories && (
-            <>
-              <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid var(--bg-border)' }} />
-              <div className="settings-groupflow-grid">
-                <label>
-                  Danh mục ngành nghề (dùng chung — extension kéo về để gán/lọc bài)
-                  {catLoading ? (
-                    <p className="text-muted" style={{ margin: '4px 0 0' }}>Đang tải…</p>
-                  ) : (
-                    <>
-                      <div className="input-with-actions" style={{ marginTop: 6 }}>
-                        <input
-                          type="text"
-                          className="input"
-                          placeholder="Tên ngành mới (VD: Nội thất)"
-                          maxLength={60}
-                          value={newCatName}
-                          onChange={(e) => setNewCatName(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(); } }}
-                        />
-                        <Button type="button" onClick={handleAddCategory} disabled={catBusy || !newCatName.trim()}>
-                          + Thêm
-                        </Button>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
-                        {categories.length === 0 && <span className="field-hint">Chưa có ngành nào.</span>}
-                        {categories.map((c) => (
-                          <div key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            <input
-                              type="text"
-                              className="input"
-                              maxLength={60}
-                              value={c.name}
-                              onChange={(e) => updateCatName(c.id, e.target.value)}
-                              style={{ flex: 1 }}
-                            />
-                            <small className="text-muted" style={{ whiteSpace: 'nowrap' }} title="Số bài đang gán ngành này">
-                              {c.post_count || 0} bài
-                            </small>
-                            <Button type="button" variant="secondary" size="sm" onClick={() => handleRenameCategory(c.id, c.name)}>
-                              Lưu
-                            </Button>
-                            <Button type="button" variant="secondary" size="sm" onClick={() => handleDeleteCategory(c.id, c.name, c.post_count)}>
-                              Xóa
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                      <span className="field-hint">
-                        Danh mục đồng nhất toàn hệ thống — mọi extension kéo về dùng chung (Cài đặt → Ngành nghề trong extension, hoặc tự động khi mở panel). 1 bài có thể thuộc nhiều ngành; lọc theo ngành ở tab Tạo bài &amp; Comment để lên lịch seeding dễ hơn. Xoá 1 ngành chỉ gỡ ngành đó khỏi bài, không xoá bài.
-                      </span>
-                    </>
-                  )}
-                </label>
-              </div>
-            </>
-          )}
-
-          {canManageAnnouncement && (
-            <>
-              <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid var(--bg-border)' }} />
-              <div className="settings-groupflow-grid">
-                <label>
-                  Thông báo cho extension (hiện toast trong GroupFlow)
-                  {annLoading ? (
-                    <p className="text-muted" style={{ margin: '4px 0 0' }}>Đang tải…</p>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 'normal' }}>
-                        <input
-                          type="checkbox"
-                          checked={ann.enabled}
-                          onChange={(e) => setAnn((a) => ({ ...a, enabled: e.target.checked }))}
-                        />
-                        Bật thông báo (extension sẽ hiện toast khi mở panel)
-                      </label>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <select
-                          className="input"
-                          style={{ maxWidth: 160 }}
-                          value={ann.level}
-                          onChange={(e) => setAnn((a) => ({ ...a, level: e.target.value }))}
-                        >
-                          <option value="info">Thông tin</option>
-                          <option value="warning">Cảnh báo</option>
-                          <option value="critical">Khẩn cấp</option>
-                        </select>
-                        <input
-                          type="text"
-                          className="input"
-                          style={{ flex: 1, minWidth: 160 }}
-                          placeholder="Bản mới nhất (VD: 1.0.280) — cảnh báo cập nhật"
-                          value={ann.latest_version}
-                          onChange={(e) => setAnn((a) => ({ ...a, latest_version: e.target.value }))}
-                        />
-                      </div>
-                      <textarea
-                        className="input"
-                        rows={3}
-                        maxLength={500}
-                        placeholder="Nội dung thông báo gửi tới mọi extension (VD: Đã có bản mới, vui lòng tải lại extension)…"
-                        value={ann.message}
-                        onChange={(e) => setAnn((a) => ({ ...a, message: e.target.value }))}
-                      />
-                      <div>
-                        <Button type="button" onClick={handleSaveAnnouncement} disabled={annSaving}>
-                          {annSaving ? 'Đang lưu…' : 'Lưu thông báo'}
-                        </Button>
-                      </div>
-                      <span className="field-hint">
-                        Extension đọc thông báo khi mở panel (độ trễ vài phút). Chỉ hiện toast 1 lần cho mỗi lần bạn lưu. Ô "Bản mới nhất" so với version extension đang chạy — cũ hơn thì extension nhắc tải lại. Bỏ tick "Bật" để tắt thông báo.
-                      </span>
-                    </div>
-                  )}
                 </label>
               </div>
             </>

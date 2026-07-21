@@ -9,6 +9,8 @@ import WebsiteImport from './pages/WebsiteImport';
 import GroupPosts from './pages/GroupPosts';
 import GroupDrafts from './pages/GroupDrafts';
 import GroupImport from './pages/GroupImport';
+import GroupCategories from './pages/GroupCategories';
+import GroupAnnouncement from './pages/GroupAnnouncement';
 import Generate from './pages/Generate';
 import BatchGenerate from './pages/BatchGenerate';
 import Pages from './pages/Pages';
@@ -52,6 +54,8 @@ function App() {
             <Route path="groups" element={<GroupPosts />} />
             <Route path="groups/import" element={<GroupImport />} />
             <Route path="groups/drafts" element={<GroupDrafts />} />
+            <Route path="groups/categories" element={<GroupCategories />} />
+            <Route path="groups/announcement" element={<GroupAnnouncement />} />
             <Route path="generate" element={<Generate />} />
             <Route path="batch-generate" element={<BatchGenerate />} />
             <Route path="pages" element={<Pages />} />
