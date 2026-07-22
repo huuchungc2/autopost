@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "defaultMode": "acceptEdits",
     "allow": [
       "Bash(node *)",
       "Bash(npx *)",
@@ -17,7 +16,14 @@
       "Bash(git commit*)",
       "Bash(git push*)",
       "Bash(git pull*)",
-      "Bash(git fetch*)"
-    ]
+      "Bash(git fetch*)",
+      "Bash(node --check sidepanel.js)",
+      "Bash(git commit *)",
+      "Bash(node -e ' *)",
+      "Bash(node --check src/services/migrationRunner.js)",
+      "Bash(grep -rn \"users/.*\\\\/pages\\\\|page_ids\\\\|assigned_pages\" src --include=*.jsx)",
+      "Bash(git commit -m ' *)"
+    ],
+    "defaultMode": "acceptEdits"
   }
 }

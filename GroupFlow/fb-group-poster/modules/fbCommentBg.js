@@ -11,6 +11,12 @@ const DOC_TYPING_STOP = '6911603175550464';
 // (chờ duyệt, hoặc tín hiệu mơ hồ như 404/lỗi mạng) là trạng thái CÓ THỂ ĐỔI (admin duyệt sau,
 // mạng chỉ lỗi tạm) nên chỉ cache ngắn hạn rồi phải check lại — xem getPostAccess().
 const PENDING_ACCESS_TTL_MS = 20 * 60 * 1000;
+// v1.0.289 — Tony chốt: "vô lẽ đi check mãi một bài". Bài 'pending' quá 72h kể từ lần đầu thấy
+// chờ duyệt → NGỪNG check tự động (thực tế FB: admin không duyệt trong 2-3 ngày thì gần như không
+// bao giờ duyệt) — bài rơi vào danh sách "Chưa duyệt" trên tab Comment, check tiếp bằng tay từng
+// bài (nút 🔄 Check lại → GF_FORCE_CHECK_POST). Trước 72h thì giãn nhịp dần theo số lần đã check
+// (xem pendingRecheckDelayMs()).
+const PENDING_GIVE_UP_MS = 72 * 60 * 60 * 1000;
 // v1.0.229 — Tony xác nhận bằng ảnh chụp thật 1 bài "Bạn hiện không xem được nội dung này" (chủ
 // bài giới hạn người xem/đã xóa — đúng marker đã có ở checkPostCommentable() bên dưới) nhưng vẫn
 // bị cache 'ok' — nghĩa là marker string-match không khớp được HTML thô fetch() lấy về (rất có thể
@@ -40,7 +46,10 @@ const POST_ACCESS_CACHE_KEY = 'gf_post_access_cache';
 // đúng 1 bài đang lỗi) đều mất cache, phải chờ cron warmPostAccessCache() check lại dần (2 bài/~3
 // phút, hoặc 6 bài ngay khi mở tab Comment) — chấp nhận được vì đây chỉ là cache hiệu năng, không
 // phải dữ liệu thật.
-const POST_ACCESS_CACHE_SCHEMA = 3;
+// v1.0.287 — bump 3→4: xoá sạch cache verdict cũ 1 lần — mọi entry 'ok' ghi TRƯỚC bản vá poll
+// timing (checkPostCommentableViaTab, background.js) đều có thể là false-positive (chụp innerText
+// trước khi banner "chờ duyệt" kịp render), mà 'ok' cache vĩnh viễn nên không tự sửa được.
+const POST_ACCESS_CACHE_SCHEMA = 4;
 const POST_ACCESS_CACHE_SCHEMA_KEY = 'gf_post_access_cache_schema';
 
 const FC = globalThis.GF.fbCommentBg = {
@@ -217,6 +226,9 @@ const FC = globalThis.GF.fbCommentBg = {
   async readPostAccessCache() {
     const d = await chrome.storage.local.get([POST_ACCESS_CACHE_KEY, POST_ACCESS_CACHE_SCHEMA_KEY]);
     if (d[POST_ACCESS_CACHE_SCHEMA_KEY] !== POST_ACCESS_CACHE_SCHEMA) {
+      // v1.0.293 — BỎ mốc `gf_post_access_wiped_at` (v1.0.288): cài lại extension cũng wipe (storage
+      // trống) nên mốc đó chặn nhầm luôn seed verdict hợp lệ từ server — giờ seed so với mốc CỐ ĐỊNH
+      // TRUSTED_VERDICT_SINCE_MS (sidepanel.js) thay vì mốc wipe cục bộ.
       await chrome.storage.local.set({ [POST_ACCESS_CACHE_KEY]: {}, [POST_ACCESS_CACHE_SCHEMA_KEY]: POST_ACCESS_CACHE_SCHEMA });
       return {};
     }
@@ -230,13 +242,32 @@ const FC = globalThis.GF.fbCommentBg = {
     return entry;
   },
 
+  // v1.0.289 — nhịp re-check giãn dần theo số lần liên tiếp thấy 'pending' (checkCount, gắn bởi
+  // getPostAccess()): 3 lần đầu giữ 20' (bắt nhanh ca admin duyệt liền), lần 4-5 giãn 2h, từ lần 6
+  // giãn 6h — tới mốc 72h (PENDING_GIVE_UP_MS) thì pendingGaveUp() ngừng hẳn.
+  pendingRecheckDelayMs(entry) {
+    const n = entry?.checkCount || 1;
+    if (n <= 3) return PENDING_ACCESS_TTL_MS;
+    if (n <= 5) return 2 * 60 * 60 * 1000;
+    return 6 * 60 * 60 * 1000;
+  },
+
+  pendingGaveUp(entry) {
+    if (!entry || entry.kind !== 'pending') return false;
+    const first = entry.firstPendingAt || entry.checkedAt || 0;
+    return Date.now() - first > PENDING_GIVE_UP_MS;
+  },
+
   isAccessEntryFresh(entry) {
     if (!entry) return false;
     // v1.0.276 — 'ok'/'deleted' BỀN vô thời hạn (không re-check bài đã OK — xem khối chú thích chỗ
     // gỡ `OK_ACCESS_TTL_MS` đầu file); chỉ 'pending' (chờ duyệt / tín hiệu mơ hồ 404/lỗi mạng) còn
-    // hết hạn 20 phút để tự check lại. Khớp đúng `isPostAccessFresh()` bên sidepanel.js.
+    // tự check lại theo nhịp backoff. Khớp đúng `isPostAccessFresh()` bên sidepanel.js.
     if (entry.kind !== 'pending') return true;
-    return Date.now() - (entry.checkedAt || 0) < PENDING_ACCESS_TTL_MS;
+    // v1.0.289 — quá 72h vẫn pending → coi luôn là "tươi" = KHÔNG auto-check nữa (bỏ cuộc); chỉ
+    // check tiếp qua nút 🔄 Check lại (force:true bỏ qua hàm này).
+    if (this.pendingGaveUp(entry)) return true;
+    return Date.now() - (entry.checkedAt || 0) < this.pendingRecheckDelayMs(entry);
   },
 
   // Bọc checkPostCommentable() bằng cache theo post_id — dùng chung cho cả luồng comment thật
@@ -244,8 +275,8 @@ const FC = globalThis.GF.fbCommentBg = {
   // UI đọc trực tiếp storage để hiện tag/chặn nút (sidepanel.js không load module này, chỉ đọc
   // thẳng key `gf_post_access_cache` — xem ghi chú ở buildPermalink()/PENDING_ACCESS_TTL_MS).
   async getPostAccess({ groupId, postId, session, isTimeline, force = false }) {
-    const cached = force ? null : (await this.readPostAccessCache())[String(postId)];
-    if (this.isAccessEntryFresh(cached)) return cached;
+    const prev = (await this.readPostAccessCache())[String(postId)];
+    if (!force && this.isAccessEntryFresh(prev)) return prev;
     // v1.0.258 — đổi sang check bằng tab thật (GF_BG.checkPostCommentableViaTab(), background.js) —
     // xem chú thích đầy đủ ở đó. `this.checkPostCommentable()` (fetch() HTML thô, KHÔNG BAO GIỜ thấy
     // được banner "chờ duyệt" do Facebook lược bớt nội dung cho request không phải điều hướng thật)
@@ -255,6 +286,19 @@ const FC = globalThis.GF.fbCommentBg = {
     // scope của service worker cổ điển (không phải ES module) — không cần `globalThis.GF_BG`.
     const result = await GF_BG.checkPostCommentableViaTab({ groupId, postId, session, isTimeline });
     const entry = { ...result, checkedAt: Date.now() };
+    // v1.0.289 — đếm số lần LIÊN TIẾP thấy 'pending' + mốc lần đầu, nuôi backoff/bỏ-cuộc
+    // (pendingRecheckDelayMs/pendingGaveUp). Đọc prev cả khi force (force chỉ bỏ qua cache để
+    // QUYẾT ĐỊNH check, không có nghĩa quên lịch sử đếm — bài bỏ-cuộc bấm Check lại vẫn ra pending
+    // thì tiếp tục nằm yên trong nhóm bỏ-cuộc, không tự quay lại vòng auto-check).
+    if (entry.kind === 'pending') {
+      if (prev?.kind === 'pending') {
+        entry.checkCount = (prev.checkCount || 1) + 1;
+        entry.firstPendingAt = prev.firstPendingAt || prev.checkedAt || Date.now();
+      } else {
+        entry.checkCount = 1;
+        entry.firstPendingAt = Date.now();
+      }
+    }
     await this.writePostAccessEntry(postId, entry);
     return entry;
   },

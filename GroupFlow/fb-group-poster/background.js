@@ -2517,7 +2517,44 @@ const GF_BG = {
   // này tới giờ, sẽ bị bỏ qua êm thay vì chạy thật — đúng thứ Tony yêu cầu sửa ("lịch đã lên mà
   // chưa chạy thì vẫn phải chạy, dù trước đó đã comment rồi"). Tham số `opts`/`allowRepeat` không
   // còn ý nghĩa gì (luôn chạy) nên đã bỏ khỏi chữ ký hàm — dọn theo ở mọi nơi gọi.
+  // v1.0.290 — luật N ngày là luật CỨNG toàn hệ thống (Tony chốt: quá N ngày = không hiển thị,
+  // không check, không comment). Server đã ngừng trả bài cũ + list Comment và vòng check đã lọc
+  // (v1.0.265) — khe hở cuối là LỊCH COMMENT đã đặt từ trước: bài đặt lịch lúc còn hạn, tới giờ
+  // chạy thì đã quá N ngày → job "đông lạnh" vẫn chạy. Job không mang posted_at nên tra ngày đăng
+  // từ cache (postQueue theo post_queue_id, serverMyPosts/crossPostsCache theo post_id); không tra
+  // được ngày → coi như còn hạn (an toàn — không lỡ hủy nhầm, khớp isWithinPostsSyncLookback).
+  async isCommentJobWithinLookback(job) {
+    const days = await this.getPostsSyncLookbackDays();
+    const d = await chrome.storage.local.get(['postQueue', 'serverMyPosts', 'crossPostsCache']);
+    let dateStr = null;
+    if (job.post_queue_id) {
+      const p = (d.postQueue || []).find((x) => x.id === job.post_queue_id);
+      if (p?.lastPostedAt) dateStr = p.lastPostedAt;
+    }
+    if (!dateStr && job.post_id) {
+      const pid = String(job.post_id);
+      const sp = (d.serverMyPosts || []).find((x) => String(x.post_id) === pid)
+        || (d.crossPostsCache || []).find((x) => String(x.post_id) === pid);
+      if (sp?.posted_at) dateStr = sp.posted_at;
+    }
+    return this.isWithinPostsSyncLookback(dateStr, days);
+  },
+
   async runComment(job) {
+    if (!(await this.isCommentJobWithinLookback(job))) {
+      await this.appendHistory({
+        type: 'comment',
+        ok: false,
+        skipped: true,
+        group_id: job.group_id,
+        post_id: job.post_id,
+        author_name: job.author_name,
+        author_fb_id: job.author_fb_id,
+        snippet: '',
+        error: 'Bỏ qua — bài đã quá số ngày đồng bộ (cấu hình N ngày trên website)',
+      });
+      return;
+    }
     const settings = await chrome.storage.local.get(['fbLang', 'fbUser', 'activeActorId']);
     const comment = await this.resolveJobComment(job);
     const runJob = { ...job, comment };
@@ -3358,35 +3395,68 @@ const GF_BG = {
       if (!windowId) {
         return { canComment: false, kind: 'pending', reason: 'Không có cửa sổ Chrome thường để mở tab check' };
       }
-      const tab = await chrome.tabs.create({ url, active: false, windowId });
+      // v1.0.293 — gắn đuôi #gfcheck để nhận diện "tab do check mở" (URL user tự mở không bao giờ
+      // có) — sweepOrphanCheckTabs() dựa vào đuôi này đóng tab mồ côi khi finally bên dưới không
+      // kịp chạy (reload extension / SW bị giết giữa lượt check — Tony báo "để quá nhiều tab").
+      const tab = await chrome.tabs.create({ url: `${url}#gfcheck`, active: false, windowId });
       try {
         await this.waitForTabLoad(tab.id, 20000);
-        // 'complete' chỉ đảm bảo tải xong tài nguyên — banner trạng thái là UI phụ, chờ thêm chút
-        // để chắc đã render xong (đo thực tế trên máy thường ~1-2 giây là đủ).
-        await this.delay(1500);
-        const injected = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: () => document.body?.innerText || '',
-        });
-        const text = String(injected?.[0]?.result || '').normalize('NFC');
-        if (
-          text.includes("This content isn't available at the moment")
-          || text.includes('Bạn hiện không xem được nội dung này')
-          || text.includes('Nội dung này hiện không có sẵn')
-          || text.includes('đã xóa nội dung')
-        ) {
-          return { canComment: false, kind: 'deleted', reason: 'Bài đã bị xóa hoặc ẩn' };
-        }
-        if (
-          text.includes('Your post is pending approval')
-          || text.includes('đang chờ phê duyệt')
-          || text.includes('đang chờ duyệt')
-          || text.includes('chờ quản trị viên phê duyệt')
-        ) {
-          return { canComment: false, kind: 'pending', reason: 'Bài đang chờ admin duyệt' };
+        // v1.0.287 — Tony chụp được bài chờ duyệt THẬT (banner "Bài viết đang chờ phê duyệt /
+        // ...đang chờ quản trị viên phê duyệt" hiện rõ trên trang permalink) nhưng check vẫn phán
+        // 'ok' → bài chờ duyệt lọt vào tab Comment. Marker KHÔNG sai ("đang chờ phê duyệt" +
+        // "chờ quản trị viên phê duyệt" đều khớp câu chữ trong ảnh) — chỗ sai là TIMING: banner do
+        // FB fetch/render BẤT ĐỒNG BỘ sau khi trang 'complete', tab check lại là tab NỀN (Chrome
+        // throttle JS) nên chờ cố định 1.5s thường CHƯA đủ — innerText chụp sớm không có banner →
+        // fail-open 'ok', mà 'ok' cache vĩnh viễn (v1.0.276) nên dính mãi. Đổi sang POLL mỗi 700ms
+        // tới 8s: thấy marker xấu là chốt verdict ngay (nhanh hơn cả bản cũ khi banner hiện sớm);
+        // hết 8s không thấy gì xấu mới coi là 'ok' — giữ nguyên bias fail-open, chỉ cho banner đủ
+        // thời gian hiện.
+        const pollDeadline = Date.now() + 8000;
+        let text = '';
+        for (;;) {
+          await this.delay(700);
+          const injected = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => document.body?.innerText || '',
+          });
+          text = String(injected?.[0]?.result || '').normalize('NFC');
+          if (
+            text.includes("This content isn't available at the moment")
+            || text.includes('Bạn hiện không xem được nội dung này')
+            || text.includes('Nội dung này hiện không có sẵn')
+            || text.includes('đã xóa nội dung')
+          ) {
+            return { canComment: false, kind: 'deleted', reason: 'Bài đã bị xóa hoặc ẩn' };
+          }
+          if (
+            text.includes('Your post is pending approval')
+            || text.includes('đang chờ phê duyệt')
+            || text.includes('đang chờ duyệt')
+            || text.includes('chờ quản trị viên phê duyệt')
+          ) {
+            return { canComment: false, kind: 'pending', reason: 'Bài đang chờ admin duyệt' };
+          }
+          if (Date.now() >= pollDeadline) break;
         }
         // Không có tín hiệu xấu rõ ràng trên trang ĐÃ RENDER ĐẦY ĐỦ (đáng tin hơn hẳn fetch() cũ,
         // vốn không bao giờ thấy được banner) — coi là commentable.
+        // v1.0.286 — đường tab thật trước giờ phán 'ok' IM LẶNG (đường fetch() cũ có log OK-match
+        // v1.0.251/254/255, đường này thì không) — mà 'ok' cache vĩnh viễn (v1.0.276), nên bài chờ
+        // duyệt bị phán nhầm OK 1 lần là dính mãi, không bằng chứng nào để sửa marker cho đúng.
+        // Log từ khoá lỏng + ngữ cảnh ±150 ký tự quanh mỗi từ (1 chuỗi JSON — copy nguyên văn được)
+        // ngay trước khi trả 'ok': lần tới "bài chờ duyệt vẫn hiện" là có sẵn câu chữ thật FB dùng.
+        const lowerText = text.toLowerCase();
+        const looseHints = ['duyệt', 'approv', 'pending', 'chờ', 'review'].filter((kw) => lowerText.includes(kw));
+        if (looseHints.length) {
+          const hintSnippets = {};
+          for (const kw of looseHints) {
+            const idx = lowerText.indexOf(kw);
+            hintSnippets[kw] = text.slice(Math.max(0, idx - 150), idx + 150);
+          }
+          console.log('[GroupFlow] checkPostCommentableViaTab OK nhưng có từ khoá nghi vấn: ' + JSON.stringify({
+            postId, groupId, textLength: text.length, looseHints, hintSnippets,
+          }));
+        }
         return { canComment: true, kind: 'ok' };
       } finally {
         await chrome.tabs.remove(tab.id).catch(() => {});
@@ -3471,10 +3541,28 @@ const GF_BG = {
     return (Date.now() - t) < days * 24 * 60 * 60 * 1000;
   },
 
+  // v1.0.293 — Tony báo "tab check duyệt ok xong không tự tắt, để quá nhiều tab": finally trong
+  // checkPostCommentableViaTab() đóng tab bình thường, nhưng reload extension / service worker bị
+  // giết GIỮA lượt check thì finally không bao giờ chạy — tab mồ côi nằm lại vĩnh viễn (reload
+  // nhiều lần giữa các batch là dồn cả đống). Tab check giờ mang đuôi #gfcheck lúc mở — quét đóng
+  // mọi tab facebook còn đuôi đó lúc SW khởi động + trước mỗi lượt warm. Best-effort: FB có thể
+  // rewrite URL bỏ fragment sau thời gian dài, tab đó đành để user tự đóng.
+  async sweepOrphanCheckTabs() {
+    try {
+      const tabs = await chrome.tabs.query({ url: ['https://www.facebook.com/*', 'https://m.facebook.com/*'] });
+      for (const t of tabs) {
+        if (String(t.url || '').includes('#gfcheck')) {
+          await chrome.tabs.remove(t.id).catch(() => {});
+        }
+      }
+    } catch { /* best-effort */ }
+  },
+
   async warmPostAccessCache({ batchSize = 2 } = {}) {
     if (this._warmPostAccessInFlight) return;
     this._warmPostAccessInFlight = true;
     try {
+      await this.sweepOrphanCheckTabs();
       return await this._warmPostAccessCacheImpl({ batchSize });
     } finally {
       this._warmPostAccessInFlight = false;
@@ -3624,6 +3712,8 @@ chrome.power.requestKeepAwake('display');
 console.log('[GroupFlow] service worker ready');
 ensureGroupFlowPeriodicAlarms().catch(() => {});
 GF_BG.reconcileQueueSchedules().catch(() => {});
+// v1.0.293 — đóng tab check mồ côi (#gfcheck) sót lại từ đời SW trước (reload/bị giết giữa lượt check).
+GF_BG.sweepOrphanCheckTabs().catch(() => {});
 // v1.0.222 — dọn ngay lúc khởi động (không đợi tới lần checkPostAccess/comment đầu tiên) cache
 // 'gf_post_access_cache' cũ ghi sai do bug buildPermalink() (route /permalink/ khiến check luôn
 // fail-open "ok") — readPostAccessCache() tự xoá nếu schema cũ, xem fbCommentBg.js.
@@ -3730,6 +3820,29 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           console.warn('[GroupFlow] manual check posts:', e.message);
         });
         sendResponse({ ok: true });
+        return;
+      }
+      if (msg.type === 'GF_FORCE_CHECK_POST') {
+        // v1.0.289 — nút "🔄 Check lại" từng bài trong danh sách Chưa duyệt (sidepanel): force
+        // check 1 bài bất kể cache/backoff/bỏ-cuộc, rồi báo kết quả lên server luôn
+        // (reportOwnPendingApproval) — bài vừa được duyệt là đồng đội thấy ngay qua cross-posts
+        // để còn vào comment (rule Tony chốt). Await thật (không fire-and-forget như
+        // GF_CHECK_POSTS_NOW) vì panel cần verdict để hiện toast + cập nhật list ngay.
+        try {
+          const { groupId, postId } = msg.data || {};
+          const FC = globalThis.GF?.fbCommentBg;
+          const S = globalThis.GF?.fbSessionBg;
+          if (!FC || !S || !groupId || !postId) throw new Error('Thiếu groupId/postId');
+          const actorD = await chrome.storage.local.get('activeActorId');
+          const session = await S.resolveSession({ actorId: actorD.activeActorId });
+          const entry = await FC.getPostAccess({ groupId, postId, session, isTimeline: false, force: true });
+          if (entry?.kind === 'pending' || entry?.kind === 'ok') {
+            await GF_BG.reportOwnPendingApproval(groupId, postId, entry.kind === 'pending');
+          }
+          sendResponse({ ok: true, entry });
+        } catch (e) {
+          sendResponse({ ok: false, error: e.message || 'Check thất bại' });
+        }
         return;
       }
       if (msg.type === 'GF_COMMENT_OWN_POST') {

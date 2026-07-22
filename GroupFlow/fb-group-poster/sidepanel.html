@@ -215,7 +215,7 @@
             </div>
           </div>
           <div id="manualMediaPreview" class="gf-media-thumbs"></div>
-          <p class="hint" id="manualMediaLabel">Ảnh ≤8MB · tối đa 10 ảnh · Video ≤15MB (1 file) · hoặc prompt AI bên dưới</p>
+          <p class="hint" id="manualMediaLabel">Ảnh ≤8MB · tối đa 10 ảnh · Video ≤30MB (1 file) · hoặc prompt AI bên dưới</p>
           <input type="text" id="manualPrompt" class="gf-prompt-input" placeholder="Prompt ảnh AI (nếu chưa có file)…" />
           <label class="switch-row">
             <input type="checkbox" id="manualAutoImage" checked />
@@ -404,11 +404,6 @@
           </div>
           <button type="button" id="btnCheckNow" class="btn sm" title="Check bài chưa duyệt" style="margin-left: auto;">🔍 Check</button>
         </div>
-        <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-weight: 500; color: var(--color-text-primary); padding: 0 16px;">
-          <span>Đã duyệt(<span id="statsApproved">0</span>)</span>
-          <span>Chưa duyệt(<span id="statsPending">0</span>)</span>
-          <span>Chưa check(<span id="statsUnchecked">0</span>)</span>
-        </div>
         <div class="segmented comment-sub-tabs">
           <button type="button" data-comment-sub="mine" class="segmented-btn active">Của tôi <span id="commentSubMineCount"></span></button>
           <button type="button" data-comment-sub="team" class="segmented-btn">Đồng đội <span id="commentSubTeamCount"></span></button>
@@ -417,6 +412,14 @@
           <div id="commentPersonFilterWrap" class="hidden" style="display:contents">
             <input type="text" id="commentFilterPerson" class="gf-select-sm" list="commentFilterPersonList" placeholder="Tìm tên đồng đội…" autocomplete="off" />
             <datalist id="commentFilterPersonList"></datalist>
+          </div>
+          <div id="commentApprovalFilterWrap" style="display:contents">
+            <select id="commentFilterApproval" class="gf-select-sm" title="Lọc theo trạng thái duyệt (chỉ bài của tôi)">
+              <option value="all">Duyệt: Tất cả</option>
+              <option value="ok">✓ Đã duyệt</option>
+              <option value="pending">⏳ Chưa duyệt</option>
+              <option value="unchecked">❔ Chưa check</option>
+            </select>
           </div>
           <select id="commentFilterTemplate" class="gf-select-sm">
             <option value="all">Mẫu bình luận: Tất cả</option>

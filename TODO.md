@@ -1,6 +1,20 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-07-18
+> Cập nhật: 2026-07-22
+
+## GroupFlow v1.0.284-293: fix đăng bài kẹt sau gắn media + đại tu check "bài chờ duyệt" (2026-07-21/22)
+
+Chi tiết từng bản: CHANGELOG.md `[Unreleased]` + [docs/GROUPFLOW.md](docs/GROUPFLOW.md) (khối v1.0.287-293).
+
+- [x] v1.0.284 — fix đăng Cổ điển kẹt sau bước gắn ảnh/video (FB đổi DOM composer: `waitForMediaPreview` + guard node chết `isConnected`).
+- [x] v1.0.285 — nâng giới hạn video 15MB → 30MB.
+- [x] v1.0.286-287 — fix check "chờ duyệt" phán nhầm OK (poll 8s thay chụp innerText 1 phát sau 1.5s) + log chẩn đoán + wipe verdict cũ (schema 3→4).
+- [x] v1.0.288/293 — seed verdict từ server: chặn hồi sinh verdict sai cũ NHƯNG không phá seed sau cài lại (mốc cố định `TRUSTED_VERDICT_SINCE_MS` thay mốc wipe cục bộ).
+- [x] v1.0.289 — backoff check bài pending (20'→2h→6h) + quá 72h ngừng auto-check, chỉ còn check tay.
+- [x] v1.0.290 — luật N ngày kín: lịch comment "đông lạnh" cho bài quá hạn bị bỏ qua êm.
+- [x] v1.0.291-292 — tab Comment "Của tôi" hiện tất cả bài + tag trạng thái + ô lọc "Duyệt:" trong thanh lọc + nút 🔄 Check trên card; lên lịch/Chạy chỉ nhận bài đã duyệt.
+- [x] v1.0.293 — tab check gắn `#gfcheck` + `sweepOrphanCheckTabs()` dọn tab mồ côi khi SW khởi động.
+- [ ] **Cần Tony xác nhận**: đăng bài ảnh/video Cổ điển chạy trơn; bài chờ duyệt không còn lọt vào list comment được; cài lại extension không phải duyệt lại; không còn tab check tồn đọng.
 
 ## Backend + Frontend: phân quyền website (user_websites) + siết CORS (2026-07-15)
 

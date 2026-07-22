@@ -1131,6 +1131,7 @@ if (!GF_CONTENT) GF_CONTENT = {
 
   async finalizeComposerForSubmit(el, lang = 'vi') {
     if (!el) return el;
+    if (!el.isConnected) el = this.findOpenComposerEditor() || el;
     await this.nudgeComposerForSubmit(el);
     let btn = this.findSubmitButton(lang);
     if (btn && !this.isDisabledBtn(btn)) return el;
@@ -1210,6 +1211,13 @@ if (!GF_CONTENT) GF_CONTENT = {
         return ed;
       }
     } catch { /* keep fallback */ }
+    // 2026-07-21 — sau khi gắn media, FB render lại dialog → tham chiếu ô soạn cũ có thể đã bị
+    // tháo khỏi DOM (isConnected=false). Gõ/paste vào node chết là no-op im lặng: cursor vẫn
+    // nhấp nháy, user gõ tay được, còn tool "gõ" mãi không ra chữ rồi kẹt nhiều phút ở vòng chờ
+    // nút Đăng. Báo lỗi rõ để engine retry, thay vì tiếp tục với node chết.
+    if (fallback && !fallback.isConnected) {
+      throw new Error('Ô soạn bài bị FB render lại sau khi gắn media — thử Đăng lại hoặc F5 tab FB');
+    }
     if (fallback) {
       fallback.focus();
       fallback.click();
@@ -1351,7 +1359,12 @@ if (!GF_CONTENT) GF_CONTENT = {
 
   async injectRichText(el, { text, html, classicTextMode = 'hybrid' }) {
     this.checkAborted();
-    const editor = this.assertComposerEditor(el, 'inject');
+    // Node bị FB tháo khỏi DOM (re-render sau khi gắn media) → tìm lại editor thật, đừng gõ vào node chết.
+    let target = el;
+    if (!target?.isConnected) {
+      target = await this.findComposerEditor(8000).catch(() => null);
+    }
+    const editor = this.assertComposerEditor(target, 'inject');
     const TF = globalThis.GF?.textFormat;
     const pack = TF?.prepareClassicPayload?.({ text, htmlFromDelta: html }) || {
       plain: String(text || ''),
@@ -1586,13 +1599,34 @@ if (!GF_CONTENT) GF_CONTENT = {
   async waitForMediaPreview(timeout = 45000) {
     const end = Date.now() + timeout;
     while (Date.now() < end) {
-      const dialog = document.querySelector('[role="dialog"]');
-      const scope = dialog || document;
-      const preview = scope.querySelector(
-        'img[src*="blob:"], img[src*="scontent"], [data-testid*="media"], [aria-label*="Remove"], [aria-label*="Xóa"]',
-      );
-      if (preview) return true;
+      // FB Comet có thể render nhiều [role="dialog"] cùng lúc — quét TẤT CẢ, không chỉ dialog
+      // đầu tiên (cùng bug đã gặp ở findComposerEditor()).
+      const dialogs = this.qsa('[role="dialog"]');
+      const scopes = dialogs.length ? dialogs : [document];
+      for (const scope of scopes) {
+        if (this.mediaPreviewInScope(scope)) return true;
+      }
       await this.sleep(600);
+    }
+    return false;
+  },
+
+  // 2026-07-21 — FB đổi DOM composer: preview video là thẻ <video> (không phải <img>), preview
+  // ảnh có thể render bằng background-image: url(blob:...) trên div, nút xoá media đổi nhãn
+  // "Xóa" → "Gỡ". Selector cũ không khớp cái nào → video chờ đủ 120s rồi ném "Video chưa hiện
+  // preview" dù media ĐÃ gắn thành công, ảnh đốt 60s đứng ở "gắn N ảnh…".
+  mediaPreviewInScope(scope) {
+    if (scope.querySelector(
+      'video, img[src^="blob:"], img[src*="blob:"], img[src*="scontent"], [data-testid*="media"], '
+      + '[aria-label*="Remove"], [aria-label*="Xóa"], [aria-label*="Gỡ"]',
+    )) return true;
+    for (const el of scope.querySelectorAll('div[style*="background-image"]')) {
+      if ((el.getAttribute('style') || '').includes('blob:')) return true;
+    }
+    // Nút "Chỉnh sửa"/"Edit" overlay chỉ xuất hiện đè trên media đã gắn trong composer.
+    for (const btn of scope.querySelectorAll('[role="button"]')) {
+      const t = (btn.textContent || '').trim().toLowerCase();
+      if (t === 'chỉnh sửa' || t === 'edit' || t === 'chỉnh sửa tất cả' || t === 'edit all') return true;
     }
     return false;
   },

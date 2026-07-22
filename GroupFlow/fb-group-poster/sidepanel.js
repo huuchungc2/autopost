@@ -61,6 +61,7 @@ const state = {
   composeCategoryIds: new Set(),
   inlineCategoryPickerPostId: null,
   postedGroupsOpenIds: new Set(),
+  commentFilterApproval: 'all',
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -793,7 +794,7 @@ function readFileAsBase64(file) {
   });
 }
 
-const MEDIA_LIMITS = { image: 8 * 1024 * 1024, video: 15 * 1024 * 1024 };
+const MEDIA_LIMITS = { image: 8 * 1024 * 1024, video: 30 * 1024 * 1024 };
 const MAX_MANUAL_IMAGES = 10;
 
 function manualMediaId() {
@@ -817,7 +818,7 @@ function renderManualMediaPreview() {
   if (!list.length) {
     box.innerHTML = '';
     box.classList.add('empty');
-    if (label) label.textContent = 'Ảnh ≤8MB · tối đa 10 ảnh · Video ≤15MB (1 file) · hoặc prompt AI bên dưới';
+    if (label) label.textContent = 'Ảnh ≤8MB · tối đa 10 ảnh · Video ≤30MB (1 file) · hoặc prompt AI bên dưới';
     return;
   }
   box.classList.remove('empty');
@@ -878,7 +879,7 @@ async function onManualMediaPick(fileList) {
         return;
       }
       const limit = MEDIA_LIMITS.video;
-      if (file.size > limit) return alert('Video tối đa 15MB');
+      if (file.size > limit) return alert('Video tối đa 30MB');
       const base64 = await readFileAsBase64(file);
       state.manualMediaList = [{
         id: manualMediaId(),
@@ -3978,11 +3979,25 @@ const POST_ACCESS_PENDING_TTL_MS = 20 * 60 * 1000;
 // là máy này tự đánh dấu bỏ qua cục bộ (v1.0.267).
 
 // Cache 'ok'/'deleted' coi là bền (không hết hạn); 'pending' (chờ duyệt, hoặc tín hiệu mơ hồ như
-// lỗi mạng/404) chỉ tin trong 20 phút — quá hạn thì coi như "chưa check", không chặn gì cả.
+// lỗi mạng/404) tin theo nhịp backoff — quá hạn thì coi như "chưa check", không chặn gì cả.
+// v1.0.289 — khớp luật backoff/bỏ-cuộc bên fbCommentBg.js (pendingRecheckDelayMs/pendingGaveUp —
+// chép tay vì module chỉ bundle cho service worker): 3 lần đầu 20', lần 4-5 2h, từ lần 6 6h; quá
+// 72h kể từ lần đầu pending → coi luôn là "tươi" (bài đã bỏ-cuộc auto-check, chỉ còn check tay).
+const POST_ACCESS_GIVE_UP_MS = 72 * 60 * 60 * 1000;
 function isPostAccessFresh(entry) {
   if (!entry) return false;
   if (entry.kind !== 'pending') return true;
-  return Date.now() - (entry.checkedAt || 0) < POST_ACCESS_PENDING_TTL_MS;
+  const first = entry.firstPendingAt || entry.checkedAt || 0;
+  if (Date.now() - first > POST_ACCESS_GIVE_UP_MS) return true;
+  const n = entry.checkCount || 1;
+  const ttl = n <= 3 ? POST_ACCESS_PENDING_TTL_MS : (n <= 5 ? 2 * 60 * 60 * 1000 : 6 * 60 * 60 * 1000);
+  return Date.now() - (entry.checkedAt || 0) < ttl;
+}
+
+function isPostAccessGaveUp(entry) {
+  if (!entry || entry.kind !== 'pending') return false;
+  const first = entry.firstPendingAt || entry.checkedAt || 0;
+  return Date.now() - first > POST_ACCESS_GIVE_UP_MS;
 }
 
 // Tách nhóm THẬT SỰ biết chắc chưa comment được (cache còn hạn + canComment:false) ra khỏi nhóm
@@ -4019,6 +4034,27 @@ function splitGroupsByAccess(groups) {
 // vì Facebook không cho non-owner thấy gì để dò. Máy đồng đội chỉ cần tin thẳng: có mặt trong
 // crossPostsCache tức là đã được xác nhận. Bài CỦA CHÍNH MÌNH vẫn giữ nguyên check cục bộ (đáng tin
 // vì chính là chủ bài).
+// v1.0.291 — trạng thái duyệt của bài CỦA MÌNH theo cache check: 'ok' (ít nhất 1 nhóm xác nhận
+// comment được) / 'pending' (chờ duyệt) / 'deleted' (đã xóa) / 'unchecked' (chưa có verdict).
+// Nuôi tag trên card, 3 chip lọc stats, guard lên lịch/Chạy — thiết kế mới của Tony: hiện TẤT CẢ
+// bài ở tab Của tôi kèm trạng thái, thay vì giấu bài chưa-OK như v1.0.224 (sau wipe cache
+// v1.0.287 list trống trơn 28 bài, không biết bài mình đâu).
+function ownPostApprovalState(c) {
+  const validGroups = (c.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
+  if (!validGroups.length) return 'unchecked';
+  let sawPending = false;
+  let sawDeleted = false;
+  for (const g of validGroups) {
+    const entry = state.postAccessCache[String(g.post_id)];
+    if (entry?.kind === 'ok') return 'ok';
+    if (entry?.kind === 'pending') sawPending = true;
+    else if (entry?.kind === 'deleted') sawDeleted = true;
+  }
+  if (sawPending) return 'pending';
+  if (sawDeleted) return 'deleted';
+  return 'unchecked';
+}
+
 function isCommentActionable(c) {
   if (isCommentDone(c)) return true;
   if (c._source === 'cross') {
@@ -4028,12 +4064,7 @@ function isCommentActionable(c) {
     // từng OK đã bị fetchCrossPostsFromServer() gỡ khỏi cache từ tín hiệu server, không tới được đây.
     return Boolean(c.pending_checked_at);
   }
-  const validGroups = (c.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
-  if (!validGroups.length) return false;
-  return validGroups.some((g) => {
-    const entry = state.postAccessCache[String(g.post_id)];
-    return isPostAccessFresh(entry) && entry.canComment === true;
-  });
+  return ownPostApprovalState(c) === 'ok';
 }
 
 // Tag trạng thái "có comment được không" trên card Comment — đọc thẳng state.postAccessCache
@@ -4042,22 +4073,9 @@ function isCommentActionable(c) {
 // v1.0.236 — bài đồng đội (isCross) luôn hiện "✓ Có thể comment" thẳng — không đọc
 // state.postAccessCache (máy này không tự check bài của người khác nữa, xem isCommentActionable()),
 // vì có mặt trong danh sách tức là server đã xác nhận chủ bài confirm OK rồi.
-function commentAccessTagHtml(validGroups, isCross = false) {
-  // 2026-07-15 — Tony: "bỏ phần có thể comment đi vì bài nào comment được mới hiển thị rồi" — từ
-  // v1.0.224/236 danh sách CHỈ hiện bài đã xác nhận comment được (isCommentActionable), nên tag
-  // "✓ Có thể comment" xanh là thừa 100% (mọi bài hiện ra đều mang nó). Bỏ tag xanh ở CẢ 2 nguồn;
-  // GIỮ tag cảnh báo (⏳ Chờ duyệt / ✕ Đã xóa) — vẫn cần cho bài đã-comment-xong (được giữ lại
-  // trong list nhờ isCommentDone) mà sau đó bài gốc chuyển trạng thái xấu.
-  if (isCross) return '';
-  if (!validGroups?.length) return '';
-  const { blocked } = splitGroupsByAccess(validGroups);
-  if (blocked.length) {
-    const entry = state.postAccessCache[String(blocked[0].post_id)];
-    const isDeleted = entry?.kind === 'deleted';
-    return `<span class="tag error" title="${escAttr(blocked[0]._accessReason)}">${isDeleted ? '✕ Đã xóa' : '⏳ Chờ duyệt'}</span>`;
-  }
-  return '';
-}
+// v1.0.291 — bỏ commentAccessTagHtml(): list "Của tôi" giờ hiện TẤT CẢ bài kèm tag trạng thái đầy
+// đủ (⏳/✕/❔ — dựng thẳng trong renderComments() từ ownPostApprovalState()), không còn kiểu chỉ
+// gắn tag cảnh báo cho bài đã-comment-xong như thiết kế giấu-bài cũ.
 
 // Bài đã được comment xong hay chưa — dùng chung cho tag "✓ Đã comment" và filter Bình luận, áp
 // dụng cho cả bài của mình (theo firstCommentOk từng nhóm, ghi bởi markPostedGroupCommented() —
@@ -4371,7 +4389,18 @@ function getFilteredComments() {
   const cat = state.commentFilterCategory || 'all';
   if (cat === 'none') list = list.filter((c) => !itemCategoryIds(c).length);
   else if (cat !== 'all') list = list.filter((c) => itemCategoryIds(c).includes(String(cat)));
-  list = list.filter(isCommentActionable);
+  // v1.0.291 — Tony đổi thiết kế: tab "Của tôi" hiện TẤT CẢ bài (kể cả chưa check/chờ duyệt —
+  // trước đây lọc isCommentActionable giấu sạch, sau wipe cache list trống trơn không biết bài
+  // đâu), lọc theo trạng thái duyệt bằng 3 chip stats (Đã duyệt/Chưa duyệt/Chưa check — bấm để
+  // lọc, bấm lại bỏ lọc). Tab Đồng đội giữ luật cũ: chỉ bài chủ đã confirm OK.
+  if (state.commentSubTab === 'team') {
+    list = list.filter(isCommentActionable);
+  } else {
+    const ap = state.commentFilterApproval || 'all';
+    if (ap === 'ok') list = list.filter((c) => ownPostApprovalState(c) === 'ok');
+    else if (ap === 'pending') list = list.filter((c) => ['pending', 'deleted'].includes(ownPostApprovalState(c)));
+    else if (ap === 'unchecked') list = list.filter((c) => ownPostApprovalState(c) === 'unchecked');
+  }
   return list;
 }
 
@@ -4400,6 +4429,9 @@ function setCommentSubTab(sub) {
     b.classList.toggle('active', b.dataset.commentSub === state.commentSubTab);
   });
   $('#commentPersonFilterWrap')?.classList.toggle('hidden', !commentSubTabHasPersonFilter());
+  // v1.0.291b — ô lọc "Duyệt:" + nút 🔍 Check chỉ có nghĩa với bài CỦA MÌNH — ẩn ở tab Đồng đội.
+  $('#commentApprovalFilterWrap')?.classList.toggle('hidden', state.commentSubTab === 'team');
+  $('#btnCheckNow')?.classList.toggle('hidden', state.commentSubTab === 'team');
   state.commentsPage = 0;
   renderComments();
 }
@@ -4409,6 +4441,8 @@ function bindCommentSubTabs() {
     btn.addEventListener('click', () => setCommentSubTab(btn.dataset.commentSub));
   });
   $('#commentPersonFilterWrap')?.classList.toggle('hidden', !commentSubTabHasPersonFilter());
+  $('#commentApprovalFilterWrap')?.classList.toggle('hidden', state.commentSubTab === 'team');
+  $('#btnCheckNow')?.classList.toggle('hidden', state.commentSubTab === 'team');
 }
 
 // Danh sách tên đồng đội (kèm số bài đang có trong danh sách đã tải) cho filter "Người" ở tab Đồng
@@ -4449,49 +4483,76 @@ function updateCommentSubTabCounts() {
   let mine = 0;
   let team = 0;
   state.comments.forEach((c) => {
-    if (!isCommentActionable(c)) return;
-    if (c._source === 'cross') team += 1;
-    else mine += 1;
+    // v1.0.291 — "Của tôi" giờ hiện TẤT CẢ bài (kể cả chưa check/chờ duyệt) nên đếm hết cho khớp
+    // list; "Đồng đội" giữ luật cũ (chỉ bài chủ confirm OK — isCommentActionable).
+    if (c._source === 'cross') {
+      if (isCommentActionable(c)) team += 1;
+    } else {
+      mine += 1;
+    }
   });
   if (mineEl) mineEl.textContent = mine ? `(${mine})` : '';
   if (teamEl) teamEl.textContent = team ? `(${team})` : '';
 }
 
-// 2026-07-17 — Hiển thị stats duyệt: Đã duyệt(x) | Chưa duyệt(y) | Chưa check(z)
-// "Của tôi" = bài của extension user chỉ hiển thị bài đã duyệt (kind='ok')
-// Update ngay khi cache thay đổi
+// v1.0.291b — Tony chốt lần 2: stats duyệt chuyển hẳn vào ô select "Duyệt:" trong thanh lọc của
+// tab Của tôi (bỏ hàng chip riêng phía trên sub-tabs — trạng thái duyệt chỉ có nghĩa với bài của
+// mình, nằm ngoài cả tab Đồng đội là sai chỗ). Hàm này đổ SỐ ĐẾM vào nhãn từng option
+// (VD "⏳ Chưa duyệt (3)") — gọi lại mỗi khi cache check/list đổi. Đếm theo ownPostApprovalState()
+// (some-ok thắng, giống filter/tag trên card — 'deleted' gộp vào nhóm Chưa duyệt).
 function updateCommentApprovalStats() {
-  const cache = state.postAccessCache || {};
-  let approved = 0;      // kind='ok'
-  let pending = 0;       // kind='pending' or 'manual_pending'
-  let unchecked = 0;     // không có entry trong cache
-
+  const sel = $('#commentFilterApproval');
+  if (!sel) return;
+  let approved = 0;
+  let pending = 0;
+  let unchecked = 0;
   state.comments.forEach((c) => {
-    // Chỉ đếm bài của TÔI (c._source !== 'cross'), không đếm bài đồng đội
     if (c._source === 'cross') return;
-
-    const postId = c.postedGroups?.[0]?.post_id;
-    if (!postId) return;
-
-    const entry = cache[String(postId)];
-    const kind = entry?.kind;
-
-    if (kind === 'ok') {
-      approved += 1;
-    } else if (kind === 'pending' || kind === 'manual_pending') {
-      pending += 1;
-    } else if (!entry) {
-      // Bài chưa check = không có entry
-      unchecked += 1;
-    }
+    const st = ownPostApprovalState(c);
+    if (st === 'ok') approved += 1;
+    else if (st === 'pending' || st === 'deleted') pending += 1;
+    else unchecked += 1;
   });
+  const setLabel = (val, label) => {
+    const opt = sel.querySelector(`option[value="${val}"]`);
+    if (opt) opt.textContent = label;
+  };
+  setLabel('all', `Duyệt: Tất cả (${approved + pending + unchecked})`);
+  setLabel('ok', `✓ Đã duyệt (${approved})`);
+  setLabel('pending', `⏳ Chưa duyệt (${pending})`);
+  setLabel('unchecked', `❔ Chưa check (${unchecked})`);
+  sel.value = state.commentFilterApproval || 'all';
+}
 
-  const approvedEl = $('#statsApproved');
-  const pendingEl = $('#statsPending');
-  const uncheckedEl = $('#statsUnchecked');
-  if (approvedEl) approvedEl.textContent = approved;
-  if (pendingEl) pendingEl.textContent = pending;
-  if (uncheckedEl) uncheckedEl.textContent = unchecked;
+async function forceCheckPendingPost(btn) {
+  if (btn.disabled) return;
+  const postId = btn.dataset.forceCheck;
+  const groupId = btn.dataset.forceCheckGroup;
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Đang check…';
+  try {
+    // Check bằng tab thật — mất ~5-30s (mở tab nền + poll banner, xem checkPostCommentableViaTab)
+    const res = await gfSendMessage({ type: 'GF_FORCE_CHECK_POST', data: { groupId, postId } });
+    if (!res?.ok) throw new Error(res?.error || 'Check thất bại');
+    const d = await chrome.storage.local.get('gf_post_access_cache');
+    state.postAccessCache = d.gf_post_access_cache || {};
+    const kind = res.entry?.kind;
+    if (kind === 'ok') {
+      showToast('✅ Bài đã được duyệt — đã báo server, đồng đội sẽ thấy để comment', 'success', 5000);
+    } else if (kind === 'deleted') {
+      showToast('✕ Bài đã bị xóa hoặc ẩn', 'warn', 5000);
+    } else {
+      showToast('⏳ Bài vẫn đang chờ duyệt', 'info', 4000);
+    }
+    updateCommentApprovalStats();
+    renderComments();
+    updateCommentSubTabCounts();
+  } catch (e) {
+    showToast(`Check thất bại: ${e.message}`, 'error', 5000);
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
 }
 
 // Gõ tự do vào input — khớp chính xác (không phân biệt hoa/thường) thì áp filter ngay; khớp DUY
@@ -4513,6 +4574,12 @@ function bindCommentFilters() {
     const resolved = resolveCommentFilterPersonInput(e.target.value);
     if (resolved === null) return;
     state.commentFilterPerson = resolved;
+    state.commentsPage = 0;
+    renderComments();
+  });
+  // v1.0.291b — ô "Duyệt:" trong thanh lọc (chỉ hiện ở tab Của tôi — xem setCommentSubTab).
+  $('#commentFilterApproval')?.addEventListener('change', (e) => {
+    state.commentFilterApproval = e.target.value;
     state.commentsPage = 0;
     renderComments();
   });
@@ -4587,7 +4654,21 @@ function renderComments() {
         ? `<a class="tag web" href="https://www.facebook.com/${escAttr(c._userFbId)}" target="_blank" rel="noopener noreferrer" title="Mở trang Facebook của ${escAttr(c._userLabel || '')}">👤 ${esc(c._userLabel || 'cross')}</a>`
         : `<span class="tag web" title="Tác giả bài">👤 ${esc(c._userLabel || 'cross')}</span>`)
       : '';
-    const accessTag = commentAccessTagHtml(validGroups, c._source === 'cross');
+    // v1.0.291 — tag trạng thái duyệt cho bài CỦA MÌNH (list giờ hiện tất cả bài): bài OK không
+    // tag gì (trạng thái "bình thường" — đúng ý Tony bỏ tag thừa từ v1.0.224); chưa-OK thì tag rõ
+    // + nút 🔄 Check trên card. Bài pending còn hiện thêm số lần đã check / đã ngừng auto-check.
+    const approvalState = c._source === 'cross' ? 'ok' : ownPostApprovalState(c);
+    const firstEntry = validGroups.length ? state.postAccessCache[String(validGroups[0].post_id)] : null;
+    const gaveUpLabel = approvalState === 'pending' && isPostAccessGaveUp(firstEntry)
+      ? ' · ngừng check tự động' : '';
+    const approvalTag = c._source === 'cross' ? '' : (
+      approvalState === 'pending'
+        ? `<span class="tag pending" title="Bài đang chờ admin nhóm duyệt${gaveUpLabel ? ' — đã quá 72h, chỉ còn check tay' : ''}">⏳ Chờ duyệt${firstEntry?.checkCount ? ` (${firstEntry.checkCount} lần check)` : ''}${gaveUpLabel}</span>`
+        : approvalState === 'deleted'
+          ? '<span class="tag error">✕ Đã xóa/ẩn</span>'
+          : approvalState === 'unchecked'
+            ? '<span class="tag" title="Chưa check — bấm 🔄 Check trên card hoặc nút 🔍 Check chung">❔ Chưa check</span>'
+            : '');
     // Bài đã comment xong không bị lọc mất khỏi danh sách (dù của mình hay đồng đội) — chỉ gắn tag
     // để biết trạng thái, dùng chung isCommentDone() cho cả 2 nguồn.
     const lastCommentedAt = lastCommentedAtLabel(c);
@@ -4621,13 +4702,14 @@ function renderComments() {
         ${crossLabel}
         ${commentedTag}
         <span class="tag">${groupInfo}</span>
-        ${accessTag}
+        ${approvalTag}
         ${commentTemplateTagHtml(c, draft)}
         ${commentScheduleTagHtml(c)}
         ${postedAt ? `<span class="tag" title="Bài gốc đăng lên Facebook lúc này — không đổi theo lịch comment">📌 Đăng ${esc(postedAt)}</span>` : ''}
       </div>
       <div class="row post-actions comment-item-actions">
-        <button type="button" class="btn primary sm" data-run-comment="${escAttr(c.id)}">▶ Chạy</button>
+        <button type="button" class="btn primary sm" data-run-comment="${escAttr(c.id)}" ${c._source !== 'cross' && approvalState !== 'ok' && !isCommentDone(c) ? 'disabled title="Bài chưa xác nhận comment được — bấm 🔄 Check trước"' : ''}>▶ Chạy</button>
+        ${c._source !== 'cross' && approvalState !== 'ok' ? `<button type="button" class="btn ghost sm" data-check-post="${escAttr(c.id)}" title="Check ngay bài này (mở tab nền ~5-30s) — OK thì báo server cho đồng đội thấy">🔄 Check</button>` : ''}
         ${primaryUrl ? `<a class="btn ghost sm" href="${escAttr(primaryUrl)}" target="_blank" rel="noopener noreferrer">Mở bài</a>` : ''}
         ${groupLinks}
       </div>
@@ -4732,11 +4814,29 @@ function renderComments() {
       }
     });
   });
+
+  // v1.0.291 — nút 🔄 Check trên card bài chưa-OK: chọn nhóm đầu tiên chưa có verdict 'ok' rồi
+  // đi chung đường forceCheckPendingPost (GF_FORCE_CHECK_POST — force check + báo server).
+  box.querySelectorAll('[data-check-post]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const c = state.comments.find((x) => x.id === btn.dataset.checkPost);
+      const groups = (c?.postedGroups || []).filter((g) => g.post_id && /^\d+$/.test(String(g.post_id)));
+      const target = groups.find((g) => state.postAccessCache[String(g.post_id)]?.kind !== 'ok') || groups[0];
+      if (!target) return alert('Bài chưa có post_id FB hợp lệ');
+      btn.dataset.forceCheck = String(target.post_id);
+      btn.dataset.forceCheckGroup = String(target.group_id);
+      forceCheckPendingPost(btn);
+    });
+  });
 }
 
 async function runComment(id) {
   const c = state.comments.find((x) => x.id === id);
   if (!c) return;
+  // v1.0.291 — nút Chạy đã disabled trên card chưa-OK, guard lại đây cho chắc (đường gọi khác).
+  if (c._source !== 'cross' && !isCommentDone(c) && ownPostApprovalState(c) !== 'ok') {
+    return alert('Bài chưa xác nhận comment được (chưa check/chờ duyệt) — bấm 🔄 Check trên card trước');
+  }
   // background.js runComment() không còn chặn "job trùng lặp" nữa ở bất kỳ đường nào (v1.0.194 —
   // đẩy bài lặp lại là mục đích chính đáng) nên bấm vào bài đã "✓ Đã comment" SẼ đăng comment thật
   // lần nữa. Xác nhận lại 1 lần ở đây chỉ để tránh đăng trùng ngoài ý muốn do bấm nhầm tay.
@@ -4807,9 +4907,14 @@ function buildRawJobsForOneComment(id, { alertOnEmpty = true } = {}) {
     if (alertOnEmpty) alert('Bài chưa có post_id FB hợp lệ');
     return null;
   }
-  // Không cho LÊN LỊCH nhóm đã biết chắc chưa comment được (chờ duyệt/đã xóa) — khỏi tốn 1 alarm
-  // chỉ để tới giờ lại bị bỏ qua. Nhóm chưa từng check vẫn cho lên lịch bình thường (job thật sẽ tự
-  // check lại lúc chạy — xem runComment()/runCommentOwn(), background.js).
+  // v1.0.291 — Tony chốt: LÊN LỊCH chỉ nhận bài ĐÃ xác nhận comment được. Bài chưa check/chờ duyệt
+  // giờ HIỆN trong list (thiết kế hiện-tất-cả) nhưng bị bỏ qua khi lên lịch — check tay bằng nút
+  // 🔄 Check trên card rồi mới lên lịch. (Đảo luật cũ "nhóm chưa từng check vẫn cho lên lịch, job
+  // tự check lúc chạy" — luật đó hợp với thiết kế giấu-bài, không hợp khi bài chưa check lộ ra.)
+  if (c._source !== 'cross' && !isCommentDone(c) && ownPostApprovalState(c) !== 'ok') {
+    if (alertOnEmpty) alert('Bài chưa xác nhận comment được (chưa check/chờ duyệt) — bấm 🔄 Check trên card trước');
+    return null;
+  }
   const { ready: readyGroups, blocked: blockedGroups } = splitGroupsByAccess(validGroups);
   if (!readyGroups.length) {
     if (alertOnEmpty) alert(`Bài chưa sẵn sàng để lên lịch — ${blockedGroups[0]?._accessReason || 'chưa thể comment'}`);
@@ -4901,8 +5006,12 @@ async function scheduleSelectedComments() {
   const { groups: itemJobGroups, skipped } = collectSelectedCommentJobGroups();
   if (!itemJobGroups.length) {
     return alert(skipped
-      ? `Cả ${skipped} bài đã chọn đều chưa sẵn sàng (chờ duyệt/đã xóa) — không thể lên lịch`
+      ? `Cả ${skipped} bài đã chọn đều chưa sẵn sàng (chưa check/chờ duyệt/đã xóa) — bấm 🔄 Check trên card trước`
       : 'Chọn ít nhất một bài có post_id hợp lệ');
+  }
+  // v1.0.291 — báo rõ số bài bị bỏ qua (chưa check/chờ duyệt) thay vì lên lịch im lặng thiếu bài.
+  if (skipped > 0) {
+    showToast(`Bỏ qua ${skipped} bài chưa xác nhận comment được (chưa check/chờ duyệt)`, 'warn', 5000);
   }
   const input = $('#commentScheduleStart')?.value;
   if (!input) return alert('Chọn ngày giờ bắt đầu ở trên');
@@ -6876,19 +6985,33 @@ function warnSyncFailed(what, status) {
 // check lại từ đầu; bài đã có xác nhận thì dùng lại luôn, không phí công fetch Facebook lần nữa.
 // So sánh mốc thời gian — không ghi đè nếu cache cục bộ đang có SẴN kết quả MỚI HƠN (vd vừa
 // force-check tay xong ngay trước khi sync server chạy).
+// v1.0.293 — v1.0.288 từng so verdict server với mốc `gf_post_access_wiped_at` (thời điểm wipe
+// cache CỤC BỘ) để chặn hồi sinh verdict 'ok' sai do checker lỗi timing cũ tạo — nhưng CÀI LẠI
+// extension cũng tạo mốc wipe mới (storage trống → schema mismatch → wipe ngay lần đọc đầu), làm
+// MỌI verdict server (checked trước lúc cài, đương nhiên) bị từ chối sạch → Tony gỡ/cài lại là
+// toàn bộ bài "Chưa check" phải duyệt lại từ đầu, phá đúng tính năng seed v1.0.253 ("check OK rồi
+// thì thôi, cài lại không phải duyệt lại"). Đổi sang MỐC CỐ ĐỊNH = thời điểm deploy v1.0.287 (fix
+// poll timing của checker): verdict checked TRƯỚC mốc = checker lỗi cũ tạo → bỏ qua (máy tự check
+// lại 1 lần); verdict SAU mốc = checker mới, đáng tin → gieo lại thẳng. Nếu sau này checker lại
+// phải sửa kiểu "mọi verdict cũ đáng ngờ" → cập nhật mốc này cùng lúc bump schema.
+const TRUSTED_VERDICT_SINCE_MS = Date.parse('2026-07-21T13:00:00Z');
+
 async function seedPostAccessCacheFromServerRows(rows) {
   const confirmed = (rows || []).filter((r) => r.post_id && r.pending_checked_at);
   if (!confirmed.length) return;
   const d = await chrome.storage.local.get(['gf_post_access_cache', 'gf_post_access_cache_schema']);
   const cache = d.gf_post_access_cache || {};
-  // 3 — phải khớp POST_ACCESS_CACHE_SCHEMA (modules/fbCommentBg.js). Không import được hằng số đó ở
+  // 4 — phải khớp POST_ACCESS_CACHE_SCHEMA (modules/fbCommentBg.js). Không import được hằng số đó ở
   // đây (module chỉ bundle cho service worker, xem chú thích recheckLicenseStillValid()) nên chép
   // lại giá trị — nhớ đổi theo nếu fbCommentBg.js bump schema lần nữa.
-  const schema = 3;
+  const schema = 4;
   let changed = false;
   for (const r of confirmed) {
     const checkedAtMs = new Date(r.pending_checked_at).getTime();
     if (!Number.isFinite(checkedAtMs)) continue;
+    // Verdict 'ok' của checker cũ (trước mốc tin cậy) → bỏ, check lại bằng checker mới; 'pending'
+    // cũ vẫn seed (hướng an toàn — chỉ ẩn bài, tự hết hạn rồi re-check, không dính vĩnh viễn).
+    if (!r.pending_approval && checkedAtMs < TRUSTED_VERDICT_SINCE_MS) continue;
     const existing = cache[String(r.post_id)];
     if (existing?.checkedAt && existing.checkedAt >= checkedAtMs) continue;
     cache[String(r.post_id)] = {

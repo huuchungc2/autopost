@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GroupFlow — Hướng dẫn cài đặt</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .table-of-contents {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            border-radius: 6px;
+            margin-bottom: 40px;
+        }
+        .table-of-contents h2 {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+        .table-of-contents ol {
+            list-style-position: inside;
+            padding-left: 20px;
+        }
+        .table-of-contents li {
+            margin: 8px 0;
+        }
+        .table-of-contents a {
+            color: #667eea;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .table-of-contents a:hover {
+            text-decoration: underline;
+        }
+        .step {
+            margin-bottom: 50px;
+            scroll-margin-top: 100px;
+        }
+        .step h2 {
+            font-size: 1.8em;
+            color: #667eea;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .step-content {
+            margin-left: 55px;
+        }
+        .step p {
+            margin: 12px 0;
+            font-size: 1em;
+        }
+        .step-image {
+            margin: 25px 0;
+            text-align: center;
+        }
+        .step-image img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .step-image p {
+            margin-top: 10px;
+            font-size: 0.95em;
+            color: #666;
+            font-style: italic;
+        }
+        .note {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .note strong {
+            color: #cc7a00;
+        }
+        .success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .success strong {
+            color: #155724;
+        }
+        .warning {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .warning strong {
+            color: #721c24;
+        }
+        .faq {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 8px;
+            margin-top: 50px;
+        }
+        .faq h2 {
+            color: #667eea;
+            margin-bottom: 25px;
+            font-size: 1.6em;
+        }
+        .faq-item {
+            margin-bottom: 25px;
+            padding-bottom: 25px;
+            border-bottom: 1px solid #ddd;
+        }
+        .faq-item:last-child {
+            border-bottom: none;
+        }
+        .faq-question {
+            font-weight: bold;
+            color: #333;
+            font-size: 1.05em;
+            margin-bottom: 10px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .faq-question:before {
+            content: "▶ ";
+            color: #667eea;
+            margin-right: 8px;
+        }
+        .faq-answer {
+            margin-left: 25px;
+            color: #666;
+            line-height: 1.7;
+        }
+        .footer {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #ddd;
+        }
+        .footer p {
+            margin: 8px 0;
+            color: #666;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            .content, .header {
+                padding: 20px;
+            }
+            .step h2 {
+                font-size: 1.4em;
+            }
+            .step-image {
+                margin: 20px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 GroupFlow v1.0.277</h1>
+            <p>Hướng dẫn cài đặt extension đăng bài Facebook Group</p>
+        </div>
+
+        <div class="content">
+            <div class="table-of-contents">
+                <h2>📋 Mục lục</h2>
+                <ol>
+                    <li><a href="#step1">Tải extension (zip)</a></li>
+                    <li><a href="#step2">Giải nén folder GroupFlow</a></li>
+                    <li><a href="#step3">Vào chrome://extensions → Load unpacked</a></li>
+                    <li><a href="#step4">Nhập License Key từ tidien.xyz</a></li>
+                    <li><a href="#faq">FAQ & Khắc phục sự cố</a></li>
+                </ol>
+            </div>
+
+            <div id="step1" class="step">
+                <h2><span class="step-number">1</span>Tải extension</h2>
+                <div class="step-content">
+                    <p>GroupFlow có thể được tải từ 2 cách:</p>
+                    <p><strong>Cách A (nếu lên Chrome Web Store):</strong></p>
+                    <p>Truy cập Chrome Web Store, tìm "GroupFlow" → bấm "Add to Chrome"</p>
+                    <div class="step-image">
+                        <img src="./images/step1.jpg" alt="Chrome Web Store - GroupFlow">
+                        <p>Hình: Chrome Web Store với GroupFlow v1.0.277</p>
+                    </div>
+
+                    <p><strong>Cách B (Load unpacked từ folder):</strong></p>
+                    <p>Nếu bạn có file groupflow.zip từ tác giả:</p>
+                    <ol style="margin-left: 20px; margin-top: 10px;">
+                        <li>Giải nén file groupflow.zip</li>
+                        <li>Nhớ đường dẫn folder <code>groupflow/fb-group-poster/</code></li>
+                        <li>Tiếp tục bước 2</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div id="step2" class="step">
+                <h2><span class="step-number">2</span>Giải nén folder GroupFlow</h2>
+                <div class="step-content">
+                    <p>Nếu bạn tải qua Cách B (từ zip), bạn cần giải nén folder trước khi load unpacked</p>
+                    <p><strong>Trên Windows:</strong> Bấm chuột phải vào file zip → chọn "Extract All" → chọn vị trí lưu</p>
+                    <p><strong>Trên Mac/Linux:</strong> Double-click file zip → tự động giải nén</p>
+                    <div class="step-image">
+                        <img src="./images/step3.jpg" alt="Giải nén folder">
+                        <p>Hình: Giải nén file zip</p>
+                    </div>
+                    <p>Sau khi giải nén, bạn sẽ có folder: <code>GroupFlow/fb-group-poster/</code> (chứa manifest.json, background.js, v.v.)</p>
+                    <p>Nhớ vị trí folder này — sẽ dùng ở bước 5 (Load unpacked)</p>
+                </div>
+            </div>
+
+            <div id="step3" class="step">
+                <h2><span class="step-number">3</span>Vào chrome://extensions → Load unpacked</h2>
+                <div class="step-content">
+                    <p><strong>Bước 3.1: Mở trang Chrome Extensions</strong></p>
+                    <p>Trong Chrome, nhập vào thanh địa chỉ:</p>
+                    <p><code style="background: #f0f0f0; padding: 5px 10px; border-radius: 4px;">chrome://extensions</code></p>
+                    <p>Hoặc: Menu (⋮) → Công cụ khác → Tiện ích</p>
+                    <div class="step-image">
+                        <img src="./images/step2.jpg" alt="chrome://extensions">
+                        <p>Hình: Trang Tiện ích của Chrome</p>
+                    </div>
+
+                    <p style="margin-top: 25px;"><strong>Bước 3.2: Bật Developer Mode</strong></p>
+                    <p>Ở góc phải trên của trang, bạn sẽ thấy công tắc <strong>"Developer mode"</strong></p>
+                    <p>Bấm công tắc này để <strong>bật Developer mode</strong> (công tắc sẽ chuyển sang xanh)</p>
+                    <div class="step-image">
+                        <img src="./images/step4.jpg" alt="Bật Developer Mode">
+                        <p>🇬🇧 Enable Developer mode | 🇻🇳 Bật chế độ Nhà phát triển (Developer mode)</p>
+                    </div>
+                    <div class="note">
+                        <strong>ℹ️ Lưu ý:</strong> Developer mode cho phép cài đặt extension từ máy tính mà không cần qua Chrome Web Store.
+                    </div>
+
+                    <p style="margin-top: 25px;"><strong>Bước 3.3: Bấm Load unpacked</strong></p>
+                    <p>Sau khi bật Developer mode, 3 nút mới sẽ xuất hiện ở đầu trang:</p>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li><strong>Load unpacked</strong> — cài đặt extension từ folder</li>
+                        <li>Pack extension</li>
+                        <li>Update extensions now</li>
+                    </ul>
+                    <p style="margin-top: 15px;">Bấm nút <strong>"Load unpacked"</strong></p>
+                    <div class="step-image">
+                        <img src="./images/step5.jpg" alt="Load unpacked">
+                        <p>🇬🇧 Click "Load unpacked" button | 🇻🇳 Bấm nút "Load unpacked"</p>
+                    </div>
+
+                    <p style="margin-top: 25px;"><strong>Bước 3.4: Chọn folder fb-group-poster</strong></p>
+                    <p>Một hộp thoại chọn folder sẽ mở ra</p>
+                    <p>Điều hướng tới folder <code>GroupFlow/fb-group-poster/</code> (nơi chứa manifest.json)</p>
+                    <p>Bấm <strong>"Select Folder"</strong> (hoặc tương tự tùy hệ điều hành) → GroupFlow sẽ cài đặt thành công</p>
+                    <div class="success" style="margin: 20px 0;">
+                        <strong>✅ GroupFlow đã cài xong!</strong> Bạn sẽ thấy icon GroupFlow (chữ G xanh) ở góc trên phải Chrome
+                    </div>
+                </div>
+            </div>
+
+            <div id="step4" class="step">
+                <h2><span class="step-number">4</span>Nhập License Key từ tidien.xyz</h2>
+                <div class="step-content">
+                    <p>Để hoạt động đầy đủ, GroupFlow cần License Key từ tidien.xyz</p>
+
+                    <p style="margin-top: 20px;"><strong>Bước 4.1: Đăng nhập tidien.xyz</strong></p>
+                    <p>Truy cập <a href="https://tidien.xyz/user/login" target="_blank">https://tidien.xyz/user/login</a></p>
+                    <p>Nhập Email + Mật khẩu của bạn → bấm "Đăng nhập"</p>
+
+                    <p style="margin-top: 25px;"><strong>Bước 4.2: Lấy License Key</strong></p>
+                    <p>Sau khi đăng nhập, bạn sẽ thấy Dashboard</p>
+                    <p>Tìm mục <strong>"License Key"</strong> → bấm nút <strong>"Copy"</strong> để sao chép key</p>
+
+                    <div class="step-image">
+                        <img src="./images/step5.jpg" alt="Load unpacked + Lấy License Key">
+                        <p>🇬🇧 Load unpacked button + tidien.xyz License Key | 🇻🇳 Nút Load unpacked + Lấy License Key từ tidien.xyz</p>
+                    </div>
+
+                    <p style="margin-top: 25px;"><strong>Bước 4.3: Nhập vào GroupFlow</strong></p>
+                    <p>Quay lại Chrome, bấm icon GroupFlow (ở góc trên phải)</p>
+                    <p>Vào tab "Cài đặt" → "Extension"</p>
+                    <p>Dán License Key vừa copy vào ô "License Key"</p>
+                    <p>Bấm "Xác thực key"</p>
+
+                    <div class="step-image">
+                        <img src="./images/step7.jpg" alt="Nhập License Key vào GroupFlow extension">
+                        <p>🇬🇧 Enter License Key in GroupFlow | 🇻🇳 Nhập License Key vào GroupFlow extension</p>
+                    </div>
+
+                    <div class="success">
+                        <strong>✅ Hoàn thành!</strong> GroupFlow đã sẵn sàng sử dụng. Bạn có thể bắt đầu tạo bài, comment chéo, lên lịch, v.v.
+                    </div>
+                </div>
+            </div>
+
+            <div id="faq" class="faq">
+                <h2>❓ FAQ & Khắc phục sự cố</h2>
+
+                <div class="faq-item">
+                    <div class="faq-question">Làm sao để biết GroupFlow đã cài thành công?</div>
+                    <div class="faq-answer">
+                        Khi cài xong, bạn sẽ thấy icon GroupFlow (chữ "G" xanh) ở góc trên phải Chrome. Bấm vào → panel GroupFlow mở ra với các tab: Tạo bài, Comment, Cài đặt, v.v.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Panel GroupFlow không mở, chỉ thấy icon nhưng bấm không có gì?</div>
+                    <div class="faq-answer">
+                        <strong>Cách 1:</strong> Reload extension — vào chrome://extensions, tìm GroupFlow → bấm icon ↻ (refresh)<br><br>
+                        <strong>Cách 2:</strong> Thử mở Facebook.com trước, rồi bấm icon GroupFlow (extension chỉ hoạt động trên Facebook)<br><br>
+                        <strong>Cách 3:</strong> Mở Console (F12) → Console tab → Tìm lỗi đỏ, báo cho tác giả
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Lỗi "License Key không hợp lệ"?</div>
+                    <div class="faq-answer">
+                        <strong>Kiểm tra:</strong><br>
+                        1. Key có bị cắt (copy dỏm) không? → Copy lại từ tidien.xyz Dashboard<br>
+                        2. Có khoảng trắng thừa không? → Xoá các khoảng trắng đầu/cuối<br>
+                        3. Key đã hết hạn không? → Vào tidien.xyz xem "Hoạt động cuối" — nếu hết hạn, liên hệ tác giả để gia hạn
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Có cách nào xoá/gỡ GroupFlow không?</div>
+                    <div class="faq-answer">
+                        Vào chrome://extensions → Tìm GroupFlow → bấm nút "Remove" (hoặc tương tự) → Xác nhận
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">GroupFlow có hoạt động offline không?</div>
+                    <div class="faq-answer">
+                        <strong>Không.</strong> GroupFlow cần kết nối internet để:<br>
+                        - Đồng bộ bài viết với tidien.xyz<br>
+                        - Gọi API Facebook để đăng bài / comment<br>
+                        - Dùng AI text/image generation<br>
+                        Nếu mất mạng, bạn vẫn có thể tạo bài cục bộ, nhưng không thể đồng bộ hay đăng cho tới khi có mạng trở lại.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Tôi có 5 máy khác nhau, cài GroupFlow trên tất cả được không?</div>
+                    <div class="faq-answer">
+                        <strong>Được.</strong> GroupFlow hỗ trợ multi-device sync — một License Key có thể dùng trên nhiều máy cùng lúc. Bạn sẽ thấy danh sách "Devices" ở tidien.xyz để quản lý.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Có bước nào là nguy hiểm / có thể làm hỏng máy không?</div>
+                    <div class="faq-answer">
+                        <strong>Không.</strong> GroupFlow chỉ là extension Chrome, hoạt động trong trình duyệt. Nó không có quyền:<br>
+                        - Truy cập files hệ thống<br>
+                        - Sửa đổi Windows/macOS/Linux<br>
+                        - Cài đặt phần mềm khác<br>
+                        - Chạy mã độc<br>
+                        An toàn để cài đặt và sử dụng.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>GroupFlow v1.0.277</strong> — Đăng bài Facebook Group + AI + Comment chéo + Lên lịch</p>
+            <p>Hỗ trợ: <a href="https://tidien.xyz" target="_blank">tidien.xyz</a></p>
+            <p style="margin-top: 15px; font-size: 0.9em;">Hướng dẫn cài đặt cập nhật lần cuối: 2026-07-18</p>
+        </div>
+    </div>
+</body>
+</html>
