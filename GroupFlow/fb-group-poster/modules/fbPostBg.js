@@ -169,6 +169,20 @@ const FP = globalThis.GF.fbPostBg = {
     return null;
   },
 
+  // v1.0.295 — lưới bắt id ĐỘC LẬP với schema story_create: dò URL permalink bài trong nhóm chứa
+  // ĐÚNG groupId của ta (`/groups/<gid>/posts/<id>` hoặc `/permalink/<id>`). FB hay đổi tên
+  // field/mutation làm idFromStoryCreate()/idFromRawText() trượt hết → báo "không rõ đã đăng chưa"
+  // dù bài ĐÃ lên; nhưng URL bài thì FB vẫn trả và mang groupId của ta nên không đụng bài người
+  // khác trong feed. Chuẩn hoá `\/` (JSON escape) về `/` trước khi khớp.
+  idFromGroupPermalink(rawText, groupId) {
+    const gid = String(groupId || '');
+    if (!gid) return null;
+    const clean = String(rawText || '').replace(/\\\//g, '/');
+    const m = clean.match(new RegExp(`groups/${gid}/(?:posts|permalink)/(\\d+)`))
+      || clean.match(new RegExp(`/${gid}/(?:posts|permalink)/(\\d+)`));
+    return m?.[1] ? this.normalizePostId(m[1]) : null;
+  },
+
   idFromRawText(rawText) {
     const t = String(rawText || '');
 
@@ -509,7 +523,16 @@ const FP = globalThis.GF.fbPostBg = {
     // post_id TRƯỚC — có post_id thật (bằng chứng cấu trúc, đáng tin hơn hẳn 1 regex match) thì
     // coi là thành công ngay, bỏ qua mọi nghi ngờ critical/auth phía dưới.
     const debugMsgs = [];
-    const postId = this.extractPostId(json, rawText, chunks, (m) => debugMsgs.push(m));
+    let postId = this.extractPostId(json, rawText, chunks, (m) => debugMsgs.push(m));
+    // v1.0.295 — lưới cuối bắt id qua URL permalink chứa đúng groupId của ta (FB đổi schema field
+    // thì idFromStoryCreate trượt, nhưng URL bài vẫn có) → xác nhận SẠCH thay vì rơi vào "không rõ".
+    if (!postId) {
+      const fromUrl = this.idFromGroupPermalink(rawText, groupId);
+      if (fromUrl) {
+        postId = fromUrl;
+        debugMsgs.push(`[DEBUG post_id] method=group_permalink id=${fromUrl}`);
+      }
+    }
     if (debugMsgs.length) {
       globalThis.GF?.bg?.appendEngineLog?.({
         level: 'info', phase: 'post-id-debug', message: debugMsgs.join(' | '),
@@ -517,17 +540,27 @@ const FP = globalThis.GF.fbPostBg = {
       }).catch?.(() => {});
     }
 
+    // v1.0.295 — QUY TẮC CHỐNG TRÙNG CỐT LÕI: story_create mutation ĐÃ GỬI lên FB (qua
+    // graphqlRequest ở trên). Từ điểm này, KHÔNG thể khẳng định FB CHƯA tạo bài — nên MỌI lỗi đều
+    // đánh `ambiguousDelivery` để postGroupItem() KHÔNG fallback Cổ điển (đăng lần 2). Đây chính là
+    // gốc bug Tony gặp lặp lại: response không nhận dạng được / bị coi là "action_blocked"/"soft" →
+    // trước đây fallback Cổ điển → 1 bài lên 2 lần (log chỉ báo 1). Thà báo "không rõ, mở nhóm kiểm
+    // tra" (runPostMatrix ghi posted_uncertain, không retry) còn hơn đăng trùng nhìn như spam.
+    // Fallback Cổ điển giờ CHỈ còn cho lỗi TRƯỚC khi gửi mutation (uploadPhoto/session throw ở trên).
+    const markAmbiguous = (message) => {
+      const e = new Error(message);
+      e.ambiguousDelivery = true;
+      return e;
+    };
+
     const err = postId ? null : this.parseFbErrors(rawText);
     if (err?.critical || err?.auth) {
-      // Log raw text khi gặp lỗi critical/auth (checkpoint, rate limit, session hết hạn...) —
-      // parseFbErrors chỉ match substring rất rộng, nên cần thấy nguyên văn để biết có đúng là
-      // lỗi thật hay match nhầm vào field không liên quan.
       console.warn('[GroupFlow] Fast post critical/auth error:', err.message, '| raw:', rawText.slice(0, 800));
     }
-    if (err?.critical) throw new Error(err.message);
+    if (err?.critical) throw markAmbiguous(err.message);
     if (err?.auth) {
       S.invalidateCache();
-      throw new Error(err.message);
+      throw markAmbiguous(err.message);
     }
 
     const notice = this.parseGraphqlNotice(json, rawText, chunks);
@@ -583,29 +616,25 @@ const FP = globalThis.GF.fbPostBg = {
     }
 
     const storyErr = this.extractStoryCreateError(json, chunks);
-    if (storyErr) throw new Error(storyErr);
-    if (err?.soft) throw new Error(err.message);
+    if (storyErr) throw markAmbiguous(storyErr);
+    if (err?.soft) throw markAmbiguous(err.message);
 
-    // Bug thật đã gặp: Tony báo "bật Cổ điển lên là thấy đã đăng Nhanh rồi nhưng vẫn đăng Cổ điển
-    // tiếp" — request Nhanh có response HTTP sạch (không lỗi mạng/5xx, không bị extractStoryCreateError()
-    // bắt được lỗi rõ ràng), tức FB CÓ THỂ đã tạo bài thật, chỉ là extractPostId()/detectSubmittedWithoutId()
-    // không nhận ra được post_id trong response (nghi do FB đang đổi schema — cùng đợt với lỗi
-    // field_exception gặp song song) — response hạ tầng OK nên fetchWithRetry()/graphqlRequest()
-    // (fbSessionBg.js) không đánh dấu ambiguousDelivery, khiến postGroupItem() (background.js) tưởng
-    // đây là lỗi rõ ràng và tự fallback Cổ điển → đăng trùng thật. "spam/action_blocked" là tín hiệu
-    // FB từ chối rõ ràng (không tạo bài) nên KHÔNG đánh dấu ambiguous; mọi trường hợp còn lại (kể cả
-    // "story_create rỗng" và "không rõ gì cả") đều không thể khẳng định CHƯA tạo bài — đánh dấu
-    // ambiguousDelivery để postGroupItem() không tự fallback, bắt user tự kiểm tra trước khi đăng lại.
+    // v1.0.295 — mutation ĐÃ GỬI mà không nhận dạng được kết quả: LUÔN ambiguous (kể cả khi hint
+    // có "spam"/"action_blocked" — trước đây coi là "chắc chắn từ chối" rồi fallback Cổ điển, nhưng
+    // FB VẪN có thể đã tạo bài rồi mới gắn cờ spam → đăng Cổ điển thành bài thứ 2). Không fallback.
     const hint = this.inspectGraphqlFailure(json, rawText, chunks);
-    console.warn('[GroupFlow] Fast post no post_id', groupId, rawText.slice(0, 600));
-    const isDefiniteReject = /spam|action.?blocked/i.test(hint || '');
-    const failErr = new Error(
+    console.warn('[GroupFlow] Fast post no post_id', groupId, '| raw:', rawText.slice(0, 1200));
+    globalThis.GF?.bg?.appendEngineLog?.({
+      level: 'warn',
+      phase: 'fast-post-no-id',
+      message: `Nhanh không nhận ra post_id (mở nhóm kiểm tra). hint=${hint || 'n/a'} | raw: ${rawText.slice(0, 500)}`,
+      groupId: String(groupId),
+    }).catch?.(() => {});
+    throw markAmbiguous(
       hint
-        ? `FB từ chối hoặc không phản hồi (${hint}) — mở nhóm kiểm tra; thử Cổ điển`
-        : 'Không rõ FB đã tạo bài chưa (response không nhận dạng được) — mở nhóm kiểm tra trước khi đăng lại, tránh đăng trùng',
+        ? `FB không rõ đã tạo bài chưa (${hint}) — mở nhóm kiểm tra, KHÔNG đăng lại kẻo trùng`
+        : 'Không rõ FB đã tạo bài chưa (response không nhận dạng được) — mở nhóm kiểm tra, KHÔNG đăng lại kẻo trùng',
     );
-    if (!isDefiniteReject) failErr.ambiguousDelivery = true;
-    throw failErr;
   },
 
   async postToGroup({ groupId, text, imageBase64, images, mediaMime, actorId, backgroundColor }) {
@@ -615,7 +644,13 @@ const FP = globalThis.GF.fbPostBg = {
       session = await S.resolveSession({ actorId, groupId });
       return await this.createGroupPost({ groupId, text, imageBase64, images, mediaMime, session, backgroundColor });
     } catch (e) {
-      if (e.message?.includes('hết hạn') || e.message?.includes('fb_dtsg') || e.message?.includes('token')) {
+      // v1.0.295 — KHÔNG retry Nhanh nếu lỗi là ambiguous (mutation đã gửi, FB có thể đã tạo bài)
+      // — retry lúc này sẽ upload ảnh + gửi mutation LẦN NỮA = đăng trùng ngay trong postToGroup.
+      // Chỉ retry cho lỗi auth/token XẢY RA TRƯỚC KHI gửi mutation (session resolve/ chưa post gì).
+      if (
+        !e.ambiguousDelivery
+        && (e.message?.includes('hết hạn') || e.message?.includes('fb_dtsg') || e.message?.includes('token'))
+      ) {
         S.invalidateCache();
         session = await S.resolveSession({ force: true, actorId, groupId });
         return await this.createGroupPost({ groupId, text, imageBase64, images, mediaMime, session, backgroundColor });

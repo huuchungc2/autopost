@@ -2,9 +2,22 @@
 
 > Cập nhật: 2026-07-22
 
-## GroupFlow v1.0.284-293: fix đăng bài kẹt sau gắn media + đại tu check "bài chờ duyệt" (2026-07-21/22)
+## Backend: Upload ảnh bài fanpage thất bại khi Cài đặt = Google Drive (2026-07-22)
 
-Chi tiết từng bản: CHANGELOG.md `[Unreleased]` + [docs/GROUPFLOW.md](docs/GROUPFLOW.md) (khối v1.0.287-293).
+Tony hỏi "sao sửa lại upload ảnh không được, VPS thì sao, Drive thì sao". Soi ra bug cũ có sẵn (không phải do đợt vá bảo mật XSS 07-16 gây ra): `upload.js` chọn multer disk/memory storage bằng `isUsingGoogleDrive()` ngay ở module scope — chạy 1 lần lúc import, TRƯỚC `dotenv.config()`/`loadAppSettings()` → luôn ra `false` → multer luôn ghi đĩa bất kể Cài đặt sau đó chọn gì. Khi Cài đặt = Google Drive: route handler tưởng đang Drive, đọc `req.file.buffer` (luôn `undefined` vì multer thực ghi đĩa) → upload lỗi, file rác nằm lại `public/images/`. Local (VPS) không bị ảnh hưởng (trùng hành vi mặc định).
+
+- [x] Fix `upload.js`: `imageUpload` luôn `multer.memoryStorage()`; route handler tự quyết định ghi đĩa hay đẩy Drive ngay trong handler (nơi `isUsingGoogleDrive()` luôn đọc đúng Cài đặt hiện tại mỗi request).
+- [x] Fix `usePostEditor.js` `handleImageUpload()`: trước chỉ `console.error` khi lỗi, không báo UI — giờ gọi `onError()`.
+- [ ] **Cần Tony xác nhận**: restart backend → thử Upload ảnh trong Post Editor ở cả 2 chế độ (Cài đặt → Nơi lưu ảnh = VPS local / Google Drive) đều lưu được và preview đúng.
+
+## GroupFlow v1.0.284-294: fix đăng bài kẹt sau gắn media + mất media/đăng trùng + đại tu check "bài chờ duyệt" (2026-07-21/22)
+
+Chi tiết từng bản: CHANGELOG.md `[Unreleased]` + [docs/GROUPFLOW.md](docs/GROUPFLOW.md).
+
+- [x] v1.0.294 — fix đăng bài MẤT MEDIA (mediaPreviewInScope trả true quá sớm do khớp avatar + nút "Chỉnh sửa") + sổ bền `gf_recent_posts` chống trùng cross-run.
+- [x] v1.0.296 — **BỎ HẲN mode Nhanh khi đăng bài** (Tony chốt — FB đổi schema liên tục, vá 4 vòng không dứt; Cổ điển thấy được bài đã lên ⇒ không trùng) + **fix MẤT MEDIA** (`sendToFb` bóc media khỏi message nhưng `mediaFromBg=false` khi không có pack → content.js bỏ qua khối lấy media → đăng thiếu media im lặng).
+- [x] v1.0.297 — rà lại TOÀN BỘ quy trình đăng bài, vá 2 khe mất media còn lại: (a) bài nhiều ảnh — ảnh 2..N không hề được chờ xác nhận (`waitForMediaPreview` thấy preview ảnh 1 là trả true ngay) → đếm media, chờ số tăng thêm 1 mỗi lần gắn; (b) không ai kiểm lại media ngay trước cú click Đăng (composer có thể bị FB render lại/đổi dialog giữa chừng) → chốt chặn cuối, thiếu media thì huỷ lượt đăng (chưa submit ⇒ không trùng). Chỉ đụng content.js — không rebuild bundle; **phải F5 tab FB** sau khi cập nhật.
+- [x] v1.0.295 — fix ĐĂNG TRÙNG "1 Nhanh + 1 Cổ điển" trong CÙNG lượt (Nhanh đăng OK nhưng response không ra post_id → fallback Cổ điển đăng lại): mutation đã gửi → mọi lỗi ambiguous → KHÔNG fallback Cổ điển; + idFromGroupPermalink bắt id qua URL; + postToGroup không retry khi ambiguous.
 
 - [x] v1.0.284 — fix đăng Cổ điển kẹt sau bước gắn ảnh/video (FB đổi DOM composer: `waitForMediaPreview` + guard node chết `isConnected`).
 - [x] v1.0.285 — nâng giới hạn video 15MB → 30MB.
@@ -14,7 +27,7 @@ Chi tiết từng bản: CHANGELOG.md `[Unreleased]` + [docs/GROUPFLOW.md](docs/
 - [x] v1.0.290 — luật N ngày kín: lịch comment "đông lạnh" cho bài quá hạn bị bỏ qua êm.
 - [x] v1.0.291-292 — tab Comment "Của tôi" hiện tất cả bài + tag trạng thái + ô lọc "Duyệt:" trong thanh lọc + nút 🔄 Check trên card; lên lịch/Chạy chỉ nhận bài đã duyệt.
 - [x] v1.0.293 — tab check gắn `#gfcheck` + `sweepOrphanCheckTabs()` dọn tab mồ côi khi SW khởi động.
-- [ ] **Cần Tony xác nhận**: đăng bài ảnh/video Cổ điển chạy trơn; bài chờ duyệt không còn lọt vào list comment được; cài lại extension không phải duyệt lại; không còn tab check tồn đọng.
+- [ ] **Cần Tony xác nhận**: đăng bài ảnh/video Cổ điển chạy trơn + KHÔNG mất ảnh/video + KHÔNG đăng trùng; bài chờ duyệt không còn lọt vào list comment được; cài lại extension không phải duyệt lại; không còn tab check tồn đọng.
 
 ## Backend + Frontend: phân quyền website (user_websites) + siết CORS (2026-07-15)
 

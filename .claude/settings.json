@@ -22,7 +22,14 @@
       "Bash(node -e ' *)",
       "Bash(node --check src/services/migrationRunner.js)",
       "Bash(grep -rn \"users/.*\\\\/pages\\\\|page_ids\\\\|assigned_pages\" src --include=*.jsx)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(node --check content.js)",
+      "Bash(node --check background.js)",
+      "Bash(node build-sw-bundle.js)",
+      "Bash(node --check modules/swBundle.js)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('manifest.json','utf8'\\)\\); console.log\\('manifest OK'\\)\")",
+      "Bash(node --check src/routes/upload.js)",
+      "Bash(node --check src/hooks/usePostEditor.js)"
     ],
     "defaultMode": "acceptEdits"
   }

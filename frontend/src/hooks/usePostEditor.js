@@ -114,6 +114,7 @@ export default function usePostEditor({ post, pages, initialPageId, active, onSa
       }));
     } catch (err) {
       console.error(err);
+      onError?.(err.response?.data?.error || 'Upload ảnh thất bại');
     } finally {
       setImageUploading(false);
     }

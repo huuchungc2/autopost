@@ -40,17 +40,6 @@ function uniqueBase(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-const imageStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(basePublicDir, 'images');
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${uniqueBase('image')}${IMAGE_EXT_BY_MIME[file.mimetype] || '.png'}`);
-  },
-});
-
 const videoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(basePublicDir, 'videos', 'tmp');
@@ -76,8 +65,14 @@ function videoFileFilter(req, file, cb) {
   cb(null, true);
 }
 
+// Luôn dùng memoryStorage — KHÔNG chọn disk/memory theo isUsingGoogleDrive() ở đây, vì dòng này chạy
+// đúng 1 lần lúc import module (trước cả dotenv.config() và loadAppSettings() trong app.js), nên luôn
+// đọc cache rỗng → luôn ra 'local' bất kể admin đã cấu hình gì trong Cài đặt. Hậu quả: khi Cài đặt chọn
+// Google Drive, multer vẫn ghi ra đĩa (không có req.file.buffer) trong khi route handler bên dưới lại
+// tưởng đang ở chế độ Drive và cố đọc buffer → upload ảnh thất bại. Chọn nơi lưu (đĩa hay Drive) NGAY
+// TRONG route handler, nơi isUsingGoogleDrive() được gọi lại mỗi request nên luôn phản ánh đúng Cài đặt.
 const imageUpload = multer({
-  storage: isUsingGoogleDrive() ? multer.memoryStorage() : imageStorage,
+  storage: multer.memoryStorage(),
   fileFilter: imageFileFilter,
   limits: { fileSize: maxImageUploadMb * 1024 * 1024 },
 });
@@ -109,12 +104,12 @@ router.post('/image', handleUpload(imageUpload.single('image')), async (req, res
       const url = await storeUploadedImage(req.file, { pageId: pageId ? Number(pageId) : null });
       return res.json({ url, storage: 'google_drive' });
     }
-    res.json({ url: `/images/${req.file.filename}`, storage: 'local' });
+    const dir = path.join(basePublicDir, 'images');
+    fs.mkdirSync(dir, { recursive: true });
+    const filename = `${uniqueBase('image')}${IMAGE_EXT_BY_MIME[req.file.mimetype] || '.png'}`;
+    await fs.promises.writeFile(path.join(dir, filename), req.file.buffer);
+    res.json({ url: `/images/${filename}`, storage: 'local' });
   } catch (error) {
-    // Validate fail ở chế độ local: file đã được multer ghi ra đĩa — xoá đi, không để rác/nội dung độc.
-    if (!isUsingGoogleDrive() && req.file?.path) {
-      fs.promises.unlink(req.file.path).catch(() => {});
-    }
     res.status(400).json({ error: error.message });
   }
 });

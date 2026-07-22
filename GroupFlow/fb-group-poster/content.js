@@ -1596,16 +1596,26 @@ if (!GF_CONTENT) GF_CONTENT = {
     throw new Error('Không tìm thấy nút Đăng — nội dung có thể chưa nhận (thử F5 tab FB) hoặc ảnh chưa upload xong');
   },
 
-  async waitForMediaPreview(timeout = 45000) {
+  // FB Comet có thể render nhiều [role="dialog"] cùng lúc — quét TẤT CẢ, không chỉ dialog đầu
+  // tiên (cùng bug đã gặp ở findComposerEditor()). Trả về SỐ media đang gắn (max qua các scope).
+  mediaPreviewCountNow() {
+    const dialogs = this.qsa('[role="dialog"]');
+    const scopes = dialogs.length ? dialogs : [document];
+    let best = 0;
+    for (const scope of scopes) {
+      const n = this.mediaPreviewCount(scope);
+      if (n > best) best = n;
+    }
+    return best;
+  },
+
+  // v1.0.297 — `minCount` là mấu chốt của fix "đăng nhiều ảnh chỉ lên 1 ảnh": trước đây hàm này
+  // chỉ hỏi "có preview nào không", nên từ ảnh thứ 2 trở đi nó thấy preview của ảnh THỨ NHẤT rồi
+  // trả true ngay lập tức — attachMedia() không hề chờ ảnh 2..N được FB nhận.
+  async waitForMediaPreview(timeout = 45000, minCount = 1) {
     const end = Date.now() + timeout;
     while (Date.now() < end) {
-      // FB Comet có thể render nhiều [role="dialog"] cùng lúc — quét TẤT CẢ, không chỉ dialog
-      // đầu tiên (cùng bug đã gặp ở findComposerEditor()).
-      const dialogs = this.qsa('[role="dialog"]');
-      const scopes = dialogs.length ? dialogs : [document];
-      for (const scope of scopes) {
-        if (this.mediaPreviewInScope(scope)) return true;
-      }
+      if (this.mediaPreviewCountNow() >= minCount) return true;
       await this.sleep(600);
     }
     return false;
@@ -1614,21 +1624,36 @@ if (!GF_CONTENT) GF_CONTENT = {
   // 2026-07-21 — FB đổi DOM composer: preview video là thẻ <video> (không phải <img>), preview
   // ảnh có thể render bằng background-image: url(blob:...) trên div, nút xoá media đổi nhãn
   // "Xóa" → "Gỡ". Selector cũ không khớp cái nào → video chờ đủ 120s rồi ném "Video chưa hiện
-  // preview" dù media ĐÃ gắn thành công, ảnh đốt 60s đứng ở "gắn N ảnh…".
-  mediaPreviewInScope(scope) {
-    if (scope.querySelector(
-      'video, img[src^="blob:"], img[src*="blob:"], img[src*="scontent"], [data-testid*="media"], '
-      + '[aria-label*="Remove"], [aria-label*="Xóa"], [aria-label*="Gỡ"]',
-    )) return true;
+  // preview" dù media ĐÃ gắn thành công.
+  //
+  // 2026-07-22 (v1.0.294) — BUG MẤT MEDIA do chính bản v1.0.284: 2 tín hiệu quá RỘNG khiến
+  // mediaPreviewInScope() trả true NGAY khi composer vừa mở, TRƯỚC khi ảnh/video thật kịp gắn →
+  // attachMedia() tưởng "đã có preview" nên gõ chữ + bấm Đăng luôn → bài lên KHÔNG có media:
+  //   (1) `img[src*="scontent"]` khớp AVATAR người đăng (luôn có sẵn trong dialog "Tạo bài viết");
+  //   (2) quét mọi [role=button] có text "Chỉnh sửa"/"Edit" khớp nút "Chỉnh sửa" của bộ chọn đối
+  //       tượng ("Công khai · Chỉnh sửa") — cũng có sẵn trước khi gắn media.
+  //   (`[data-testid*="media"]` cũng bỏ — dễ khớp NÚT "Ảnh/video" thêm media, không phải media đã gắn.)
+  // Chỉ giữ tín hiệu CHẮC CHẮN chỉ xuất hiện SAU khi media thật đã đính: thẻ <video>, ảnh preview
+  // dạng blob: (object URL cục bộ của file vừa chọn — khác avatar https/scontent), và nút GỠ media
+  // đính kèm (aria-label Xóa/Gỡ/Remove — luôn nằm cạnh mỗi ảnh/video đã gắn).
+  //
+  // 2026-07-22 (v1.0.297) — tách thành ĐẾM thay vì chỉ có/không: xem chú thích `minCount` ở
+  // waitForMediaPreview(). Mỗi media đã gắn cho ra ~1 preview (blob img / <video> / div
+  // background-image blob:) VÀ ~1 nút Gỡ, nên lấy max của 2 cách đếm thay vì cộng (cộng sẽ đếm
+  // đôi mỗi item, làm vòng chờ thoát sớm — đúng loại lỗi đang đi vá).
+  mediaPreviewCount(scope) {
+    let blobs = scope.querySelectorAll('video, img[src^="blob:"], img[src*="blob:"]').length;
     for (const el of scope.querySelectorAll('div[style*="background-image"]')) {
-      if ((el.getAttribute('style') || '').includes('blob:')) return true;
+      if ((el.getAttribute('style') || '').includes('blob:')) blobs += 1;
     }
-    // Nút "Chỉnh sửa"/"Edit" overlay chỉ xuất hiện đè trên media đã gắn trong composer.
-    for (const btn of scope.querySelectorAll('[role="button"]')) {
-      const t = (btn.textContent || '').trim().toLowerCase();
-      if (t === 'chỉnh sửa' || t === 'edit' || t === 'chỉnh sửa tất cả' || t === 'edit all') return true;
-    }
-    return false;
+    const removers = scope.querySelectorAll(
+      '[aria-label*="Remove"], [aria-label*="Xóa"], [aria-label*="Gỡ"]',
+    ).length;
+    return Math.max(blobs, removers);
+  },
+
+  mediaPreviewInScope(scope) {
+    return this.mediaPreviewCount(scope) > 0;
   },
 
   async scrollSidebar(maxRounds = 8) {
@@ -1729,7 +1754,7 @@ if (!GF_CONTENT) GF_CONTENT = {
     return false;
   },
 
-  async attachMedia(fileBlob, lang, filename = 'groupflow.png') {
+  async attachMedia(fileBlob, lang, filename = 'groupflow.png', { expectCount = 0 } = {}) {
     const isVideo = (fileBlob.type || '').startsWith('video/');
     const editor = document.querySelector('[role="dialog"] div[data-lexical-editor="true"], [role="dialog"] div[role="textbox"][contenteditable="true"]');
     const dialog = document.querySelector('[role="dialog"]');
@@ -1753,6 +1778,11 @@ if (!GF_CONTENT) GF_CONTENT = {
       throw new Error('Không tìm thấy nút Ảnh/video — mở composer nhóm, F5 trang FB rồi thử lại');
     }
 
+    // Chụp số media ĐANG có TRƯỚC khi gắn — mốc để biết file này có thật sự vào composer không
+    // (ảnh thứ 2..N: composer vốn đã có preview của ảnh trước, không thể dùng "có preview" làm dấu).
+    const baseCount = this.mediaPreviewCountNow();
+    const wantCount = Math.max(expectCount || 0, baseCount + 1);
+
     const dt = new DataTransfer();
     dt.items.add(new File([fileBlob], filename, { type: fileBlob.type || 'image/png' }));
     input.files = dt.files;
@@ -1765,9 +1795,17 @@ if (!GF_CONTENT) GF_CONTENT = {
     // gắn ảnh) — dù được try/catch bắt nên không phá gì (file đã gắn đúng cách ở trên rồi), nó chỉ
     // làm rác Log lỗi của extension, gây nhiễu khi tìm lỗi thật. Bỏ hẳn — không có tác dụng gì.
 
-    const previewOk = await this.waitForMediaPreview(isVideo ? 120000 : 60000);
-    if (!previewOk && isVideo) {
-      throw new Error('Video chưa hiện preview — đợi thêm hoặc thử file nhỏ hơn');
+    const previewOk = await this.waitForMediaPreview(isVideo ? 120000 : 60000, wantCount);
+    // v1.0.294 — ẢNH timeout cũng NÉM lỗi (trước đây chỉ video ném; ảnh cứ đăng tiếp) — nếu ảnh
+    // thật sự chưa gắn (preview không hiện) mà vẫn gõ chữ + bấm Đăng thì bài lên KHÔNG có ảnh. Thà
+    // huỷ lượt đăng này (retry sau) còn hơn đăng bài mất ảnh. Huỷ ở đây là an toàn: chưa hề submit,
+    // nên không tạo bài trùng — postToGroupClassic() ném lên trên, runPostMatrix() bắt theo từng
+    // nhóm rồi đánh 'fail', không đăng gì cả.
+    if (!previewOk) {
+      if (isVideo) throw new Error('Video chưa hiện preview — đợi thêm hoặc thử file nhỏ hơn');
+      throw new Error(wantCount > 1
+        ? `Ảnh thứ ${wantCount} chưa vào composer (mới thấy ${this.mediaPreviewCountNow()}/${wantCount}) — huỷ để tránh đăng thiếu ảnh; thử lại`
+        : 'Ảnh chưa hiện preview trong composer — huỷ để tránh đăng bài mất ảnh; thử lại');
     }
     await this.sleep(isVideo ? 3000 : 1500);
   },
@@ -1908,10 +1946,17 @@ if (!GF_CONTENT) GF_CONTENT = {
       await this.attachMedia(this.base64ToBlob(videoBase64, mime), lang, `groupflow.${ext}`);
     } else if (imgList.length) {
       this.gfProgress('classic-media', `Cổ điển: gắn ${imgList.length} ảnh…`, groupId);
-      for (const img of imgList) {
+      for (let i = 0; i < imgList.length; i += 1) {
+        const img = imgList[i];
         const mime = img.mime || 'image/png';
         const ext = mime.includes('jpeg') ? 'jpg' : mime.split('/')[1] || 'png';
-        await this.attachMedia(this.base64ToBlob(img.base64, mime), lang, `groupflow-${Date.now()}.${ext}`);
+        if (imgList.length > 1) {
+          this.gfProgress('classic-media', `Cổ điển: gắn ảnh ${i + 1}/${imgList.length}…`, groupId);
+        }
+        await this.attachMedia(
+          this.base64ToBlob(img.base64, mime), lang, `groupflow-${Date.now()}.${ext}`,
+          { expectCount: i + 1 },
+        );
         if (imgList.length > 1) await this.sleep(800);
       }
     }
@@ -1937,6 +1982,23 @@ if (!GF_CONTENT) GF_CONTENT = {
       const box = activeBox || textbox;
       await this.injectRichText(box, { text, html: textHtml, classicTextMode: 'paste' });
       activeBox = await this.finalizeComposerForSubmit(box, lang);
+    }
+
+    // v1.0.297 — CHỐT CHẶN CUỐI trước khi bấm Đăng. Giữa lúc gắn media xong và lúc submit còn 3
+    // bước có thể làm rơi media mà không ai kiểm lại: refocusComposerEditor() (FB render lại
+    // dialog), finalizeComposerForSubmit() (có nhánh `el.click()` mở SANG dialog khác —
+    // postToGroupClassic bên dưới thậm chí có sẵn nhánh "chuyển sang dialog — paste lại", tức
+    // chuyện đổi composer là có thật), và vòng paste lại nội dung. Media gắn ở composer CŨ không
+    // đi theo sang composer mới ⇒ bài lên chỉ có chữ, im lặng. Kiểm lại ngay trước cú click là chỗ
+    // rẻ nhất và chắc nhất; huỷ ở đây vẫn an toàn (chưa submit ⇒ không thể trùng bài).
+    if (imgList.length || videoBase64) {
+      const wanted = videoBase64 ? 1 : imgList.length;
+      const seen = this.mediaPreviewCountNow();
+      if (seen < wanted) {
+        throw new Error(seen === 0
+          ? 'Media rơi khỏi composer trước khi Đăng (FB render lại ô soạn) — huỷ để không đăng bài mất media; thử lại'
+          : `Composer chỉ còn ${seen}/${wanted} media trước khi Đăng — huỷ để không đăng thiếu; thử lại`);
+      }
     }
 
     this.gfProgress('classic-submit', 'Cổ điển: bấm Đăng…', groupId);

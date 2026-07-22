@@ -880,13 +880,33 @@ const GF_BG = {
     let outbound = { type, ...payload };
     if (type === 'GF_POST' && classicPost && payload.queuePostId) {
       const pack = await this.getPostMediaPack(payload.queuePostId);
-      if (pack) this._classicMediaCache.set(payload.queuePostId, pack);
-      outbound = {
-        type,
-        ...this.stripMediaFromPayload(payload),
-        queuePostId: payload.queuePostId,
-        mediaFromBg: Boolean(pack),
-      };
+      // v1.0.296 — BUG MẤT MEDIA (Tony: "đăng bài cổ điển không có media"): trước đây LUÔN bóc
+      // media khỏi message (stripMediaFromPayload) rồi chỉ gửi cờ `mediaFromBg` — nhưng khi
+      // getPostMediaPack() KHÔNG tìm thấy pack (media chưa/không nằm trong postMediaStore) thì cờ
+      // = false, mà media inline thì ĐÃ BỊ BÓC → content.js bỏ qua luôn khối lấy media
+      // (`if (postMsg.mediaFromBg && postMsg.queuePostId)`) → đăng bài KHÔNG có ảnh/video, IM LẶNG,
+      // không lỗi nào. Giờ: chỉ bóc khi THẬT SỰ có pack; không có pack thì giữ nguyên media inline
+      // trong message; không có cả 2 mà bài lẽ ra phải có media thì NÉM LỖI thay vì đăng thiếu.
+      if (pack) {
+        this._classicMediaCache.set(payload.queuePostId, pack);
+        outbound = {
+          type,
+          ...this.stripMediaFromPayload(payload),
+          queuePostId: payload.queuePostId,
+          mediaFromBg: true,
+        };
+      } else {
+        const hasInline = Boolean(
+          payload.imageBase64 || payload.videoBase64 || payload.images?.length,
+        );
+        const wantsMedia = hasInline
+          || payload.mediaType === 'image'
+          || payload.mediaType === 'video';
+        if (wantsMedia && !hasInline) {
+          throw new Error('Ảnh/video chưa load được từ kho — Sửa bài, gắn lại media rồi đăng lại (không đăng bài thiếu media)');
+        }
+        outbound = { type, ...payload, mediaFromBg: false };
+      }
     }
     const sendPromise = chrome.tabs.sendMessage(tab.id, outbound);
     const timeoutPromise = new Promise((_, reject) => {
@@ -1461,45 +1481,20 @@ const GF_BG = {
     // bằng Fanpage qua Nhanh không có gì đảm bảo đúng actor. Gọi ngay đầu hàm để cả Nhanh lẫn Cổ
     // điển (fallback bên dưới) đều dùng chung đúng actor đã lưu trong payload.
     await this.preparePostActorCookie(payload.actorId);
-    // Nhanh (GraphQL nền, không mở tab) thử trước — giống hệt cách comment đã làm
-    // (commentOnPostBgOrClassic). Video chưa hỗ trợ upload qua GraphQL nền nên bỏ qua thẳng
-    // sang Cổ điển. Lỗi Nhanh RÕ RÀNG (session hết hạn, FB từ chối kèm response — field_exception,
-    // không có quyền...) mới fallback Cổ điển — 2 cơ chế độc lập nhau nên lỗi rõ bên Nhanh không có
-    // nghĩa Cổ điển cũng lỗi.
+    // v1.0.296 — TONY CHỐT: BỎ HẲN mode Nhanh khi đăng bài, CHỈ dùng Cổ điển.
     //
-    // Bug thật đã gặp: request Nhanh ĐƯỢC FB TẠO BÀI THẬT phía server nhưng response bị rớt trước
-    // khi về tới đây (mất mạng, service worker bị Chrome tạm ngưng giữa request, 5xx tạm thời của
-    // hạ tầng FB...) — graphqlRequest()/fetchWithRetry() (fbSessionBg.js) không thể phân biệt "FB
-    // chưa xử lý" với "FB xử lý rồi nhưng mất phản hồi", nên đánh dấu `e.ambiguousDelivery = true`
-    // cho đúng 2 trường hợp này. Nếu tự fallback Cổ điển như mọi lỗi khác → ĐĂNG TRÙNG THẬT vào
-    // cùng 1 nhóm (Nhanh đã đăng xong, Cổ điển đăng thêm 1 lần nữa) — không lộ ra ngay vì Nhanh
-    // "trông như lỗi" nên không ai để ý bài đã lên. Với lỗi ambiguousDelivery: KHÔNG fallback Cổ
-    // điển, báo lỗi rõ để user tự mở nhóm kiểm tra trước khi đăng lại tay — thà bỏ lỡ 1 lượt đăng
-    // còn hơn đăng trùng nhìn như spam (rủi ro nhóm/tài khoản bị FB gắn cờ).
-    const FP = globalThis.GF?.fbPostBg;
-    const isVideo = payload.mediaType === 'video' || Boolean(payload.videoBase64);
-    if (FP && !isVideo && payload.groupId) {
-      try {
-        const res = await FP.postToGroup({
-          groupId: payload.groupId,
-          text: payload.text,
-          imageBase64: payload.imageBase64,
-          images: payload.images,
-          mediaMime: payload.mediaMime,
-          actorId: payload.actorId,
-          backgroundColor: payload.backgroundColor,
-        });
-        if (res?.postId) return res;
-      } catch (e) {
-        if (e.ambiguousDelivery) {
-          throw new Error(
-            `Không rõ Nhanh đã đăng thành công hay chưa (mất phản hồi từ FB) — mở nhóm kiểm tra trước khi đăng lại, tránh đăng trùng. Chi tiết: ${e.message}`,
-          );
-        }
-        console.warn('[GroupFlow] fast post failed, fallback Classic:', e.message);
-      }
-      if (this.stopRequested) throw new Error('Đã dừng đăng');
-    }
+    // Lý do (bằng chứng thật, lặp lại nhiều lần): Nhanh gửi `story_create` qua GraphQL nền. Khi FB
+    // ĐÃ tạo bài nhưng response không nhận dạng được post_id (FB liên tục đổi schema), code không
+    // có cách nào biết chắc "đã đăng hay chưa" → hoặc fallback Cổ điển (⇒ 1 bài lên 2 lần, log chỉ
+    // báo 1 — đúng ca Tony chụp được), hoặc báo "không rõ, tự mở nhóm kiểm tra" (⇒ phiền, mất tin
+    // cậy). Đã vá nhiều vòng (v1.0.246/287/294/295: ambiguousDelivery, cấm fallback sau khi gửi
+    // mutation, bắt id qua permalink…) nhưng gốc vấn đề không nằm ở ta — nằm ở việc FB đổi response
+    // liên tục. Cổ điển thao tác trên composer thật: chậm hơn nhưng THẤY được bài đã lên hay chưa,
+    // không có cửa "đăng rồi mà tưởng chưa" ⇒ không bao giờ trùng.
+    //
+    // Module `modules/fbPostBg.js` GIỮ NGUYÊN (không xoá) — vẫn dùng cho chỗ khác/để bật lại sau
+    // nếu FB ổn định schema; chỉ luồng ĐĂNG BÀI này không gọi tới nữa.
+    if (this.stopRequested) throw new Error('Đã dừng đăng');
     return this.sendToFb('GF_POST', {
       ...payload,
       postMode: 'classic',
@@ -1580,6 +1575,39 @@ const GF_BG = {
     p.postedGroups = this.mergePostedGroups(p.postedGroups, [groupDetail]);
     p.lastPostedAt = new Date().toISOString();
     await chrome.storage.local.set({ postQueue: queue });
+  },
+
+  // v1.0.294 — Sổ chống đăng trùng BỀN (chrome.storage.local, sống sót qua SW restart) + độc lập
+  // postQueue. Khác postedGroups (chỉ ghi được nếu bài nằm trong postQueue): sổ này LUÔN ghi được,
+  // là lưới an toàn cuối chặn "1 bài đăng 2 lần vào 1 nhóm" do retry lịch/alarm bắn lại/SW chết
+  // giữa job. Key = `<queuePostId>|<groupId>`, value = mốc đăng OK. TTL 20 phút: đủ để chặn mọi
+  // lượt double-run "liên tục" (retry mỗi phút, alarm bắn dồn) mà vẫn cho đăng lại chủ động sau đó
+  // (đăng cùng bài vào cùng nhóm trong <20' gần như luôn là trùng ngoài ý muốn — FB cũng coi là spam).
+  RECENT_POST_TTL_MS: 20 * 60 * 1000,
+
+  recentPostKey(postId, groupId) {
+    return `${String(postId || '')}|${String(groupId || '')}`;
+  },
+
+  async wasRecentlyPosted(postId, groupId) {
+    if (!postId || !groupId) return false;
+    const d = await chrome.storage.local.get('gf_recent_posts');
+    const map = d.gf_recent_posts || {};
+    const ts = map[this.recentPostKey(postId, groupId)];
+    return Boolean(ts) && (Date.now() - ts) < this.RECENT_POST_TTL_MS;
+  },
+
+  async markRecentlyPosted(postId, groupId) {
+    if (!postId || !groupId) return;
+    const d = await chrome.storage.local.get('gf_recent_posts');
+    const map = d.gf_recent_posts || {};
+    const now = Date.now();
+    map[this.recentPostKey(postId, groupId)] = now;
+    // Dọn key quá hạn để map không phình vô hạn.
+    for (const k of Object.keys(map)) {
+      if (now - map[k] > this.RECENT_POST_TTL_MS) delete map[k];
+    }
+    await chrome.storage.local.set({ gf_recent_posts: map });
   },
 
   async markPostedGroupCommented(postQueueId, groupId, ok = true) {
@@ -2141,6 +2169,35 @@ const GF_BG = {
           let res;
           let hadError = false;
           let postedOk = false;
+          // v1.0.294 — CHỐT CHẶN ĐĂNG TRÙNG độc lập với postedGroups. Tony báo "1 bài đăng 2 lần
+          // vào 1 nhóm (1 Nhanh + 1 Cổ điển)": bài đã đăng OK ở 1 lượt nhưng lượt SAU (retry lịch,
+          // alarm bắn lại, service worker restart giữa job, hoặc bài không nằm trong postQueue nên
+          // persistGroupProgress im lặng bỏ qua) vẫn đăng lại. postedGroups không đủ vì phụ thuộc
+          // postQueue + có thể mất khi SW chết. Sổ bền gf_recent_posts theo (post.id|group.id) +
+          // TTL: đã đăng OK trong TTL thì BỎ QUA hẳn (không Nhanh, không Cổ điển). Chỉ ghi khi đăng
+          // THÀNH CÔNG — bài thất bại thật vẫn được retry bình thường.
+          if (await this.wasRecentlyPosted(post.id, group.id)) {
+            done += 1;
+            bumpPostResult(post.id, 'ok');
+            await this.appendHistory({
+              type: 'post',
+              ok: true,
+              group_id: group.id,
+              group_name: group.name,
+              snippet: text.slice(0, 80),
+              error: 'Bỏ qua — bài này vừa đăng vào nhóm này (chống trùng)',
+              mode: 'skip-dup',
+              status: 'skipped_duplicate',
+            });
+            this.emitProgress({
+              phase: 'ok',
+              done,
+              total,
+              group: group.name,
+              snippet: 'Bỏ qua — đã đăng gần đây (chống trùng)',
+            });
+            continue;
+          }
           chrome.runtime.sendMessage({
             type: 'GF_PROGRESS',
             data: {
@@ -2148,7 +2205,7 @@ const GF_BG = {
               done,
               total,
               group: group.name,
-              snippet: 'Đang đăng (Nhanh, dự phòng Cổ điển nếu lỗi)…',
+              snippet: 'Đang đăng (Cổ điển)…',
             },
           }).catch(() => {});
           try {
@@ -2176,6 +2233,59 @@ const GF_BG = {
             if (/đã dừng/i.test(e.message || '')) {
               this.stopRequested = true;
               break;
+            }
+            // v1.0.294 — Nhanh "không rõ đã đăng chưa" (mất phản hồi FB): KHÔNG đánh 'fail' — ghi
+            // nhóm dạng 'posted_uncertain' để resolvePostGroups() LOẠI khỏi lần chạy/ retry sau
+            // (tránh đăng trùng vào nhóm FB có thể đã tạo bài). Đếm là 'pending' (coi như đã xử lý),
+            // cảnh báo user tự mở nhóm kiểm tra.
+            if (e.ambiguousDelivery) {
+              done += 1;
+              hadError = false;
+              const groupDetail = {
+                group_id: String(group.id),
+                group_name: group.name,
+                post_id: 'uncertain',
+                url: this.buildGroupPostUrl(group.id, null),
+                status: 'posted_uncertain',
+                posted_at: new Date().toISOString(),
+                firstCommentOk: null,
+                tidienSynced: false,
+                tidienSyncedAt: null,
+              };
+              this.pushPostedGroupResult(postGroupResults, post.id, groupDetail);
+              await this.persistGroupProgress(post.id, groupDetail);
+              await this.markRecentlyPosted(post.id, group.id);
+              bumpPostResult(post.id, 'pending');
+              await this.appendHistory({
+                type: 'post',
+                ok: true,
+                group_id: group.id,
+                group_name: group.name,
+                post_id: 'uncertain',
+                snippet: text.slice(0, 80),
+                error: e.message,
+                mode: 'fast-bg',
+                status: 'posted_uncertain',
+              });
+              this.emitProgress({
+                phase: 'ok',
+                done,
+                total,
+                group: group.name,
+                snippet: 'Không rõ đã đăng — bỏ qua để tránh trùng, mở nhóm kiểm tra',
+              });
+              postsSincePause = await this.waitAfterPostAttempt({
+                post,
+                settings,
+                postsSincePause,
+                hadError: false,
+                postedOk: true,
+                hasMoreInGroup: gi < groups.length - 1,
+                hasMorePosts: pi < job.posts.length - 1,
+                done,
+                total,
+              });
+              continue;
             }
             hadError = true;
             const rateLimited = /giới hạn tạm thời|rate limit|action_blocked/i.test(e.message || '');
@@ -2279,6 +2389,9 @@ const GF_BG = {
               };
               this.pushPostedGroupResult(postGroupResults, post.id, groupDetail);
               await this.persistGroupProgress(post.id, groupDetail);
+              // v1.0.294 — ghi sổ chống trùng NGAY khi đăng OK (bền, độc lập postQueue) — lượt sau
+              // thấy sổ này thì bỏ qua, không đăng lại nhóm đã xong.
+              await this.markRecentlyPosted(post.id, group.id);
             }
 
             if (postedOk) {

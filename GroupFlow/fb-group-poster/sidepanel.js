@@ -5616,7 +5616,7 @@ function updatePostingConfigSummary() {
   const sec = getSelectedSecurityLevel();
   const textLabel = textMode === 'paste' ? 'Paste cả bài' : 'Hybrid';
   const secLabel = { fast: 'Giãn nhanh', balanced: 'Cân bằng', safe: 'An toàn' }[sec] || sec;
-  el.textContent = `Nhanh → Cổ điển dự phòng · ${textLabel} · ${secLabel}`;
+  el.textContent = `Cổ điển · ${textLabel} · ${secLabel}`;
 }
 
 function updateClassicTextModeUI(mode) {
