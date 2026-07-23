@@ -401,6 +401,16 @@ export async function ensureUserWebsitesTable() {
   await runMigrationFile('049_user_websites.sql', 'Migration 049 applied: user_websites (phân quyền website)');
 }
 
+// GroupFlow chạy trên máy riêng của từng người dùng (Chrome extension, phiên FB của họ) — lỗi xảy
+// ra ở đó không ai ở xa thấy được ngoài xin chụp màn hình tab Nhật ký. Bảng này nhận log Nhật ký
+// (engineLog) gom về từ nút "Gửi log lên server" trong extension, 1 dòng/thiết bị/ngày (UNIQUE
+// device_id+report_date — chặn spam ngay ở DB, xem POST /api/user-sync/log-report).
+export async function ensureGroupflowLogReportsTable() {
+  if (!(await tableExists('users'))) return;
+  if (await tableExists('groupflow_log_reports')) return;
+  await runMigrationFile('050_groupflow_log_reports.sql', 'Migration 050 applied: groupflow_log_reports');
+}
+
 export async function ensureGroupPostDraftsCategory() {
   if (!(await tableExists('group_post_drafts'))) return;
   if (await columnExists('group_post_drafts', 'category_ids')) return;

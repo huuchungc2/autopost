@@ -1596,10 +1596,32 @@ if (!GF_CONTENT) GF_CONTENT = {
     throw new Error('Không tìm thấy nút Đăng — nội dung có thể chưa nhận (thử F5 tab FB) hoặc ảnh chưa upload xong');
   },
 
-  // FB Comet có thể render nhiều [role="dialog"] cùng lúc — quét TẤT CẢ, không chỉ dialog đầu
-  // tiên (cùng bug đã gặp ở findComposerEditor()). Trả về SỐ media đang gắn (max qua các scope).
+  // Dialog nhóm TRƯỚC có thể chưa kịp unmount khỏi DOM khi dialog nhóm SAU đã mở (FB có
+  // transition/unmount trễ hơn sleep(500) ở dismissOpenPostDialog()) — vẫn còn `role="dialog"`,
+  // vẫn "trông giống" composer thật (còn editor node/heading) nên không thể tin chắc offsetParent
+  // hay findComposerInRoot() để loại nó. Coi là "đã đóng" khi: rời DOM, `aria-hidden="true"`, hoặc
+  // display/visibility/kích thước bằng 0 (FB thường set 1 trong các cờ này ngay khi bắt đầu đóng,
+  // trước cả lúc unmount thật).
+  isDialogClosed(el) {
+    if (!el || !el.isConnected) return true;
+    if (el.getAttribute('aria-hidden') === 'true') return true;
+    const s = window.getComputedStyle(el);
+    if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) return true;
+    const r = el.getBoundingClientRect();
+    return r.width <= 0 || r.height <= 0;
+  },
+
+  // 2026-07-23 — HYBRID: bản gốc quét TẤT CẢ [role="dialog"] rồi lấy MAX (vá vụ FB Comet render
+  // nhiều dialog lồng nhau — backdrop/layer — cho CÙNG một composer thật), nhưng dialog nhóm TRƯỚC
+  // sót lại trong DOM bị tính lẫn làm baseCount cho nhóm SAU → báo lỗi ảo "ảnh thứ 3 chưa vào
+  // composer" dù bài chỉ có 1 ảnh. Thử đổi hẳn sang chỉ tin 1 dialog do getGroupPostDialog() chọn —
+  // RỦI RO hơn: nếu nó chọn NHẦM đúng dialog cũ (vẫn còn "trông giống" composer thật lúc đang unmount
+  // dở) thay vì dialog mới đang thao tác thật, coi như mù hẳn trước composer thật ⇒ nguy cơ mất ảnh
+  // thật sự (không chỉ báo lỗi ảo). Hybrid: vẫn quét TẤT CẢ dialog + lấy MAX như bản gốc (an toàn
+  // cho case nhiều dialog cùng 1 composer thật), nhưng LOẠI trước các dialog đã isDialogClosed() —
+  // không còn đủ tin để chọn "đúng 1" dialog, chỉ đủ để loại "chắc chắn đã đóng".
   mediaPreviewCountNow() {
-    const dialogs = this.qsa('[role="dialog"]');
+    const dialogs = this.qsa('[role="dialog"]').filter((d) => !this.isDialogClosed(d));
     const scopes = dialogs.length ? dialogs : [document];
     let best = 0;
     for (const scope of scopes) {

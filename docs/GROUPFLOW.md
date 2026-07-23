@@ -1,5 +1,14 @@
 # GroupFlow — Chrome Extension FB Group
 
+**GroupFlow v1.0.299 + Backend + Frontend — Gom log Nhật ký từ nhiều máy về server để đọc tập trung (2026-07-23):** xem mục "Gửi log Nhật ký lên server" trong phần DB/API bên dưới. Tóm tắt: nút "📤 Gửi log lên server" (tab Log → Nhật ký) đẩy toàn bộ engineLog lên `POST /api/user-sync/log-report` (1 lần/ngày/thiết bị), admin xem tập trung tại trang `/groupflow-logs` (`super_admin`).
+
+**GroupFlow v1.0.298 — Fix lỗi ảo "ảnh thứ N chưa vào composer" cho bài chỉ 1 ảnh khi đăng liên tiếp nhiều nhóm (2026-07-23):**
+
+- **Nguyên nhân**: `mediaPreviewCountNow()` (content.js) quét TẤT CẢ `[role="dialog"]` đang có trên trang rồi lấy MAX (ý định gốc ở v1.0.294 là vá vụ FB Comet render nhiều dialog lồng nhau cho CÙNG một composer). Nhưng dialog composer của NHÓM TRƯỚC không luôn bị gỡ khỏi DOM ngay khi đóng (`dismissOpenPostDialog()` chỉ click nút Đóng rồi `sleep(500)`, không đợi FB thật sự unmount) → ảnh + nút "Gỡ" còn sót của nhóm trước bị tính lẫn làm `baseCount` cho nhóm SAU, dù composer mới chỉ vừa gắn đúng 1 ảnh thật → `wantCount` bị đội sai lên 2-3 → ném lỗi ảo, huỷ oan lượt đăng của nhóm đó.
+- **Bản vá đầu (bỏ) — chỉ tin đúng 1 dialog**: đổi `mediaPreviewCountNow()` sang scope hẳn vào dialog do `getGroupPostDialog()` chọn. Rủi ro hơn bản gốc: nếu nó lỡ chọn NHẦM dialog CŨ (vẫn còn "trông giống" composer thật lúc đang unmount dở — còn editor node, còn heading "Tạo bài viết") thay vì dialog mới đang thao tác thật, coi như mù hẳn trước composer thật ⇒ nguy cơ đăng thiếu ảnh THẬT (không chỉ báo lỗi ảo) — nặng hơn bug đang vá.
+- **Fix chốt — HYBRID**: vẫn quét TẤT CẢ `[role="dialog"]` + lấy MAX như bản gốc (an toàn cho case nhiều dialog cùng 1 composer thật), nhưng loại trước các dialog `isDialogClosed()` — rời DOM (`!el.isConnected`), `aria-hidden="true"`, hoặc display/visibility/kích thước bằng 0 (FB thường set 1 trong các cờ này ngay khi BẮT ĐẦU đóng dialog, trước cả lúc unmount thật ra khỏi DOM). Không đủ tin để chọn "đúng 1" dialog như bản đầu, nhưng đủ để loại "chắc chắn đã đóng" — giữ nguyên khả năng chịu case multi-dialog hợp lệ của bản gốc.
+- Chỉ đụng `content.js` → không rebuild `swBundle.js`; F5 tab FB đang mở sau khi cập nhật.
+
 **GroupFlow v1.0.297 — Rà lại toàn bộ quy trình đăng bài: vá 2 khe hở mất media còn lại (2026-07-22):**
 
 *Đường đi của media (đầy đủ, để lần sau khỏi dò lại):* soạn/import bài → media lưu **IndexedDB** `groupflow-media` (`modules/postMediaStore.js`), `postQueue` trong `chrome.storage.local` chỉ giữ cờ `mediaCached` (`stripForQueue()` — tránh vượt quota) → chạy/lên lịch: `hydratePostsForJob()` (sidepanel.js) nạp base64 vào job → `runPostMatrix()` (background.js) đọc lại bài tươi từ `postQueue`, `PMS.hydratePost()`, và `assertPostMediaReady()` **ném lỗi nếu bài cần media mà kho không có** → `postGroupItem()` → `sendToFb('GF_POST')`: có pack thì bóc media khỏi message + cờ `mediaFromBg: true`, không pack thì GIỮ media inline (fix v1.0.296) → content.js `GF_POST` hỏi ngược `GF_GET_POST_MEDIA` → `postToGroupClassic()` → `attachMedia()` từng file → gõ chữ → `submitPost()`.
@@ -469,6 +478,7 @@ Filter tab **Tất cả nhóm FB**. File: `groupMetaStore.js`, `groupParse.js`, 
 | 040 | `group_post_drafts.is_shared` — thêm index (audit đồng bộ 2026-07-06 — cột này từ migration 026 chưa từng có index, filter eligibility `sync/status`/`drafts/pull` phải quét từng dòng khi shared draft tích luỹ) |
 | 043 | `users.phone` — bắt buộc lúc đăng ký (`POST /user-auth/register`), nullable ở DB (user cũ không có) |
 | 044 | `license_key_devices` — giới hạn số thiết bị/license key theo plan |
+| 050 | `groupflow_log_reports` — log Nhật ký (engineLog) gom từ nhiều máy về server qua nút "Gửi log lên server", `UNIQUE(device_id, report_date)` |
 
 ### Giới hạn thiết bị theo plan + số điện thoại bắt buộc lúc đăng ký (2026-07-10)
 
@@ -500,7 +510,15 @@ Gọi qua `authenticateLicenseKey` (`middleware/licenseAuth.js`), route `backend
 - **Bug đã sửa:** endpoint này JOIN nhầm bảng `user_accounts` — bảng đã bị xoá từ migration 036 — nên lỗi SQL 500 mọi lúc, extension nuốt lỗi (`fetchCrossPostsFromServer()` trả `[]` khi request fail) nên tab Comment âm thầm chỉ còn hiện bài của chính mình từ sau migration 036. Đổi JOIN sang `users`.
 - **Filter Tất cả/Của mình:** 2 nút trong tab Comment, lọc `state.comments` theo `c._source !== 'cross'`.
 - **Lên lịch lặp lại hàng ngày:** ngoài kiểu "1 lần cụ thể" cũ (alarm `gf_cmt_*`, xem mục Comment chéo team bên dưới), thêm kiểu daily — lưu `commentDailySchedules` (`chrome.storage.local`), tick mỗi phút qua alarm `gf_comment_daily` → `GF_BG.tickCommentDailySchedule()` (chạy tối đa 1 job/3 phút toàn cục, mỗi bài 1 lần/ngày trong khung giờ, giống cơ chế `tickGroupImageSchedule`). Nội dung **không** resolve spintax lúc đặt lịch — để `resolveJobComment()` random lại mỗi lần chạy thật.
-- **Log đồng bộ theo license key:** `appendHistory()` gắn `id` ổn định; `pushUnsyncedActivityToServer()`/`pullActivityFromServer()` (`background.js`) chạy trong cùng chu kỳ `syncFromTidien()`, đẩy/kéo `POST|GET /api/user-sync/activity` — mỗi user chỉ thấy log của chính mình (không cross-user như Comment).
+- **Log đồng bộ theo license key:** `appendHistory()` gắn `id` ổn định; `pushUnsyncedActivityToServer()`/`pullActivityFromServer()` (`background.js`) chạy trong cùng chu kỳ `syncFromTidien()`, đẩy/kéo `POST|GET /api/user-sync/activity` — mỗi user chỉ thấy log của chính mình (không cross-user như Comment). Đây là log TÓM TẮT theo post (OK/Error, `error` tối đa 800 ký tự) — khác với "Gửi log lên server" bên dưới (log CHI TIẾT từng bước, đọc để đoán bug).
+
+### Gửi log Nhật ký lên server để đọc tập trung (v1.0.299, 2026-07-23)
+
+GroupFlow chạy trên máy riêng của từng người dùng — lỗi xảy ra ở đó (như bug "ảnh thứ 3 chưa vào composer" ở trên) trước đây không ai ở xa thấy được ngoài xin chụp màn hình tab Nhật ký. Tony chốt thiết kế: gửi THỦ CÔNG (không tự động/định kỳ — máy người dùng, không nên âm thầm đẩy dữ liệu bài/nhóm lên mỗi khi có lỗi vặt), gửi TOÀN BỘ Nhật ký hiện có (không chỉ lọc dòng lỗi — đọc log đoán bug thường cần cả ngữ cảnh các bước trước đó), mỗi thiết bị chỉ gửi được **1 lần/ngày**.
+
+- **Extension**: nút "📤 Gửi log lên server" trong tab Log → Nhật ký (`sidepanel.html`, cạnh "Xóa nhật ký") → `GF_SEND_LOG_REPORT` (background.js) → `sendLogReportToServer()`: lấy toàn bộ `engineLog` (chrome.storage.local, đã tự cap 400 dòng) + `gfDeviceId` (tái dùng chính device id đã có sẵn cho `license_key_devices`, xem mục "Giới hạn thiết bị theo plan" ở trên — cùng 1 giá trị, cùng ý nghĩa "1 máy") + version extension, POST `/api/user-sync/log-report` (license key).
+- **Backend**: `groupflow_log_reports` (migration 050) — 1 dòng/thiết bị/ngày, `UNIQUE(device_id, report_date)` chặn CỨNG spam ngay ở DB (bấm thêm trong ngày → 409 "Máy này đã gửi log hôm nay rồi"). `GET /api/groupflow-logs` + `/:id` (route mới, JWT + `super_admin` — khác hẳn `authenticateLicenseKey` của các route extension khác) cho admin xem danh sách lượt gửi + chi tiết từng dòng log.
+- **Frontend**: trang `/groupflow-logs` ("Log GroupFlow", menu Hệ thống, chỉ `super_admin`) — bảng lượt gửi (người dùng, thiết bị, bản extension, số dòng), bấm "Xem" tải chi tiết (thời gian, cấp độ, nhóm, nội dung, lỗi) từng dòng.
 
 ### Auth extension ↔ backend
 

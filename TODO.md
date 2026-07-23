@@ -1,6 +1,6 @@
 # AutoPost — TODO
 
-> Cập nhật: 2026-07-22
+> Cập nhật: 2026-07-23
 
 ## Backend: Upload ảnh bài fanpage thất bại khi Cài đặt = Google Drive (2026-07-22)
 
@@ -10,10 +10,20 @@ Tony hỏi "sao sửa lại upload ảnh không được, VPS thì sao, Drive th
 - [x] Fix `usePostEditor.js` `handleImageUpload()`: trước chỉ `console.error` khi lỗi, không báo UI — giờ gọi `onError()`.
 - [ ] **Cần Tony xác nhận**: restart backend → thử Upload ảnh trong Post Editor ở cả 2 chế độ (Cài đặt → Nơi lưu ảnh = VPS local / Google Drive) đều lưu được và preview đúng.
 
-## GroupFlow v1.0.284-294: fix đăng bài kẹt sau gắn media + mất media/đăng trùng + đại tu check "bài chờ duyệt" (2026-07-21/22)
+## GroupFlow v1.0.299 + Backend + Frontend: gom log lỗi từ nhiều máy về 1 chỗ (2026-07-23)
+
+Tony hỏi "chạy lỗi mỗi máy làm sao gom về để đọc log đoán lỗi fix?" — chốt: gửi THỦ CÔNG (nút bấm, không tự động), gửi TOÀN BỘ Nhật ký hiện có, mỗi thiết bị chỉ gửi được 1 lần/ngày. Chi tiết CHANGELOG.md `[Unreleased]` + [docs/GROUPFLOW.md](docs/GROUPFLOW.md).
+
+- [x] Backend: migration 050 `groupflow_log_reports` + `ensureGroupflowLogReportsTable()` + wire app.js. `POST /api/user-sync/log-report` (license key) nhận log, UNIQUE(device_id, report_date) chặn spam. `GET /api/groupflow-logs` + `/:id` (JWT, super_admin) cho admin xem.
+- [x] Extension: nút "📤 Gửi log lên server" trong tab Nhật ký (sidepanel) → `sendLogReportToServer()` (background.js).
+- [x] Frontend: trang `/groupflow-logs` ("Log GroupFlow", menu Hệ thống, super_admin) — danh sách lượt gửi + xem chi tiết từng dòng log.
+- [ ] **Cần Tony xác nhận**: restart backend (migration 050 tự chạy) → F5 tab FB (nạp lại content.js/background.js) → mở tab Nhật ký, bấm "Gửi log lên server" → vào website `/groupflow-logs` (đăng nhập super_admin) thấy đúng lượt gửi + xem được chi tiết log; bấm gửi lần 2 trong ngày phải báo lỗi "đã gửi hôm nay".
+
+## GroupFlow v1.0.284-298: fix đăng bài kẹt sau gắn media + mất media/đăng trùng + đại tu check "bài chờ duyệt" (2026-07-21/23)
 
 Chi tiết từng bản: CHANGELOG.md `[Unreleased]` + [docs/GROUPFLOW.md](docs/GROUPFLOW.md).
 
+- [x] v1.0.298 — fix bài CHỈ 1 ẢNH vẫn báo lỗi ảo "ảnh thứ 3 chưa vào composer" khi đăng liên tiếp nhiều nhóm: `mediaPreviewCountNow()` quét mù TẤT CẢ `[role="dialog"]` trên trang (kể cả dialog nhóm trước chưa kịp gỡ khỏi DOM) rồi lấy MAX → đếm lẫn ảnh nhóm trước vào nhóm sau → huỷ oan lượt đăng. Bản HYBRID chốt: vẫn quét tất cả + lấy MAX (an toàn cho case FB render nhiều dialog cùng 1 composer thật) nhưng loại trước dialog đã `isDialogClosed()` (rời DOM/aria-hidden/kích thước 0) — tránh rủi ro của phương án "chỉ tin đúng 1 dialog" (`getGroupPostDialog()`) là có thể chọn nhầm dialog cũ, mù trước composer thật, nguy cơ mất ảnh thật.
 - [x] v1.0.294 — fix đăng bài MẤT MEDIA (mediaPreviewInScope trả true quá sớm do khớp avatar + nút "Chỉnh sửa") + sổ bền `gf_recent_posts` chống trùng cross-run.
 - [x] v1.0.296 — **BỎ HẲN mode Nhanh khi đăng bài** (Tony chốt — FB đổi schema liên tục, vá 4 vòng không dứt; Cổ điển thấy được bài đã lên ⇒ không trùng) + **fix MẤT MEDIA** (`sendToFb` bóc media khỏi message nhưng `mediaFromBg=false` khi không có pack → content.js bỏ qua khối lấy media → đăng thiếu media im lặng).
 - [x] v1.0.297 — rà lại TOÀN BỘ quy trình đăng bài, vá 2 khe mất media còn lại: (a) bài nhiều ảnh — ảnh 2..N không hề được chờ xác nhận (`waitForMediaPreview` thấy preview ảnh 1 là trả true ngay) → đếm media, chờ số tăng thêm 1 mỗi lần gắn; (b) không ai kiểm lại media ngay trước cú click Đăng (composer có thể bị FB render lại/đổi dialog giữa chừng) → chốt chặn cuối, thiếu media thì huỷ lượt đăng (chưa submit ⇒ không trùng). Chỉ đụng content.js — không rebuild bundle; **phải F5 tab FB** sau khi cập nhật.

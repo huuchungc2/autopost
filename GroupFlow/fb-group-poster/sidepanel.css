@@ -1209,7 +1209,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .activity-journal-hint { margin: -4px 0 10px; font-size: 11px; }
-.journal-toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.journal-toolbar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
 .engine-log-list { display: flex; flex-direction: column; gap: 6px; }
 .engine-log-row {
   padding: 8px 10px;

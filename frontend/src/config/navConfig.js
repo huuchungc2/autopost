@@ -16,6 +16,7 @@ import {
   FolderOpen,
   Tag,
   Megaphone,
+  Bug,
 } from 'lucide-react';
 
 export const navGroups = [
@@ -64,6 +65,7 @@ export const navGroups = [
       { to: '/providers', label: 'AI Provider', icon: Cpu, roles: ['super_admin', 'admin'] },
       { to: '/users', label: 'Người dùng', icon: Users, roles: ['super_admin', 'admin'] },
       { to: '/activity', label: 'Nhật ký', icon: History, roles: ['super_admin'] },
+      { to: '/groupflow-logs', label: 'Log GroupFlow', icon: Bug, roles: ['super_admin'] },
       { to: '/notifications', label: 'Thông báo', icon: Bell, roles: ['super_admin', 'admin', 'editor'] },
       { to: '/settings', label: 'Cài đặt', icon: Settings, roles: ['super_admin', 'admin', 'editor'] },
     ],

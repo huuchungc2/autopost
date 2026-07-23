@@ -25,6 +25,7 @@ import WebsiteBlogPostEditor from './pages/WebsiteBlogPostEditor';
 import Providers from './pages/Providers';
 import UserManagement from './pages/UserManagement';
 import ActivityLog from './pages/ActivityLog';
+import GroupflowLogs from './pages/GroupflowLogs';
 import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
 import ChangePassword from './pages/ChangePassword';
@@ -72,6 +73,7 @@ function App() {
             <Route path="providers" element={<Providers />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="activity" element={<ActivityLog />} />
+            <Route path="groupflow-logs" element={<GroupflowLogs />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="settings" element={<Settings />} />
             <Route path="change-password" element={<ChangePassword />} />

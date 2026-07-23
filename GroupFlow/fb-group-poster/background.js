@@ -2988,6 +2988,41 @@ const GF_BG = {
     return { pulled: added };
   },
 
+  // 2026-07-23 — nút "Gửi log lên server" (tab Nhật ký, sidepanel) — GroupFlow chạy trên máy riêng
+  // của từng người dùng, lỗi xảy ra ở đó không ai ở xa thấy được ngoài xin chụp màn hình. Gửi
+  // TOÀN BỘ engineLog hiện có (đã tự cap 400 dòng, xem appendEngineLog()) — không lọc riêng dòng
+  // lỗi, vì đọc log đoán bug thường cần cả ngữ cảnh các bước trước đó, không chỉ đúng dòng báo lỗi.
+  // Chủ động THỦ CÔNG (không tự động/định kỳ) — máy người dùng, không nên âm thầm đẩy dữ liệu
+  // bài/nhóm lên mỗi khi có lỗi vặt. Giới hạn 1 lần/ngày/thiết bị chốt CỨNG ở server (UNIQUE
+  // device_id+report_date, migration 050) — ở đây chỉ trả thẳng lỗi 409 lên UI, không tự chặn
+  // trước (server là nguồn sự thật duy nhất, tránh lệch nếu 2 máy dùng chung storage qua Chrome sync).
+  async sendLogReportToServer() {
+    const auth = await this.getTidienAuth();
+    if (!auth) return { ok: false, error: 'Chưa kích hoạt license key' };
+
+    const d = await chrome.storage.local.get(['engineLog', 'gfDeviceId']);
+    const entries = d.engineLog || [];
+    if (!entries.length) return { ok: false, error: 'Không có log để gửi' };
+
+    let deviceId = d.gfDeviceId;
+    if (!deviceId) {
+      deviceId = crypto.randomUUID();
+      await chrome.storage.local.set({ gfDeviceId: deviceId });
+    }
+
+    const headers = { Authorization: `Bearer ${auth.token}` };
+    try {
+      const data = await this.tidienPostJson(auth, '/api/user-sync/log-report', {
+        device_id: deviceId,
+        extension_version: chrome.runtime.getManifest().version,
+        entries,
+      }, headers);
+      return { ok: true, sent: data.sent || entries.length };
+    } catch (e) {
+      return { ok: false, error: e.message || 'Gửi log thất bại' };
+    }
+  },
+
   /** Hỏi (status) → lấy 1 lô → cập nhật local → nghỉ → hỏi tiếp — trong 1 phiên, không song song */
   async pullCursorSession(auth, headers, {
     kind = 'posts',
@@ -3909,6 +3944,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await chrome.storage.local.set({ engineLog: [] });
         chrome.runtime.sendMessage({ type: 'GF_ENGINE_LOG', data: { cleared: true } }).catch(() => {});
         sendResponse({ ok: true });
+        return;
+      }
+      if (msg.type === 'GF_SEND_LOG_REPORT') {
+        const res = await GF_BG.sendLogReportToServer();
+        sendResponse(res);
         return;
       }
 

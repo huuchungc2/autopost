@@ -317,6 +317,42 @@ router.post('/activity', authenticateLicenseKey, asyncHandler(async (req, res) =
   res.json({ ok: true, inserted });
 }));
 
+// POST /api/user-sync/log-report — extension gửi TOÀN BỘ tab Nhật ký (engineLog cục bộ) lên server
+// qua nút bấm thủ công (không tự động — GroupFlow chạy trên máy riêng của từng người, im lặng đẩy
+// log liên tục sẽ vừa tốn traffic/DB vừa dễ lộ nội dung bài/nhóm không cần thiết mỗi khi có lỗi vặt).
+// Giới hạn CỨNG 1 lần/ngày/thiết bị ngay ở DB (UNIQUE device_id+report_date, migration 050) — bấm
+// thêm trong ngày cùng 1 máy sẽ nhận 409, KHÔNG dựa vào client tự giác không bấm lại.
+router.post('/log-report', authenticateLicenseKey, asyncHandler(async (req, res) => {
+  const { device_id, device_label, extension_version, entries } = req.body;
+  if (!device_id) return res.status(400).json({ error: 'Thiếu device_id' });
+  if (!Array.isArray(entries) || !entries.length) return res.status(400).json({ error: 'Không có log để gửi' });
+
+  const capped = entries.slice(0, 400);
+  const reportDate = new Date().toISOString().slice(0, 10);
+  try {
+    await query(
+      `INSERT INTO groupflow_log_reports
+         (user_id, device_id, device_label, extension_version, entry_count, entries_json, report_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.userAccount.id,
+        String(device_id).slice(0, 64),
+        device_label ? String(device_label).slice(0, 255) : null,
+        extension_version ? String(extension_version).slice(0, 20) : null,
+        capped.length,
+        JSON.stringify(capped),
+        reportDate,
+      ]
+    );
+  } catch (e) {
+    if (e.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Máy này đã gửi log hôm nay rồi — mai gửi tiếp' });
+    }
+    throw e;
+  }
+  res.json({ ok: true, sent: capped.length });
+}));
+
 // GET /api/user-sync/activity — kéo Log/Lịch sử của chính license key này (đa thiết bị), KHÔNG chia sẻ cross-user
 router.get('/activity', authenticateLicenseKey, asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 100, 300);

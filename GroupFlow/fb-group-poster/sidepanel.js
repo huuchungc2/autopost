@@ -6391,6 +6391,28 @@ function bindEvents() {
     }
   });
 
+  // 2026-07-23 — gom log lỗi từ nhiều máy về server để đọc tập trung (thay vì xin từng máy chụp
+  // màn hình tab Nhật ký). Thủ công, không tự động — xem chú thích sendLogReportToServer() (background.js).
+  $('#btnSendLogReport')?.addEventListener('click', async (ev) => {
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    const oldLabel = btn.textContent;
+    btn.textContent = 'Đang gửi…';
+    try {
+      const res = await gfSendMessage({ type: 'GF_SEND_LOG_REPORT' });
+      if (res?.ok) {
+        showToast(`Đã gửi ${res.sent} dòng log lên server`, 'success');
+      } else {
+        showToast(res?.error || 'Gửi log thất bại', 'error');
+      }
+    } catch (e) {
+      showToast(e.message || 'Gửi log thất bại', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = oldLabel;
+    }
+  });
+
   $('#btnTidienSyncNow')?.addEventListener('click', () => runTidienSyncNow());
 
   $('#btnToggleLicenseKey')?.addEventListener('click', () => {
