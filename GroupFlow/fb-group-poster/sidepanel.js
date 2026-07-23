@@ -6401,7 +6401,7 @@ function bindEvents() {
     try {
       const res = await gfSendMessage({ type: 'GF_SEND_LOG_REPORT' });
       if (res?.ok) {
-        showToast(`Đã gửi ${res.sent} dòng log lên server`, 'success');
+        showToast(`Đã gửi ${res.sent} dòng log lỗi lên server`, 'success');
       } else {
         showToast(res?.error || 'Gửi log thất bại', 'error');
       }

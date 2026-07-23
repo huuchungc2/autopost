@@ -518,12 +518,12 @@
         <button type="button" data-sub="history" class="segmented-btn">Lịch sử <span id="historyBadge" class="tab-badge hidden"></span></button>
         <button type="button" data-sub="journal" class="segmented-btn">Nhật ký <span id="journalBadge" class="tab-badge hidden"></span></button>
       </div>
-      <p class="hint activity-journal-hint hidden" id="activityJournalHint">Mọi bước đăng + lỗi chi tiết — bấm "Gửi log lên server" khi báo lỗi (mỗi máy gửi được 1 lần/ngày).</p>
+      <p class="hint activity-journal-hint hidden" id="activityJournalHint">Mọi bước đăng + lỗi chi tiết — bấm "Gửi log lỗi lên server" khi báo lỗi (chỉ gửi các dòng lỗi, mỗi máy gửi được 1 lần/ngày).</p>
       <div id="activityUpcoming" class="list"></div>
       <div id="activityHistory" class="list hidden"></div>
       <div id="activityJournal" class="list hidden">
         <div class="journal-toolbar">
-          <button type="button" id="btnSendLogReport" class="btn ghost sm">📤 Gửi log lên server</button>
+          <button type="button" id="btnSendLogReport" class="btn ghost sm">📤 Gửi log lỗi lên server</button>
           <button type="button" id="btnClearEngineLog" class="btn ghost sm">Xóa nhật ký</button>
         </div>
         <div id="engineLogList" class="engine-log-list"></div>

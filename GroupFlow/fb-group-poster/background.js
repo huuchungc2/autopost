@@ -2988,21 +2988,21 @@ const GF_BG = {
     return { pulled: added };
   },
 
-  // 2026-07-23 — nút "Gửi log lên server" (tab Nhật ký, sidepanel) — GroupFlow chạy trên máy riêng
-  // của từng người dùng, lỗi xảy ra ở đó không ai ở xa thấy được ngoài xin chụp màn hình. Gửi
-  // TOÀN BỘ engineLog hiện có (đã tự cap 400 dòng, xem appendEngineLog()) — không lọc riêng dòng
-  // lỗi, vì đọc log đoán bug thường cần cả ngữ cảnh các bước trước đó, không chỉ đúng dòng báo lỗi.
-  // Chủ động THỦ CÔNG (không tự động/định kỳ) — máy người dùng, không nên âm thầm đẩy dữ liệu
-  // bài/nhóm lên mỗi khi có lỗi vặt. Giới hạn 1 lần/ngày/thiết bị chốt CỨNG ở server (UNIQUE
-  // device_id+report_date, migration 050) — ở đây chỉ trả thẳng lỗi 409 lên UI, không tự chặn
-  // trước (server là nguồn sự thật duy nhất, tránh lệch nếu 2 máy dùng chung storage qua Chrome sync).
+  // 2026-07-23 — nút "Gửi log lỗi lên server" (tab Nhật ký, sidepanel) — GroupFlow chạy trên máy
+  // riêng của từng người dùng, lỗi xảy ra ở đó không ai ở xa thấy được ngoài xin chụp màn hình.
+  // Chỉ gửi các dòng level='error' trong engineLog (Tony chốt: "chỉ cần log lỗi thôi") — không gửi
+  // info/ok, tránh lẫn nhiễu không cần thiết khi đọc log đoán bug. Chủ động THỦ CÔNG (không tự
+  // động/định kỳ) — máy người dùng, không nên âm thầm đẩy dữ liệu bài/nhóm lên mỗi khi có lỗi vặt.
+  // Giới hạn 1 lần/ngày/thiết bị chốt CỨNG ở server (UNIQUE device_id+report_date, migration 050)
+  // — ở đây chỉ trả thẳng lỗi 409 lên UI, không tự chặn trước (server là nguồn sự thật duy nhất,
+  // tránh lệch nếu 2 máy dùng chung storage qua Chrome sync).
   async sendLogReportToServer() {
     const auth = await this.getTidienAuth();
     if (!auth) return { ok: false, error: 'Chưa kích hoạt license key' };
 
     const d = await chrome.storage.local.get(['engineLog', 'gfDeviceId']);
-    const entries = d.engineLog || [];
-    if (!entries.length) return { ok: false, error: 'Không có log để gửi' };
+    const entries = (d.engineLog || []).filter((e) => e.level === 'error');
+    if (!entries.length) return { ok: false, error: 'Không có dòng lỗi nào trong Nhật ký để gửi' };
 
     let deviceId = d.gfDeviceId;
     if (!deviceId) {

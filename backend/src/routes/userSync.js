@@ -317,9 +317,11 @@ router.post('/activity', authenticateLicenseKey, asyncHandler(async (req, res) =
   res.json({ ok: true, inserted });
 }));
 
-// POST /api/user-sync/log-report — extension gửi TOÀN BỘ tab Nhật ký (engineLog cục bộ) lên server
-// qua nút bấm thủ công (không tự động — GroupFlow chạy trên máy riêng của từng người, im lặng đẩy
-// log liên tục sẽ vừa tốn traffic/DB vừa dễ lộ nội dung bài/nhóm không cần thiết mỗi khi có lỗi vặt).
+// POST /api/user-sync/log-report — extension gửi các dòng LỖI (level='error') trong tab Nhật ký
+// (engineLog cục bộ, lọc phía content — xem sendLogReportToServer() background.js) lên server qua
+// nút bấm thủ công (không tự động — GroupFlow chạy trên máy riêng của từng người, im lặng đẩy log
+// liên tục sẽ vừa tốn traffic/DB vừa dễ lộ nội dung bài/nhóm không cần thiết mỗi khi có lỗi vặt).
+// Route này không tự giả định "entries" luôn là lỗi — chỉ lưu nguyên những gì client gửi lên.
 // Giới hạn CỨNG 1 lần/ngày/thiết bị ngay ở DB (UNIQUE device_id+report_date, migration 050) — bấm
 // thêm trong ngày cùng 1 máy sẽ nhận 409, KHÔNG dựa vào client tự giác không bấm lại.
 router.post('/log-report', authenticateLicenseKey, asyncHandler(async (req, res) => {

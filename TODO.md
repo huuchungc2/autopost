@@ -10,14 +10,14 @@ Tony hỏi "sao sửa lại upload ảnh không được, VPS thì sao, Drive th
 - [x] Fix `usePostEditor.js` `handleImageUpload()`: trước chỉ `console.error` khi lỗi, không báo UI — giờ gọi `onError()`.
 - [ ] **Cần Tony xác nhận**: restart backend → thử Upload ảnh trong Post Editor ở cả 2 chế độ (Cài đặt → Nơi lưu ảnh = VPS local / Google Drive) đều lưu được và preview đúng.
 
-## GroupFlow v1.0.299 + Backend + Frontend: gom log lỗi từ nhiều máy về 1 chỗ (2026-07-23)
+## GroupFlow v1.0.299-300 + Backend + Frontend: gom log lỗi từ nhiều máy về 1 chỗ (2026-07-23)
 
-Tony hỏi "chạy lỗi mỗi máy làm sao gom về để đọc log đoán lỗi fix?" — chốt: gửi THỦ CÔNG (nút bấm, không tự động), gửi TOÀN BỘ Nhật ký hiện có, mỗi thiết bị chỉ gửi được 1 lần/ngày. Chi tiết CHANGELOG.md `[Unreleased]` + [docs/GROUPFLOW.md](docs/GROUPFLOW.md).
+Tony hỏi "chạy lỗi mỗi máy làm sao gom về để đọc log đoán lỗi fix?" — chốt: gửi THỦ CÔNG (nút bấm, không tự động), CHỈ gửi các dòng lỗi (v1.0.300, sau khi Tony chốt lại "chỉ cần log lỗi thôi" — v1.0.299 ban đầu gửi toàn bộ Nhật ký), mỗi thiết bị chỉ gửi được 1 lần/ngày. Chi tiết CHANGELOG.md `[Unreleased]` + [docs/GROUPFLOW.md](docs/GROUPFLOW.md).
 
 - [x] Backend: migration 050 `groupflow_log_reports` + `ensureGroupflowLogReportsTable()` + wire app.js. `POST /api/user-sync/log-report` (license key) nhận log, UNIQUE(device_id, report_date) chặn spam. `GET /api/groupflow-logs` + `/:id` (JWT, super_admin) cho admin xem.
-- [x] Extension: nút "📤 Gửi log lên server" trong tab Nhật ký (sidepanel) → `sendLogReportToServer()` (background.js).
+- [x] Extension: nút "📤 Gửi log lỗi lên server" trong tab Nhật ký (sidepanel) → `sendLogReportToServer()` (background.js) — lọc `level === 'error'` trước khi gửi (v1.0.300).
 - [x] Frontend: trang `/groupflow-logs` ("Log GroupFlow", menu Hệ thống, super_admin) — danh sách lượt gửi + xem chi tiết từng dòng log.
-- [ ] **Cần Tony xác nhận**: restart backend (migration 050 tự chạy) → F5 tab FB (nạp lại content.js/background.js) → mở tab Nhật ký, bấm "Gửi log lên server" → vào website `/groupflow-logs` (đăng nhập super_admin) thấy đúng lượt gửi + xem được chi tiết log; bấm gửi lần 2 trong ngày phải báo lỗi "đã gửi hôm nay".
+- [ ] **Cần Tony xác nhận**: restart backend (migration 050 tự chạy) → F5 tab FB (nạp lại content.js/background.js) → mở tab Nhật ký, bấm "Gửi log lỗi lên server" → vào website `/groupflow-logs` (đăng nhập super_admin) thấy đúng lượt gửi + xem được chi tiết log; bấm gửi lần 2 trong ngày phải báo lỗi "đã gửi hôm nay".
 
 ## GroupFlow v1.0.284-298: fix đăng bài kẹt sau gắn media + mất media/đăng trùng + đại tu check "bài chờ duyệt" (2026-07-21/23)
 
